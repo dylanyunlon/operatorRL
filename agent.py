@@ -172,10 +172,14 @@ class DoerAgent:
         self.agent_model = os.getenv("AGENT_MODEL", "gpt-4o-mini")
     
     def execute_tool(self, tool_name: str, *args) -> str:
-        """Execute a tool by name."""
-        if hasattr(self.tools, tool_name):
+        """Execute a tool by name with error handling."""
+        if not hasattr(self.tools, tool_name):
+            return f"Error: Tool '{tool_name}' not found"
+        
+        try:
             return getattr(self.tools, tool_name)(*args)
-        return f"Error: Tool '{tool_name}' not found"
+        except Exception as e:
+            return f"Error executing tool '{tool_name}': {str(e)}"
     
     def act(self, query: str, user_id: Optional[str] = None) -> str:
         """

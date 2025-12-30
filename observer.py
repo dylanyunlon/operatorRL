@@ -55,6 +55,12 @@ class ObserverAgent:
         # Load checkpoint
         self.checkpoint = self._load_checkpoint()
     
+    def _extract_user_id(self, event: TelemetryEvent) -> Optional[str]:
+        """Extract user_id from event metadata."""
+        if event.metadata and isinstance(event.metadata, dict):
+            return event.metadata.get("user_id")
+        return None
+    
     def _load_checkpoint(self) -> Dict[str, Any]:
         """Load the last processing checkpoint."""
         if os.path.exists(self.checkpoint_file):
@@ -218,10 +224,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         
         # Update prioritization framework with safety correction
         if self.enable_prioritization:
-            # Extract user_id from event metadata if available
-            user_id = None
-            if event.metadata and isinstance(event.metadata, dict):
-                user_id = event.metadata.get("user_id")
+            user_id = self._extract_user_id(event)
             
             self.prioritization.learn_from_failure(
                 query=event.query,
@@ -274,10 +277,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         for event in events:
             # Learn user preferences from feedback
             if self.enable_prioritization and event.user_feedback:
-                # Extract user_id from event metadata if available
-                user_id = None
-                if event.metadata and isinstance(event.metadata, dict):
-                    user_id = event.metadata.get("user_id")
+                user_id = self._extract_user_id(event)
                 
                 if user_id:
                     self.prioritization.learn_user_preference(

@@ -103,6 +103,9 @@ class PrioritizationFramework:
     - Global Wisdom: Generic best practices
     """
     
+    # Configuration constants
+    MIN_KEYWORD_OVERLAP = 2  # Minimum matching words for relevance
+    
     def __init__(self,
                  safety_db_file: str = "safety_corrections.json",
                  preferences_db_file: str = "user_preferences.json",
@@ -264,8 +267,9 @@ class PrioritizationFramework:
             if user_id and correction.user_id and correction.user_id != user_id:
                 continue
             
-            # TODO: In a real implementation, use semantic similarity (e.g., embeddings)
-            # to match query with task_pattern. For now, use simple keyword matching.
+            # Note: In production, use semantic similarity (e.g., embeddings) to match
+            # query with task_pattern. This simple keyword matching is a placeholder.
+            # See PRIORITIZATION_FRAMEWORK.md for future enhancement details.
             query_lower = query.lower()
             pattern_lower = correction.task_pattern.lower()
             
@@ -274,7 +278,7 @@ class PrioritizationFramework:
             pattern_words = set(pattern_lower.split())
             overlap = len(query_words & pattern_words)
             
-            if overlap >= 2 or any(word in query_lower for word in pattern_words):
+            if overlap >= self.MIN_KEYWORD_OVERLAP or any(word in query_lower for word in pattern_words):
                 # Format the safety warning
                 urgency = "CRITICAL" if correction.occurrences > 2 else "WARNING"
                 warning = (
@@ -356,16 +360,15 @@ class PrioritizationFramework:
         Extract safety corrections from failure critique.
         
         This is called by the Observer when it detects a failure.
+        
+        Note: In production, use LLM to extract structured failure information.
+        This simple heuristic extraction is a placeholder.
+        See PRIORITIZATION_FRAMEWORK.md for future enhancement details.
         """
         if verbose:
             print(f"\n[PRIORITIZATION] Learning from failure on: {query}")
         
-        # In a real implementation, use LLM to extract structured failure info
-        # For now, use a simple heuristic
-        
         # Extract key information from critique
-        # Assume critique mentions what went wrong and what should be done
-        
         task_pattern = query[:100]  # Use query as task pattern
         failure_description = critique[:200]  # First part of critique
         
@@ -405,12 +408,13 @@ class PrioritizationFramework:
         Extract user preferences from feedback.
         
         This is called when user provides feedback on agent behavior.
+        
+        Note: In production, use LLM to extract structured preferences.
+        This pattern-based extraction is a placeholder for common cases.
+        See PRIORITIZATION_FRAMEWORK.md for future enhancement details.
         """
         if verbose:
             print(f"\n[PRIORITIZATION] Learning user preference from feedback")
-        
-        # In a real implementation, use LLM to extract structured preferences
-        # For now, detect common preference patterns
         
         feedback_lower = user_feedback.lower()
         

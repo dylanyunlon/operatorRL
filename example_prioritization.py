@@ -16,6 +16,11 @@ from prioritization import PrioritizationFramework
 load_dotenv()
 
 
+def check_api_key_available() -> bool:
+    """Check if API key is available."""
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
 def setup_prioritization_demo():
     """Set up the prioritization framework with demo data."""
     print("="*60)
@@ -141,7 +146,7 @@ def demo_with_doer_agent():
     """Demonstrate DoerAgent with prioritization."""
     
     # Check for API key
-    if not os.getenv("OPENAI_API_KEY"):
+    if not check_api_key_available():
         print("\n" + "="*60)
         print("SKIPPING DOER AGENT DEMO")
         print("="*60)
@@ -184,7 +189,7 @@ def demo_with_observer_agent():
     """Demonstrate ObserverAgent learning with prioritization."""
     
     # Check for API key
-    if not os.getenv("OPENAI_API_KEY"):
+    if not check_api_key_available():
         print("\n" + "="*60)
         print("SKIPPING OBSERVER AGENT DEMO")
         print("="*60)
@@ -224,7 +229,7 @@ def main():
     demo_prioritized_context()
     
     # Demo 2 & 3: Agent integration (requires API key)
-    if os.getenv("OPENAI_API_KEY"):
+    if check_api_key_available():
         demo_with_doer_agent()
         demo_with_observer_agent()
     else:

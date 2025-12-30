@@ -441,7 +441,7 @@ python example_prioritization.py
 - **Time Complexity**: O(n) for safety correction matching (where n = number of corrections in window)
 - **Space Complexity**: Bounded by time window for safety corrections
 - **Storage**: JSON-based for simplicity; can be replaced with database for scale
-- **Caching**: Framework loads databases on init; considers adding caching for high-throughput scenarios
+- **Caching**: Framework loads databases on init; consider adding caching for high-throughput scenarios
 
 ## License
 
