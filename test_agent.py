@@ -5,6 +5,7 @@ Tests the core components and structure of the agent.
 
 import json
 import os
+import tempfile
 from agent import MemorySystem, AgentTools
 
 
@@ -12,36 +13,41 @@ def test_memory_system():
     """Test the memory system."""
     print("Testing MemorySystem...")
     
-    # Create a test memory file
-    test_file = "/tmp/test_instructions.json"
+    # Create a test memory file using tempfile for cross-platform compatibility
+    test_file = os.path.join(tempfile.gettempdir(), 'test_instructions_temp.json')
     
-    # Test initialization with new file
-    memory = MemorySystem(test_file)
-    assert memory.instructions is not None
-    assert "instructions" in memory.instructions
-    print("✓ Memory initialization works")
-    
-    # Test getting system prompt
-    prompt = memory.get_system_prompt()
-    assert isinstance(prompt, str)
-    assert len(prompt) > 0
-    print("✓ Get system prompt works")
-    
-    # Test updating instructions
-    memory.update_instructions("New instructions", "Test critique")
-    assert memory.instructions["version"] == 2
-    assert len(memory.instructions["improvements"]) == 1
-    print("✓ Update instructions works")
-    
-    # Test persistence
-    memory2 = MemorySystem(test_file)
-    assert memory2.instructions["version"] == 2
-    assert memory2.instructions["instructions"] == "New instructions"
-    print("✓ Instructions persistence works")
-    
-    # Cleanup
+    # Remove if exists from previous test
     if os.path.exists(test_file):
         os.remove(test_file)
+    
+    try:
+        # Test initialization with new file (doesn't exist yet)
+        memory = MemorySystem(test_file)
+        assert memory.instructions is not None
+        assert "instructions" in memory.instructions
+        print("✓ Memory initialization works")
+        
+        # Test getting system prompt
+        prompt = memory.get_system_prompt()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 0
+        print("✓ Get system prompt works")
+        
+        # Test updating instructions
+        memory.update_instructions("New instructions", "Test critique")
+        assert memory.instructions["version"] == 2
+        assert len(memory.instructions["improvements"]) == 1
+        print("✓ Update instructions works")
+        
+        # Test persistence
+        memory2 = MemorySystem(test_file)
+        assert memory2.instructions["version"] == 2
+        assert memory2.instructions["instructions"] == "New instructions"
+        print("✓ Instructions persistence works")
+    finally:
+        # Cleanup
+        if os.path.exists(test_file):
+            os.remove(test_file)
     
     print("MemorySystem: All tests passed!\n")
 

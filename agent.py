@@ -10,6 +10,8 @@ This module implements a self-evolving agent that:
 
 import json
 import os
+import ast
+import operator
 from typing import Dict, List, Any, Tuple
 from datetime import datetime
 from openai import OpenAI
@@ -66,15 +68,39 @@ class AgentTools:
     
     @staticmethod
     def calculate(expression: str) -> str:
-        """Safely evaluate a mathematical expression."""
-        try:
-            # Only allow basic math operations for safety
-            allowed_chars = set('0123456789+-*/()., ')
-            if all(c in allowed_chars for c in expression):
-                result = eval(expression)
-                return f"Result: {result}"
+        """Safely evaluate a mathematical expression using AST parsing."""
+        # Safe mathematical operators
+        operators = {
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+            ast.Pow: operator.pow,
+            ast.USub: operator.neg,
+        }
+        
+        def eval_node(node):
+            if isinstance(node, ast.Constant):  # Python 3.8+
+                return node.value
+            elif isinstance(node, ast.Num):  # Fallback for older Python
+                return node.n
+            elif isinstance(node, ast.BinOp):
+                left = eval_node(node.left)
+                right = eval_node(node.right)
+                return operators[type(node.op)](left, right)
+            elif isinstance(node, ast.UnaryOp):
+                operand = eval_node(node.operand)
+                return operators[type(node.op)](operand)
             else:
-                return "Error: Invalid characters in expression"
+                raise ValueError(f"Unsupported operation: {type(node).__name__}")
+        
+        try:
+            # Parse the expression
+            tree = ast.parse(expression, mode='eval')
+            result = eval_node(tree.body)
+            return f"Result: {result}"
+        except (ValueError, KeyError, SyntaxError, TypeError) as e:
+            return f"Error: Invalid mathematical expression - {str(e)}"
         except Exception as e:
             return f"Error: {str(e)}"
     
