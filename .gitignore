@@ -53,3 +53,6 @@ observer_checkpoint.json
 safety_corrections.json
 user_preferences.json
 
+# Model upgrade tracking
+model_upgrade_log.json
+

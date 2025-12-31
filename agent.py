@@ -49,15 +49,19 @@ class MemorySystem:
     def load_instructions(self) -> Dict[str, Any]:
         """Load system instructions from JSON file."""
         if os.path.exists(self.memory_file):
-            with open(self.memory_file, 'r') as f:
-                return json.load(f)
-        else:
-            # Default instructions
-            return {
-                "version": 1,
-                "instructions": "You are a helpful AI assistant.",
-                "improvements": []
-            }
+            try:
+                with open(self.memory_file, 'r') as f:
+                    content = f.read().strip()
+                    if content:
+                        return json.loads(content)
+            except (json.JSONDecodeError, IOError):
+                pass
+        # Default instructions
+        return {
+            "version": 1,
+            "instructions": "You are a helpful AI assistant.",
+            "improvements": []
+        }
     
     def save_instructions(self, instructions: Dict[str, Any]) -> None:
         """Save system instructions to JSON file."""
@@ -69,15 +73,33 @@ class MemorySystem:
         """Get the current system instructions as a prompt."""
         return self.instructions.get("instructions", "")
     
-    def update_instructions(self, new_instructions: str, critique: str) -> None:
-        """Update instructions with new version and log the improvement."""
+    def update_instructions(self, new_instructions: str, critique: str, *,
+                           query: Optional[str] = None, response: Optional[str] = None) -> None:
+        """
+        Update instructions with new version and log the improvement.
+        
+        Args:
+            new_instructions: New system instructions
+            critique: Critique that prompted the improvement
+            query: Optional query that caused the failure (for upgrade purge)
+            response: Optional agent response that failed (for upgrade purge)
+        """
         self.instructions["version"] = self.instructions.get("version", 0) + 1
         self.instructions["instructions"] = new_instructions
-        self.instructions["improvements"].append({
+        
+        improvement_entry = {
             "version": self.instructions["version"],
             "timestamp": datetime.now().isoformat(),
             "critique": critique
-        })
+        }
+        
+        # Store query and response for upgrade purge strategy
+        if query:
+            improvement_entry["query"] = query
+        if response:
+            improvement_entry["response"] = response
+        
+        self.instructions["improvements"].append(improvement_entry)
         self.save_instructions(self.instructions)
 
 
@@ -500,7 +522,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                     print("Rewriting system instructions...")
                 
                 new_instructions = self.evolve(critique, query, agent_response)
-                self.memory.update_instructions(new_instructions, critique)
+                self.memory.update_instructions(new_instructions, critique, query=query, response=agent_response)
                 
                 if verbose:
                     print(f"Updated to version {self.memory.instructions['version']}")
