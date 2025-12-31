@@ -24,6 +24,13 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **Automated Circuit Breaker**: Real-time rollout management with deterministic metrics
+  - **The Probe**: Gradual rollout (1% → 5% → 20% → 100%)
+  - **The Watchdog**: Real-time monitoring of Task Completion Rate and Latency
+  - **Auto-Scale**: Automatic advancement when metrics hold
+  - **Auto-Rollback**: Immediate revert when metrics degrade
+  - Replaces "Old World" manual A/B testing with "New World" automated controls
+  - See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation
 - **Intent Detection**: Smart evaluation based on conversation type
   - **Troubleshooting Intent**: Success = Quick resolution (≤3 turns)
   - **Brainstorming Intent**: Success = Deep exploration (≥5 turns)
@@ -326,6 +333,57 @@ report = manager.perform_upgrade(
 
 See [UPGRADE_PURGE.md](UPGRADE_PURGE.md) for detailed documentation.
 
+## Automated Circuit Breaker
+
+The system includes an automated circuit breaker for managing agent rollouts with deterministic metrics. When you deploy a new agent version, the circuit breaker automatically manages the rollout and can roll back if metrics degrade.
+
+**The Process:**
+1. **Probe**: Start with 1% of traffic to validate new version
+2. **Watchdog**: Monitor Task Completion Rate and Latency in real-time
+3. **Auto-Scale**: Advance to 5% → 20% → 100% when metrics hold
+4. **Auto-Rollback**: Immediately revert if metrics degrade below thresholds
+
+**Try it:**
+```bash
+# Run circuit breaker demo
+python example_circuit_breaker.py
+
+# Test circuit breaker functionality
+python test_circuit_breaker.py
+```
+
+**Usage:**
+```python
+from agent import DoerAgent
+
+# Enable circuit breaker in agent
+doer = DoerAgent(
+    enable_circuit_breaker=True,
+    circuit_breaker_config_file="cb_config.json"
+)
+
+# Agent automatically handles version selection and metrics
+result = doer.run(query="What is 10 + 20?", user_id="user123")
+
+# Check which version was used
+print(f"Version: {result['version_used']}")
+print(f"Latency: {result['latency_ms']:.0f}ms")
+```
+
+**Configuration:**
+```python
+from circuit_breaker import CircuitBreakerConfig
+
+config = CircuitBreakerConfig(
+    min_task_completion_rate=0.85,  # Must stay above 85%
+    max_latency_ms=2000.0,           # Must stay below 2000ms
+    min_samples_per_phase=10,        # Min samples before advancing
+    monitoring_window_minutes=5      # Time window for metrics
+)
+```
+
+See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
+
 ## Testing
 
 Run all tests:
@@ -347,6 +405,9 @@ python test_silent_signals.py
 
 # Test intent detection feature
 python test_intent_detection.py
+
+# Test circuit breaker system
+python test_circuit_breaker.py
 ```
 
 ### Configuration

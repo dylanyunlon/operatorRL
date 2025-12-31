@@ -16,6 +16,8 @@ import json
 import os
 import ast
 import operator
+import time
+import random
 from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime
 from openai import OpenAI
@@ -164,6 +166,10 @@ class AgentTools:
 """
 
 
+# Constants for circuit breaker integration
+CIRCUIT_BREAKER_EVAL_PROBABILITY = 0.1  # Evaluate circuit breaker 10% of the time
+
+
 class DoerAgent:
     """
     The "Doer" - Synchronous execution agent.
@@ -171,6 +177,8 @@ class DoerAgent:
     Executes tasks with read-only access to the Wisdom Database.
     Emits telemetry to an event stream for offline learning.
     Does NOT perform reflection or evolution during execution.
+    
+    Optionally supports circuit breaker for A/B testing different agent versions.
     """
     
     def __init__(self,
@@ -178,13 +186,16 @@ class DoerAgent:
                  stream_file: str = "telemetry_events.jsonl",
                  enable_telemetry: bool = True,
                  enable_prioritization: bool = True,
-                 enable_intent_detection: bool = True):
+                 enable_intent_detection: bool = True,
+                 enable_circuit_breaker: bool = False,
+                 circuit_breaker_config_file: Optional[str] = None):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)  # Read-only access
         self.tools = AgentTools()
         self.enable_telemetry = enable_telemetry and TELEMETRY_AVAILABLE
         self.enable_prioritization = enable_prioritization and PRIORITIZATION_AVAILABLE
         self.enable_intent_detection = enable_intent_detection
+        self.enable_circuit_breaker = enable_circuit_breaker
         
         if self.enable_telemetry:
             self.event_stream = EventStream(stream_file)
@@ -206,6 +217,29 @@ class DoerAgent:
                 self.enable_intent_detection = False
                 self.intent_detector = None
         
+        # Circuit breaker for A/B testing
+        if self.enable_circuit_breaker:
+            try:
+                from circuit_breaker import CircuitBreakerController, CircuitBreakerConfig
+                
+                if circuit_breaker_config_file and os.path.exists(circuit_breaker_config_file):
+                    import json
+                    with open(circuit_breaker_config_file, 'r') as f:
+                        config_data = json.load(f)
+                    config = CircuitBreakerConfig(**config_data)
+                else:
+                    config = CircuitBreakerConfig()
+                
+                self.circuit_breaker = CircuitBreakerController(config=config)
+            except ImportError as e:
+                print(f"Warning: Circuit breaker disabled - ImportError: {e}")
+                self.enable_circuit_breaker = False
+                self.circuit_breaker = None
+            except Exception as e:
+                print(f"Warning: Circuit breaker disabled - {type(e).__name__}: {e}")
+                self.enable_circuit_breaker = False
+                self.circuit_breaker = None
+        
         # Model configuration
         self.agent_model = os.getenv("AGENT_MODEL", "gpt-4o-mini")
     
@@ -219,7 +253,8 @@ class DoerAgent:
         except Exception as e:
             return f"Error executing tool '{tool_name}': {str(e)}"
     
-    def act(self, query: str, user_id: Optional[str] = None) -> str:
+    def act(self, query: str, user_id: Optional[str] = None, 
+            version_override: Optional[str] = None) -> Tuple[str, str]:
         """
         Agent attempts to solve the query using current wisdom.
         Uses prioritization framework to rank context by importance.
@@ -227,7 +262,22 @@ class DoerAgent:
         Args:
             query: User's query
             user_id: Optional user identifier for personalization
+            version_override: Optional version to use ("old" or "new"), 
+                            overrides circuit breaker decision
+        
+        Returns:
+            (response, version) tuple where version is "old" or "new"
         """
+        # Determine which version to use
+        version = "old"  # Default
+        
+        if self.enable_circuit_breaker and version_override is None:
+            # Let circuit breaker decide based on traffic split
+            use_new = self.circuit_breaker.should_use_new_version(request_id=user_id)
+            version = "new" if use_new else "old"
+        elif version_override:
+            version = version_override
+        
         system_prompt = self.wisdom.get_system_prompt()
         
         # Use prioritization framework if available
@@ -239,6 +289,10 @@ class DoerAgent:
                 verbose=False
             )
             system_prompt = prioritized_context.build_system_prompt()
+        
+        # Version is tracked internally but doesn't modify the actual system prompt
+        # In production, different versions might use different models, prompts, or tools
+        # For this POC, both versions use the same prompt (version is just for A/B testing tracking)
         
         # Add tool information to the system prompt
         full_system_prompt = f"{system_prompt}\n\n{self.tools.get_available_tools()}"
@@ -255,9 +309,9 @@ class DoerAgent:
                 messages=messages,
                 temperature=0.7
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content, version
         except Exception as e:
-            return f"Error executing agent: {str(e)}"
+            return f"Error executing agent: {str(e)}", version
     
     def _emit_telemetry(self, event_type: str, query: str, 
                        agent_response: Optional[str] = None,
@@ -363,6 +417,12 @@ class DoerAgent:
             print(f"Wisdom Version: {self.wisdom.instructions['version']}")
             if self.enable_prioritization:
                 print("[PRIORITIZATION] Enabled - using ranked context")
+            if self.enable_circuit_breaker:
+                status = self.circuit_breaker.get_status()
+                print(f"[CIRCUIT BREAKER] Phase: {status['current_phase']}, State: {status['state']}")
+        
+        # Record start time for latency tracking
+        start_time = time.time()
         
         # Emit task start event
         self._emit_telemetry(
@@ -375,14 +435,30 @@ class DoerAgent:
             intent_confidence=intent_confidence
         )
         
-        # ACT: Execute the query with prioritization
+        # ACT: Execute the query with prioritization and circuit breaker
         if verbose:
             print("\n[EXECUTING] Processing query...")
         
-        agent_response = self.act(query, user_id=user_id)
+        agent_response, version = self.act(query, user_id=user_id)
+        
+        # Calculate latency
+        latency_ms = (time.time() - start_time) * 1000
         
         if verbose:
             print(f"Response: {agent_response}")
+            if self.enable_circuit_breaker:
+                print(f"Version Used: {version.upper()}, Latency: {latency_ms:.0f}ms")
+        
+        # Record execution in circuit breaker if enabled
+        if self.enable_circuit_breaker:
+            # For simplicity, we consider any non-error response as success
+            success = not agent_response.startswith("Error")
+            self.circuit_breaker.record_execution(version, success, latency_ms)
+            
+            # Periodically evaluate and decide on rollout progression
+            # In production, this might be done by a separate process
+            if random.random() < CIRCUIT_BREAKER_EVAL_PROBABILITY:
+                self.circuit_breaker.evaluate_and_decide(verbose=False)
         
         # Emit task completion event
         self._emit_telemetry(
@@ -401,7 +477,7 @@ class DoerAgent:
         if verbose:
             print("\n[TELEMETRY] Event emitted to stream")
         
-        return {
+        result = {
             "query": query,
             "response": agent_response,
             "instructions_version": self.wisdom.instructions['version'],
@@ -412,6 +488,14 @@ class DoerAgent:
             "intent_type": intent_type,
             "intent_confidence": intent_confidence
         }
+        
+        # Add circuit breaker info if enabled
+        if self.enable_circuit_breaker:
+            result["circuit_breaker_enabled"] = True
+            result["version_used"] = version
+            result["latency_ms"] = latency_ms
+        
+        return result
     
     def emit_undo_signal(self, query: str, agent_response: str, 
                         user_id: Optional[str] = None,
