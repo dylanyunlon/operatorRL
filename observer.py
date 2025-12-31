@@ -403,12 +403,18 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         
         return analysis
     
-    def learn_from_analysis(self, analysis: Dict[str, Any], verbose: bool = False) -> bool:
+    def learn_from_analysis(self, analysis: Dict[str, Any], verbose: bool = False, 
+                           results: Optional[Dict[str, Any]] = None) -> bool:
         """
         Update the wisdom database based on analysis.
         Also updates prioritization framework with safety corrections.
         
         With Wisdom Curator enabled, policy-violating updates require human approval.
+        
+        Args:
+            analysis: Analysis dictionary with event, score, critique
+            verbose: Print detailed logs
+            results: Optional results dict to update statistics
         
         Returns True if wisdom was updated.
         """
@@ -448,6 +454,10 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                     query=event.query,
                     response=event.agent_response
                 )
+                
+                # Track statistics
+                if results is not None:
+                    results["curator_stats"]["policy_reviews_created"] += 1
                 
                 if verbose:
                     print(f"[WISDOM CURATOR] Created review item {review_item.review_id}")
@@ -553,7 +563,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                         results["signal_stats"]["acceptance_signals"] += 1
                     
                     # Learn from signal (critical and high priority signals)
-                    if self.learn_from_analysis(signal_analysis, verbose=verbose):
+                    if self.learn_from_analysis(signal_analysis, verbose=verbose, results=results):
                         results["lessons_learned"] += 1
                         self.checkpoint["lessons_learned"] += 1
                 
@@ -614,7 +624,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                             results["analyses"].append(intent_analysis)
                             
                             # Learn from intent-based failure
-                            if self.learn_from_analysis(intent_analysis, verbose=verbose):
+                            if self.learn_from_analysis(intent_analysis, verbose=verbose, results=results):
                                 results["lessons_learned"] += 1
                                 self.checkpoint["lessons_learned"] += 1
             
@@ -640,7 +650,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                         print(f"[WISDOM CURATOR] 📊 Created strategic sample {sample_item.review_id}")
                 
                 # Learn if needed
-                if self.learn_from_analysis(analysis, verbose=verbose):
+                if self.learn_from_analysis(analysis, verbose=verbose, results=results):
                     results["lessons_learned"] += 1
                     self.checkpoint["lessons_learned"] += 1
             

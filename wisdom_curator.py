@@ -41,7 +41,6 @@ class PolicyViolationType(Enum):
     DATA_PRIVACY = "data_privacy"  # e.g., exposing sensitive data
     SECURITY_RISK = "security_risk"  # e.g., disabling authentication
     QUALITY_DEGRADATION = "quality_degradation"  # e.g., lowering standards
-    GENERIC = "generic"  # Other policy concerns
 
 
 class DesignProposal:
@@ -140,7 +139,7 @@ class WisdomCurator:
     def __init__(self,
                  review_queue_file: str = "curator_review_queue.json",
                  design_proposals_file: str = "design_proposals.json",
-                 sample_rate: float = 0.005):  # 0.5% sample rate (50 out of 10,000)
+                 sample_rate: float = 0.005):  # 0.5% (e.g., 50 out of 10,000 interactions)
         self.review_queue_file = review_queue_file
         self.design_proposals_file = design_proposals_file
         self.sample_rate = sample_rate
