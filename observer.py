@@ -23,6 +23,13 @@ try:
 except ImportError:
     PRIORITIZATION_AVAILABLE = False
 
+# Import wisdom curator
+try:
+    from wisdom_curator import WisdomCurator
+    WISDOM_CURATOR_AVAILABLE = True
+except ImportError:
+    WISDOM_CURATOR_AVAILABLE = False
+
 # Load environment variables
 load_dotenv()
 
@@ -37,13 +44,15 @@ class ObserverAgent:
                  stream_file: str = "telemetry_events.jsonl",
                  checkpoint_file: str = "observer_checkpoint.json",
                  enable_prioritization: bool = True,
-                 enable_intent_metrics: bool = True):
+                 enable_intent_metrics: bool = True,
+                 enable_wisdom_curator: bool = True):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)
         self.event_stream = EventStream(stream_file)
         self.checkpoint_file = checkpoint_file
         self.enable_prioritization = enable_prioritization and PRIORITIZATION_AVAILABLE
         self.enable_intent_metrics = enable_intent_metrics
+        self.enable_wisdom_curator = enable_wisdom_curator and WISDOM_CURATOR_AVAILABLE
         
         # Model configuration - can use more powerful models for learning
         self.reflection_model = os.getenv("REFLECTION_MODEL", "gpt-4o-mini")
@@ -53,6 +62,10 @@ class ObserverAgent:
         # Initialize prioritization framework
         if self.enable_prioritization:
             self.prioritization = PrioritizationFramework()
+        
+        # Initialize wisdom curator
+        if self.enable_wisdom_curator:
+            self.wisdom_curator = WisdomCurator()
         
         # Initialize intent metrics
         if self.enable_intent_metrics:
@@ -390,10 +403,19 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         
         return analysis
     
-    def learn_from_analysis(self, analysis: Dict[str, Any], verbose: bool = False) -> bool:
+    def learn_from_analysis(self, analysis: Dict[str, Any], verbose: bool = False, 
+                           results: Optional[Dict[str, Any]] = None) -> bool:
         """
         Update the wisdom database based on analysis.
         Also updates prioritization framework with safety corrections.
+        
+        With Wisdom Curator enabled, policy-violating updates require human approval.
+        
+        Args:
+            analysis: Analysis dictionary with event, score, critique
+            verbose: Print detailed logs
+            results: Optional results dict to update statistics
+        
         Returns True if wisdom was updated.
         """
         if not analysis["needs_learning"]:
@@ -413,6 +435,38 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             event.agent_response
         )
         
+        # WISDOM CURATOR: Check if this update requires human policy review
+        if self.enable_wisdom_curator:
+            current_instructions = self.wisdom.get_system_prompt()
+            
+            if self.wisdom_curator.requires_policy_review(new_instructions, analysis["critique"]):
+                if verbose:
+                    print("[WISDOM CURATOR] 🛡️  Policy violation detected - creating review item")
+                    violations = self.wisdom_curator.detect_policy_violations(new_instructions)
+                    for violation_type, pattern in violations:
+                        print(f"  ⚠️  {violation_type.value}: '{pattern}'")
+                
+                # Create policy review instead of auto-applying
+                review_item = self.wisdom_curator.create_policy_review(
+                    proposed_wisdom=new_instructions,
+                    current_wisdom=current_instructions,
+                    critique=analysis["critique"],
+                    query=event.query,
+                    response=event.agent_response
+                )
+                
+                # Track statistics
+                if results is not None:
+                    results["curator_stats"]["policy_reviews_created"] += 1
+                
+                if verbose:
+                    print(f"[WISDOM CURATOR] Created review item {review_item.review_id}")
+                    print("[WISDOM CURATOR] Wisdom update BLOCKED pending human approval")
+                
+                # Return False because we didn't update wisdom (needs approval)
+                return False
+        
+        # No policy violation or curator disabled - proceed with update
         # Update wisdom database
         self.wisdom.update_instructions(new_instructions, analysis["critique"], 
                                        query=event.query, response=event.agent_response)
@@ -448,6 +502,8 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                 print("[PRIORITIZATION] Enabled - learning safety corrections")
             if self.enable_intent_metrics:
                 print("[INTENT METRICS] Enabled - using intent-based evaluation")
+            if self.enable_wisdom_curator:
+                print("[WISDOM CURATOR] Enabled - policy review and strategic sampling")
             print("[SILENT SIGNALS] Enabled - detecting implicit feedback")
         
         # Get unprocessed events
@@ -479,6 +535,10 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                 "brainstorming_conversations": 0,
                 "troubleshooting_failures": 0,
                 "brainstorming_failures": 0
+            },
+            "curator_stats": {
+                "strategic_samples_created": 0,
+                "policy_reviews_created": 0
             }
         }
         
@@ -503,7 +563,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                         results["signal_stats"]["acceptance_signals"] += 1
                     
                     # Learn from signal (critical and high priority signals)
-                    if self.learn_from_analysis(signal_analysis, verbose=verbose):
+                    if self.learn_from_analysis(signal_analysis, verbose=verbose, results=results):
                         results["lessons_learned"] += 1
                         self.checkpoint["lessons_learned"] += 1
                 
@@ -564,7 +624,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                             results["analyses"].append(intent_analysis)
                             
                             # Learn from intent-based failure
-                            if self.learn_from_analysis(intent_analysis, verbose=verbose):
+                            if self.learn_from_analysis(intent_analysis, verbose=verbose, results=results):
                                 results["lessons_learned"] += 1
                                 self.checkpoint["lessons_learned"] += 1
             
@@ -573,8 +633,24 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             if analysis:
                 results["analyses"].append(analysis)
                 
+                # WISDOM CURATOR: Strategic sampling for high-level review
+                if self.enable_wisdom_curator and self.wisdom_curator.should_sample_interaction():
+                    sample_item = self.wisdom_curator.create_strategic_sample(
+                        query=event.query,
+                        agent_response=event.agent_response,
+                        metadata={
+                            "score": analysis.get("score"),
+                            "event_id": event.timestamp,
+                            "instructions_version": event.instructions_version
+                        }
+                    )
+                    results["curator_stats"]["strategic_samples_created"] += 1
+                    
+                    if verbose:
+                        print(f"[WISDOM CURATOR] 📊 Created strategic sample {sample_item.review_id}")
+                
                 # Learn if needed
-                if self.learn_from_analysis(analysis, verbose=verbose):
+                if self.learn_from_analysis(analysis, verbose=verbose, results=results):
                     results["lessons_learned"] += 1
                     self.checkpoint["lessons_learned"] += 1
             
@@ -607,6 +683,14 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                 print(f"\nPrioritization Framework Stats:")
                 print(f"  Safety Corrections: {stats['recent_safety_corrections']} recent / {stats['total_safety_corrections']} total")
                 print(f"  User Preferences: {stats['total_preferences']} for {stats['total_users_with_preferences']} users")
+            if self.enable_wisdom_curator:
+                curator_stats = self.wisdom_curator.get_review_stats()
+                print(f"\nWisdom Curator Stats:")
+                print(f"  📊 Strategic Samples Created: {results['curator_stats']['strategic_samples_created']}")
+                print(f"  🛡️  Policy Reviews Pending: {curator_stats['by_type']['policy_review']['pending']}")
+                print(f"  ✅ Policy Reviews Approved: {curator_stats['by_type']['policy_review']['approved']}")
+                print(f"  ❌ Policy Reviews Rejected: {curator_stats['by_type']['policy_review']['rejected']}")
+                print(f"  📋 Total Reviews in Queue: {curator_stats['pending']} pending / {curator_stats['total_reviews']} total")
         
         return results
 
