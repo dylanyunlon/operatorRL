@@ -177,18 +177,29 @@ class DoerAgent:
                  wisdom_file: str = "system_instructions.json",
                  stream_file: str = "telemetry_events.jsonl",
                  enable_telemetry: bool = True,
-                 enable_prioritization: bool = True):
+                 enable_prioritization: bool = True,
+                 enable_intent_detection: bool = True):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)  # Read-only access
         self.tools = AgentTools()
         self.enable_telemetry = enable_telemetry and TELEMETRY_AVAILABLE
         self.enable_prioritization = enable_prioritization and PRIORITIZATION_AVAILABLE
+        self.enable_intent_detection = enable_intent_detection
         
         if self.enable_telemetry:
             self.event_stream = EventStream(stream_file)
         
         if self.enable_prioritization:
             self.prioritization = PrioritizationFramework()
+        
+        # Intent detection
+        if self.enable_intent_detection:
+            try:
+                from intent_detection import IntentDetector
+                self.intent_detector = IntentDetector()
+            except ImportError:
+                self.enable_intent_detection = False
+                self.intent_detector = None
         
         # Model configuration
         self.agent_model = os.getenv("AGENT_MODEL", "gpt-4o-mini")
@@ -247,7 +258,11 @@ class DoerAgent:
                        agent_response: Optional[str] = None,
                        success: Optional[bool] = None,
                        user_feedback: Optional[str] = None,
-                       user_id: Optional[str] = None) -> None:
+                       user_id: Optional[str] = None,
+                       conversation_id: Optional[str] = None,
+                       turn_number: Optional[int] = None,
+                       intent_type: Optional[str] = None,
+                       intent_confidence: Optional[float] = None) -> None:
         """Emit telemetry event to the stream."""
         if not self.enable_telemetry:
             return
@@ -262,7 +277,11 @@ class DoerAgent:
             success=success,
             user_feedback=user_feedback,
             instructions_version=self.wisdom.instructions['version'],
-            metadata=metadata
+            metadata=metadata,
+            conversation_id=conversation_id,
+            turn_number=turn_number,
+            intent_type=intent_type,
+            intent_confidence=intent_confidence
         )
         self.event_stream.emit(event)
     
@@ -298,7 +317,9 @@ class DoerAgent:
     
     def run(self, query: str, verbose: bool = True, 
             user_feedback: Optional[str] = None,
-            user_id: Optional[str] = None) -> Dict[str, Any]:
+            user_id: Optional[str] = None,
+            conversation_id: Optional[str] = None,
+            turn_number: Optional[int] = None) -> Dict[str, Any]:
         """
         Execute query and emit telemetry.
         No reflection or evolution - just execution.
@@ -308,19 +329,46 @@ class DoerAgent:
             verbose: Print execution details
             user_feedback: Optional user feedback
             user_id: Optional user identifier for personalization
+            conversation_id: Optional conversation identifier for tracking multi-turn conversations
+            turn_number: Optional turn number within the conversation (1-indexed)
         """
-        if verbose:
+        # Detect intent on first turn
+        intent_type = None
+        intent_confidence = None
+        
+        if self.enable_intent_detection and turn_number == 1:
+            if verbose:
+                print("="*60)
+                print("DOER AGENT: Executing Task with Intent Detection")
+                print("="*60)
+            
+            intent_result = self.intent_detector.detect_intent(query, verbose=verbose)
+            intent_type = intent_result["intent"]
+            intent_confidence = intent_result["confidence"]
+        elif verbose:
             print("="*60)
             print("DOER AGENT: Executing Task")
             print("="*60)
+        
+        if verbose:
             print(f"Query: {query}")
             print(f"User ID: {user_id or 'Anonymous'}")
+            print(f"Conversation ID: {conversation_id or 'N/A'}")
+            print(f"Turn Number: {turn_number or 'N/A'}")
             print(f"Wisdom Version: {self.wisdom.instructions['version']}")
             if self.enable_prioritization:
                 print("[PRIORITIZATION] Enabled - using ranked context")
         
         # Emit task start event
-        self._emit_telemetry("task_start", query, user_id=user_id)
+        self._emit_telemetry(
+            "task_start", 
+            query, 
+            user_id=user_id,
+            conversation_id=conversation_id,
+            turn_number=turn_number,
+            intent_type=intent_type,
+            intent_confidence=intent_confidence
+        )
         
         # ACT: Execute the query with prioritization
         if verbose:
@@ -338,7 +386,11 @@ class DoerAgent:
             agent_response=agent_response,
             success=True,
             user_feedback=user_feedback,
-            user_id=user_id
+            user_id=user_id,
+            conversation_id=conversation_id,
+            turn_number=turn_number,
+            intent_type=intent_type,
+            intent_confidence=intent_confidence
         )
         
         if verbose:
@@ -349,7 +401,11 @@ class DoerAgent:
             "response": agent_response,
             "instructions_version": self.wisdom.instructions['version'],
             "telemetry_emitted": self.enable_telemetry,
-            "prioritization_enabled": self.enable_prioritization
+            "prioritization_enabled": self.enable_prioritization,
+            "conversation_id": conversation_id,
+            "turn_number": turn_number,
+            "intent_type": intent_type,
+            "intent_confidence": intent_confidence
         }
     
     def emit_undo_signal(self, query: str, agent_response: str, 

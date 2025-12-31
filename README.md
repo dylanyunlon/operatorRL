@@ -24,6 +24,13 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **Intent Detection**: Smart evaluation based on conversation type
+  - **Troubleshooting Intent**: Success = Quick resolution (≤3 turns)
+  - **Brainstorming Intent**: Success = Deep exploration (≥5 turns)
+  - Key insight: "Engagement is often Failure" — a 20-turn password reset means the user is trapped, not engaged
+  - Automatically detects intent from first interaction
+  - Applies appropriate metrics for each conversation type
+  - See [INTENT_DETECTION.md](INTENT_DETECTION.md) for detailed documentation
 - **Silent Signals**: Implicit feedback mechanism that captures user friction
   - **Undo Signal** (Critical Failure): User reverses agent action (Ctrl+Z, revert) 
   - **Abandonment Signal** (Loss): User stops responding mid-workflow
@@ -86,6 +93,47 @@ result = doer.run("What is 10 + 20?")
 # Phase 2: Learn offline (separate process)
 observer = ObserverAgent()
 observer.process_events()  # Batch process telemetry
+```
+
+### Intent Detection
+
+Run the intent detection demo:
+```bash
+python example_intent_detection.py
+```
+
+This demonstrates intent-based evaluation:
+1. **Troubleshooting**: Quick resolution (≤3 turns) = SUCCESS
+2. **Troubleshooting**: User trapped (>3 turns) = FAILURE
+3. **Brainstorming**: Deep exploration (≥5 turns) = SUCCESS
+4. **Brainstorming**: Too shallow (<5 turns) = FAILURE
+
+Manual usage:
+
+```python
+from agent import DoerAgent
+import uuid
+
+doer = DoerAgent()
+conversation_id = str(uuid.uuid4())
+
+# Multi-turn conversation with intent detection
+doer.run(
+    query="How do I reset my password?",
+    conversation_id=conversation_id,
+    turn_number=1  # Intent detected on first turn
+)
+
+doer.run(
+    query="Thanks, that worked!",
+    conversation_id=conversation_id,
+    turn_number=2
+)
+
+# Observer evaluates using intent-specific metrics
+from observer import ObserverAgent
+observer = ObserverAgent()
+observer.process_events()  # Applies intent-based evaluation
 ```
 
 ### Silent Signals
@@ -296,6 +344,9 @@ python test_model_upgrade.py
 
 # Test silent signals feature
 python test_silent_signals.py
+
+# Test intent detection feature
+python test_intent_detection.py
 ```
 
 ### Configuration

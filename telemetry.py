@@ -26,6 +26,11 @@ class TelemetryEvent:
     metadata: Optional[Dict[str, Any]] = None
     signal_type: Optional[str] = None  # "undo", "abandonment", "acceptance"
     signal_context: Optional[Dict[str, Any]] = None  # Additional context for the signal
+    # Intent-based evaluation fields
+    conversation_id: Optional[str] = None  # Groups related turns together
+    turn_number: Optional[int] = None  # Position in conversation (1-indexed)
+    intent_type: Optional[str] = None  # "troubleshooting", "brainstorming", "unknown"
+    intent_confidence: Optional[float] = None  # Confidence in intent detection (0-1)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert event to dictionary."""
@@ -106,3 +111,42 @@ class EventStream:
             signal_events = [e for e in signal_events if e.signal_type == signal_type]
         
         return signal_events
+    
+    def get_conversation_events(self, conversation_id: str) -> List[TelemetryEvent]:
+        """
+        Get all events for a specific conversation.
+        
+        Args:
+            conversation_id: The conversation identifier
+        
+        Returns:
+            List of events for this conversation, sorted by turn number
+        """
+        all_events = self.read_all()
+        conversation_events = [
+            e for e in all_events 
+            if e.conversation_id == conversation_id
+        ]
+        
+        # Sort by turn number if available
+        conversation_events.sort(key=lambda e: e.turn_number or 0)
+        
+        return conversation_events
+    
+    def get_conversation_turn_count(self, conversation_id: str) -> int:
+        """
+        Get the number of turns in a conversation.
+        
+        Args:
+            conversation_id: The conversation identifier
+        
+        Returns:
+            Number of turns in the conversation
+        """
+        events = self.get_conversation_events(conversation_id)
+        if not events:
+            return 0
+        
+        # Count unique turn numbers
+        turn_numbers = [e.turn_number for e in events if e.turn_number is not None]
+        return max(turn_numbers) if turn_numbers else 0
