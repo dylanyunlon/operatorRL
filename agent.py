@@ -321,6 +321,159 @@ class DoerAgent:
             "telemetry_emitted": self.enable_telemetry,
             "prioritization_enabled": self.enable_prioritization
         }
+    
+    def emit_undo_signal(self, query: str, agent_response: str, 
+                        user_id: Optional[str] = None,
+                        undo_action: Optional[str] = None,
+                        verbose: bool = True) -> None:
+        """
+        Emit an "Undo" signal - Critical Failure.
+        
+        This is called when a user reverses an agent action (e.g., Ctrl+Z, revert code).
+        This is the loudest "Thumbs Down" possible.
+        
+        Args:
+            query: Original query
+            agent_response: Agent's response that was undone
+            user_id: Optional user identifier
+            undo_action: Description of what was undone
+            verbose: Print signal details
+        """
+        if verbose:
+            print("\n" + "="*60)
+            print("🚨 UNDO SIGNAL DETECTED - Critical Failure")
+            print("="*60)
+            print(f"User reversed agent action: {undo_action or 'Not specified'}")
+        
+        if not self.enable_telemetry:
+            return
+        
+        metadata = {
+            "user_id": user_id,
+            "undo_action": undo_action
+        }
+        
+        event = TelemetryEvent(
+            event_type="signal_undo",
+            timestamp=datetime.now().isoformat(),
+            query=query,
+            agent_response=agent_response,
+            success=False,
+            instructions_version=self.wisdom.instructions['version'],
+            metadata=metadata,
+            signal_type="undo",
+            signal_context={"undo_action": undo_action}
+        )
+        self.event_stream.emit(event)
+        
+        if verbose:
+            print("[TELEMETRY] Undo signal emitted to stream")
+    
+    def emit_abandonment_signal(self, query: str, agent_response: Optional[str] = None,
+                                user_id: Optional[str] = None,
+                                interaction_count: int = 0,
+                                last_interaction_time: Optional[str] = None,
+                                verbose: bool = True) -> None:
+        """
+        Emit an "Abandonment" signal - Loss.
+        
+        This is called when a user starts a workflow but stops responding halfway
+        without reaching a resolution. This means we lost them.
+        
+        Args:
+            query: Original query
+            agent_response: Last agent response before abandonment
+            user_id: Optional user identifier
+            interaction_count: Number of interactions before abandonment
+            last_interaction_time: Timestamp of last interaction
+            verbose: Print signal details
+        """
+        if verbose:
+            print("\n" + "="*60)
+            print("⚠️ ABANDONMENT SIGNAL DETECTED - Loss")
+            print("="*60)
+            print(f"User abandoned workflow after {interaction_count} interactions")
+        
+        if not self.enable_telemetry:
+            return
+        
+        metadata = {
+            "user_id": user_id,
+            "interaction_count": interaction_count,
+            "last_interaction_time": last_interaction_time
+        }
+        
+        event = TelemetryEvent(
+            event_type="signal_abandonment",
+            timestamp=datetime.now().isoformat(),
+            query=query,
+            agent_response=agent_response,
+            success=False,
+            instructions_version=self.wisdom.instructions['version'],
+            metadata=metadata,
+            signal_type="abandonment",
+            signal_context={
+                "interaction_count": interaction_count,
+                "last_interaction_time": last_interaction_time
+            }
+        )
+        self.event_stream.emit(event)
+        
+        if verbose:
+            print("[TELEMETRY] Abandonment signal emitted to stream")
+    
+    def emit_acceptance_signal(self, query: str, agent_response: str,
+                              user_id: Optional[str] = None,
+                              next_task: Optional[str] = None,
+                              time_to_next_task: Optional[float] = None,
+                              verbose: bool = True) -> None:
+        """
+        Emit an "Acceptance" signal - Success.
+        
+        This is called when a user takes the output and moves to the next task
+        without follow-up questions. This means we won.
+        
+        Args:
+            query: Original query
+            agent_response: Agent's response that was accepted
+            user_id: Optional user identifier
+            next_task: Description of the next task user moved to
+            time_to_next_task: Time in seconds from response to next task
+            verbose: Print signal details
+        """
+        if verbose:
+            print("\n" + "="*60)
+            print("✅ ACCEPTANCE SIGNAL DETECTED - Success")
+            print("="*60)
+            print(f"User accepted output and moved to: {next_task or 'next task'}")
+        
+        if not self.enable_telemetry:
+            return
+        
+        metadata = {
+            "user_id": user_id,
+            "next_task": next_task,
+            "time_to_next_task": time_to_next_task
+        }
+        
+        event = TelemetryEvent(
+            event_type="signal_acceptance",
+            timestamp=datetime.now().isoformat(),
+            query=query,
+            agent_response=agent_response,
+            success=True,
+            instructions_version=self.wisdom.instructions['version'],
+            metadata=metadata,
+            signal_type="acceptance",
+            signal_context={
+                "next_task": next_task,
+                "time_to_next_task": time_to_next_task
+            }
+        )
+        self.event_stream.emit(event)
+        
+        if verbose:
+            print("[TELEMETRY] Acceptance signal emitted to stream")
 
 
 class SelfEvolvingAgent:
