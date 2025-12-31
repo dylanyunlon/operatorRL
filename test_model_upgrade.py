@@ -14,7 +14,15 @@ from agent import MemorySystem
 
 
 def setup_test_wisdom_database(temp_file):
-    """Set up a test wisdom database with sample improvements."""
+    """
+    Set up a test wisdom database with sample improvements.
+    
+    Args:
+        temp_file: Path to temporary file for test database
+        
+    Returns:
+        Dict containing the wisdom data structure
+    """
     wisdom_data = {
         "version": 4,
         "instructions": "You are a helpful AI assistant with calculator tools.",
@@ -375,7 +383,12 @@ def test_memory_system_update_with_context():
 
 
 def run_all_tests():
-    """Run all tests."""
+    """
+    Run all tests in the model upgrade test suite.
+    
+    Returns:
+        bool: True if all tests passed, False otherwise
+    """
     print("\n" + "="*70)
     print("MODEL UPGRADE MANAGER - TEST SUITE")
     print("="*70)

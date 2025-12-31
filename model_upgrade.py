@@ -66,7 +66,14 @@ class ModelUpgradeManager:
         self.upgrade_log = self._load_upgrade_log()
     
     def _load_upgrade_log(self) -> Dict[str, Any]:
-        """Load the model upgrade log."""
+        """
+        Load the model upgrade log from disk.
+        
+        Returns:
+            Dict containing:
+                - upgrades: List of upgrade records
+                - current_model: Name of current model (or None)
+        """
         if os.path.exists(self.upgrade_log_file):
             try:
                 with open(self.upgrade_log_file, 'r') as f:
@@ -81,7 +88,10 @@ class ModelUpgradeManager:
         }
     
     def _save_upgrade_log(self) -> None:
-        """Save the model upgrade log."""
+        """
+        Save the model upgrade log to disk.
+        Persists the current upgrade history and model information.
+        """
         with open(self.upgrade_log_file, 'w') as f:
             json.dump(self.upgrade_log, f, indent=2)
     
@@ -92,6 +102,14 @@ class ModelUpgradeManager:
         Each improvement represents a past failure that caused the system
         to learn a new lesson. We need to test if the new model can handle
         these scenarios without the learned lessons.
+        
+        Returns:
+            List of scenario dictionaries, each containing:
+                - version: Version number when lesson was learned
+                - timestamp: When the lesson was learned
+                - critique: The critique that prompted learning
+                - query: Original query that failed
+                - response: Original agent response that failed
         """
         improvements = self.wisdom.instructions.get("improvements", [])
         

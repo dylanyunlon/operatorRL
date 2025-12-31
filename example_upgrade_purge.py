@@ -241,7 +241,14 @@ With Upgrade Purge:
 
 
 def main():
-    """Main example execution."""
+    """
+    Main example execution demonstrating the upgrade purge strategy.
+    
+    Shows:
+    1. Conceptual explanation of the upgrade purge process
+    2. Hypothetical scenario with sample data
+    3. Long-term benefits and lifecycle management
+    """
     print("\n")
     print("╔" + "="*68 + "╗")
     print("║" + " "*68 + "║")
