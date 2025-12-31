@@ -15,6 +15,7 @@ rather than editors (fixing grammar).
 import json
 import os
 import random
+import uuid
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from enum import Enum
@@ -260,7 +261,7 @@ class WisdomCurator:
         proposal = self.design_proposals[proposal_id]
         
         review_item = ReviewItem(
-            review_id=f"design_{proposal_id}_{datetime.now().timestamp()}",
+            review_id=f"design_{proposal_id}_{uuid.uuid4().hex[:8]}",
             review_type=ReviewType.DESIGN_CHECK,
             content={
                 "proposal_id": proposal_id,
@@ -314,7 +315,7 @@ class WisdomCurator:
             ReviewItem that was added to the queue
         """
         review_item = ReviewItem(
-            review_id=f"sample_{datetime.now().timestamp()}",
+            review_id=f"sample_{uuid.uuid4().hex[:12]}",
             review_type=ReviewType.STRATEGIC_SAMPLE,
             content={
                 "query": query,
@@ -405,7 +406,7 @@ class WisdomCurator:
         violations = self.detect_policy_violations(proposed_wisdom)
         
         review_item = ReviewItem(
-            review_id=f"policy_{datetime.now().timestamp()}",
+            review_id=f"policy_{uuid.uuid4().hex[:12]}",
             review_type=ReviewType.POLICY_REVIEW,
             content={
                 "proposed_wisdom": proposed_wisdom,
