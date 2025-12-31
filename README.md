@@ -24,6 +24,14 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **Orchestration Layer (Deterministic Workflows)**: Rigid state machine that manages probabilistic AI workers
+  - **The Orchestrator**: Deterministic state machine (not a fuzzy AI manager)
+  - **Hub & Spoke Pattern**: Workers never talk to each other directly - they report to the Hub
+  - **Transformer Middleware**: Manages data flow between probabilistic workers
+  - **Pre-built Pipelines**: Product Manager → Coder → Reviewer workflows
+  - Key insight: "The Brain (AI) is probabilistic, but the Skeleton (Orchestrator) is deterministic"
+  - Startup opportunity: "Orchestration-as-a-Service" - define a goal, service spins up the correct pipeline
+  - See [ORCHESTRATION.md](ORCHESTRATION.md) for detailed documentation
 - **Constraint Engineering (The Logic Firewall)**: Deterministic safety layer that intercepts AI plans before execution
   - **Brain (LLM)**: Generates creative plans with high temperature
   - **Firewall (Constraint Engine)**: Deterministic Python validation layer
@@ -101,6 +109,83 @@ cp .env.example .env
 ```
 
 ## Usage
+
+### Orchestration Layer (Deterministic Workflows)
+
+Run the orchestration demonstration:
+```bash
+python example_orchestration.py
+```
+
+This demonstrates:
+1. **Deterministic State Machine**: Orchestrator manages workflow (not AI)
+2. **Hub & Spoke Pattern**: Workers communicate through hub only
+3. **Transformer Middleware**: Data transformation between steps
+4. **Build Website Pipeline**: Product Manager → Coder → Reviewer
+5. **Failure Handling**: Predefined fallback paths
+
+Manual usage:
+
+```python
+from orchestrator import (
+    Orchestrator,
+    WorkerDefinition,
+    WorkerType,
+    create_build_website_workflow
+)
+
+# Create orchestrator (The Hub)
+orchestrator = Orchestrator()
+
+# Register workers (Probabilistic AI)
+orchestrator.register_worker(
+    WorkerDefinition(
+        worker_type=WorkerType.CODER,
+        name="AI Coder",
+        description="Implements code based on specs",
+        executor=coder_function,
+        input_transformer=transform_input
+    )
+)
+
+# Register workflow (Deterministic State Machine)
+workflow = create_build_website_workflow()
+orchestrator.register_workflow(workflow)
+
+# Execute workflow
+result = orchestrator.execute_workflow(
+    workflow_name="build_website",
+    goal="Build a portfolio website",
+    verbose=True
+)
+
+print(f"Final State: {result.state}")
+print(f"Steps Executed: {len(result.history)}")
+```
+
+Integration with DoerAgent:
+
+```python
+from agent import DoerAgent
+from orchestrator import Orchestrator, WorkerDefinition, WorkerType
+
+# Use DoerAgent as a worker in the orchestration layer
+def ai_worker(input_data, context):
+    doer = DoerAgent()
+    result = doer.run(input_data)
+    return result["response"]
+
+orchestrator.register_worker(
+    WorkerDefinition(
+        worker_type=WorkerType.CODER,
+        name="AI Coder",
+        description="AI-powered coding agent",
+        executor=ai_worker
+    )
+)
+```
+
+**The Key Insight**: "The Brain (AI workers) is probabilistic, but the Skeleton (orchestrator) is deterministic."
 
 ### Constraint Engineering (The Logic Firewall)
 
@@ -627,6 +712,9 @@ See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
 
 Run all tests:
 ```bash
+# Test orchestration layer (deterministic workflows)
+python test_orchestration.py
+
 # Test constraint engineering (logic firewall)
 python test_constraint_engineering.py
 
