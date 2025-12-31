@@ -31,6 +31,13 @@ try:
 except ImportError:
     TELEMETRY_AVAILABLE = False
 
+# Import prioritization framework if available (optional dependency)
+try:
+    from prioritization import PrioritizationFramework
+    PRIORITIZATION_AVAILABLE = True
+except ImportError:
+    PRIORITIZATION_AVAILABLE = False
+
 
 class MemorySystem:
     """Manages the agent's system instructions stored in JSON."""
@@ -147,29 +154,53 @@ class DoerAgent:
     def __init__(self,
                  wisdom_file: str = "system_instructions.json",
                  stream_file: str = "telemetry_events.jsonl",
-                 enable_telemetry: bool = True):
+                 enable_telemetry: bool = True,
+                 enable_prioritization: bool = True):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)  # Read-only access
         self.tools = AgentTools()
         self.enable_telemetry = enable_telemetry and TELEMETRY_AVAILABLE
+        self.enable_prioritization = enable_prioritization and PRIORITIZATION_AVAILABLE
         
         if self.enable_telemetry:
             self.event_stream = EventStream(stream_file)
+        
+        if self.enable_prioritization:
+            self.prioritization = PrioritizationFramework()
         
         # Model configuration
         self.agent_model = os.getenv("AGENT_MODEL", "gpt-4o-mini")
     
     def execute_tool(self, tool_name: str, *args) -> str:
-        """Execute a tool by name."""
-        if hasattr(self.tools, tool_name):
+        """Execute a tool by name with error handling."""
+        if not hasattr(self.tools, tool_name):
+            return f"Error: Tool '{tool_name}' not found"
+        
+        try:
             return getattr(self.tools, tool_name)(*args)
-        return f"Error: Tool '{tool_name}' not found"
+        except Exception as e:
+            return f"Error executing tool '{tool_name}': {str(e)}"
     
-    def act(self, query: str) -> str:
+    def act(self, query: str, user_id: Optional[str] = None) -> str:
         """
         Agent attempts to solve the query using current wisdom.
+        Uses prioritization framework to rank context by importance.
+        
+        Args:
+            query: User's query
+            user_id: Optional user identifier for personalization
         """
         system_prompt = self.wisdom.get_system_prompt()
+        
+        # Use prioritization framework if available
+        if self.enable_prioritization:
+            prioritized_context = self.prioritization.get_prioritized_context(
+                query=query,
+                global_wisdom=system_prompt,
+                user_id=user_id,
+                verbose=False
+            )
+            system_prompt = prioritized_context.build_system_prompt()
         
         # Add tool information to the system prompt
         full_system_prompt = f"{system_prompt}\n\n{self.tools.get_available_tools()}"
@@ -193,10 +224,13 @@ class DoerAgent:
     def _emit_telemetry(self, event_type: str, query: str, 
                        agent_response: Optional[str] = None,
                        success: Optional[bool] = None,
-                       user_feedback: Optional[str] = None) -> None:
+                       user_feedback: Optional[str] = None,
+                       user_id: Optional[str] = None) -> None:
         """Emit telemetry event to the stream."""
         if not self.enable_telemetry:
             return
+        
+        metadata = {"user_id": user_id} if user_id else None
         
         event = TelemetryEvent(
             event_type=event_type,
@@ -205,31 +239,42 @@ class DoerAgent:
             agent_response=agent_response,
             success=success,
             user_feedback=user_feedback,
-            instructions_version=self.wisdom.instructions['version']
+            instructions_version=self.wisdom.instructions['version'],
+            metadata=metadata
         )
         self.event_stream.emit(event)
     
     def run(self, query: str, verbose: bool = True, 
-            user_feedback: Optional[str] = None) -> Dict[str, Any]:
+            user_feedback: Optional[str] = None,
+            user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Execute query and emit telemetry.
         No reflection or evolution - just execution.
+        
+        Args:
+            query: User's query
+            verbose: Print execution details
+            user_feedback: Optional user feedback
+            user_id: Optional user identifier for personalization
         """
         if verbose:
             print("="*60)
             print("DOER AGENT: Executing Task")
             print("="*60)
             print(f"Query: {query}")
+            print(f"User ID: {user_id or 'Anonymous'}")
             print(f"Wisdom Version: {self.wisdom.instructions['version']}")
+            if self.enable_prioritization:
+                print("[PRIORITIZATION] Enabled - using ranked context")
         
         # Emit task start event
-        self._emit_telemetry("task_start", query)
+        self._emit_telemetry("task_start", query, user_id=user_id)
         
-        # ACT: Execute the query
+        # ACT: Execute the query with prioritization
         if verbose:
             print("\n[EXECUTING] Processing query...")
         
-        agent_response = self.act(query)
+        agent_response = self.act(query, user_id=user_id)
         
         if verbose:
             print(f"Response: {agent_response}")
@@ -240,7 +285,8 @@ class DoerAgent:
             query,
             agent_response=agent_response,
             success=True,
-            user_feedback=user_feedback
+            user_feedback=user_feedback,
+            user_id=user_id
         )
         
         if verbose:
@@ -250,7 +296,8 @@ class DoerAgent:
             "query": query,
             "response": agent_response,
             "instructions_version": self.wisdom.instructions['version'],
-            "telemetry_emitted": self.enable_telemetry
+            "telemetry_emitted": self.enable_telemetry,
+            "prioritization_enabled": self.enable_prioritization
         }
 
 

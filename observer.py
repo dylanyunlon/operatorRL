@@ -16,6 +16,13 @@ from dotenv import load_dotenv
 from telemetry import EventStream, TelemetryEvent
 from agent import MemorySystem
 
+# Import prioritization framework
+try:
+    from prioritization import PrioritizationFramework
+    PRIORITIZATION_AVAILABLE = True
+except ImportError:
+    PRIORITIZATION_AVAILABLE = False
+
 # Load environment variables
 load_dotenv()
 
@@ -28,19 +35,31 @@ class ObserverAgent:
     def __init__(self,
                  wisdom_file: str = "system_instructions.json",
                  stream_file: str = "telemetry_events.jsonl",
-                 checkpoint_file: str = "observer_checkpoint.json"):
+                 checkpoint_file: str = "observer_checkpoint.json",
+                 enable_prioritization: bool = True):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)
         self.event_stream = EventStream(stream_file)
         self.checkpoint_file = checkpoint_file
+        self.enable_prioritization = enable_prioritization and PRIORITIZATION_AVAILABLE
         
         # Model configuration - can use more powerful models for learning
         self.reflection_model = os.getenv("REFLECTION_MODEL", "gpt-4o-mini")
         self.evolution_model = os.getenv("EVOLUTION_MODEL", "gpt-4o-mini")
         self.score_threshold = float(os.getenv("SCORE_THRESHOLD", "0.8"))
         
+        # Initialize prioritization framework
+        if self.enable_prioritization:
+            self.prioritization = PrioritizationFramework()
+        
         # Load checkpoint
         self.checkpoint = self._load_checkpoint()
+    
+    def _extract_user_id(self, event: TelemetryEvent) -> Optional[str]:
+        """Extract user_id from event metadata."""
+        if event.metadata and isinstance(event.metadata, dict):
+            return event.metadata.get("user_id")
+        return None
     
     def _load_checkpoint(self) -> Dict[str, Any]:
         """Load the last processing checkpoint."""
@@ -180,6 +199,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
     def learn_from_analysis(self, analysis: Dict[str, Any], verbose: bool = False) -> bool:
         """
         Update the wisdom database based on analysis.
+        Also updates prioritization framework with safety corrections.
         Returns True if wisdom was updated.
         """
         if not analysis["needs_learning"]:
@@ -192,7 +212,7 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         if verbose:
             print(f"[OBSERVER] Learning from low-score execution (score: {analysis['score']:.2f})")
         
-        # Evolve instructions
+        # Evolve instructions (traditional learning)
         new_instructions = self.evolve(
             analysis["critique"],
             event.query,
@@ -202,8 +222,21 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         # Update wisdom database
         self.wisdom.update_instructions(new_instructions, analysis["critique"])
         
+        # Update prioritization framework with safety correction
+        if self.enable_prioritization:
+            user_id = self._extract_user_id(event)
+            
+            self.prioritization.learn_from_failure(
+                query=event.query,
+                critique=analysis["critique"],
+                user_id=user_id,
+                verbose=verbose
+            )
+        
         if verbose:
             print(f"[OBSERVER] Updated wisdom database to version {self.wisdom.instructions['version']}")
+            if self.enable_prioritization:
+                print("[OBSERVER] Updated prioritization framework with safety correction")
         
         return True
     
@@ -216,6 +249,8 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             print("="*60)
             print("OBSERVER: Starting Event Processing")
             print("="*60)
+            if self.enable_prioritization:
+                print("[PRIORITIZATION] Enabled - learning safety corrections")
         
         # Get unprocessed events
         last_timestamp = self.checkpoint.get("last_processed_timestamp")
@@ -240,6 +275,18 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         
         # Process each event
         for event in events:
+            # Learn user preferences from feedback
+            if self.enable_prioritization and event.user_feedback:
+                user_id = self._extract_user_id(event)
+                
+                if user_id:
+                    self.prioritization.learn_user_preference(
+                        user_id=user_id,
+                        query=event.query,
+                        user_feedback=event.user_feedback,
+                        verbose=verbose
+                    )
+            
             analysis = self.analyze_trace(event, verbose=verbose)
             
             if analysis:
@@ -264,6 +311,11 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             print(f"Events Processed: {results['events_processed']}")
             print(f"Lessons Learned: {results['lessons_learned']}")
             print(f"Wisdom Version: {self.wisdom.instructions['version']}")
+            if self.enable_prioritization:
+                stats = self.prioritization.get_stats()
+                print(f"\nPrioritization Framework Stats:")
+                print(f"  Safety Corrections: {stats['recent_safety_corrections']} recent / {stats['total_safety_corrections']} total")
+                print(f"  User Preferences: {stats['total_preferences']} for {stats['total_users_with_preferences']} users")
         
         return results
 

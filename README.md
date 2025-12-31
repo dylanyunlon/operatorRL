@@ -25,6 +25,10 @@ Traditional self-improvement loop for backward compatibility:
 ## Features
 
 - **Decoupled Execution/Learning**: Low-latency execution with offline learning
+- **Prioritization Framework**: Graph RAG-inspired three-layer context ranking system
+  - Safety Layer: Prevents repeating recent failures
+  - Personalization Layer: User-specific preferences and constraints
+  - Global Wisdom Layer: Generic best practices
 - **Telemetry System**: Event stream for capturing execution traces
 - **Wisdom Database**: Persistent knowledge stored in `system_instructions.json`
 - **Tool System**: Simple tools for calculations, time, and string operations
@@ -154,6 +158,36 @@ print(f"Response: {results['final_response']}")
 4. **Model Flexibility**: Use different/more powerful models for learning
 5. **Async Processing**: Learning happens offline, separate from execution
 6. **Resource Efficiency**: Learning process can be scheduled independently
+7. **Context Prioritization**: Critical information (safety, user prefs) is highly visible
+
+## Prioritization Framework
+
+The system now includes a three-layer prioritization framework that sits between the database and agent:
+
+1. **Safety Layer (Highest Priority)**: "Have we failed at this exact task recently?"
+   - Injects corrections with high urgency
+   - Prevents repeating past mistakes
+   - Time-windowed (7 days default)
+
+2. **Personalization Layer (Medium Priority)**: "Does this specific user have preferred constraints?"
+   - User-specific preferences (e.g., "Always use JSON output")
+   - Learned from feedback
+   - Priority-ranked
+
+3. **Global Wisdom Layer (Low Priority)**: "What is the generic best practice?"
+   - Base system instructions
+   - Generic best practices
+
+**Try it:**
+```bash
+# Run prioritization demo
+python example_prioritization.py
+
+# Test prioritization framework
+python test_prioritization.py
+```
+
+See [PRIORITIZATION_FRAMEWORK.md](PRIORITIZATION_FRAMEWORK.md) for detailed documentation.
 
 ## Testing
 
@@ -164,6 +198,9 @@ python test_agent.py
 
 # Test decoupled architecture
 python test_decoupled.py
+
+# Test prioritization framework
+python test_prioritization.py
 ```
 
 ### Configuration
