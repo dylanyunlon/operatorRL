@@ -24,6 +24,13 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **Evaluation Engineering (The New TDD)**: Write evaluation suites instead of implementation code
+  - **Golden Datasets**: Define quality through 50+ test cases with expected outputs
+  - **Scoring Rubrics**: Multi-dimensional evaluation (correctness + tone + safety)
+  - **Eval-DD**: Evaluation-Driven Development - write the exam, let AI iterate until it passes
+  - Key insight: "If correct but rude, score 5/10" - quality is multi-dimensional
+  - The "Source Code" is the Evaluation Suite that constrains the AI
+  - See [EVALUATION_ENGINEERING.md](EVALUATION_ENGINEERING.md) for detailed documentation
 - **Wisdom Curator**: Human-in-the-loop review for high-level strategic verification
   - **Design Check**: Verify implementation matches architectural proposals (not syntax!)
   - **Strategic Sample**: Review random samples (50 out of 10,000) for quality/vibe
@@ -83,6 +90,79 @@ cp .env.example .env
 ```
 
 ## Usage
+
+### Evaluation Engineering (The New TDD)
+
+Run the evaluation engineering demonstration:
+```bash
+python example_evaluation_engineering.py
+```
+
+This demonstrates:
+1. **Golden Datasets**: 25 tricky date parsing test cases (instead of writing parseDate())
+2. **Scoring Rubrics**: Multi-dimensional scoring (70% correctness + 30% clarity)
+3. **Eval-DD**: Write the exam first, let AI iterate until it passes (>90%)
+
+Manual usage:
+
+```python
+from evaluation_engineering import (
+    EvaluationDataset, 
+    ScoringRubric, 
+    EvaluationRunner
+)
+
+# 1. Write the Golden Dataset (this is your "code")
+dataset = EvaluationDataset(
+    name="Date Parsing",
+    description="50 tricky date strings"
+)
+
+dataset.add_case(
+    id="parse_001",
+    input="Parse: Jan 15, 2024",
+    expected_output="2024-01-15",
+    tags=["readable"]
+)
+
+# 2. Write the Scoring Rubric
+rubric = ScoringRubric("Date Parser", "Correctness + Clarity")
+
+rubric.add_criteria(
+    dimension="correctness",
+    weight=0.7,  # 70% of score
+    description="Is the date correct?",
+    evaluator=correctness_evaluator
+)
+
+rubric.add_criteria(
+    dimension="tone",
+    weight=0.3,  # 30% of score
+    description="Is response clear?",
+    evaluator=tone_evaluator
+)
+
+rubric.set_pass_threshold(0.9)  # 90% to pass
+
+# 3. Run Evaluation
+def my_ai_function(input_text: str) -> str:
+    # Your AI implementation
+    return ai_response
+
+runner = EvaluationRunner(dataset, rubric, my_ai_function)
+results = runner.run(verbose=True)
+
+if results['overall_passed']:
+    print("🎉 AI meets requirements!")
+else:
+    print("❌ Needs improvement")
+    for case in runner.get_failed_cases():
+        print(f"Failed: {case.case_id}")
+```
+
+**The Key Insight**: "If the answer is correct but rude, score 5/10. If incorrect but polite, score 0/10."
+
+Quality is multi-dimensional. The "Source Code" of the future is the Evaluation Suite that constrains the AI.
 
 ### Decoupled Architecture (Recommended)
 
@@ -459,6 +539,9 @@ See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
 
 Run all tests:
 ```bash
+# Test evaluation engineering framework
+python test_evaluation_engineering.py
+
 # Test legacy components
 python test_agent.py
 
