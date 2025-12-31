@@ -73,7 +73,7 @@ class MemorySystem:
         """Get the current system instructions as a prompt."""
         return self.instructions.get("instructions", "")
     
-    def update_instructions(self, new_instructions: str, critique: str, 
+    def update_instructions(self, new_instructions: str, critique: str, *,
                            query: Optional[str] = None, response: Optional[str] = None) -> None:
         """
         Update instructions with new version and log the improvement.

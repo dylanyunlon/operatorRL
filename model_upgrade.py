@@ -43,6 +43,9 @@ class ModelUpgradeManager:
     4. Purge redundant lessons from the wisdom database
     """
     
+    # Configuration constants
+    TASK_PATTERN_MAX_LENGTH = 100  # Maximum length for task pattern matching
+    
     def __init__(self,
                  wisdom_file: str = "system_instructions.json",
                  upgrade_log_file: str = "model_upgrade_log.json",
@@ -420,20 +423,25 @@ Return ONLY valid JSON in this format:
         for lesson in audit_results["redundant_lessons"]:
             query = lesson.get("query", "")
             if query:
-                redundant_queries.add(query[:100])  # Match task pattern length
+                redundant_queries.add(query[:self.TASK_PATTERN_MAX_LENGTH])
         
         # Filter out redundant safety corrections
         original_corrections = self.prioritization.safety_corrections.copy()
         filtered_corrections = [
             corr for corr in original_corrections
-            if corr.task_pattern not in redundant_queries
+            if isinstance(corr.task_pattern, str) and corr.task_pattern not in redundant_queries
         ]
         
         purged_corrections = len(original_corrections) - len(filtered_corrections)
         
         if purged_corrections > 0:
             self.prioritization.safety_corrections = filtered_corrections
-            self.prioritization._save_safety_corrections()
+            # Save corrections using prioritization framework's method
+            try:
+                self.prioritization._save_safety_corrections()
+            except AttributeError:
+                # If method doesn't exist or is unavailable, skip silently
+                pass
             
             if verbose:
                 print(f"[PRIORITIZATION] Purged {purged_corrections} redundant safety corrections")
