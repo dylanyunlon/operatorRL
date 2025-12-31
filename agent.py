@@ -286,12 +286,9 @@ class DoerAgent:
             )
             system_prompt = prioritized_context.build_system_prompt()
         
-        # Add version-specific behavior (in production, this might load different models or prompts)
-        if version == "new":
-            # Add marker to track which version was used
-            system_prompt = f"[Version: NEW]\n{system_prompt}"
-        else:
-            system_prompt = f"[Version: OLD]\n{system_prompt}"
+        # Version is tracked internally but doesn't modify the actual system prompt
+        # In production, different versions might use different models, prompts, or tools
+        # For this POC, both versions use the same prompt (version is just for A/B testing tracking)
         
         # Add tool information to the system prompt
         full_system_prompt = f"{system_prompt}\n\n{self.tools.get_available_tools()}"

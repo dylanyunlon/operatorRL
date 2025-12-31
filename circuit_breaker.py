@@ -17,6 +17,7 @@ Key Metrics:
 import json
 import os
 import time
+import random
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
@@ -187,6 +188,10 @@ class CircuitBreakerMetrics:
             m for m in self.metrics_log
             if datetime.fromisoformat(m["timestamp"]) >= cutoff_time
         ]
+    
+    def clear_metrics(self) -> None:
+        """Clear all metrics. Useful for testing or reset scenarios."""
+        self.metrics_log = []
 
 
 class CircuitBreakerWatchdog:
@@ -426,7 +431,6 @@ class CircuitBreakerController:
             return hash_val < (new_pct * 100)
         
         # Random routing
-        import random
         return random.random() < new_pct
     
     def record_execution(self, version: str, success: bool, latency_ms: float) -> None:

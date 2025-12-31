@@ -113,7 +113,7 @@ def test_watchdog_decisions():
     
     # Test rollback with poor metrics
     # Clear ALL previous metrics to test rollback scenario cleanly
-    metrics.metrics_log = []
+    metrics.clear_metrics()
     
     for i in range(10):
         metrics.record_execution(
@@ -231,7 +231,7 @@ def test_rollback_scenario():
         assert decision["action"] in ["advance", "maintain"]
         
         # Clear metrics to simulate clean degradation
-        controller.metrics.metrics_log = []
+        controller.metrics.clear_metrics()
         
         # Simulate degraded metrics
         print("  Phase 2: Degraded metrics (high latency)")
@@ -316,7 +316,7 @@ def test_metric_thresholds():
     print(f"✓ Scenario 1 (low completion): {reason}")
     
     # Clear and test scenario 2: High latency
-    metrics.metrics_log = []
+    metrics.clear_metrics()
     for i in range(10):
         metrics.record_execution(version="new", success=True, latency_ms=2500.0, phase="PROBE")
     
@@ -327,7 +327,7 @@ def test_metric_thresholds():
     print(f"✓ Scenario 2 (high latency): {reason}")
     
     # Clear and test scenario 3: Both metrics good
-    metrics.metrics_log = []
+    metrics.clear_metrics()
     for i in range(10):
         metrics.record_execution(version="new", success=True, latency_ms=1500.0, phase="PROBE")
     
