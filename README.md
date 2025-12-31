@@ -25,6 +25,10 @@ Traditional self-improvement loop for backward compatibility:
 ## Features
 
 - **Decoupled Execution/Learning**: Low-latency execution with offline learning
+- **Upgrade Purge Strategy**: Active lifecycle management for wisdom database
+  - Automatically removes lessons when upgrading models
+  - Keeps database lean and specialized
+  - Treats wisdom like a high-performance cache
 - **Prioritization Framework**: Graph RAG-inspired three-layer context ranking system
   - Safety Layer: Prevents repeating recent failures
   - Personalization Layer: User-specific preferences and constraints
@@ -189,6 +193,40 @@ python test_prioritization.py
 
 See [PRIORITIZATION_FRAMEWORK.md](PRIORITIZATION_FRAMEWORK.md) for detailed documentation.
 
+## Upgrade Purge Strategy
+
+The system includes active lifecycle management for the wisdom database. When you upgrade your base model (e.g., GPT-3.5 → GPT-4), many lessons become redundant as the new model can handle them natively.
+
+**The Process:**
+1. **Audit**: Test old failure scenarios against the new model
+2. **Identify**: Mark lessons the new model solves natively
+3. **Purge**: Automatically remove redundant lessons
+4. **Result**: Leaner, more specialized wisdom database
+
+**Try it:**
+```bash
+# Run upgrade purge demo
+python example_upgrade_purge.py
+
+# Test upgrade functionality
+python test_model_upgrade.py
+```
+
+**Usage:**
+```python
+from model_upgrade import ModelUpgradeManager
+
+manager = ModelUpgradeManager()
+report = manager.perform_upgrade(
+    new_model="gpt-4o",
+    baseline_instructions="Your baseline system prompt...",
+    score_threshold=0.8,
+    auto_purge=True
+)
+```
+
+See [UPGRADE_PURGE.md](UPGRADE_PURGE.md) for detailed documentation.
+
 ## Testing
 
 Run all tests:
@@ -201,6 +239,9 @@ python test_decoupled.py
 
 # Test prioritization framework
 python test_prioritization.py
+
+# Test upgrade purge strategy
+python test_model_upgrade.py
 ```
 
 ### Configuration

@@ -220,7 +220,8 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         )
         
         # Update wisdom database
-        self.wisdom.update_instructions(new_instructions, analysis["critique"])
+        self.wisdom.update_instructions(new_instructions, analysis["critique"], 
+                                       query=event.query, response=event.agent_response)
         
         # Update prioritization framework with safety correction
         if self.enable_prioritization:
