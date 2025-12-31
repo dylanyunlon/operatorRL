@@ -209,7 +209,7 @@ def test_intent_detection_structure():
     print("✓ IntentMetrics has required methods")
     
     # Test static methods work
-    result = IntentMetrics.evaluate_troubleshooting(2, True)
+    result = IntentMetrics.evaluate_troubleshooting(turn_count=2, resolved=True)
     assert "success" in result
     assert "metric" in result
     assert "reasoning" in result

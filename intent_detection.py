@@ -18,7 +18,7 @@ Intent Types:
 
 import json
 import os
-from typing import Dict, Any, Optional, Literal
+from typing import Dict, Any, Optional, Literal, List
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -117,7 +117,7 @@ Return ONLY valid JSON in this format:
             return {
                 "intent": "unknown",
                 "confidence": 0.0,
-                "reasoning": f"Detection failed: {str(e)}"
+                "reasoning": f"Intent detection failed: {type(e).__name__}: {str(e)}"
             }
 
 
@@ -216,7 +216,7 @@ class IntentMetrics:
             }
     
     @staticmethod
-    def calculate_context_depth(conversation_history: list, verbose: bool = False) -> float:
+    def calculate_context_depth(conversation_history: List[Dict[str, Any]], verbose: bool = False) -> float:
         """
         Calculate context depth score for a conversation.
         

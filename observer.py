@@ -59,7 +59,12 @@ class ObserverAgent:
             try:
                 from intent_detection import IntentMetrics
                 self.intent_metrics = IntentMetrics()
-            except ImportError:
+            except ImportError as e:
+                print(f"Warning: Intent metrics disabled - ImportError: {e}")
+                self.enable_intent_metrics = False
+                self.intent_metrics = None
+            except Exception as e:
+                print(f"Warning: Intent metrics disabled - {type(e).__name__}: {e}")
                 self.enable_intent_metrics = False
                 self.intent_metrics = None
         

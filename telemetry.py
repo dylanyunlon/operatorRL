@@ -147,6 +147,6 @@ class EventStream:
         if not events:
             return 0
         
-        # Count unique turn numbers
+        # Count unique turn numbers (handles non-sequential turns)
         turn_numbers = [e.turn_number for e in events if e.turn_number is not None]
-        return max(turn_numbers) if turn_numbers else 0
+        return len(set(turn_numbers)) if turn_numbers else 0

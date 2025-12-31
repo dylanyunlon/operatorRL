@@ -197,7 +197,12 @@ class DoerAgent:
             try:
                 from intent_detection import IntentDetector
                 self.intent_detector = IntentDetector()
-            except ImportError:
+            except ImportError as e:
+                print(f"Warning: Intent detection disabled - ImportError: {e}")
+                self.enable_intent_detection = False
+                self.intent_detector = None
+            except Exception as e:
+                print(f"Warning: Intent detection disabled - {type(e).__name__}: {e}")
                 self.enable_intent_detection = False
                 self.intent_detector = None
         
