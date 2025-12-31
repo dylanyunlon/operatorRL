@@ -36,12 +36,14 @@ class ObserverAgent:
                  wisdom_file: str = "system_instructions.json",
                  stream_file: str = "telemetry_events.jsonl",
                  checkpoint_file: str = "observer_checkpoint.json",
-                 enable_prioritization: bool = True):
+                 enable_prioritization: bool = True,
+                 enable_intent_metrics: bool = True):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)
         self.event_stream = EventStream(stream_file)
         self.checkpoint_file = checkpoint_file
         self.enable_prioritization = enable_prioritization and PRIORITIZATION_AVAILABLE
+        self.enable_intent_metrics = enable_intent_metrics
         
         # Model configuration - can use more powerful models for learning
         self.reflection_model = os.getenv("REFLECTION_MODEL", "gpt-4o-mini")
@@ -51,6 +53,20 @@ class ObserverAgent:
         # Initialize prioritization framework
         if self.enable_prioritization:
             self.prioritization = PrioritizationFramework()
+        
+        # Initialize intent metrics
+        if self.enable_intent_metrics:
+            try:
+                from intent_detection import IntentMetrics
+                self.intent_metrics = IntentMetrics()
+            except ImportError as e:
+                print(f"Warning: Intent metrics disabled - ImportError: {e}")
+                self.enable_intent_metrics = False
+                self.intent_metrics = None
+            except Exception as e:
+                print(f"Warning: Intent metrics disabled - {type(e).__name__}: {e}")
+                self.enable_intent_metrics = False
+                self.intent_metrics = None
         
         # Load checkpoint
         self.checkpoint = self._load_checkpoint()
@@ -196,6 +212,102 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         
         return analysis
     
+    def evaluate_conversation_by_intent(self, conversation_id: str, verbose: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Evaluate a completed conversation using intent-specific metrics.
+        
+        This is the key method that implements the problem statement:
+        - Troubleshooting: Time-to-Resolution (flag if > 3 turns)
+        - Brainstorming: Depth of Context (flag if too short)
+        
+        Args:
+            conversation_id: The conversation identifier
+            verbose: Print evaluation details
+            
+        Returns:
+            Evaluation results with intent-specific success criteria
+        """
+        if not self.enable_intent_metrics:
+            return None
+        
+        # Get all events for this conversation
+        conversation_events = self.event_stream.get_conversation_events(conversation_id)
+        
+        if not conversation_events:
+            return None
+        
+        # Get intent from first event
+        first_event = conversation_events[0]
+        intent_type = first_event.intent_type
+        
+        if not intent_type or intent_type == "unknown":
+            if verbose:
+                print(f"[INTENT EVAL] No valid intent detected for conversation {conversation_id}")
+            return None
+        
+        # Count turns
+        turn_count = self.event_stream.get_conversation_turn_count(conversation_id)
+        
+        if verbose:
+            print(f"\n[INTENT EVAL] Evaluating conversation {conversation_id}")
+            print(f"  Intent: {intent_type.upper()}")
+            print(f"  Turn Count: {turn_count}")
+        
+        # Evaluate based on intent type
+        if intent_type == "troubleshooting":
+            # Check if issue was resolved (last event success status)
+            last_event = conversation_events[-1]
+            resolved = last_event.success if last_event.success is not None else True
+            
+            evaluation = self.intent_metrics.evaluate_troubleshooting(
+                turn_count=turn_count,
+                resolved=resolved
+            )
+            
+            if verbose:
+                print(f"  Metric: {evaluation['metric']}")
+                print(f"  Success: {evaluation['success']}")
+                print(f"  Reasoning: {evaluation['reasoning']}")
+            
+            return {
+                "conversation_id": conversation_id,
+                "intent_type": intent_type,
+                "evaluation": evaluation,
+                "needs_learning": not evaluation["success"]
+            }
+            
+        elif intent_type == "brainstorming":
+            # Calculate context depth
+            conversation_history = [
+                {"content": e.agent_response or ""}
+                for e in conversation_events
+                if e.agent_response
+            ]
+            
+            depth_score = self.intent_metrics.calculate_context_depth(
+                conversation_history,
+                verbose=verbose
+            )
+            
+            evaluation = self.intent_metrics.evaluate_brainstorming(
+                turn_count=turn_count,
+                context_depth_score=depth_score
+            )
+            
+            if verbose:
+                print(f"  Metric: {evaluation['metric']}")
+                print(f"  Success: {evaluation['success']}")
+                print(f"  Reasoning: {evaluation['reasoning']}")
+            
+            return {
+                "conversation_id": conversation_id,
+                "intent_type": intent_type,
+                "evaluation": evaluation,
+                "needs_learning": not evaluation["success"]
+            }
+        
+        return None
+    
     def analyze_signal(self, event: TelemetryEvent, verbose: bool = False) -> Optional[Dict[str, Any]]:
         """
         Analyze a silent signal event and determine learning strategy.
@@ -334,6 +446,8 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             print("="*60)
             if self.enable_prioritization:
                 print("[PRIORITIZATION] Enabled - learning safety corrections")
+            if self.enable_intent_metrics:
+                print("[INTENT METRICS] Enabled - using intent-based evaluation")
             print("[SILENT SIGNALS] Enabled - detecting implicit feedback")
         
         # Get unprocessed events
@@ -359,8 +473,17 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                 "undo_signals": 0,
                 "abandonment_signals": 0,
                 "acceptance_signals": 0
+            },
+            "intent_evaluations": {
+                "troubleshooting_conversations": 0,
+                "brainstorming_conversations": 0,
+                "troubleshooting_failures": 0,
+                "brainstorming_failures": 0
             }
         }
+        
+        # Track conversations we've evaluated
+        evaluated_conversations = set()
         
         # Process each event
         for event in events:
@@ -399,6 +522,52 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
                         verbose=verbose
                     )
             
+            # Evaluate conversations by intent when we see task_complete events
+            if self.enable_intent_metrics and event.event_type == "task_complete" and event.conversation_id:
+                # Only evaluate each conversation once (when we see its last event)
+                if event.conversation_id not in evaluated_conversations:
+                    intent_eval = self.evaluate_conversation_by_intent(
+                        event.conversation_id,
+                        verbose=verbose
+                    )
+                    
+                    if intent_eval:
+                        evaluated_conversations.add(event.conversation_id)
+                        
+                        # Track statistics
+                        intent_type = intent_eval["intent_type"]
+                        if intent_type == "troubleshooting":
+                            results["intent_evaluations"]["troubleshooting_conversations"] += 1
+                            if intent_eval["needs_learning"]:
+                                results["intent_evaluations"]["troubleshooting_failures"] += 1
+                        elif intent_type == "brainstorming":
+                            results["intent_evaluations"]["brainstorming_conversations"] += 1
+                            if intent_eval["needs_learning"]:
+                                results["intent_evaluations"]["brainstorming_failures"] += 1
+                        
+                        # Flag failures for learning
+                        if intent_eval["needs_learning"]:
+                            evaluation = intent_eval["evaluation"]
+                            
+                            # Create a critique based on intent-specific failure
+                            critique = f"Intent-based evaluation failure: {evaluation['reasoning']}"
+                            
+                            # Create analysis for learning
+                            intent_analysis = {
+                                "event": event,
+                                "score": 0.3,  # Low score for failures
+                                "critique": critique,
+                                "needs_learning": True,
+                                "intent_evaluation": intent_eval
+                            }
+                            
+                            results["analyses"].append(intent_analysis)
+                            
+                            # Learn from intent-based failure
+                            if self.learn_from_analysis(intent_analysis, verbose=verbose):
+                                results["lessons_learned"] += 1
+                                self.checkpoint["lessons_learned"] += 1
+            
             analysis = self.analyze_trace(event, verbose=verbose)
             
             if analysis:
@@ -427,6 +596,12 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             print(f"  🚨 Undo Signals (Critical): {results['signal_stats']['undo_signals']}")
             print(f"  ⚠️ Abandonment Signals (Loss): {results['signal_stats']['abandonment_signals']}")
             print(f"  ✅ Acceptance Signals (Success): {results['signal_stats']['acceptance_signals']}")
+            if self.enable_intent_metrics:
+                print(f"\nIntent-Based Evaluation Statistics:")
+                print(f"  🔧 Troubleshooting Conversations: {results['intent_evaluations']['troubleshooting_conversations']}")
+                print(f"     ❌ Failed (>3 turns): {results['intent_evaluations']['troubleshooting_failures']}")
+                print(f"  💡 Brainstorming Conversations: {results['intent_evaluations']['brainstorming_conversations']}")
+                print(f"     ❌ Failed (too shallow): {results['intent_evaluations']['brainstorming_failures']}")
             if self.enable_prioritization:
                 stats = self.prioritization.get_stats()
                 print(f"\nPrioritization Framework Stats:")
