@@ -24,6 +24,17 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **Constraint Engineering (The Logic Firewall)**: Deterministic safety layer that intercepts AI plans before execution
+  - **Brain (LLM)**: Generates creative plans with high temperature
+  - **Firewall (Constraint Engine)**: Deterministic Python validation layer
+  - **Hand (Executor)**: Only executes if firewall approves
+  - **SQL Injection Prevention**: Blocks DROP TABLE, DELETE WHERE 1=1, and injection patterns
+  - **File Operation Safety**: Protects system directories and blocks dangerous commands
+  - **Cost Limits**: Enforces per-action cost thresholds
+  - **Domain Restrictions**: Whitelists for email domains and API endpoints
+  - **Rate Limiting**: Prevents excessive action execution
+  - Key insight: "The Human builds the walls; the AI plays inside them"
+  - See [CONSTRAINT_ENGINEERING.md](CONSTRAINT_ENGINEERING.md) for detailed documentation
 - **Evaluation Engineering (The New TDD)**: Write evaluation suites instead of implementation code
   - **Golden Datasets**: Define quality through 50+ test cases with expected outputs
   - **Scoring Rubrics**: Multi-dimensional evaluation (correctness + tone + safety)
@@ -90,6 +101,83 @@ cp .env.example .env
 ```
 
 ## Usage
+
+### Constraint Engineering (The Logic Firewall)
+
+Run the constraint engineering demonstration:
+```bash
+python example_constraint_engineering.py
+```
+
+This demonstrates:
+1. **Firewall Blocking Dangerous SQL**: DROP TABLE, DELETE WHERE 1=1
+2. **Firewall Blocking Dangerous File Operations**: rm -rf /, protected paths
+3. **Cost Limit Enforcement**: Actions exceeding $0.05 threshold
+4. **Email Domain Restrictions**: Only approved domains allowed
+5. **Safe Operations Approved**: Legitimate actions pass through
+6. **Creative AI with Safety**: High temperature models with deterministic firewall
+
+Manual usage:
+
+```python
+from constraint_engine import create_default_engine
+
+# Create firewall with sensible defaults
+engine = create_default_engine(
+    max_cost=0.05,
+    allowed_domains=["example.com", "company.com"]
+)
+
+# AI generates a plan (could be dangerous)
+ai_plan = {
+    "action_type": "sql_query",
+    "action_data": {
+        "query": "DROP TABLE users"  # Dangerous!
+    }
+}
+
+# Firewall intercepts and validates
+result = engine.validate_plan(ai_plan, verbose=True)
+
+if result.approved:
+    execute_action(ai_plan)
+else:
+    print("🚫 Blocked by firewall!")
+    for violation in result.violations:
+        print(f"  - {violation.message}")
+```
+
+Integration with DoerAgent:
+
+```python
+from agent import DoerAgent
+
+# Enable constraint engine in agent
+doer = DoerAgent(
+    enable_constraint_engine=True,
+    constraint_engine_config={
+        "max_cost": 0.05,
+        "allowed_domains": ["example.com", "company.com"]
+    }
+)
+
+# Validate actions before execution
+plan = {
+    "action_type": "sql_query",
+    "action_data": {"query": "SELECT * FROM users WHERE id = ?"}
+}
+
+approved, reason = doer.validate_action_plan(plan, verbose=True)
+if approved:
+    # Safe to execute
+    result = execute(plan)
+else:
+    print(f"Blocked: {reason}")
+```
+
+**The Key Insight**: "If correct but rude, score 5/10. If incorrect but polite, score 0/10."
+
+Quality is multi-dimensional. The "Source Code" of the future is the Evaluation Suite that constrains the AI.
 
 ### Evaluation Engineering (The New TDD)
 
@@ -539,6 +627,9 @@ See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
 
 Run all tests:
 ```bash
+# Test constraint engineering (logic firewall)
+python test_constraint_engineering.py
+
 # Test evaluation engineering framework
 python test_evaluation_engineering.py
 
