@@ -10,13 +10,9 @@ Tests validate that the deterministic safety layer correctly:
 """
 
 import sys
+import constraint_engine
 from constraint_engine import (
     ConstraintEngine,
-    SQLInjectionRule,
-    FileOperationRule,
-    CostLimitRule,
-    EmailDomainRule,
-    RateLimitRule,
     ViolationSeverity,
     create_default_engine
 )
@@ -28,7 +24,7 @@ def test_sql_injection_rule():
     print("TEST: SQL Injection Prevention")
     print("="*60)
     
-    rule = SQLInjectionRule()
+    rule = constraint_engine.SQLInjectionRule()
     
     # Test 1: Dangerous DROP TABLE
     plan = {
@@ -84,7 +80,7 @@ def test_file_operation_rule():
     print("TEST: File Operation Safety")
     print("="*60)
     
-    rule = FileOperationRule()
+    rule = constraint_engine.FileOperationRule()
     
     # Test 1: Dangerous rm -rf /
     plan = {
@@ -133,7 +129,7 @@ def test_cost_limit_rule():
     print("TEST: Cost Limit Enforcement")
     print("="*60)
     
-    rule = CostLimitRule(max_cost_per_action=0.05)
+    rule = constraint_engine.CostLimitRule(max_cost_per_action=0.05)
     
     # Test 1: Over limit
     plan = {
@@ -179,7 +175,7 @@ def test_email_domain_rule():
     print("TEST: Email Domain Restriction")
     print("="*60)
     
-    rule = EmailDomainRule(allowed_domains=["example.com", "company.com"])
+    rule = constraint_engine.EmailDomainRule(allowed_domains=["example.com", "company.com"])
     
     # Test 1: Unapproved domain
     plan = {
@@ -224,7 +220,7 @@ def test_rate_limit_rule():
     print("TEST: Rate Limit Enforcement")
     print("="*60)
     
-    rule = RateLimitRule(max_actions_per_minute=10)
+    rule = constraint_engine.RateLimitRule(max_actions_per_minute=10)
     
     # Test 1: Over rate limit
     plan = {
@@ -356,10 +352,8 @@ def test_custom_rules():
     print("TEST: Custom Rules")
     print("="*60)
     
-    from constraint_engine import ConstraintRule, ConstraintViolation
-    
-    # Create a custom rule
-    class CustomAPIRule(ConstraintRule):
+    # Create a custom rule using constraint_engine module
+    class CustomAPIRule(constraint_engine.ConstraintRule):
         def __init__(self):
             super().__init__(
                 name="custom_api_restriction",
@@ -371,7 +365,7 @@ def test_custom_rules():
             if plan.get("action_type") == "api_call":
                 api_name = plan.get("action_data", {}).get("api_name", "")
                 if api_name == "forbidden_api":
-                    violations.append(ConstraintViolation(
+                    violations.append(constraint_engine.ConstraintViolation(
                         rule_name=self.name,
                         severity=ViolationSeverity.HIGH,
                         message="Access to forbidden_api is not allowed",

@@ -87,9 +87,9 @@ class SQLInjectionRule(ConstraintRule):
         r'\bDELETE\s+FROM\b.*\bWHERE\s+1\s*=\s*1\b',
         r'\bTRUNCATE\s+TABLE\b',
         r'\bALTER\s+TABLE\b.*\bDROP\b',
-        r';\s*DROP\b',  # SQL injection pattern
-        r'--\s*',       # SQL comment pattern (common in injection)
-        r'/\*.*\*/',    # SQL block comment
+        r';\s*DROP\b',  # SQL injection pattern - command chaining
+        r';\s*DELETE\b',  # SQL injection pattern - command chaining
+        r'/\*.*?\*/',    # SQL block comment (non-greedy matching)
     ]
     
     def __init__(self):
@@ -268,13 +268,12 @@ class RateLimitRule(ConstraintRule):
             description=f"Limits actions to {max_actions_per_minute} per minute"
         )
         self.max_actions_per_minute = max_actions_per_minute
-        self.action_count = 0
     
     def validate(self, plan: Dict[str, Any]) -> List[ConstraintViolation]:
         violations = []
         
         # In a real implementation, this would track actions over time windows
-        # For this POC, we just demonstrate the concept
+        # For this POC, we demonstrate the concept using rate from plan data
         current_rate = plan.get("action_data", {}).get("current_rate", 0)
         
         if current_rate >= self.max_actions_per_minute:
