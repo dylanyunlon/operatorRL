@@ -188,7 +188,9 @@ class DoerAgent:
                  enable_prioritization: bool = True,
                  enable_intent_detection: bool = True,
                  enable_circuit_breaker: bool = False,
-                 circuit_breaker_config_file: Optional[str] = None):
+                 circuit_breaker_config_file: Optional[str] = None,
+                 enable_constraint_engine: bool = False,
+                 constraint_engine_config: Optional[Dict[str, Any]] = None):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)  # Read-only access
         self.tools = AgentTools()
@@ -196,6 +198,7 @@ class DoerAgent:
         self.enable_prioritization = enable_prioritization and PRIORITIZATION_AVAILABLE
         self.enable_intent_detection = enable_intent_detection
         self.enable_circuit_breaker = enable_circuit_breaker
+        self.enable_constraint_engine = enable_constraint_engine
         
         if self.enable_telemetry:
             self.event_stream = EventStream(stream_file)
@@ -240,6 +243,24 @@ class DoerAgent:
                 self.enable_circuit_breaker = False
                 self.circuit_breaker = None
         
+        # Constraint engine (logic firewall)
+        if self.enable_constraint_engine:
+            try:
+                from constraint_engine import create_default_engine
+                
+                if constraint_engine_config:
+                    self.constraint_engine = create_default_engine(**constraint_engine_config)
+                else:
+                    self.constraint_engine = create_default_engine()
+            except ImportError as e:
+                print(f"Warning: Constraint engine disabled - ImportError: {e}")
+                self.enable_constraint_engine = False
+                self.constraint_engine = None
+            except Exception as e:
+                print(f"Warning: Constraint engine disabled - {type(e).__name__}: {e}")
+                self.enable_constraint_engine = False
+                self.constraint_engine = None
+        
         # Model configuration
         self.agent_model = os.getenv("AGENT_MODEL", "gpt-4o-mini")
     
@@ -252,6 +273,34 @@ class DoerAgent:
             return getattr(self.tools, tool_name)(*args)
         except Exception as e:
             return f"Error executing tool '{tool_name}': {str(e)}"
+    
+    def validate_action_plan(self, plan: Dict[str, Any], verbose: bool = False) -> Tuple[bool, Optional[str]]:
+        """
+        Validate an action plan through the constraint engine (logic firewall).
+        
+        Args:
+            plan: Action plan to validate with keys:
+                - action_type: Type of action (e.g., "sql_query", "email", "file_operation")
+                - action_data: Action-specific data
+            verbose: Print validation details
+        
+        Returns:
+            (approved, reason) tuple where:
+                - approved: Whether the plan passed validation
+                - reason: Reason for rejection if not approved
+        """
+        if not self.enable_constraint_engine:
+            return True, None
+        
+        result = self.constraint_engine.validate_plan(plan, verbose=verbose)
+        
+        if result.approved:
+            return True, None
+        else:
+            # Collect violation messages
+            violation_messages = [v.message for v in result.get_blocking_violations()]
+            reason = "; ".join(violation_messages)
+            return False, reason
     
     def act(self, query: str, user_id: Optional[str] = None, 
             version_override: Optional[str] = None) -> Tuple[str, str]:
