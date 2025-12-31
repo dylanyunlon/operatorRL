@@ -24,6 +24,15 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **OpenAgent Definition (OAD) - The "USB Port" for AI**: Standard interface definition language for AI agents
+  - **Capabilities**: What the agent CAN do (e.g., "I can write Python 3.9 code")
+  - **Constraints**: What the agent WON'T/CAN'T do (e.g., "I have no internet access")
+  - **IO Contract**: Standard input/output specification (like OpenAPI/Swagger)
+  - **Trust Score**: Real performance metrics (success rate, latency, executions)
+  - **Agent Discovery**: Find and compare agents in a marketplace
+  - **Agent Composition**: Validate compatibility and build pipelines
+  - Key insight: "This is the USB Port moment for AI. The startup that defines the Standard Agent Protocol wins the platform war."
+  - See [OPENAGENT_DEFINITION.md](OPENAGENT_DEFINITION.md) for detailed documentation
 - **Orchestration Layer (Deterministic Workflows)**: Rigid state machine that manages probabilistic AI workers
   - **The Orchestrator**: Deterministic state machine (not a fuzzy AI manager)
   - **Hub & Spoke Pattern**: Workers never talk to each other directly - they report to the Hub
@@ -109,6 +118,91 @@ cp .env.example .env
 ```
 
 ## Usage
+
+### OpenAgent Definition (OAD) - Standard Agent Protocol
+
+Run the OpenAgent Definition demonstration:
+```bash
+python example_agent_metadata.py
+```
+
+This demonstrates:
+1. **Capabilities**: Defining what the agent can do
+2. **Constraints**: Defining what the agent won't/can't do
+3. **IO Contract**: Standard input/output specification
+4. **Trust Score**: Real performance metrics that update dynamically
+5. **Agent Discovery**: Finding agents in a marketplace
+6. **Agent Composition**: Validating compatibility and building pipelines
+
+Manual usage:
+
+```python
+from agent_metadata import AgentMetadata, AgentMetadataManager
+
+# Create metadata manifest
+metadata = AgentMetadata(
+    agent_id="github-coder",
+    name="GitHub Coder Agent",
+    version="2.3.1",
+    description="Specialized agent for GitHub code operations"
+)
+
+# Define capabilities (The "Can-Do")
+metadata.add_capability(
+    name="python_code_generation",
+    description="Can generate Python 3.9+ code",
+    tags=["python", "code-generation"]
+)
+
+# Define constraints (The "Won't-Do")
+metadata.add_constraint(
+    type="access",
+    description="No internet access outside GitHub API",
+    severity="high"
+)
+
+# Set IO contract
+metadata.set_io_contract(
+    input_schema={"type": "object", "properties": {...}},
+    output_schema={"type": "object", "properties": {...}}
+)
+
+# Set trust score
+metadata.set_trust_score(
+    success_rate=0.93,
+    avg_latency_ms=2400.0,
+    total_executions=1547
+)
+
+# Save manifest
+manager = AgentMetadataManager("agent_manifest.json")
+manager.save_manifest(metadata)
+
+# Publish to marketplace
+result = manager.publish_manifest()
+```
+
+Integration with DoerAgent:
+
+```python
+from agent import DoerAgent
+
+# Agent automatically publishes and maintains OAD manifest
+doer = DoerAgent(enable_metadata=True)
+
+# Get agent's metadata manifest
+manifest = doer.get_metadata_manifest()
+print(f"Agent: {manifest['name']}")
+print(f"Trust Score: {manifest['trust_score']['success_rate']:.1%}")
+
+# Run tasks - trust score updates automatically
+result = doer.run("What is 10 + 20?")
+
+# Publish to marketplace
+doer.publish_manifest()
+```
+
+**The Key Insight**: "This is the USB Port moment for AI. The startup that defines the Standard Agent Protocol wins the platform war."
 
 ### Orchestration Layer (Deterministic Workflows)
 
@@ -716,6 +810,9 @@ See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
 
 Run all tests:
 ```bash
+# Test OpenAgent Definition (OAD) metadata system
+python test_agent_metadata.py
+
 # Test orchestration layer (deterministic workflows)
 python test_orchestration.py
 
