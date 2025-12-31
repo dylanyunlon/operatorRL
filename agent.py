@@ -203,7 +203,6 @@ class DoerAgent:
         self.enable_circuit_breaker = enable_circuit_breaker
         self.enable_constraint_engine = enable_constraint_engine
         self.enable_metadata = enable_metadata
-        self.enable_metadata = enable_metadata
         
         if self.enable_telemetry:
             self.event_stream = EventStream(stream_file)
