@@ -30,6 +30,7 @@ Traditional self-improvement loop for backward compatibility:
   - **Acceptance Signal** (Success): User moves to next task without follow-up
   - Eliminates blind spot of relying solely on explicit feedback
   - Learns from what users DO, not just what they SAY
+  - See [SILENT_SIGNALS.md](SILENT_SIGNALS.md) for detailed documentation
 - **Decoupled Execution/Learning**: Low-latency execution with offline learning
 - **Upgrade Purge Strategy**: Active lifecycle management for wisdom database
   - Automatically removes lessons when upgrading models
