@@ -179,6 +179,7 @@ class DoerAgent:
     Does NOT perform reflection or evolution during execution.
     
     Optionally supports circuit breaker for A/B testing different agent versions.
+    Publishes an OpenAgent Definition (OAD) metadata manifest.
     """
     
     def __init__(self,
@@ -190,7 +191,9 @@ class DoerAgent:
                  enable_circuit_breaker: bool = False,
                  circuit_breaker_config_file: Optional[str] = None,
                  enable_constraint_engine: bool = False,
-                 constraint_engine_config: Optional[Dict[str, Any]] = None):
+                 constraint_engine_config: Optional[Dict[str, Any]] = None,
+                 enable_metadata: bool = True,
+                 manifest_file: str = "agent_manifest.json"):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.wisdom = MemorySystem(wisdom_file)  # Read-only access
         self.tools = AgentTools()
@@ -199,12 +202,37 @@ class DoerAgent:
         self.enable_intent_detection = enable_intent_detection
         self.enable_circuit_breaker = enable_circuit_breaker
         self.enable_constraint_engine = enable_constraint_engine
+        self.enable_metadata = enable_metadata
+        self.enable_metadata = enable_metadata
         
         if self.enable_telemetry:
             self.event_stream = EventStream(stream_file)
         
         if self.enable_prioritization:
             self.prioritization = PrioritizationFramework()
+        
+        # OpenAgent Definition (OAD) metadata system
+        if self.enable_metadata:
+            try:
+                from agent_metadata import AgentMetadataManager, create_default_manifest
+                self.metadata_manager = AgentMetadataManager(manifest_file)
+                
+                # Load or create default manifest
+                if not self.metadata_manager.load_manifest():
+                    metadata = create_default_manifest(
+                        agent_id="doer-agent",
+                        name="Doer Agent (Self-Evolving)",
+                        version="1.0.0"
+                    )
+                    self.metadata_manager.save_manifest(metadata)
+            except ImportError as e:
+                print(f"Warning: Metadata system disabled - ImportError: {e}")
+                self.enable_metadata = False
+                self.metadata_manager = None
+            except Exception as e:
+                print(f"Warning: Metadata system disabled - {type(e).__name__}: {e}")
+                self.enable_metadata = False
+                self.metadata_manager = None
         
         # Intent detection
         if self.enable_intent_detection:
@@ -509,6 +537,14 @@ class DoerAgent:
             if random.random() < CIRCUIT_BREAKER_EVAL_PROBABILITY:
                 self.circuit_breaker.evaluate_and_decide(verbose=False)
         
+        # Update agent metadata trust score if enabled
+        if self.enable_metadata and self.metadata_manager:
+            success = not agent_response.startswith("Error")
+            metadata = self.metadata_manager.get_manifest()
+            if metadata:
+                metadata.update_trust_score(success=success, latency_ms=latency_ms)
+                self.metadata_manager.save_manifest(metadata)
+        
         # Emit task completion event
         self._emit_telemetry(
             "task_complete",
@@ -654,6 +690,38 @@ class DoerAgent:
             },
             verbose=verbose
         )
+    
+    def get_metadata_manifest(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the agent's OpenAgent Definition (OAD) metadata manifest.
+        
+        Returns the complete metadata including capabilities, constraints,
+        IO contract, and trust score.
+        
+        This is the "USB Port" for AI - a standard interface definition
+        that allows agents to be discovered, understood, and composed.
+        """
+        if not self.enable_metadata or not self.metadata_manager:
+            return None
+        
+        metadata = self.metadata_manager.get_manifest()
+        return metadata.to_dict() if metadata else None
+    
+    def publish_manifest(self) -> Optional[Dict[str, Any]]:
+        """
+        Publish the agent's metadata manifest.
+        
+        In a real system, this would register the agent in a marketplace
+        or registry for discovery by other agents or systems.
+        """
+        if not self.enable_metadata or not self.metadata_manager:
+            return None
+        
+        try:
+            return self.metadata_manager.publish_manifest()
+        except ValueError as e:
+            print(f"Error publishing manifest: {e}")
+            return None
 
 
 class SelfEvolvingAgent:
