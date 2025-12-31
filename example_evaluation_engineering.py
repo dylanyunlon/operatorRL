@@ -34,11 +34,15 @@ def create_date_parsing_dataset() -> EvaluationDataset:
     Create the golden dataset for date parsing.
     
     This is what a Senior Engineer writes instead of parseDate() implementation.
-    50 tricky, malformed date strings with expected outputs.
+    25 tricky, malformed date strings with expected outputs.
+    
+    Note: The problem statement mentions "50 tricky date strings" as the concept.
+    This demo includes 25 representative cases for practical demonstration.
+    In production, you would enumerate 50+ edge cases.
     """
     dataset = EvaluationDataset(
         name="Date Parsing Golden Dataset",
-        description="50 tricky, malformed date strings that the AI must parse correctly"
+        description="Tricky, malformed date strings that the AI must parse correctly"
     )
     
     # Add diverse, edge-case date formats
@@ -390,7 +394,7 @@ def demonstrate_eval_dd():
     
     # Demo 1: Date Parsing
     print("\n\n" + "#"*80)
-    print("DEMO 1: Date Parsing - 50 Tricky Date Strings")
+    print("DEMO 1: Date Parsing - 25 Tricky Date Strings")
     print("#"*80)
     print("\nThe Engineer's Job: Write the Golden Dataset (not the code!)")
     print("  ✓ Created 25 test cases with edge cases")
