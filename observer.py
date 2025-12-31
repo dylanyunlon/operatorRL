@@ -217,12 +217,13 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
         # Determine learning priority based on signal type
         if event.signal_type == "undo":
             # Critical failure - user reversed the action
+            signal_context = event.signal_context or {}
             critique = (
                 f"CRITICAL FAILURE: User immediately reversed the agent's action. "
                 f"This indicates the response was fundamentally wrong or harmful. "
                 f"Query: {event.query}. "
                 f"Response: {event.agent_response}. "
-                f"Undo action: {event.signal_context.get('undo_action', 'Not specified')}. "
+                f"Undo action: {signal_context.get('undo_action', 'Not specified')}. "
                 f"The agent MUST learn to avoid similar responses in the future."
             )
             score = 0.0  # Lowest possible score
@@ -231,12 +232,13 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             
         elif event.signal_type == "abandonment":
             # Loss of engagement - user gave up
+            signal_context = event.signal_context or {}
             critique = (
                 f"USER ABANDONMENT: User started the workflow but stopped responding. "
                 f"This indicates the agent failed to engage effectively. "
                 f"Query: {event.query}. "
                 f"Last response: {event.agent_response or 'None'}. "
-                f"Interactions: {event.signal_context.get('interaction_count', 0)}. "
+                f"Interactions: {signal_context.get('interaction_count', 0)}. "
                 f"The agent should provide more engaging or helpful responses."
             )
             score = 0.3  # Low score
@@ -245,12 +247,13 @@ Return ONLY the new system instructions as plain text (no JSON, no formatting):
             
         elif event.signal_type == "acceptance":
             # Success - user accepted and moved on
+            signal_context = event.signal_context or {}
             critique = (
                 f"SUCCESS: User accepted the output and moved to the next task. "
                 f"This response pattern should be reinforced. "
                 f"Query: {event.query}. "
                 f"Response: {event.agent_response}. "
-                f"Next task: {event.signal_context.get('next_task', 'Not specified')}. "
+                f"Next task: {signal_context.get('next_task', 'Not specified')}. "
                 f"The agent is performing well in this scenario."
             )
             score = 1.0  # Perfect score

@@ -266,6 +266,36 @@ class DoerAgent:
         )
         self.event_stream.emit(event)
     
+    def _emit_signal(self, signal_type: str, query: str, agent_response: Optional[str],
+                    success: bool, user_id: Optional[str], 
+                    signal_context: Dict[str, Any], verbose: bool) -> None:
+        """
+        Helper method to emit a signal event to the stream.
+        Reduces code duplication across signal emission methods.
+        """
+        if not self.enable_telemetry:
+            return
+        
+        metadata = dict(signal_context)
+        if user_id:
+            metadata["user_id"] = user_id
+        
+        event = TelemetryEvent(
+            event_type=f"signal_{signal_type}",
+            timestamp=datetime.now().isoformat(),
+            query=query,
+            agent_response=agent_response,
+            success=success,
+            instructions_version=self.wisdom.instructions['version'],
+            metadata=metadata,
+            signal_type=signal_type,
+            signal_context=signal_context
+        )
+        self.event_stream.emit(event)
+        
+        if verbose:
+            print("[TELEMETRY] Signal emitted to stream")
+    
     def run(self, query: str, verbose: bool = True, 
             user_feedback: Optional[str] = None,
             user_id: Optional[str] = None) -> Dict[str, Any]:
@@ -345,29 +375,15 @@ class DoerAgent:
             print("="*60)
             print(f"User reversed agent action: {undo_action or 'Not specified'}")
         
-        if not self.enable_telemetry:
-            return
-        
-        metadata = {
-            "user_id": user_id,
-            "undo_action": undo_action
-        }
-        
-        event = TelemetryEvent(
-            event_type="signal_undo",
-            timestamp=datetime.now().isoformat(),
+        self._emit_signal(
+            signal_type="undo",
             query=query,
             agent_response=agent_response,
             success=False,
-            instructions_version=self.wisdom.instructions['version'],
-            metadata=metadata,
-            signal_type="undo",
-            signal_context={"undo_action": undo_action}
+            user_id=user_id,
+            signal_context={"undo_action": undo_action},
+            verbose=verbose
         )
-        self.event_stream.emit(event)
-        
-        if verbose:
-            print("[TELEMETRY] Undo signal emitted to stream")
     
     def emit_abandonment_signal(self, query: str, agent_response: Optional[str] = None,
                                 user_id: Optional[str] = None,
@@ -394,33 +410,18 @@ class DoerAgent:
             print("="*60)
             print(f"User abandoned workflow after {interaction_count} interactions")
         
-        if not self.enable_telemetry:
-            return
-        
-        metadata = {
-            "user_id": user_id,
-            "interaction_count": interaction_count,
-            "last_interaction_time": last_interaction_time
-        }
-        
-        event = TelemetryEvent(
-            event_type="signal_abandonment",
-            timestamp=datetime.now().isoformat(),
+        self._emit_signal(
+            signal_type="abandonment",
             query=query,
             agent_response=agent_response,
             success=False,
-            instructions_version=self.wisdom.instructions['version'],
-            metadata=metadata,
-            signal_type="abandonment",
+            user_id=user_id,
             signal_context={
                 "interaction_count": interaction_count,
                 "last_interaction_time": last_interaction_time
-            }
+            },
+            verbose=verbose
         )
-        self.event_stream.emit(event)
-        
-        if verbose:
-            print("[TELEMETRY] Abandonment signal emitted to stream")
     
     def emit_acceptance_signal(self, query: str, agent_response: str,
                               user_id: Optional[str] = None,
@@ -447,33 +448,18 @@ class DoerAgent:
             print("="*60)
             print(f"User accepted output and moved to: {next_task or 'next task'}")
         
-        if not self.enable_telemetry:
-            return
-        
-        metadata = {
-            "user_id": user_id,
-            "next_task": next_task,
-            "time_to_next_task": time_to_next_task
-        }
-        
-        event = TelemetryEvent(
-            event_type="signal_acceptance",
-            timestamp=datetime.now().isoformat(),
+        self._emit_signal(
+            signal_type="acceptance",
             query=query,
             agent_response=agent_response,
             success=True,
-            instructions_version=self.wisdom.instructions['version'],
-            metadata=metadata,
-            signal_type="acceptance",
+            user_id=user_id,
             signal_context={
                 "next_task": next_task,
                 "time_to_next_task": time_to_next_task
-            }
+            },
+            verbose=verbose
         )
-        self.event_stream.emit(event)
-        
-        if verbose:
-            print("[TELEMETRY] Acceptance signal emitted to stream")
 
 
 class SelfEvolvingAgent:
