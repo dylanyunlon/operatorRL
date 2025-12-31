@@ -187,7 +187,7 @@ def run_scenario_2_automatic_rollback():
     print("(Simulating high latency and low completion rate)\n")
     
     # Clear old good metrics to make degradation clear
-    controller.metrics.metrics_log = []
+    controller.metrics.clear_metrics()
     
     for i in range(15):
         version = "new" if controller.should_use_new_version(f"req_{20+i}") else "old"

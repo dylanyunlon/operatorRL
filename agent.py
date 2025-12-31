@@ -166,6 +166,10 @@ class AgentTools:
 """
 
 
+# Constants for circuit breaker integration
+CIRCUIT_BREAKER_EVAL_PROBABILITY = 0.1  # Evaluate circuit breaker 10% of the time
+
+
 class DoerAgent:
     """
     The "Doer" - Synchronous execution agent.
@@ -453,7 +457,7 @@ class DoerAgent:
             
             # Periodically evaluate and decide on rollout progression
             # In production, this might be done by a separate process
-            if random.random() < 0.1:  # Evaluate 10% of the time
+            if random.random() < CIRCUIT_BREAKER_EVAL_PROBABILITY:
                 self.circuit_breaker.evaluate_and_decide(verbose=False)
         
         # Emit task completion event
