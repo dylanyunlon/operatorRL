@@ -60,3 +60,6 @@ user_preferences.json
 # Model upgrade tracking
 model_upgrade_log.json
 
+# Ghost Mode / Context Shadow
+behavior_model.json
+
