@@ -116,6 +116,15 @@ Traditional self-improvement loop for backward compatibility:
   - Eliminates blind spot of relying solely on explicit feedback
   - Learns from what users DO, not just what they SAY
   - See [SILENT_SIGNALS.md](SILENT_SIGNALS.md) for detailed documentation
+- **Ghost Mode (Passive Observation)**: The Observer Daemon Pattern - invisible until indispensable
+  - **Background Processing**: Daemon runs silently consuming signal streams
+  - **Dry Run Analysis**: Analyzes signals without taking action
+  - **Confidence-Based Surfacing**: Only surfaces when highly confident
+  - **Context Shadow**: Learns user behavior patterns locally and securely
+  - **Behavior Model**: Local storage of workflows that can be queried by agents
+  - Key insight: "The future interface isn't a Destination (website). It is a Daemon (background process)."
+  - Startup opportunity: "Context Shadow" - the "Cookies" of the real world for secure user context storage
+  - See [GHOST_MODE.md](GHOST_MODE.md) for detailed documentation
 - **Decoupled Execution/Learning**: Low-latency execution with offline learning
 - **Upgrade Purge Strategy**: Active lifecycle management for wisdom database
   - Automatically removes lessons when upgrading models
@@ -924,6 +933,141 @@ doer.emit_acceptance_signal(
 )
 ```
 
+### Ghost Mode (Passive Observation)
+
+Run the Ghost Mode demonstration:
+```bash
+python example_ghost_mode.py
+```
+
+This demonstrates:
+1. **Background Daemon**: Observer runs silently without blocking
+2. **Dry Run Analysis**: Analyzes signals without taking action
+3. **Confidence-Based Surfacing**: Only interrupts when highly confident
+4. **Context Shadow**: Learns user behavior patterns locally
+5. **Pattern Recognition**: Proactively suggests next steps based on learned workflows
+
+Manual usage:
+
+```python
+from ghost_mode import (
+    GhostModeObserver,
+    ContextShadow,
+    BehaviorPattern,
+    ObservationResult
+)
+
+# Define callback for when observations should surface
+def on_high_confidence(observation: ObservationResult):
+    """Called when Ghost Mode has something important to share."""
+    print(f"🔔 {observation.observation}")
+    if observation.recommendation:
+        print(f"💡 {observation.recommendation}")
+
+# Create observer with confidence threshold
+observer = GhostModeObserver(
+    confidence_threshold=0.7,  # Only surface if confidence >= 0.7
+    surfacing_callback=on_high_confidence
+)
+
+# Start the daemon (runs in background thread)
+observer.start_observing(poll_interval=1.0)
+
+# Application generates signals (non-blocking)
+observer.observe_signal({
+    "type": "file_change",
+    "data": {
+        "file_path": "/config/secrets.yaml",
+        "change_type": "modified"
+    }
+})
+
+# Daemon processes silently and surfaces only when confident
+# → High confidence: "Security-sensitive file modified"
+
+# Stop when done
+observer.stop_observing()
+
+# Get statistics
+stats = observer.get_stats()
+print(f"Processed: {stats['signals_processed']}")
+print(f"Surfaced: {stats['signals_surfaced']}")
+```
+
+Context Shadow - Learning User Workflows:
+
+```python
+# Create context shadow for secure pattern storage
+shadow = ContextShadow(user_id="user123")
+
+# Learn a workflow pattern
+expense_pattern = BehaviorPattern(
+    pattern_id="expense_filing",
+    name="Weekly Expense Filing",
+    description="User files expenses every Friday",
+    trigger="open_expense_form",
+    steps=[
+        "Open expense report form",
+        "Attach receipt image",
+        "Fill in amount and category",
+        "Submit for approval"
+    ],
+    frequency=1,
+    last_seen="2024-01-01T16:00:00",
+    confidence=0.7
+)
+shadow.learn_pattern(expense_pattern)
+
+# Query learned patterns
+patterns = shadow.query_patterns(
+    trigger="open_expense_form",
+    min_confidence=0.5
+)
+
+for pattern in patterns:
+    print(f"Pattern: {pattern.name}")
+    print(f"Confidence: {pattern.confidence:.2f}")
+    print(f"Next steps: {pattern.steps}")
+```
+
+Integrated workflow with Ghost Mode + Context Shadow:
+
+```python
+# Create observer with context shadow
+shadow = ContextShadow(user_id="user456")
+observer = GhostModeObserver(
+    context_shadow=shadow,
+    confidence_threshold=0.6,
+    surfacing_callback=on_high_confidence
+)
+
+observer.start_observing()
+
+# As user performs workflow, Ghost Mode learns
+observer.observe_signal({
+    "type": "user_action",
+    "data": {
+        "action": "code_review",
+        "sequence": ["open_pr", "review_files", "add_comments", "approve"]
+    }
+})
+
+# When user starts the workflow again, Ghost Mode recognizes it
+# and proactively suggests next steps
+observer.observe_signal({
+    "type": "user_action",
+    "data": {
+        "action": "code_review",  # Recognizes the trigger
+        "sequence": ["open_pr"]
+    }
+})
+# → Surfaces: "Suggest next step: review_files"
+```
+
+**The Key Insight**: "The future interface isn't a Destination (a website). It is a Daemon (a background process). It is invisible until it is indispensable."
+
+**Startup Opportunity**: Build the "Context Shadow" - a lightweight daemon that securely shadows employees, learning their workflows and building a local Behavior Model that can be queried by other Agents. The "Cookies" of the real world—a secure way to store user context.
+
 ### Wisdom Curator
 
 Run the wisdom curator demo:
@@ -1232,6 +1376,9 @@ python test_intent_detection.py
 
 # Test circuit breaker system
 python test_circuit_breaker.py
+
+# Test Ghost Mode (passive observation)
+python test_ghost_mode.py
 ```
 
 ### Configuration
