@@ -24,6 +24,15 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **Agent Brokerage Layer - The API Economy**: Utility-based pricing and micro-payments for specialized agents
+  - **Agent Marketplace**: Registry where agents publish capabilities and pricing
+  - **Agent Bidding**: Agents compete on cost, speed, and quality for each task
+  - **Micro-Payments**: Pay per API call, not monthly subscriptions
+  - **Dynamic Selection**: Orchestrator selects best agent based on user constraints
+  - **Usage Tracking**: Real-time cost and performance monitoring
+  - Key insight: "The Old World: Subscribe for $20/month. The New World: Pay $0.01 for 10 seconds."
+  - Startup opportunity: "Agent Marketplace as a Service" - the AWS Marketplace for AI agents
+  - See [AGENT_BROKERAGE.md](AGENT_BROKERAGE.md) for detailed documentation
 - **OpenAgent Definition (OAD) - The "USB Port" for AI**: Standard interface definition language for AI agents
   - **Capabilities**: What the agent CAN do (e.g., "I can write Python 3.9 code")
   - **Constraints**: What the agent WON'T/CAN'T do (e.g., "I have no internet access")
@@ -118,6 +127,118 @@ cp .env.example .env
 ```
 
 ## Usage
+
+### Agent Brokerage Layer (The API Economy)
+
+Run the agent brokerage demonstration:
+```bash
+python example_agent_brokerage.py
+```
+
+This demonstrates:
+1. **Agent Discovery**: Finding agents by capability, price, and performance
+2. **Agent Bidding**: Multiple agents compete for each task
+3. **Task Execution**: Automatic selection and execution of best agent
+4. **Cost Optimization**: Different strategies (cheapest, fastest, best value)
+5. **User Constraints**: Budget and latency limits
+6. **Usage Tracking**: Real-time cost and performance monitoring
+7. **Economic Comparison**: Subscription vs. utility pricing analysis
+
+Manual usage:
+
+```python
+from agent_brokerage import (
+    AgentMarketplace,
+    AgentBroker,
+    AgentListing,
+    AgentPricing,
+    PricingModel,
+    create_sample_agents
+)
+
+# 1. Create marketplace and register agents
+marketplace = AgentMarketplace()
+for agent in create_sample_agents():
+    marketplace.register_agent(agent)
+
+# 2. Create broker
+broker = AgentBroker(marketplace)
+
+# 3. Execute task with automatic agent selection
+result = broker.execute_task(
+    task="Extract text from invoice.pdf",
+    selection_strategy="best_value",  # or "cheapest", "fastest", "most_reliable"
+    user_constraints={
+        "max_budget": 0.05,        # Max $0.05 per execution
+        "max_latency_ms": 2000     # Max 2000ms latency
+    },
+    verbose=True
+)
+
+print(f"Agent Selected: {result['agent_name']}")
+print(f"Actual Cost: ${result['actual_cost']:.4f}")
+print(f"Actual Latency: {result['actual_latency_ms']:.0f}ms")
+print(f"Response: {result['response']}")
+
+# 4. Track usage and costs
+report = broker.get_usage_report()
+print(f"Total Spent: ${report['total_spent']:.4f}")
+print(f"Total Executions: {report['total_executions']}")
+```
+
+Register your own agent in the marketplace:
+
+```python
+# Define pricing
+pricing = AgentPricing(
+    model=PricingModel.PER_EXECUTION,
+    base_price=0.01  # $0.01 per execution
+)
+
+# Create agent listing
+agent = AgentListing(
+    agent_id="my_pdf_agent",
+    name="My PDF OCR Agent",
+    description="Fast and accurate PDF text extraction",
+    capabilities=["pdf_ocr", "text_extraction"],
+    pricing=pricing,
+    executor=my_ocr_function,  # Your implementation
+    avg_latency_ms=1500.0,
+    success_rate=0.95
+)
+
+# Register in marketplace
+marketplace.register_agent(agent)
+```
+
+Integration with DoerAgent:
+
+```python
+from agent import DoerAgent
+
+# Wrap DoerAgent as a marketplace agent
+def doer_executor(task: str, metadata: dict) -> str:
+    doer = DoerAgent(enable_telemetry=False)
+    result = doer.run(task, verbose=False)
+    return result["response"]
+
+doer_listing = AgentListing(
+    agent_id="doer_agent",
+    name="Self-Evolving Doer Agent",
+    capabilities=["calculations", "time_queries", "general_tasks"],
+    pricing=AgentPricing(
+        model=PricingModel.PER_EXECUTION,
+        base_price=0.03
+    ),
+    executor=doer_executor,
+    avg_latency_ms=1200.0,
+    success_rate=0.92
+)
+
+marketplace.register_agent(doer_listing)
+```
+
+**The Key Insight**: "The Old World: Subscribe for $20/month. The New World: Pay $0.01 for 10 seconds. The future is an API Economy where specialized agents sell UTILITY, not subscriptions."
 
 ### OpenAgent Definition (OAD) - Standard Agent Protocol
 
@@ -810,6 +931,9 @@ See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
 
 Run all tests:
 ```bash
+# Test agent brokerage layer (API economy)
+python test_agent_brokerage.py
+
 # Test OpenAgent Definition (OAD) metadata system
 python test_agent_metadata.py
 
