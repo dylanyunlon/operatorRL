@@ -11,6 +11,7 @@ The Old World: "Subscribe to my Agent for $20/month"
 The New World: "Pay $0.01 for 10 seconds of specialized work"
 """
 
+from typing import Dict
 from agent_brokerage import (
     AgentMarketplace,
     AgentBroker,

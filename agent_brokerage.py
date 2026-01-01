@@ -197,7 +197,7 @@ class TaskExecution:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
-            "task_id": task_id,
+            "task_id": self.task_id,
             "task_description": self.task_description,
             "selected_agent_id": self.selected_agent_id,
             "actual_cost": self.actual_cost,
