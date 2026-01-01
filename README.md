@@ -1,28 +1,44 @@
-# Self-Evolving Agent POC
+# Self-Evolving Agent Framework
 
-A proof-of-concept implementation of a self-evolving AI agent that improves its own system instructions based on performance feedback.
+A comprehensive, production-ready framework for building self-improving AI agents with advanced features including polymorphic output, universal signal bus, agent brokerage, orchestration, constraint engineering, and more.
 
-## Overview
+## 🚀 Quick Start
 
-This agent implements two modes of operation:
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-### Decoupled Mode (Recommended)
-Separates execution from learning for low-latency operation:
+# Copy environment file and add your OpenAI API key
+cp .env.example .env
 
-1. **Doer (Synchronous)**: Executes tasks with read-only access to wisdom database, emits telemetry
-2. **Observer (Asynchronous)**: Offline learning process that analyzes telemetry and updates wisdom
+# Run basic tests (no API key required)
+python tests/test_agent.py
 
-### Legacy Mode (Synchronous)
-Traditional self-improvement loop for backward compatibility:
+# Run a simple example (requires API key)
+python examples/example.py
+```
 
-1. **Memory**: System instructions stored in JSON
-2. **Task**: Agent receives a query
-3. **Act**: Agent attempts to solve using available tools
-4. **Reflect**: Separate LLM evaluates the output (returns score 0-1 and critique)
-5. **Evolve**: If score < 0.8, a third LLM rewrites system instructions
-6. **Retry**: Agent runs again with improved instructions
+📖 **New to the framework?** Start with our [Getting Started Guide](docs/GETTING_STARTED.md)
 
-## Features
+## 📁 Project Structure
+
+```
+├── src/                    # Core framework modules
+│   ├── agent.py           # Main agent implementation
+│   ├── observer.py        # Asynchronous learning
+│   ├── telemetry.py       # Event tracking
+│   ├── polymorphic_output.py      # Adaptive rendering
+│   ├── universal_signal_bus.py    # Omni-channel input
+│   └── ...                        # 17+ modules
+├── tests/                  # Comprehensive test suite
+├── examples/               # Usage examples & samples
+├── docs/                   # Detailed documentation
+├── README.md              # This file
+├── setup.py               # Package installation
+└── requirements.txt       # Dependencies
+```
+
+## ✨ Key Features
 
 - **Polymorphic Output (Adaptive Rendering)**: The "Just-in-Time UI" where agents determine response modality based on context
   - **Output Modality Detection**: Automatically chooses the right format (text, widget, chart, table, etc.)
@@ -33,7 +49,7 @@ Traditional self-improvement loop for backward compatibility:
   - **Context-Aware**: IDE gets ghost text, monitoring gets widgets, chat gets text
   - Key insight: "If input can be anything, output must be anything"
   - Startup opportunity: "Generative UI Engine SDK" - stop hard-coding screens, render them dynamically
-  - See [POLYMORPHIC_OUTPUT.md](POLYMORPHIC_OUTPUT.md) for detailed documentation
+  - See [POLYMORPHIC_OUTPUT.md](docs/POLYMORPHIC_OUTPUT.md) for detailed documentation
 - **Universal Signal Bus (Omni-Channel Ingestion)**: The "Input Agnostic" architecture for AI
   - **Signal Normalizer**: Entry point is NOT a UI - it's a signal normalizer
   - **File Change Events**: Passive input from VS Code/IDE file watchers
@@ -43,7 +59,7 @@ Traditional self-improvement loop for backward compatibility:
   - **Standard Context Object**: All signals normalized to same format
   - Key insight: "The entry point is NOT a UI component; it is a Signal Normalizer"
   - Startup opportunity: "Universal Signal Bus as a Service" - the managed API for AI input
-  - See [UNIVERSAL_SIGNAL_BUS.md](UNIVERSAL_SIGNAL_BUS.md) for detailed documentation
+  - See [UNIVERSAL_SIGNAL_BUS.md](docs/UNIVERSAL_SIGNAL_BUS.md) for detailed documentation
 - **Agent Brokerage Layer - The API Economy**: Utility-based pricing and micro-payments for specialized agents
   - **Agent Marketplace**: Registry where agents publish capabilities and pricing
   - **Agent Bidding**: Agents compete on cost, speed, and quality for each task
@@ -52,7 +68,7 @@ Traditional self-improvement loop for backward compatibility:
   - **Usage Tracking**: Real-time cost and performance monitoring
   - Key insight: "The Old World: Subscribe for $20/month. The New World: Pay $0.01 for 10 seconds."
   - Startup opportunity: "Agent Marketplace as a Service" - the AWS Marketplace for AI agents
-  - See [AGENT_BROKERAGE.md](AGENT_BROKERAGE.md) for detailed documentation
+  - See [AGENT_BROKERAGE.md](docs/AGENT_BROKERAGE.md) for detailed documentation
 - **OpenAgent Definition (OAD) - The "USB Port" for AI**: Standard interface definition language for AI agents
   - **Capabilities**: What the agent CAN do (e.g., "I can write Python 3.9 code")
   - **Constraints**: What the agent WON'T/CAN'T do (e.g., "I have no internet access")
@@ -61,7 +77,7 @@ Traditional self-improvement loop for backward compatibility:
   - **Agent Discovery**: Find and compare agents in a marketplace
   - **Agent Composition**: Validate compatibility and build pipelines
   - Key insight: "This is the USB Port moment for AI. The startup that defines the Standard Agent Protocol wins the platform war."
-  - See [OPENAGENT_DEFINITION.md](OPENAGENT_DEFINITION.md) for detailed documentation
+  - See [OPENAGENT_DEFINITION.md](docs/OPENAGENT_DEFINITION.md) for detailed documentation
 - **Orchestration Layer (Deterministic Workflows)**: Rigid state machine that manages probabilistic AI workers
   - **The Orchestrator**: Deterministic state machine (not a fuzzy AI manager)
   - **Hub & Spoke Pattern**: Workers never talk to each other directly - they report to the Hub
@@ -69,7 +85,7 @@ Traditional self-improvement loop for backward compatibility:
   - **Pre-built Pipelines**: Product Manager → Coder → Reviewer workflows
   - Key insight: "The Brain (AI) is probabilistic, but the Skeleton (Orchestrator) is deterministic"
   - Startup opportunity: "Orchestration-as-a-Service" - define a goal, service spins up the correct pipeline
-  - See [ORCHESTRATION.md](ORCHESTRATION.md) for detailed documentation
+  - See [ORCHESTRATION.md](docs/ORCHESTRATION.md) for detailed documentation
 - **Constraint Engineering (The Logic Firewall)**: Deterministic safety layer that intercepts AI plans before execution
   - **Brain (LLM)**: Generates creative plans with high temperature
   - **Firewall (Constraint Engine)**: Deterministic Python validation layer
@@ -80,42 +96,42 @@ Traditional self-improvement loop for backward compatibility:
   - **Domain Restrictions**: Whitelists for email domains and API endpoints
   - **Rate Limiting**: Prevents excessive action execution
   - Key insight: "The Human builds the walls; the AI plays inside them"
-  - See [CONSTRAINT_ENGINEERING.md](CONSTRAINT_ENGINEERING.md) for detailed documentation
+  - See [CONSTRAINT_ENGINEERING.md](docs/CONSTRAINT_ENGINEERING.md) for detailed documentation
 - **Evaluation Engineering (The New TDD)**: Write evaluation suites instead of implementation code
   - **Golden Datasets**: Define quality through 50+ test cases with expected outputs
   - **Scoring Rubrics**: Multi-dimensional evaluation (correctness + tone + safety)
   - **Eval-DD**: Evaluation-Driven Development - write the exam, let AI iterate until it passes
   - Key insight: "If correct but rude, score 5/10" - quality is multi-dimensional
   - The "Source Code" is the Evaluation Suite that constrains the AI
-  - See [EVALUATION_ENGINEERING.md](EVALUATION_ENGINEERING.md) for detailed documentation
+  - See [EVALUATION_ENGINEERING.md](docs/EVALUATION_ENGINEERING.md) for detailed documentation
 - **Wisdom Curator**: Human-in-the-loop review for high-level strategic verification
   - **Design Check**: Verify implementation matches architectural proposals (not syntax!)
   - **Strategic Sample**: Review random samples (50 out of 10,000) for quality/vibe
   - **Policy Review**: Human approval prevents harmful wisdom updates (e.g., "ignore all errors")
   - Shifts human role from Editor (fixing grammar) to Curator (approving knowledge)
   - Automatic policy violation detection for safety, security, privacy, and quality
-  - See [WISDOM_CURATOR.md](WISDOM_CURATOR.md) for detailed documentation
+  - See [WISDOM_CURATOR.md](docs/WISDOM_CURATOR.md) for detailed documentation
 - **Automated Circuit Breaker**: Real-time rollout management with deterministic metrics
   - **The Probe**: Gradual rollout (1% → 5% → 20% → 100%)
   - **The Watchdog**: Real-time monitoring of Task Completion Rate and Latency
   - **Auto-Scale**: Automatic advancement when metrics hold
   - **Auto-Rollback**: Immediate revert when metrics degrade
   - Replaces "Old World" manual A/B testing with "New World" automated controls
-  - See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation
+  - See [CIRCUIT_BREAKER.md](docs/CIRCUIT_BREAKER.md) for detailed documentation
 - **Intent Detection**: Smart evaluation based on conversation type
   - **Troubleshooting Intent**: Success = Quick resolution (≤3 turns)
   - **Brainstorming Intent**: Success = Deep exploration (≥5 turns)
   - Key insight: "Engagement is often Failure" — a 20-turn password reset means the user is trapped, not engaged
   - Automatically detects intent from first interaction
   - Applies appropriate metrics for each conversation type
-  - See [INTENT_DETECTION.md](INTENT_DETECTION.md) for detailed documentation
+  - See [INTENT_DETECTION.md](docs/INTENT_DETECTION.md) for detailed documentation
 - **Silent Signals**: Implicit feedback mechanism that captures user friction
   - **Undo Signal** (Critical Failure): User reverses agent action (Ctrl+Z, revert) 
   - **Abandonment Signal** (Loss): User stops responding mid-workflow
   - **Acceptance Signal** (Success): User moves to next task without follow-up
   - Eliminates blind spot of relying solely on explicit feedback
   - Learns from what users DO, not just what they SAY
-  - See [SILENT_SIGNALS.md](SILENT_SIGNALS.md) for detailed documentation
+  - See [SILENT_SIGNALS.md](docs/SILENT_SIGNALS.md) for detailed documentation
 - **Ghost Mode (Passive Observation)**: The Observer Daemon Pattern - invisible until indispensable
   - **Background Processing**: Daemon runs silently consuming signal streams
   - **Dry Run Analysis**: Analyzes signals without taking action
@@ -124,7 +140,7 @@ Traditional self-improvement loop for backward compatibility:
   - **Behavior Model**: Local storage of workflows that can be queried by agents
   - Key insight: "The future interface isn't a Destination (website). It is a Daemon (background process)."
   - Startup opportunity: "Context Shadow" - the "Cookies" of the real world for secure user context storage
-  - See [GHOST_MODE.md](GHOST_MODE.md) for detailed documentation
+  - See [GHOST_MODE.md](docs/GHOST_MODE.md) for detailed documentation
 - **Decoupled Execution/Learning**: Low-latency execution with offline learning
 - **Upgrade Purge Strategy**: Active lifecycle management for wisdom database
   - Automatically removes lessons when upgrading models
@@ -144,14 +160,60 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Installation
 
-1. Install dependencies:
+### Option 1: Install as Package (Recommended)
 ```bash
-pip install -r requirements.txt
+# Clone the repository
+git clone https://github.com/imran-siddique/self-evaluating-agent-sample.git
+cd self-evaluating-agent-sample
+
+# Install in editable mode
+pip install -e .
+
+# Set up environment
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
 ```
 
-2. Set up environment variables:
+### Option 2: Install Dependencies Only
 ```bash
+pip install -r requirements.txt
+
+# Set up environment
 cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+```
+
+## Quick Examples
+
+### Example 1: Basic Agent Usage
+```bash
+python examples/example.py
+```
+
+### Example 2: Full Stack Agent (Comprehensive Integration)
+```bash
+python examples/sample_full_stack_agent.py
+```
+
+This demonstrates integration of:
+- Universal Signal Bus (omni-channel input)
+- DoerAgent (task execution)
+- Polymorphic Output (adaptive rendering)
+- Generative UI Engine (dynamic UI)
+- Telemetry (event tracking)
+
+### Example 3: Monitoring Agent (Real-World Scenario)
+```bash
+python examples/sample_monitoring_agent.py
+```
+
+This shows a production monitoring agent with:
+- Ghost Mode passive observation
+- Log stream ingestion
+- Confidence-based alerting
+- Dashboard widget rendering
+
+## Usage
 # Edit .env and add your OPENAI_API_KEY
 ```
 
@@ -1241,7 +1303,7 @@ python example_prioritization.py
 python test_prioritization.py
 ```
 
-See [PRIORITIZATION_FRAMEWORK.md](PRIORITIZATION_FRAMEWORK.md) for detailed documentation.
+See [PRIORITIZATION_FRAMEWORK.md](docs/PRIORITIZATION_FRAMEWORK.md) for detailed documentation.
 
 ## Upgrade Purge Strategy
 
@@ -1275,7 +1337,7 @@ report = manager.perform_upgrade(
 )
 ```
 
-See [UPGRADE_PURGE.md](UPGRADE_PURGE.md) for detailed documentation.
+See [UPGRADE_PURGE.md](docs/UPGRADE_PURGE.md) for detailed documentation.
 
 ## Automated Circuit Breaker
 
@@ -1326,60 +1388,66 @@ config = CircuitBreakerConfig(
 )
 ```
 
-See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
+See [CIRCUIT_BREAKER.md](docs/CIRCUIT_BREAKER.md) for detailed documentation.
 
 ## Testing
 
-Run all tests:
+Run all tests from the project root:
+
 ```bash
+# Test core agent functionality (no API key required)
+python tests/test_agent.py
+
+# Test telemetry system
+python tests/test_telemetry.py
+
 # Test polymorphic output (adaptive rendering)
-python test_polymorphic_output.py
+python tests/test_polymorphic_output.py
 
 # Test universal signal bus (omni-channel ingestion)
-python test_universal_signal_bus.py
+python tests/test_universal_signal_bus.py
 
 # Test agent brokerage layer (API economy)
-python test_agent_brokerage.py
+python tests/test_agent_brokerage.py
 
 # Test OpenAgent Definition (OAD) metadata system
-python test_agent_metadata.py
+python tests/test_agent_metadata.py
 
 # Test orchestration layer (deterministic workflows)
-python test_orchestration.py
+python tests/test_orchestration.py
 
 # Test constraint engineering (logic firewall)
-python test_constraint_engineering.py
+python tests/test_constraint_engineering.py
 
 # Test evaluation engineering framework
-python test_evaluation_engineering.py
-
-# Test legacy components
-python test_agent.py
+python tests/test_evaluation_engineering.py
 
 # Test decoupled architecture
-python test_decoupled.py
+python tests/test_decoupled.py
 
 # Test wisdom curator
-python test_wisdom_curator.py
+python tests/test_wisdom_curator.py
 
 # Test prioritization framework
-python test_prioritization.py
+python tests/test_prioritization.py
 
 # Test upgrade purge strategy
-python test_model_upgrade.py
+python tests/test_model_upgrade.py
 
 # Test silent signals feature
-python test_silent_signals.py
+python tests/test_silent_signals.py
 
 # Test intent detection feature
-python test_intent_detection.py
+python tests/test_intent_detection.py
 
 # Test circuit breaker system
-python test_circuit_breaker.py
+python tests/test_circuit_breaker.py
 
 # Test Ghost Mode (passive observation)
-python test_ghost_mode.py
+python tests/test_ghost_mode.py
 ```
+
+All tests are designed to work without an API key except for examples that actually call the LLM.
 
 ### Configuration
 
@@ -1429,6 +1497,57 @@ The `system_instructions.json` file evolves over time:
   ]
 }
 ```
+
+## Architecture Overview
+
+The framework consists of several key components:
+
+### Core Execution
+- **DoerAgent**: Fast, synchronous task execution with telemetry emission
+- **ObserverAgent**: Asynchronous offline learning from telemetry streams
+
+### Input Processing
+- **Universal Signal Bus**: Normalizes input from any source (text, files, logs, audio)
+- **Intent Detection**: Understands conversation type and applies appropriate metrics
+
+### Output Processing
+- **Polymorphic Output**: Adapts output format to context (chat, ghost text, dashboard, etc.)
+- **Generative UI Engine**: Dynamically generates UI component specifications
+
+### Safety & Quality
+- **Constraint Engine**: Deterministic firewall for validating AI-generated plans
+- **Evaluation Engineering**: Test-driven development for AI with golden datasets
+- **Wisdom Curator**: Human-in-the-loop review for strategic verification
+
+### Production Features
+- **Circuit Breaker**: Automated rollout management with real-time metrics
+- **Agent Brokerage**: Marketplace for specialized agents with utility-based pricing
+- **Ghost Mode**: Passive observation with confidence-based surfacing
+- **Prioritization Framework**: Three-layer context ranking (safety, personalization, global)
+
+For detailed architecture information, see:
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Decoupled Architecture](docs/ARCHITECTURE_DECOUPLED.md)
+- [Getting Started Guide](docs/GETTING_STARTED.md)
+
+## Documentation
+
+All documentation is available in the `docs/` directory:
+
+- **Getting Started**: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Feature Guides**: See docs/ for detailed guides on each feature
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## License
 
