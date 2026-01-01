@@ -24,6 +24,16 @@ Traditional self-improvement loop for backward compatibility:
 
 ## Features
 
+- **Universal Signal Bus (Omni-Channel Ingestion)**: The "Input Agnostic" architecture for AI
+  - **Signal Normalizer**: Entry point is NOT a UI - it's a signal normalizer
+  - **File Change Events**: Passive input from VS Code/IDE file watchers
+  - **Log Streams**: System input from server logs and error streams
+  - **Audio Streams**: Voice input from meetings and conversations
+  - **Auto-Detection**: Smart signal type detection from raw data
+  - **Standard Context Object**: All signals normalized to same format
+  - Key insight: "The entry point is NOT a UI component; it is a Signal Normalizer"
+  - Startup opportunity: "Universal Signal Bus as a Service" - the managed API for AI input
+  - See [UNIVERSAL_SIGNAL_BUS.md](UNIVERSAL_SIGNAL_BUS.md) for detailed documentation
 - **Agent Brokerage Layer - The API Economy**: Utility-based pricing and micro-payments for specialized agents
   - **Agent Marketplace**: Registry where agents publish capabilities and pricing
   - **Agent Bidding**: Agents compete on cost, speed, and quality for each task
@@ -127,6 +137,90 @@ cp .env.example .env
 ```
 
 ## Usage
+
+### Universal Signal Bus (Omni-Channel Ingestion)
+
+Run the Universal Signal Bus demonstration:
+```bash
+python example_universal_signal_bus.py
+```
+
+This demonstrates:
+1. **Text Input**: Traditional text queries (backward compatibility)
+2. **File Change Events**: Passive input from VS Code file watchers
+3. **Log Streams**: System input from server logs (500 errors, warnings)
+4. **Audio Streams**: Voice input from meetings and conversations
+5. **Auto-Detection**: Automatic signal type detection
+6. **Mixed Signals**: Multiple signal types in sequence
+7. **Agent Integration**: Input-agnostic agent processing
+8. **Startup Opportunity**: Building the Universal Signal Bus as a service
+
+Manual usage:
+
+```python
+from universal_signal_bus import (
+    UniversalSignalBus,
+    create_signal_from_text,
+    create_signal_from_file_change,
+    create_signal_from_log,
+    create_signal_from_audio
+)
+
+# Initialize the bus
+bus = UniversalSignalBus()
+
+# Ingest different signal types
+text_context = bus.ingest(create_signal_from_text("What is 10 + 20?"))
+
+file_context = bus.ingest(create_signal_from_file_change(
+    file_path="/workspace/auth/security.py",
+    change_type="modified",
+    content_before="password = 'admin'",
+    content_after="hashed = bcrypt.hashpw(...)",
+    language="python"
+))
+
+log_context = bus.ingest(create_signal_from_log(
+    level="ERROR",
+    message="Database connection pool exhausted",
+    error_code="500",
+    service="user-api"
+))
+
+audio_context = bus.ingest(create_signal_from_audio(
+    transcript="We're seeing critical performance issues",
+    speaker_id="john_doe"
+))
+
+# All normalized to standard ContextObject
+print(f"Intent: {log_context.intent}")      # → "server_error_500"
+print(f"Priority: {log_context.priority}")  # → "critical"
+print(f"Urgency: {log_context.urgency_score}") # → 0.9
+```
+
+Integration with DoerAgent:
+
+```python
+from agent import DoerAgent
+from universal_signal_bus import UniversalSignalBus
+
+bus = UniversalSignalBus()
+agent = DoerAgent()
+
+# Process any signal type
+def process_signal(raw_signal):
+    context = bus.ingest(raw_signal)
+    result = agent.run(query=context.query, user_id=context.user_id)
+    return result
+
+# Works with any input source
+process_signal({"text": "Calculate 10 + 20"})
+process_signal({"file_path": "/app.py", "change_type": "modified"})
+process_signal({"level": "ERROR", "message": "Failed"})
+process_signal({"transcript": "Help me debug this"})
+```
+
+**The Key Insight**: "The entry point is NOT a UI component; it is a Signal Normalizer. The agent is INPUT AGNOSTIC."
 
 ### Agent Brokerage Layer (The API Economy)
 
@@ -931,6 +1025,9 @@ See [CIRCUIT_BREAKER.md](CIRCUIT_BREAKER.md) for detailed documentation.
 
 Run all tests:
 ```bash
+# Test universal signal bus (omni-channel ingestion)
+python test_universal_signal_bus.py
+
 # Test agent brokerage layer (API economy)
 python test_agent_brokerage.py
 
