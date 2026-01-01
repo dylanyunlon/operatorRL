@@ -47,6 +47,8 @@ Thumbs.db
 
 # Telemetry and checkpoints
 telemetry_events.jsonl
+fullstack_telemetry.jsonl
+monitoring_telemetry.jsonl
 observer_checkpoint.json
 
 # Wisdom Curator files
@@ -60,6 +62,20 @@ user_preferences.json
 # Model upgrade tracking
 model_upgrade_log.json
 
-# Ghost Mode / Context Shadow
-behavior_model.json
+# Ghost Mode / Context Shadow - Keep example, ignore runtime versions
+# behavior_model.json  # Keep the example in repo
 
+# Agent metadata manifests (generated at runtime)
+agent_manifest.json
+
+# Circuit breaker configs (generated at runtime)
+cb_config.json
+
+# Temporary test files
+/tmp/
+*.tmp
+test_*.json
+!tests/
+
+# Sample output files
+sample_output/
