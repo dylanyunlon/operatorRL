@@ -12,9 +12,9 @@
         "Add business justification",
         "Submit for approval"
       ],
-      "frequency": 2,
+      "frequency": 4,
       "last_seen": "2024-01-12T16:30:00",
-      "confidence": 0.75,
+      "confidence": 0.8500000000000001,
       "metadata": {
         "user_id": "user123"
       }
