@@ -77,7 +77,7 @@ def demo_file_change_input():
         file_path="/workspace/auth/security.py",
         change_type="modified",
         content_before="password = input('Enter password:')\nif password == 'admin123':",
-        content_after="password = input('Enter password:')\nhashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())\nif check_password_hash(hashed, password):",
+        content_after="password = input('Enter password:')\nhashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())\nif bcrypt.checkpw(password.encode(), hashed):",
         language="python",
         project="auth-service",
         user_id="developer123"
