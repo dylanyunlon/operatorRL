@@ -26,10 +26,16 @@ import json
 import os
 import time
 import threading
+import logging
 from typing import Dict, Any, Optional, List, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
+
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class ConfidenceLevel(Enum):
@@ -299,9 +305,15 @@ class GhostModeObserver:
         
         Args:
             context_shadow: Context shadow for storing behavior patterns
-            confidence_threshold: Minimum confidence to surface (default 0.7)
+            confidence_threshold: Minimum confidence to surface (default 0.7, must be 0.0-1.0)
             surfacing_callback: Optional callback when surfacing is triggered
+            
+        Raises:
+            ValueError: If confidence_threshold is not in range 0.0-1.0
         """
+        if not 0.0 <= confidence_threshold <= 1.0:
+            raise ValueError(f"confidence_threshold must be between 0.0 and 1.0, got {confidence_threshold}")
+        
         self.context_shadow = context_shadow or ContextShadow()
         self.confidence_threshold = confidence_threshold
         self.surfacing_callback = surfacing_callback
@@ -370,7 +382,7 @@ class GhostModeObserver:
                 
             except Exception as e:
                 # Log error but keep running
-                print(f"[GHOST MODE] Error in observation loop: {e}")
+                logger.error(f"Error in observation loop: {e}", exc_info=True)
                 time.sleep(poll_interval)
     
     def observe_signal(self, signal: Dict[str, Any]) -> None:
@@ -617,7 +629,7 @@ class GhostModeObserver:
             try:
                 self.surfacing_callback(observation)
             except Exception as e:
-                print(f"[GHOST MODE] Error in surfacing callback: {e}")
+                logger.error(f"Error in surfacing callback: {e}", exc_info=True)
     
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about observation activity."""

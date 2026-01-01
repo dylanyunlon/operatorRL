@@ -106,8 +106,8 @@ def test_context_shadow_basic():
     print("\nTesting Context Shadow basics...")
     
     # Use temporary file for testing
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        temp_file = f.name
+    fd, temp_file = tempfile.mkstemp(suffix='.json')
+    os.close(fd)  # Close the file descriptor immediately
     
     try:
         # Create shadow
@@ -162,8 +162,8 @@ def test_context_shadow_multi_user():
     """Test Context Shadow with multiple users."""
     print("\nTesting Context Shadow multi-user support...")
     
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        temp_file = f.name
+    fd, temp_file = tempfile.mkstemp(suffix='.json')
+    os.close(fd)
     
     try:
         # User 1 patterns
@@ -215,8 +215,8 @@ def test_context_shadow_statistics():
     """Test Context Shadow statistics."""
     print("\nTesting Context Shadow statistics...")
     
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        temp_file = f.name
+    fd, temp_file = tempfile.mkstemp(suffix='.json')
+    os.close(fd)
     
     try:
         shadow = ContextShadow(storage_file=temp_file)
@@ -251,6 +251,36 @@ def test_context_shadow_statistics():
     finally:
         if os.path.exists(temp_file):
             os.remove(temp_file)
+
+
+def test_confidence_threshold_validation():
+    """Test confidence threshold validation."""
+    print("\nTesting confidence threshold validation...")
+    
+    # Test valid thresholds
+    observer = GhostModeObserver(confidence_threshold=0.5)
+    assert observer.confidence_threshold == 0.5
+    
+    observer = GhostModeObserver(confidence_threshold=0.0)
+    assert observer.confidence_threshold == 0.0
+    
+    observer = GhostModeObserver(confidence_threshold=1.0)
+    assert observer.confidence_threshold == 1.0
+    
+    # Test invalid thresholds
+    try:
+        GhostModeObserver(confidence_threshold=-0.1)
+        assert False, "Should have raised ValueError for negative threshold"
+    except ValueError as e:
+        assert "must be between 0.0 and 1.0" in str(e)
+    
+    try:
+        GhostModeObserver(confidence_threshold=1.5)
+        assert False, "Should have raised ValueError for threshold > 1.0"
+    except ValueError as e:
+        assert "must be between 0.0 and 1.0" in str(e)
+    
+    print("✓ Confidence threshold validation works")
 
 
 def test_ghost_mode_observer_basic():
@@ -391,8 +421,8 @@ def test_ghost_mode_pattern_learning():
     """Test pattern learning through Ghost Mode."""
     print("\nTesting Ghost Mode pattern learning...")
     
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        temp_file = f.name
+    fd, temp_file = tempfile.mkstemp(suffix='.json')
+    os.close(fd)
     
     try:
         shadow = ContextShadow(storage_file=temp_file)
@@ -525,6 +555,7 @@ def run_all_tests():
         test_context_shadow_statistics()
         
         # Ghost Mode Observer tests
+        test_confidence_threshold_validation()
         test_ghost_mode_observer_basic()
         test_ghost_mode_dry_run()
         test_ghost_mode_confidence_threshold()
