@@ -1067,10 +1067,6 @@ observer.observe_signal({
 **The Key Insight**: "The future interface isn't a Destination (a website). It is a Daemon (a background process). It is invisible until it is indispensable."
 
 **Startup Opportunity**: Build the "Context Shadow" - a lightweight daemon that securely shadows employees, learning their workflows and building a local Behavior Model that can be queried by other Agents. The "Cookies" of the real world—a secure way to store user context.
-    next_task="Calculate 20 + 30",
-    user_id="user789"
-)
-```
 
 ### Wisdom Curator
 
