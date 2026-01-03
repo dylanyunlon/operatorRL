@@ -7,6 +7,7 @@ from typing import Dict, Optional, List, Tuple, Any
 from pathlib import Path
 
 from caas.models import Document, DocumentType, ContentTier
+from caas.enrichment import MetadataEnricher
 
 
 class DocumentStore:
@@ -151,14 +152,41 @@ class DocumentStore:
 class ContextExtractor:
     """Extracts relevant context from documents based on weights."""
     
-    def __init__(self, store: DocumentStore):
+    def __init__(self, store: DocumentStore, enrich_metadata: bool = True):
         """
         Initialize context extractor.
         
         Args:
             store: The document store to use
+            enrich_metadata: Whether to enrich chunks with metadata (default: True)
         """
         self.store = store
+        self.enrich_metadata = enrich_metadata
+        self.enricher = MetadataEnricher() if enrich_metadata else None
+    
+    def _format_section(self, section: 'Section', document: Document) -> str:
+        """
+        Format a section for output, optionally with metadata enrichment.
+        
+        Args:
+            section: Section to format
+            document: Parent document for metadata
+            
+        Returns:
+            Formatted section string
+        """
+        # Get content (enriched or plain)
+        if self.enrich_metadata and self.enricher:
+            content = self.enricher.get_enriched_chunk(
+                section,
+                document.title,
+                document.detected_type,
+                include_type=True
+            )
+        else:
+            content = section.content
+        
+        return f"\n## {section.title}\n{content}\n"
     
     def extract_context(
         self,
@@ -210,7 +238,8 @@ class ContextExtractor:
         char_limit = max_tokens * 4  # Approximate: 4 chars per token
         
         for section in sorted_sections:
-            section_text = f"\n## {section.title}\n{section.content}\n"
+            # Format section (with or without enrichment)
+            section_text = self._format_section(section, document)
             
             if total_chars + len(section_text) > char_limit:
                 # Add partial section if there's room
@@ -238,6 +267,7 @@ class ContextExtractor:
             },
             "total_sections": len(document.sections),
             "sections_included": len(sections_used),
+            "metadata_enriched": self.enrich_metadata,
         }
         
         return context, metadata

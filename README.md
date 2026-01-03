@@ -10,16 +10,24 @@ A managed pipeline for intelligent context extraction and serving. The service a
 🎯 **Smart Context**: API for serving perfectly weighted context  
 📊 **Corpus Analysis**: Learn from your document corpus to improve over time  
 🏗️ **Structure-Aware Indexing**: Three-tier hierarchical approach (High/Medium/Low value) that solves the "Flat Chunk Fallacy"  
+🧬 **Metadata Injection**: Enriches chunks with contextual metadata to eliminate "context amnesia"  
 
 ## The Problem
 
-Traditional context extraction systems require manual configuration and suffer from the "Flat Chunk Fallacy":
+Traditional context extraction systems require manual configuration and suffer from TWO major fallacies:
+
+### 1. The "Flat Chunk Fallacy" (Structure Problem)
 - **Flat Chunk Approach**: Treating all content equally (e.g., splitting every 500 words and embedding)
 - Manual weight adjustments for different sections
 - Static rules that don't adapt to content
 - No learning from document patterns
 - Poor optimization for different document types
 - **The Reality**: A class definition has different value than a TODO comment, but flat approaches treat them the same
+
+### 2. The "Context Amnesia" Problem (Metadata Problem)
+- **Isolated Chunks**: Chunks lose their context when separated from parent documents
+- Example: "It increased by 5%." - What increased? Nobody knows.
+- **The Reality**: A chunk without metadata is meaningless. Without knowing it's from "Q3 Earnings > Revenue > North America", the AI can't understand what increased.
 
 ## The Solution
 
@@ -222,7 +230,56 @@ Section: "// TODO: improve authentication" # Tier 3
 Weight: 0.5x  (demoted as Low Value)
 ```
 
-### 2. Document Type Detection
+### 2. Metadata Injection (Solving "Context Amnesia")
+
+The system **enriches every chunk** with its parent metadata to maintain context:
+
+#### **The Problem:**
+```
+Original Chunk: "It increased by 5%."
+AI Response: "What increased? I don't know."
+```
+
+The chunk has lost its parents. It has **context amnesia**.
+
+#### **The Solution:**
+```
+Enriched Chunk: "[Document: Q3 Earnings] [Chapter: Revenue] [Section: North America] It increased by 5%."
+AI Response: "North America revenue increased by 5% in Q3."
+```
+
+Now the vector **carries the weight of its context**. When the AI retrieves it, it knows exactly what increased.
+
+#### **How It Works:**
+
+1. **Hierarchy Tracking**: The system tracks document hierarchy (H1 → H2 → H3 → H4)
+2. **Metadata Injection**: When extracting context, metadata is prepended to each chunk
+3. **Smart Formatting**: Metadata includes: Document Title, Document Type, Chapter, Section
+4. **Toggleable**: Can be enabled/disabled per request
+
+**Example Transformation:**
+
+```python
+# HTML Document Structure
+<h1>Q3 2024 Financial Results</h1>
+<h2>Revenue Analysis</h2>
+<h3>North America</h3>
+<p>Revenue in North America increased by 5%.</p>
+
+# Without Metadata Injection:
+"Revenue in North America increased by 5%."
+
+# With Metadata Injection:
+"[Document: Q3 Earnings Report] [Type: Research Paper] [Chapter: Q3 2024 Financial Results] [Section: North America] Revenue in North America increased by 5%."
+```
+
+**Benefits:**
+- ✅ **Context Preservation**: Chunks never lose their origin
+- ✅ **Better AI Responses**: AI can understand what each chunk refers to
+- ✅ **Improved Search**: Metadata becomes part of searchable content
+- ✅ **Hierarchical Understanding**: Maintains document structure in vectors
+
+### 3. Document Type Detection
 
 The service analyzes content to detect document types:
 - **Legal Contracts**: Looks for "whereas", "party", "hereby", "indemnify"
@@ -230,7 +287,7 @@ The service analyzes content to detect document types:
 - **Research Papers**: Detects "abstract", "methodology", "results"
 - **Source Code**: Recognizes programming patterns
 
-### 3. Base Weight Assignment
+### 4. Base Weight Assignment
 
 Each document type has optimized base weights:
 
@@ -246,7 +303,7 @@ Technical Documentation:
   - Parameters: 1.6x
 ```
 
-### 4. Content-Based Adjustments
+### 5. Content-Based Adjustments
 
 Weights are further adjusted based on:
 - **Code Examples**: +20% weight
@@ -255,11 +312,11 @@ Weights are further adjusted based on:
 - **Length**: +10% for substantial sections (>500 chars)
 - **Position**: +15% for first section, +10% for last
 
-### 5. Query Boosting
+### 6. Query Boosting
 
 When a query is provided, sections matching the query get +50% weight boost.
 
-### 5. Corpus Learning
+### 7. Corpus Learning
 
 The system analyzes patterns across all documents to:
 - Identify common section structures
@@ -286,17 +343,24 @@ The system analyzes patterns across all documents to:
 │  - PDF         - Pattern Match - Tier Classifier   │
 │  - HTML        - Structure    - Structure Parser   │
 │  - Code        - Analysis     - Query Boost        │
+│  - Hierarchy   - Section Link - Metadata Tracking  │
 └─────────────────────────────────────────────────────┘
                  │
 ┌────────────────┴────────────────────────────────────┐
 │              Storage & Extraction                    │
-│          (Structure-Aware Retrieval)                 │
+│       (Structure-Aware + Metadata-Enriched)         │
 │  ┌──────────────┐        ┌──────────────┐          │
 │  │ Document     │        │   Context    │          │
 │  │ Store        │◀───────│  Extractor   │          │
 │  └──────────────┘        └──────────────┘          │
+│                                │                     │
+│                                ▼                     │
+│                      ┌──────────────────┐           │
+│                      │ Metadata Enricher│           │
+│                      └──────────────────┘           │
 │                                                      │
 │  Prioritizes: Tier 1 > Tier 2 > Tier 3             │
+│  Enriches: [Document] [Chapter] [Section] Content  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -349,6 +413,20 @@ The system analyzes patterns across all documents to:
 
 The service works out-of-the-box with sensible defaults. No configuration required!
 
+### Metadata Enrichment
+
+Metadata enrichment is **enabled by default**. To disable it:
+
+```python
+from caas.storage import ContextExtractor, DocumentStore
+
+store = DocumentStore()
+# Disable metadata enrichment
+extractor = ContextExtractor(store, enrich_metadata=False)
+```
+
+### Custom Tuning Rules
+
 For custom tuning rules, modify `caas/tuning/tuner.py`:
 
 ```python
@@ -369,11 +447,12 @@ TYPE_SPECIFIC_WEIGHTS = {
 context-as-a-service/
 ├── caas/
 │   ├── __init__.py
-│   ├── models.py           # Data models (includes ContentTier)
+│   ├── models.py           # Data models (includes ContentTier, Section with hierarchy)
+│   ├── enrichment.py       # Metadata enrichment for contextual injection
 │   ├── cli.py              # CLI tool
 │   ├── ingestion/          # Document processors
 │   │   ├── __init__.py
-│   │   ├── processors.py
+│   │   ├── processors.py   # Processors with hierarchy tracking
 │   │   └── structure_parser.py  # Tier-based structure parser
 │   ├── detection/          # Type & structure detection
 │   │   ├── __init__.py
@@ -383,13 +462,14 @@ context-as-a-service/
 │   │   └── tuner.py
 │   ├── storage/            # Document storage
 │   │   ├── __init__.py
-│   │   └── store.py
+│   │   └── store.py        # Context extraction with metadata enrichment
 │   └── api/                # REST API
 │       ├── __init__.py
 │       └── server.py
 ├── examples/               # Example documents
 ├── test_functionality.py   # Basic functionality tests
 ├── test_structure_aware_indexing.py  # Structure-aware indexing tests
+├── test_metadata_injection.py  # Metadata injection/enrichment tests
 ├── requirements.txt
 ├── setup.py
 └── README.md
@@ -403,6 +483,9 @@ python test_functionality.py
 
 # Run structure-aware indexing tests
 python test_structure_aware_indexing.py
+
+# Run metadata injection tests
+python test_metadata_injection.py
 
 # Install dev dependencies (if needed)
 pip install pytest pytest-asyncio httpx
