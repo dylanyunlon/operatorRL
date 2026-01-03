@@ -6,11 +6,16 @@ import re
 from typing import Dict, List, Any
 from collections import Counter
 
-from caas.models import Document, DocumentType, Section
+from caas.models import Document, DocumentType, Section, ContentTier
+from caas.ingestion.structure_parser import StructureParser
 
 
 class WeightTuner:
     """Automatically tunes weights for document sections."""
+    
+    def __init__(self):
+        """Initialize the weight tuner with structure parser."""
+        self.structure_parser = StructureParser()
     
     # Base weights for different document types
     TYPE_SPECIFIC_WEIGHTS = {
@@ -68,12 +73,24 @@ class WeightTuner:
         """
         Auto-tune weights for document sections based on content analysis.
         
+        Uses structure-aware indexing to assign tiers and calculate weights.
+        Tier 1 (High): Titles, Headers, Class Definitions, API Contracts
+        Tier 2 (Medium): Body text, Function logic
+        Tier 3 (Low): Footnotes, Comments, Disclaimers
+        
         Args:
             document: The document to tune
             
         Returns:
             Document with optimized weights
         """
+        # First, parse structure and assign tiers
+        document.sections = self.structure_parser.parse_and_assign_tiers(
+            document.sections,
+            document.detected_type,
+            document.content
+        )
+        
         # Get base weights for document type
         base_weights = self.TYPE_SPECIFIC_WEIGHTS.get(
             document.detected_type,
@@ -106,16 +123,25 @@ class WeightTuner:
         base_weights: Dict[str, float],
         document: Document
     ) -> float:
-        """Calculate weight for a specific section."""
+        """Calculate weight for a specific section using tier-based approach."""
         title_lower = section.title.lower()
         
-        # Start with base weight from type-specific weights
-        weight = base_weights.get("default", 1.0)
+        # Start with tier-based base weight
+        if section.tier:
+            weight = self.structure_parser.get_tier_base_weight(section.tier)
+        else:
+            # Fallback to default if tier not assigned
+            weight = base_weights.get("default", 1.0)
         
-        # Check for matching keywords in title
+        # Apply type-specific keyword boosts on top of tier weight (additive, not multiplicative)
+        keyword_boost = 0.0
         for keyword, keyword_weight in base_weights.items():
             if keyword != "default" and keyword in title_lower:
-                weight = max(weight, keyword_weight)
+                keyword_boost = max(keyword_boost, keyword_weight - 1.0)
+                break  # Only apply one keyword boost
+        
+        # Add keyword boost instead of multiplying (prevents excessive amplification)
+        weight = weight + keyword_boost
         
         # Adjust based on content analysis
         content_factors = self._analyze_content_factors(section)
@@ -130,17 +156,17 @@ class WeightTuner:
         if content_factors["has_important_markers"]:
             weight *= 1.15
         
-        # Boost weight for longer, more substantial sections
-        if len(section.content) > 500:
+        # Boost weight for longer, more substantial sections (but not for Tier 3)
+        if len(section.content) > 500 and section.tier != ContentTier.TIER_3_LOW:
             weight *= 1.1
         
         # Position-based adjustment (first and last sections often important)
         section_index = document.sections.index(section)
         total_sections = len(document.sections)
         
-        if section_index == 0:
+        if section_index == 0 and section.tier != ContentTier.TIER_3_LOW:
             weight *= 1.15
-        elif section_index == total_sections - 1:
+        elif section_index == total_sections - 1 and section.tier != ContentTier.TIER_3_LOW:
             weight *= 1.1
         
         return round(weight, 2)

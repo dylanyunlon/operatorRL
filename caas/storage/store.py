@@ -6,7 +6,7 @@ import json
 from typing import Dict, Optional, List, Tuple, Any
 from pathlib import Path
 
-from caas.models import Document, DocumentType
+from caas.models import Document, DocumentType, ContentTier
 
 
 class DocumentStore:
@@ -167,7 +167,10 @@ class ContextExtractor:
         max_tokens: int = 2000
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Extract context from a document.
+        Extract context from a document with structure-aware boosting.
+        
+        Prioritizes Tier 1 (High Value) content over Tier 2 and Tier 3,
+        even when semantic similarity is the same.
         
         Args:
             document_id: The document ID
@@ -182,6 +185,7 @@ class ContextExtractor:
             return "", {"error": "Document not found"}
         
         # Sort sections by weight (highest first)
+        # Tier-based weights are already incorporated in section.weight
         sorted_sections = sorted(
             document.sections,
             key=lambda s: s.weight,
@@ -193,6 +197,7 @@ class ContextExtractor:
             query_lower = query.lower()
             for section in sorted_sections:
                 if query_lower in section.content.lower():
+                    # Query boost: 50% increase
                     section.weight *= 1.5
             
             # Re-sort after query boosting
@@ -227,6 +232,10 @@ class ContextExtractor:
             "document_type": document.detected_type,
             "sections_used": sections_used,
             "weights_applied": {s.title: s.weight for s in sorted_sections},
+            "tiers_applied": {
+                s.title: s.tier.value if s.tier else "unknown" 
+                for s in sorted_sections
+            },
             "total_sections": len(document.sections),
             "sections_included": len(sections_used),
         }
