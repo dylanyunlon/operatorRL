@@ -189,7 +189,6 @@ class DocumentStore:
         results.sort(key=lambda d: d.metadata.get('_search_score', 0), reverse=True)
         
         return results
-        return results
     
     def _save_to_disk(self):
         """Save documents to disk."""
@@ -309,15 +308,20 @@ class ContextExtractor:
                 decay_rate=self.decay_rate
             )
         
-        # Apply decay to all section weights
+        # Create a list of sections with adjusted weights (don't mutate original)
         # This is the key: old documents get their weights reduced
+        adjusted_sections = []
         for section in document.sections:
-            section.weight = section.weight * decay_factor
+            # Create a shallow copy of the section and adjust weight
+            import copy
+            adjusted_section = copy.copy(section)
+            adjusted_section.weight = section.weight * decay_factor
+            adjusted_sections.append(adjusted_section)
         
         # Sort sections by weight (highest first)
         # Now sections from recent documents will rank higher
         sorted_sections = sorted(
-            document.sections,
+            adjusted_sections,
             key=lambda s: s.weight,
             reverse=True
         )
