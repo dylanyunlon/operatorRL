@@ -37,6 +37,9 @@ uploads/
 data/
 *.pdf
 *.html
+# Allow example files
+!examples/*.html
+!examples/*.pdf
 
 # Logs
 *.log
