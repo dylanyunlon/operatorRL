@@ -2,7 +2,8 @@
 Time-based decay function for relevance scoring.
 
 Implements "The Half-Life of Truth" - mathematical gravity that pulls old data down.
-Formula: Score = Similarity * (1 / Time_Elapsed)
+Formula: Score = Similarity × Decay_Factor
+Where: Decay_Factor = 1 / (1 + days_elapsed × decay_rate)
 """
 
 from datetime import datetime

@@ -171,6 +171,7 @@ class DocumentStore:
             # Only include documents with matches
             if match_score > 0:
                 # Apply time decay if enabled
+                decay_factor = 1.0  # Default to no decay
                 if enable_time_decay:
                     decay_factor = calculate_decay_factor(
                         doc.ingestion_timestamp,
@@ -183,7 +184,7 @@ class DocumentStore:
                 
                 # Store score for sorting
                 doc.metadata['_search_score'] = final_score
-                doc.metadata['_decay_factor'] = decay_factor if enable_time_decay else 1.0
+                doc.metadata['_decay_factor'] = decay_factor
                 results.append(doc)
         
         # Sort by final score (highest first)
