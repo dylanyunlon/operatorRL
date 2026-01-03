@@ -75,6 +75,7 @@ class MetadataEnricher:
         
         # Create a new section with enriched content
         # We preserve the original section but update the content
+        # Note: Using model_copy() from Pydantic v2 (we're on v2.5.0)
         enriched_section = section.model_copy()
         enriched_section.content = enriched_content
         

@@ -164,6 +164,30 @@ class ContextExtractor:
         self.enrich_metadata = enrich_metadata
         self.enricher = MetadataEnricher() if enrich_metadata else None
     
+    def _format_section(self, section: 'Section', document: Document) -> str:
+        """
+        Format a section for output, optionally with metadata enrichment.
+        
+        Args:
+            section: Section to format
+            document: Parent document for metadata
+            
+        Returns:
+            Formatted section string
+        """
+        # Get content (enriched or plain)
+        if self.enrich_metadata and self.enricher:
+            content = self.enricher.get_enriched_chunk(
+                section,
+                document.title,
+                document.detected_type,
+                include_type=True
+            )
+        else:
+            content = section.content
+        
+        return f"\n## {section.title}\n{content}\n"
+    
     def extract_context(
         self,
         document_id: str,
@@ -214,17 +238,8 @@ class ContextExtractor:
         char_limit = max_tokens * 4  # Approximate: 4 chars per token
         
         for section in sorted_sections:
-            # Use enriched content if metadata enrichment is enabled
-            if self.enrich_metadata and self.enricher:
-                enriched_content = self.enricher.get_enriched_chunk(
-                    section,
-                    document.title,
-                    document.detected_type,
-                    include_type=True
-                )
-                section_text = f"\n## {section.title}\n{enriched_content}\n"
-            else:
-                section_text = f"\n## {section.title}\n{section.content}\n"
+            # Format section (with or without enrichment)
+            section_text = self._format_section(section, document)
             
             if total_chars + len(section_text) > char_limit:
                 # Add partial section if there's room
