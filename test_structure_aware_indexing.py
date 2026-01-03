@@ -130,11 +130,11 @@ def test_tier_based_retrieval():
     
     # The endpoint section (Tier 1) should be included before footnotes (Tier 3)
     if 'Footnotes' in [s.title for s in document.sections]:
-        footnote_section = [s for s in document.sections if 'Footnote' in s.title][0]
+        footnote_sections = [s for s in document.sections if s.title == 'Footnotes']
         endpoint_section = [s for s in document.sections if 'Endpoint' in s.title or 'POST' in s.title]
         
-        if endpoint_section:
-            assert endpoint_section[0].weight > footnote_section.weight, \
+        if endpoint_section and footnote_sections:
+            assert endpoint_section[0].weight > footnote_sections[0].weight, \
                 "Endpoint (Tier 1) should have higher weight than Footnotes (Tier 3)"
             print(f"✓ Tier 1 content properly prioritized over Tier 3")
     

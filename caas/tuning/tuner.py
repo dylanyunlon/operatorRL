@@ -133,11 +133,15 @@ class WeightTuner:
             # Fallback to default if tier not assigned
             weight = base_weights.get("default", 1.0)
         
-        # Apply type-specific keyword boosts on top of tier weight
+        # Apply type-specific keyword boosts on top of tier weight (additive, not multiplicative)
+        keyword_boost = 0.0
         for keyword, keyword_weight in base_weights.items():
             if keyword != "default" and keyword in title_lower:
-                weight *= keyword_weight
+                keyword_boost = max(keyword_boost, keyword_weight - 1.0)
                 break  # Only apply one keyword boost
+        
+        # Add keyword boost instead of multiplying (prevents excessive amplification)
+        weight = weight + keyword_boost
         
         # Adjust based on content analysis
         content_factors = self._analyze_content_factors(section)

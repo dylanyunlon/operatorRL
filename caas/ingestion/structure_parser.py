@@ -22,11 +22,16 @@ class StructureParser:
     # Patterns for identifying Tier 1 content (High Value)
     TIER_1_PATTERNS = {
         DocumentType.SOURCE_CODE: [
-            r'^(public|private|protected)?\s*(class|interface|enum)\s+\w+',  # Class definitions
-            r'^(public|private|protected)?\s*\w+\s+\w+\s*\([^)]*\)\s*{',  # API method signatures (Java/C-style)
-            r'^\s*def\s+\w+\s*\([^)]*\)\s*:',  # Python function definitions (top-level)
-            r'^\s*(export\s+)?(async\s+)?function\s+\w+',  # JavaScript functions (top-level)
-            r'@(api|Api|API)',  # API decorators/annotations
+            # Matches: public class MyClass, private interface IAuth, protected enum Status
+            r'^(public|private|protected)?\s*(class|interface|enum)\s+\w+',
+            # Matches: public void login(...) { (Java/C-style API methods)
+            r'^(public|private|protected)?\s*\w+\s+\w+\s*\([^)]*\)\s*{',
+            # Matches: def login(self, username, password): (Python top-level functions)
+            r'^\s*def\s+\w+\s*\([^)]*\)\s*:',
+            # Matches: export function authenticate, async function getData
+            r'^\s*(export\s+)?(async\s+)?function\s+\w+',
+            # Matches: @api, @Api, @API decorators/annotations
+            r'@(api|Api|API)',
         ],
         DocumentType.TECHNICAL_DOCUMENTATION: [
             r'^#{1,2}\s+',  # H1, H2 headers (markdown)
@@ -156,7 +161,7 @@ class StructureParser:
             if re.search(pattern, combined_text, re.MULTILINE | re.IGNORECASE):
                 # Make sure it's substantial (not just one comment line in a large section)
                 comment_lines = len(re.findall(pattern, combined_text, re.MULTILINE | re.IGNORECASE))
-                total_lines = len(content.split('\n'))
+                total_lines = len(combined_text.split('\n'))
                 if total_lines > 0 and comment_lines / total_lines > 0.5:
                     return True
         
