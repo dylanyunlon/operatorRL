@@ -7,6 +7,13 @@ from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 
 
+class ContentTier(str, Enum):
+    """Content importance tiers for structure-aware indexing."""
+    TIER_1_HIGH = "tier_1_high"  # High Value: Titles, Headers, Class Definitions, API Contracts
+    TIER_2_MEDIUM = "tier_2_medium"  # Medium Value: Body text, Function logic
+    TIER_3_LOW = "tier_3_low"  # Low Value: Footnotes, Comments, Disclaimers
+
+
 class DocumentType(str, Enum):
     """Detected document types."""
     LEGAL_CONTRACT = "legal_contract"
@@ -33,6 +40,7 @@ class Section(BaseModel):
     title: str
     content: str
     weight: float = 1.0
+    tier: Optional['ContentTier'] = None
     importance_score: float = 0.0
     start_pos: int = 0
     end_pos: int = 0
