@@ -35,7 +35,7 @@ detector = DocumentTypeDetector()
 structure_analyzer = StructureAnalyzer()
 weight_tuner = WeightTuner()
 corpus_analyzer = CorpusAnalyzer()
-context_extractor = ContextExtractor(document_store)
+# Note: context_extractor is created per-request with user-specified decay settings
 
 
 @app.get("/")

@@ -3,6 +3,7 @@ Storage module for managing documents and context.
 """
 
 import json
+import copy
 from typing import Dict, Optional, List, Tuple, Any
 from pathlib import Path
 from datetime import datetime
@@ -313,7 +314,6 @@ class ContextExtractor:
         adjusted_sections = []
         for section in document.sections:
             # Create a shallow copy of the section and adjust weight
-            import copy
             adjusted_section = copy.copy(section)
             adjusted_section.weight = section.weight * decay_factor
             adjusted_sections.append(adjusted_section)
