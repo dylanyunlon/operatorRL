@@ -23,6 +23,7 @@ from caas.models import (
     RoutingDecision,
     ModelTier,
     AddTurnRequest,
+    UpdateTurnRequest,
     ConversationHistoryResponse,
 )
 from caas.ingestion import ProcessorFactory
@@ -823,7 +824,7 @@ async def get_recent_turns(n: int = 5):
 
 
 @app.patch("/conversation/turn/{turn_id}")
-async def update_turn_response(turn_id: str, ai_response: str):
+async def update_turn_response(turn_id: str, request: UpdateTurnRequest):
     """
     Update the AI response for a specific turn.
     
@@ -832,13 +833,13 @@ async def update_turn_response(turn_id: str, ai_response: str):
     
     Args:
         turn_id: The ID of the turn to update
-        ai_response: The AI response to add
+        request: UpdateTurnRequest with the AI response
     
     Returns:
         Update status
     """
     try:
-        success = conversation_manager.update_turn_response(turn_id, ai_response)
+        success = conversation_manager.update_turn_response(turn_id, request.ai_response)
         if success:
             return {
                 "status": "success",

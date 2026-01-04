@@ -24,11 +24,15 @@ With Chopping: After 10 new turns, this is deleted entirely
                 But turns 2-11 are perfectly intact with all details
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 import uuid
+import logging
 
 from caas.models import ConversationTurn, ConversationState
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 class ConversationManager:
@@ -88,7 +92,7 @@ class ConversationManager:
         # FIFO: If we're at max capacity, delete the oldest turn
         if len(self.state.turns) >= self.state.max_turns:
             deleted_turn = self.state.turns.pop(0)  # Remove first (oldest) turn
-            print(f"🗑️  FIFO: Deleted oldest turn (ID: {deleted_turn.id[:8]}...) to make room")
+            logger.debug(f"FIFO: Deleted oldest turn (ID: {deleted_turn.id[:8]}...) to make room")
         
         # Add the new turn at the end
         self.state.turns.append(turn)
@@ -120,7 +124,7 @@ class ConversationManager:
         self, 
         include_metadata: bool = False,
         format_as_text: bool = True
-    ) -> List[ConversationTurn] | str:
+    ) -> Union[List[ConversationTurn], str]:
         """
         Get the conversation history (last N turns).
         

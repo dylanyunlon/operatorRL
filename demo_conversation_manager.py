@@ -155,10 +155,11 @@ def demo_recent_precision():
         print(f"    AI: {turn.ai_response}")
     
     # Verify critical detail is preserved (check if any of the recent turns has the detail)
-    has_line4 = any("line 4" in turn.user_message.lower() for turn in recent)
-    has_multiply3 = any("multiply by 3" in turn.user_message.lower() for turn in recent)
-    assert has_line4 or "line 4" in recent[-2].user_message.lower()
-    assert has_multiply3 or "* 3" in recent[-2].user_message.lower()
+    has_line4_detail = any("line 4" in turn.user_message.lower() for turn in recent)
+    has_multiply3_detail = any("multiply by 3" in turn.user_message.lower() or "* 3" in turn.user_message for turn in recent)
+    
+    assert has_line4_detail, "Expected 'line 4' detail to be preserved in recent turns"
+    assert has_multiply3_detail, "Expected '* 3' or 'multiply by 3' detail to be preserved in recent turns"
     
     print("\n✅ User can see EXACT fix: 'line 4 should be item.value * 3 not * 2'")
     print("   No vague summary like: 'User identified a calculation issue'")

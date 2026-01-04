@@ -243,7 +243,12 @@ class AddTurnRequest(BaseModel):
     """Request to add a conversation turn."""
     user_message: str = Field(description="The user's message")
     ai_response: Optional[str] = Field(default=None, description="The AI's response (optional)")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional metadata")
+
+
+class UpdateTurnRequest(BaseModel):
+    """Request to update a turn's AI response."""
+    ai_response: str = Field(description="The AI response to add/update")
 
 
 class ConversationHistoryResponse(BaseModel):
