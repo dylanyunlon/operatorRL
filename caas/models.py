@@ -14,6 +14,13 @@ class ContentTier(str, Enum):
     TIER_3_LOW = "tier_3_low"  # Low Value: Footnotes, Comments, Disclaimers
 
 
+class ContextLayer(str, Enum):
+    """Context triad layers defined by intimacy and access policy."""
+    HOT = "hot"  # L1: The Situation - current conversation, active data (overrides everything)
+    WARM = "warm"  # L2: The Persona - user profile, preferences (always-on filter)
+    COLD = "cold"  # L3: The Archive - historical data (on-demand only)
+
+
 class DocumentType(str, Enum):
     """Detected document types."""
     LEGAL_CONTRACT = "legal_contract"
@@ -87,4 +94,50 @@ class ContextResponse(BaseModel):
     sections_used: List[str] = []
     total_tokens: int
     weights_applied: Dict[str, float] = {}
+    metadata: Dict[str, Any] = {}
+
+
+class ContextTriadItem(BaseModel):
+    """Represents an item in a context layer."""
+    id: str
+    layer: ContextLayer
+    content: str
+    metadata: Dict[str, Any] = {}
+    timestamp: Optional[str] = None
+    priority: float = 1.0
+
+
+class ContextTriadState(BaseModel):
+    """Represents the complete context triad state."""
+    hot_context: List[ContextTriadItem] = []  # Current situation (conversation, errors)
+    warm_context: List[ContextTriadItem] = []  # User persona (profile, preferences)
+    cold_context: List[ContextTriadItem] = []  # Historical archive (old tickets, PRs)
+    
+    
+class ContextTriadRequest(BaseModel):
+    """Request for context triad retrieval."""
+    include_hot: bool = Field(default=True, description="Include hot context (current situation)")
+    include_warm: bool = Field(default=True, description="Include warm context (user persona)")
+    include_cold: bool = Field(default=False, description="Include cold context (historical archive) - on-demand only")
+    max_tokens_per_layer: Dict[str, int] = Field(
+        default={"hot": 1000, "warm": 500, "cold": 1000},
+        description="Token limits per layer"
+    )
+    query: Optional[str] = Field(default=None, description="Optional query for cold context retrieval")
+
+
+class AddContextRequest(BaseModel):
+    """Request for adding context to a layer."""
+    content: str = Field(description="The context content to add")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
+    priority: float = Field(default=1.0, ge=0.0, le=10.0, description="Priority level (0-10)")
+
+
+class ContextTriadResponse(BaseModel):
+    """Response containing context triad data."""
+    hot_context: str = ""
+    warm_context: str = ""
+    cold_context: str = ""
+    total_tokens: int
+    layers_included: List[str]
     metadata: Dict[str, Any] = {}

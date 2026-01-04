@@ -15,11 +15,16 @@ from caas.models import (
     ContentFormat,
     ContextRequest,
     ContextResponse,
+    ContextLayer,
+    ContextTriadRequest,
+    ContextTriadResponse,
+    AddContextRequest,
 )
 from caas.ingestion import ProcessorFactory
 from caas.detection import DocumentTypeDetector, StructureAnalyzer
 from caas.tuning import WeightTuner, CorpusAnalyzer
 from caas.storage import DocumentStore, ContextExtractor
+from caas.triad import ContextTriadManager
 
 
 # Initialize FastAPI app
@@ -35,6 +40,7 @@ detector = DocumentTypeDetector()
 structure_analyzer = StructureAnalyzer()
 weight_tuner = WeightTuner()
 corpus_analyzer = CorpusAnalyzer()
+triad_manager = ContextTriadManager()
 # Note: context_extractor is created per-request with user-specified decay settings
 
 
@@ -51,6 +57,10 @@ async def root():
             "context": "/context/{document_id}",
             "analyze": "/analyze/{document_id}",
             "corpus": "/corpus/analyze",
+            "triad": "/triad",
+            "triad_hot": "/triad/hot",
+            "triad_warm": "/triad/warm",
+            "triad_cold": "/triad/cold",
         }
     }
 
@@ -362,6 +372,213 @@ async def search_documents(
             for doc in results
         ]
     }
+
+
+# ===========================
+# Context Triad Endpoints
+# ===========================
+
+@app.post("/triad/hot")
+async def add_hot_context(request: AddContextRequest):
+    """
+    Add hot context - the current situation.
+    
+    Hot context represents what is happening RIGHT NOW:
+    - Current conversation messages
+    - Open VS Code tabs
+    - Error logs streaming in real-time
+    - Active debugging session
+    
+    Policy: "Attention Head" - Hot context overrides everything.
+    
+    Args:
+        request: AddContextRequest with content, metadata, and priority
+    
+    Returns:
+        Created item ID
+    """
+    try:
+        item_id = triad_manager.add_hot_context(
+            request.content, 
+            request.metadata, 
+            request.priority
+        )
+        return {
+            "status": "success",
+            "layer": "hot",
+            "item_id": item_id,
+            "message": "Hot context added successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add hot context: {str(e)}")
+
+
+@app.post("/triad/warm")
+async def add_warm_context(request: AddContextRequest):
+    """
+    Add warm context - the user persona.
+    
+    Warm context represents WHO THE USER IS:
+    - LinkedIn profile
+    - Medium articles
+    - GitHub bio
+    - Coding style preferences
+    - Favorite libraries
+    - Communication style
+    
+    Policy: "Always On Filter" - Warm context is persistent and colors
+    how the AI speaks to you.
+    
+    Args:
+        request: AddContextRequest with content, metadata, and priority
+    
+    Returns:
+        Created item ID
+    """
+    try:
+        item_id = triad_manager.add_warm_context(
+            request.content, 
+            request.metadata, 
+            request.priority
+        )
+        return {
+            "status": "success",
+            "layer": "warm",
+            "item_id": item_id,
+            "message": "Warm context added successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add warm context: {str(e)}")
+
+
+@app.post("/triad/cold")
+async def add_cold_context(request: AddContextRequest):
+    """
+    Add cold context - the historical archive.
+    
+    Cold context represents WHAT HAPPENED IN THE PAST:
+    - Old tickets from last year
+    - Closed PRs
+    - Historical design docs
+    - Legacy system documentation
+    - Archived meeting notes
+    
+    Policy: "On Demand Only" - Cold context is NEVER automatically included.
+    It's only fetched when the user explicitly asks for history.
+    
+    Args:
+        request: AddContextRequest with content, metadata, and priority
+    
+    Returns:
+        Created item ID
+    """
+    try:
+        item_id = triad_manager.add_cold_context(
+            request.content, 
+            request.metadata, 
+            request.priority
+        )
+        return {
+            "status": "success",
+            "layer": "cold",
+            "item_id": item_id,
+            "message": "Cold context added successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add cold context: {str(e)}")
+
+
+@app.post("/triad")
+async def get_context_triad(request: ContextTriadRequest):
+    """
+    Get the complete context triad.
+    
+    The Context Triad follows these policies:
+    1. Hot Context: ALWAYS included (unless explicitly disabled)
+       - The Situation: what's happening right now
+       - Policy: "Attention Head" - overrides everything
+    
+    2. Warm Context: ALWAYS ON (unless explicitly disabled)
+       - The Persona: who you are
+       - Policy: "Filter" - colors how AI speaks to you
+    
+    3. Cold Context: ON DEMAND ONLY (requires explicit query)
+       - The Archive: what happened last year
+       - Policy: Never let cold data pollute the hot window
+    
+    Args:
+        request: Context triad request with layer flags and query
+    
+    Returns:
+        Context from requested layers
+    """
+    try:
+        result = triad_manager.get_full_context(
+            include_hot=request.include_hot,
+            include_warm=request.include_warm,
+            include_cold=request.include_cold,
+            cold_query=request.query,
+            max_tokens_per_layer=request.max_tokens_per_layer,
+            include_metadata=True
+        )
+        
+        response = ContextTriadResponse(
+            hot_context=result["hot_context"],
+            warm_context=result["warm_context"],
+            cold_context=result["cold_context"],
+            total_tokens=result["total_tokens"],
+            layers_included=result["layers_included"],
+            metadata=result["metadata"]
+        )
+        
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get context triad: {str(e)}")
+
+
+@app.get("/triad/state")
+async def get_triad_state():
+    """
+    Get the current state of the context triad.
+    
+    Returns:
+        Current context triad state with item counts
+    """
+    state = triad_manager.get_state()
+    return {
+        "hot_context_items": len(state.hot_context),
+        "warm_context_items": len(state.warm_context),
+        "cold_context_items": len(state.cold_context),
+        "total_items": len(state.hot_context) + len(state.warm_context) + len(state.cold_context)
+    }
+
+
+@app.delete("/triad/hot")
+async def clear_hot_context():
+    """Clear all hot context items."""
+    triad_manager.clear_hot_context()
+    return {"status": "success", "message": "Hot context cleared"}
+
+
+@app.delete("/triad/warm")
+async def clear_warm_context():
+    """Clear all warm context items."""
+    triad_manager.clear_warm_context()
+    return {"status": "success", "message": "Warm context cleared"}
+
+
+@app.delete("/triad/cold")
+async def clear_cold_context():
+    """Clear all cold context items."""
+    triad_manager.clear_cold_context()
+    return {"status": "success", "message": "Cold context cleared"}
+
+
+@app.delete("/triad")
+async def clear_all_context():
+    """Clear all context layers."""
+    triad_manager.clear_all()
+    return {"status": "success", "message": "All context cleared"}
 
 
 if __name__ == "__main__":

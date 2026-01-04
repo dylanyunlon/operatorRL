@@ -12,10 +12,11 @@ A managed pipeline for intelligent context extraction and serving. The service a
 🏗️ **Structure-Aware Indexing**: Three-tier hierarchical approach (High/Medium/Low value) that solves the "Flat Chunk Fallacy"  
 🧬 **Metadata Injection**: Enriches chunks with contextual metadata to eliminate "context amnesia"  
 ⏰ **Time-Based Decay**: Prioritizes recent content over old using "The Half-Life of Truth" principle  
+🔥 **Context Triad (Hot, Warm, Cold)**: Intimacy-based three-tier context system that treats context by relevance, not just speed  
 
 ## The Problem
 
-Traditional context extraction systems require manual configuration and suffer from THREE major fallacies:
+Traditional context extraction systems require manual configuration and suffer from FOUR major fallacies:
 
 ### 1. The "Flat Chunk Fallacy" (Structure Problem)
 - **Flat Chunk Approach**: Treating all content equally (e.g., splitting every 500 words and embedding)
@@ -36,6 +37,13 @@ Traditional context extraction systems require manual configuration and suffer f
 - Example: "How to reset the server" in 2021 ≠ 2025
 - If AI retrieves the 2021 answer because wording matches better, it fails
 - **The Problem**: Traditional systems don't consider when information was created
+
+### 4. The "Flat Context Fallacy" (Priority Problem)
+- **The Naive Approach**: "Stuff everything into the Context Window until it's full"
+- **The Reality**: Not all context is created equal
+- Current conversation ≠ User preferences ≠ Historical archives
+- No clear prioritization between what's happening NOW vs. what happened LAST YEAR
+- **The Problem**: Traditional systems treat all context with the same priority
 
 ## The Solution
 
@@ -364,7 +372,108 @@ extractor = ContextExtractor(
 **Why This Matters:**
 Traditional RAG systems treat a 3-year-old document the same as yesterday's update. Our time decay ensures that when you ask "How do I deploy?", you get the current process, not the legacy one that happened to have better keyword matches.
 
-### 4. Document Type Detection
+### 4. Context Triad (Solving "Flat Context Fallacy")
+
+The system implements **intimacy-based context layers** that treat context by relevance, not just speed.
+
+#### **The Naive Approach:**
+```
+"Stuff everything into the Context Window until it's full."
+```
+
+#### **The Engineering Reality:**
+We need to treat context like a tiered storage system, but defined by **Intimacy**, not just speed.
+
+#### **L1: Hot Context (The Situation)**
+**Definition:** What is happening right now?
+
+**Examples:**
+- Current conversation messages
+- Open VS Code tabs
+- Error logs streaming in real-time
+- Active debugging session
+
+**Policy:** "Attention Head" - Overrides everything
+- Highest priority, always included
+- Auto-maintained (limited to 50 most recent items)
+
+#### **L2: Warm Context (The Persona)**
+**Definition:** Who am I?
+
+**Examples:**
+- LinkedIn profile
+- Medium articles
+- Coding style preferences
+- Favorite libraries and frameworks
+- Communication style
+
+**Policy:** "Always On Filter" - Colors how AI speaks to you
+- Persistent across sessions
+- Should be part of system prompt
+- Doesn't need retrieval every time
+
+#### **L3: Cold Context (The Archive)**
+**Definition:** What happened last year?
+
+**Examples:**
+- Old tickets from previous years
+- Closed pull requests
+- Historical design documents
+- Legacy system documentation
+
+**Policy:** "On Demand Only" - Fetch only when explicitly asked
+- **Never** automatically included
+- Requires explicit query to access
+- Prevents historical data from polluting hot window
+
+#### **Usage Example:**
+
+```python
+from caas.triad import ContextTriadManager
+
+manager = ContextTriadManager()
+
+# Add hot context (current situation)
+manager.add_hot_context(
+    "User debugging: NullPointerException at line 145",
+    metadata={"source": "error_log"},
+    priority=3.0
+)
+
+# Add warm context (user persona)
+manager.add_warm_context(
+    "Senior Python developer, prefers type hints",
+    metadata={"category": "Profile"},
+    priority=2.0
+)
+
+# Add cold context (historical archive)
+manager.add_cold_context(
+    "Ticket #1234: Fixed similar bug in 2023",
+    metadata={"date": "2023-06-15"},
+    priority=1.0
+)
+
+# Get context (Hot + Warm by default, Cold excluded)
+result = manager.get_full_context(
+    include_hot=True,
+    include_warm=True,
+    include_cold=False  # Cold requires explicit query
+)
+
+# Access cold context with explicit query
+result = manager.get_full_context(
+    include_cold=True,
+    cold_query="NullPointerException"  # Required for cold context
+)
+```
+
+**Why This Matters:**
+Traditional systems treat current errors the same as year-old tickets. The Context Triad ensures the right context is available at the right time with the right priority. Current situation (hot) always takes precedence, user persona (warm) is always on, and historical data (cold) never pollutes the working context unless explicitly requested.
+
+**See [CONTEXT_TRIAD.md](CONTEXT_TRIAD.md) for detailed documentation.**
+
+### 5. Document Type Detection
 
 The service analyzes content to detect document types:
 - **Legal Contracts**: Looks for "whereas", "party", "hereby", "indemnify"
@@ -388,7 +497,7 @@ Technical Documentation:
   - Parameters: 1.6x
 ```
 
-### 6. Content-Based Adjustments
+### 7. Content-Based Adjustments
 
 Weights are further adjusted based on:
 - **Code Examples**: +20% weight
@@ -397,11 +506,11 @@ Weights are further adjusted based on:
 - **Length**: +10% for substantial sections (>500 chars)
 - **Position**: +15% for first section, +10% for last
 
-### 7. Query Boosting
+### 8. Query Boosting
 
 When a query is provided, sections matching the query get +50% weight boost.
 
-### 8. Corpus Learning
+### 9. Corpus Learning
 
 The system analyzes patterns across all documents to:
 - Identify common section structures
@@ -578,6 +687,7 @@ context-as-a-service/
 │   ├── storage/            # Document storage
 │   │   ├── __init__.py
 │   │   └── store.py        # Context extraction with time decay
+│   ├── triad.py            # Context Triad manager (Hot, Warm, Cold)
 │   └── api/                # REST API
 │       ├── __init__.py
 │       └── server.py
@@ -586,7 +696,9 @@ context-as-a-service/
 ├── test_structure_aware_indexing.py  # Structure-aware indexing tests
 ├── test_metadata_injection.py  # Metadata injection/enrichment tests
 ├── test_time_decay.py      # Time-based decay tests
+├── test_context_triad.py   # Context Triad tests
 ├── demo_time_decay.py      # Time decay demonstration
+├── demo_context_triad.py   # Context Triad demonstration
 ├── requirements.txt
 ├── setup.py
 └── README.md
@@ -607,8 +719,14 @@ python test_metadata_injection.py
 # Run time-based decay tests
 python test_time_decay.py
 
+# Run context triad tests
+python test_context_triad.py
+
 # Run time decay demonstration
 python demo_time_decay.py
+
+# Run context triad demonstration
+python demo_context_triad.py
 
 # Install dev dependencies (if needed)
 pip install pytest pytest-asyncio httpx
