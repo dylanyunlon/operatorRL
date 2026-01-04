@@ -18,6 +18,7 @@ from caas.models import (
     ContextLayer,
     ContextTriadRequest,
     ContextTriadResponse,
+    AddContextRequest,
 )
 from caas.ingestion import ProcessorFactory
 from caas.detection import DocumentTypeDetector, StructureAnalyzer
@@ -378,7 +379,7 @@ async def search_documents(
 # ===========================
 
 @app.post("/triad/hot")
-async def add_hot_context(content: str, metadata: Optional[dict] = None, priority: float = 1.0):
+async def add_hot_context(request: AddContextRequest):
     """
     Add hot context - the current situation.
     
@@ -391,15 +392,17 @@ async def add_hot_context(content: str, metadata: Optional[dict] = None, priorit
     Policy: "Attention Head" - Hot context overrides everything.
     
     Args:
-        content: The hot context content
-        metadata: Optional metadata (e.g., source, type)
-        priority: Priority level (higher = more important)
+        request: AddContextRequest with content, metadata, and priority
     
     Returns:
         Created item ID
     """
     try:
-        item_id = triad_manager.add_hot_context(content, metadata, priority)
+        item_id = triad_manager.add_hot_context(
+            request.content, 
+            request.metadata, 
+            request.priority
+        )
         return {
             "status": "success",
             "layer": "hot",
@@ -411,7 +414,7 @@ async def add_hot_context(content: str, metadata: Optional[dict] = None, priorit
 
 
 @app.post("/triad/warm")
-async def add_warm_context(content: str, metadata: Optional[dict] = None, priority: float = 1.0):
+async def add_warm_context(request: AddContextRequest):
     """
     Add warm context - the user persona.
     
@@ -427,15 +430,17 @@ async def add_warm_context(content: str, metadata: Optional[dict] = None, priori
     how the AI speaks to you.
     
     Args:
-        content: The warm context content
-        metadata: Optional metadata (e.g., source, category)
-        priority: Priority level (higher = more important)
+        request: AddContextRequest with content, metadata, and priority
     
     Returns:
         Created item ID
     """
     try:
-        item_id = triad_manager.add_warm_context(content, metadata, priority)
+        item_id = triad_manager.add_warm_context(
+            request.content, 
+            request.metadata, 
+            request.priority
+        )
         return {
             "status": "success",
             "layer": "warm",
@@ -447,7 +452,7 @@ async def add_warm_context(content: str, metadata: Optional[dict] = None, priori
 
 
 @app.post("/triad/cold")
-async def add_cold_context(content: str, metadata: Optional[dict] = None, priority: float = 1.0):
+async def add_cold_context(request: AddContextRequest):
     """
     Add cold context - the historical archive.
     
@@ -462,15 +467,17 @@ async def add_cold_context(content: str, metadata: Optional[dict] = None, priori
     It's only fetched when the user explicitly asks for history.
     
     Args:
-        content: The cold context content
-        metadata: Optional metadata (e.g., date, source)
-        priority: Priority level (higher = more important)
+        request: AddContextRequest with content, metadata, and priority
     
     Returns:
         Created item ID
     """
     try:
-        item_id = triad_manager.add_cold_context(content, metadata, priority)
+        item_id = triad_manager.add_cold_context(
+            request.content, 
+            request.metadata, 
+            request.priority
+        )
         return {
             "status": "success",
             "layer": "cold",

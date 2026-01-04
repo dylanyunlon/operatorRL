@@ -126,6 +126,13 @@ class ContextTriadRequest(BaseModel):
     query: Optional[str] = Field(default=None, description="Optional query for cold context retrieval")
 
 
+class AddContextRequest(BaseModel):
+    """Request for adding context to a layer."""
+    content: str = Field(description="The context content to add")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
+    priority: float = Field(default=1.0, ge=0.0, le=10.0, description="Priority level (0-10)")
+
+
 class ContextTriadResponse(BaseModel):
     """Response containing context triad data."""
     hot_context: str = ""
