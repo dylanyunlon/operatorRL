@@ -196,3 +196,28 @@ class SourceConflict(BaseModel):
         default="medium",
         description="Severity: low, medium, high"
     )
+
+
+class ModelTier(str, Enum):
+    """Model tiers for heuristic routing decisions."""
+    CANNED = "canned"  # Canned response, zero cost
+    FAST = "fast"  # Fast model (e.g., GPT-4o-mini)
+    SMART = "smart"  # Smart model (e.g., GPT-4o)
+
+
+class RoutingDecision(BaseModel):
+    """Represents a routing decision made by the heuristic router."""
+    model_config = {'protected_namespaces': ()}  # Avoid pydantic warning for model_tier
+    
+    model_tier: ModelTier
+    reason: str  # Why this tier was chosen
+    confidence: float = Field(ge=0.0, le=1.0)  # Confidence in the decision (0-1)
+    query_length: int  # Length of the query
+    matched_keywords: List[str] = []  # Keywords that triggered the decision
+    suggested_model: str  # Suggested model name (e.g., "gpt-4o-mini", "gpt-4o")
+    estimated_cost: str  # Estimated cost category (zero, low, medium, high)
+
+
+class RouteRequest(BaseModel):
+    """Request for routing a query to the appropriate model."""
+    query: str = Field(description="The user query to route")

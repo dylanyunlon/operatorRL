@@ -19,12 +19,16 @@ from caas.models import (
     ContextTriadRequest,
     ContextTriadResponse,
     AddContextRequest,
+    RouteRequest,
+    RoutingDecision,
+    ModelTier,
 )
 from caas.ingestion import ProcessorFactory
 from caas.detection import DocumentTypeDetector, StructureAnalyzer
 from caas.tuning import WeightTuner, CorpusAnalyzer
 from caas.storage import DocumentStore, ContextExtractor
 from caas.triad import ContextTriadManager
+from caas.routing import HeuristicRouter
 
 
 # Initialize FastAPI app
@@ -41,6 +45,7 @@ structure_analyzer = StructureAnalyzer()
 weight_tuner = WeightTuner()
 corpus_analyzer = CorpusAnalyzer()
 triad_manager = ContextTriadManager()
+heuristic_router = HeuristicRouter()
 # Note: context_extractor is created per-request with user-specified decay settings
 
 
@@ -57,6 +62,7 @@ async def root():
             "context": "/context/{document_id}",
             "analyze": "/analyze/{document_id}",
             "corpus": "/corpus/analyze",
+            "route": "/route",
             "triad": "/triad",
             "triad_hot": "/triad/hot",
             "triad_warm": "/triad/warm",
@@ -400,6 +406,51 @@ async def search_documents(
             for doc in results
         ]
     }
+
+
+@app.post("/route")
+async def route_query(request: RouteRequest):
+    """
+    Route a query to the appropriate model tier using deterministic heuristics.
+    
+    The Heuristic Router Philosophy:
+    Use Deterministic Heuristics, not AI Classifiers. We can solve 80% of routing 
+    with simple logic that takes 0ms. The goal isn't 100% routing accuracy. 
+    The goal is instant response time for the trivial stuff, preserving the 
+    "Big Brain" budget for the hard stuff.
+    
+    Routing Rules (in priority order):
+    1. Greetings ("Hi", "Thanks") → CANNED response (zero cost, instant)
+    2. Smart keywords ("Summarize", "Analyze", "Compare") → SMART model (GPT-4o)
+    3. Short queries (< 50 chars) → FAST model (GPT-4o-mini)
+    4. Long queries → SMART model (better safe than sorry)
+    
+    Model Tiers:
+    - CANNED: Pre-defined responses for greetings (zero cost, 0ms latency)
+    - FAST: Fast model like GPT-4o-mini (low cost, ~200ms latency)
+    - SMART: Smart model like GPT-4o (high cost, ~500ms+ latency)
+    
+    Args:
+        request: RouteRequest with the query to route
+    
+    Returns:
+        RoutingDecision with tier, reason, confidence, and suggested model
+    """
+    try:
+        decision = heuristic_router.route(request.query)
+        
+        # If it's a canned response, include the actual response
+        response_data = decision.dict()
+        if decision.model_tier == ModelTier.CANNED:
+            canned_response = heuristic_router.get_canned_response(request.query)
+            if canned_response:
+                response_data["canned_response"] = canned_response
+        
+        return response_data
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Routing failed: {str(e)}")
+
 
 
 # ===========================
