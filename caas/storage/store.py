@@ -8,9 +8,10 @@ from typing import Dict, Optional, List, Tuple, Any
 from pathlib import Path
 from datetime import datetime
 
-from caas.models import Document, DocumentType, ContentTier
+from caas.models import Document, DocumentType, ContentTier, SourceCitation
 from caas.enrichment import MetadataEnricher
 from caas.decay import calculate_decay_factor
+from caas.pragmatic_truth import SourceDetector, ConflictDetector, CitationFormatter
 
 
 class DocumentStore:
@@ -229,7 +230,9 @@ class ContextExtractor:
         store: DocumentStore, 
         enrich_metadata: bool = True,
         enable_time_decay: bool = True,
-        decay_rate: float = 1.0
+        decay_rate: float = 1.0,
+        enable_citations: bool = True,
+        detect_conflicts: bool = True
     ):
         """
         Initialize context extractor.
@@ -239,12 +242,23 @@ class ContextExtractor:
             enrich_metadata: Whether to enrich chunks with metadata (default: True)
             enable_time_decay: Whether to apply time-based decay to relevance (default: True)
             decay_rate: Rate of time decay (default: 1.0). Higher = faster decay.
+            enable_citations: Whether to include source citations (default: True)
+            detect_conflicts: Whether to detect conflicts between sources (default: True)
         """
         self.store = store
         self.enrich_metadata = enrich_metadata
         self.enricher = MetadataEnricher() if enrich_metadata else None
         self.enable_time_decay = enable_time_decay
         self.decay_rate = decay_rate
+        self.enable_citations = enable_citations
+        self.detect_conflicts = detect_conflicts
+        
+        # Pragmatic truth components
+        if enable_citations or detect_conflicts:
+            self.source_detector = SourceDetector()
+            self.citation_formatter = CitationFormatter()
+        if detect_conflicts:
+            self.conflict_detector = ConflictDetector()
     
     def _format_section(self, section: 'Section', document: Document) -> str:
         """
@@ -279,6 +293,11 @@ class ContextExtractor:
         """
         Extract context from a document with structure-aware boosting and time-based decay.
         
+        Now with Pragmatic Truth support:
+        - Includes source citations for transparency
+        - Detects conflicts between official and practical sources
+        - Presents both official and real-world information
+        
         Prioritizes:
         1. Tier 1 (High Value) content over Tier 2 and Tier 3
         2. Recent documents over old documents (when time decay is enabled)
@@ -300,6 +319,10 @@ class ContextExtractor:
         document = self.store.get(document_id)
         if not document:
             return "", {"error": "Document not found"}
+        
+        # Ensure sections have source citations
+        if self.enable_citations:
+            self._ensure_citations(document)
         
         # Calculate decay factor for the document if time decay is enabled
         decay_factor = 1.0
@@ -341,6 +364,7 @@ class ContextExtractor:
         # Build context string within token limit
         context_parts = []
         sections_used = []
+        citations_used = []
         total_chars = 0
         char_limit = max_tokens * 4  # Approximate: 4 chars per token
         
@@ -355,13 +379,40 @@ class ContextExtractor:
                     section_text = section_text[:remaining] + "..."
                     context_parts.append(section_text)
                     sections_used.append(section.title)
+                    if self.enable_citations and section.source_citation:
+                        citations_used.append(section.source_citation)
                 break
             
             context_parts.append(section_text)
             sections_used.append(section.title)
+            if self.enable_citations and section.source_citation:
+                citations_used.append(section.source_citation)
             total_chars += len(section_text)
         
         context = "".join(context_parts)
+        
+        # Detect conflicts if enabled
+        conflicts = []
+        if self.detect_conflicts and len(sorted_sections) > 1:
+            conflicts = self.conflict_detector.detect_conflicts(
+                sorted_sections,
+                {document_id: document}
+            )
+        
+        # Enrich context with citations if enabled
+        if self.enable_citations and citations_used:
+            context = self.citation_formatter.enrich_context_with_citations(
+                context,
+                citations_used
+            )
+        
+        # Add conflict warnings if detected
+        if conflicts:
+            conflict_text = "\n\n---\n### ⚠️  Conflicting Information Detected\n\n"
+            for conflict in conflicts:
+                conflict_text += self.citation_formatter.format_conflict(conflict)
+                conflict_text += "\n\n"
+            context += conflict_text
         
         metadata = {
             "document_id": document_id,
@@ -378,6 +429,22 @@ class ContextExtractor:
             "time_decay_enabled": self.enable_time_decay,
             "decay_factor": decay_factor,
             "ingestion_timestamp": document.ingestion_timestamp,
+            "citations": [c.model_dump() for c in citations_used] if self.enable_citations else [],
+            "conflicts": [c.model_dump() for c in conflicts] if self.detect_conflicts else [],
         }
         
         return context, metadata
+    
+    def _ensure_citations(self, document: Document):
+        """
+        Ensure all sections have source citations.
+        
+        Args:
+            document: Document to process
+        """
+        for section in document.sections:
+            if not section.source_citation:
+                section.source_citation = self.source_detector.create_citation(
+                    document,
+                    section
+                )

@@ -75,7 +75,9 @@ async def health_check():
 async def ingest_document(
     file: UploadFile = File(...),
     format: ContentFormat = Form(...),
-    title: Optional[str] = Form(None)
+    title: Optional[str] = Form(None),
+    source_type: Optional[str] = Form(None),
+    source_url: Optional[str] = Form(None)
 ):
     """
     Ingest a document for processing.
@@ -84,12 +86,19 @@ async def ingest_document(
     1. Process the raw content
     2. Auto-detect the document type and structure
     3. Auto-tune weights for sections
-    4. Store the processed document
+    4. Detect or use provided source type for Pragmatic Truth tracking
+    5. Store the processed document
+    
+    Pragmatic Truth Support:
+    - source_type: Explicitly specify source type (official_docs, team_chat, practical_logs, etc.)
+    - source_url: Optional URL to the original source
     
     Args:
         file: The file to ingest
         format: The file format (pdf, html, code)
         title: Optional title for the document
+        source_type: Optional source type for citation tracking
+        source_url: Optional URL to the original source
     
     Returns:
         Processed document information
@@ -108,6 +117,12 @@ async def ingest_document(
             "title": title or file.filename,
             "filename": file.filename,
         }
+        
+        # Add source metadata if provided
+        if source_type:
+            metadata['source_type'] = source_type
+        if source_url:
+            metadata['source_url'] = source_url
         
         document = processor.process(content, metadata)
         
@@ -134,6 +149,7 @@ async def ingest_document(
             "format": document.format,
             "sections_found": len(document.sections),
             "weights": document.weights,
+            "source_type": source_type or "auto-detected",
             "status": "ingested"
         }
     
@@ -218,27 +234,37 @@ async def get_context(document_id: str, request: ContextRequest):
     - Time-based decay (prioritizes recent content)
     - Optional query for focused extraction
     - Token limits
+    - Source citations for transparency (Pragmatic Truth)
+    - Conflict detection between official and practical sources
+    
+    Pragmatic Truth Philosophy:
+    - Provides REAL answers, not just OFFICIAL ones
+    - When official docs conflict with practical experience, shows both
+    - Includes transparent citations (e.g., "from Slack conversation")
+    - Example: "Officially, limit is 100. However, team reports crashes after 50."
     
     Time Decay Formula: Score = Base_Weight * (1 / (1 + days_elapsed * decay_rate))
     Result: Recent documents rank higher than old documents, even with lower similarity.
     
     Args:
         document_id: The document ID
-        request: Context request parameters (includes enable_time_decay, decay_rate)
+        request: Context request parameters (includes enable_time_decay, decay_rate, enable_citations, detect_conflicts)
     
     Returns:
-        Optimized context with time-weighted relevance
+        Optimized context with time-weighted relevance, citations, and conflict detection
     """
     document = document_store.get(document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    # Create context extractor with requested decay settings
+    # Create context extractor with requested settings
     extractor = ContextExtractor(
         document_store,
         enrich_metadata=request.include_metadata,
         enable_time_decay=request.enable_time_decay,
-        decay_rate=request.decay_rate
+        decay_rate=request.decay_rate,
+        enable_citations=request.enable_citations,
+        detect_conflicts=request.detect_conflicts
     )
     
     # Extract context
@@ -258,7 +284,9 @@ async def get_context(document_id: str, request: ContextRequest):
         sections_used=metadata.get("sections_used", []),
         total_tokens=estimated_tokens,
         weights_applied=metadata.get("weights_applied", {}),
-        metadata=metadata if request.include_metadata else {}
+        metadata=metadata if request.include_metadata else {},
+        source_citations=metadata.get("citations", []),
+        source_conflicts=metadata.get("conflicts", [])
     )
     
     return response

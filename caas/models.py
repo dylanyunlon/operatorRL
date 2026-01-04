@@ -42,6 +42,29 @@ class ContentFormat(str, Enum):
     TEXT = "text"
 
 
+class SourceType(str, Enum):
+    """Source types for pragmatic truth tracking."""
+    OFFICIAL_DOCS = "official_docs"  # Official documentation, specs, formal docs
+    PRACTICAL_LOGS = "practical_logs"  # Server logs, error logs, system logs
+    TEAM_CHAT = "team_chat"  # Slack, Teams, chat conversations
+    CODE_COMMENTS = "code_comments"  # Inline code comments and TODOs
+    TICKET_SYSTEM = "ticket_system"  # Jira, GitHub issues, bug reports
+    RUNBOOK = "runbook"  # Operational runbooks, troubleshooting guides
+    WIKI = "wiki"  # Internal wiki, knowledge base
+    MEETING_NOTES = "meeting_notes"  # Meeting notes, decisions
+    UNKNOWN = "unknown"  # Unknown or unspecified source
+
+
+class SourceCitation(BaseModel):
+    """Citation for source tracking."""
+    source_type: SourceType
+    source_name: str  # e.g., "API Documentation v2.1", "Slack #engineering 2024-01-03"
+    source_url: Optional[str] = None  # Link to original source if available
+    timestamp: Optional[str] = None  # When the information was created/updated
+    excerpt: Optional[str] = None  # Brief excerpt from source
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)  # Confidence in the information (0-1)
+
+
 class Section(BaseModel):
     """Represents a section of a document."""
     title: str
@@ -53,6 +76,7 @@ class Section(BaseModel):
     end_pos: int = 0
     parent_section: Optional[str] = None  # Parent section title for hierarchical context
     chapter: Optional[str] = None  # Chapter or major section name
+    source_citation: Optional['SourceCitation'] = None  # Citation for pragmatic truth tracking
 
 
 class Document(BaseModel):
@@ -66,6 +90,7 @@ class Document(BaseModel):
     metadata: Dict[str, Any] = {}
     weights: Dict[str, float] = {}
     ingestion_timestamp: Optional[str] = None
+    source_citation: Optional['SourceCitation'] = None  # Document-level citation
 
 
 class ContextRequest(BaseModel):
@@ -84,6 +109,14 @@ class ContextRequest(BaseModel):
         le=10.0,
         description="Rate of time decay. Higher = faster decay (default: 1.0)"
     )
+    enable_citations: bool = Field(
+        default=True,
+        description="Include source citations for transparency (default: True)"
+    )
+    detect_conflicts: bool = Field(
+        default=True,
+        description="Detect conflicts between official and practical sources (default: True)"
+    )
 
 
 class ContextResponse(BaseModel):
@@ -95,6 +128,14 @@ class ContextResponse(BaseModel):
     total_tokens: int
     weights_applied: Dict[str, float] = {}
     metadata: Dict[str, Any] = {}
+    source_citations: List['SourceCitation'] = Field(
+        default=[],
+        description="Citations for all sources used in the context"
+    )
+    source_conflicts: List[Dict[str, Any]] = Field(
+        default=[],
+        description="Conflicts between official and practical sources"
+    )
 
 
 class ContextTriadItem(BaseModel):
@@ -141,3 +182,17 @@ class ContextTriadResponse(BaseModel):
     total_tokens: int
     layers_included: List[str]
     metadata: Dict[str, Any] = {}
+
+
+class SourceConflict(BaseModel):
+    """Represents a conflict between official and practical sources."""
+    topic: str  # What the conflict is about
+    official_answer: str  # What official docs say
+    official_source: 'SourceCitation'  # Citation for official answer
+    practical_answer: str  # What practical sources say (logs, chat, etc.)
+    practical_source: 'SourceCitation'  # Citation for practical answer
+    recommendation: str  # Which to trust and why
+    conflict_severity: str = Field(
+        default="medium",
+        description="Severity: low, medium, high"
+    )
