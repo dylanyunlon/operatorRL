@@ -572,9 +572,6 @@ async def clear_all_context():
     """Clear all context layers."""
     triad_manager.clear_all()
     return {"status": "success", "message": "All context cleared"}
-            for doc in results
-        ]
-    }
 
 
 if __name__ == "__main__":
