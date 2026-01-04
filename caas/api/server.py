@@ -33,6 +33,7 @@ from caas.storage import DocumentStore, ContextExtractor
 from caas.triad import ContextTriadManager
 from caas.routing import HeuristicRouter
 from caas.conversation import ConversationManager
+from caas.gateway import TrustGateway, SecurityPolicy, DeploymentMode
 
 
 # Initialize FastAPI app
@@ -51,6 +52,14 @@ corpus_analyzer = CorpusAnalyzer()
 triad_manager = ContextTriadManager()
 heuristic_router = HeuristicRouter()
 conversation_manager = ConversationManager(max_turns=10)  # Sliding window with 10 turns
+# Trust Gateway with enterprise-grade security
+trust_gateway = TrustGateway(
+    security_policy=SecurityPolicy(
+        deployment_mode=DeploymentMode.ON_PREM,
+        security_level="high"
+    ),
+    audit_enabled=True
+)
 # Note: context_extractor is created per-request with user-specified decay settings
 
 
@@ -75,6 +84,10 @@ async def root():
             "conversation": "/conversation",
             "conversation_add": "/conversation/turn",
             "conversation_stats": "/conversation/stats",
+            "gateway": "/gateway",
+            "gateway_route": "/gateway/route",
+            "gateway_info": "/gateway/info",
+            "gateway_audit": "/gateway/audit",
         }
     }
 
@@ -875,6 +888,249 @@ async def clear_conversation():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear conversation: {str(e)}")
 
+
+# ===========================
+# Trust Gateway Endpoints
+# ===========================
+
+@app.get("/gateway")
+async def gateway_status():
+    """
+    Get Trust Gateway status and deployment information.
+    
+    The Trust Gateway addresses the "Middleware Gap" by providing an
+    enterprise-grade, on-premises / private cloud router that CISOs can trust.
+    
+    Philosophy:
+    No Enterprise CISO will send proprietary data to a random middleware startup.
+    The Trust Gateway can be deployed within your own infrastructure, ensuring:
+    - Data never leaves your environment
+    - Full audit trail for compliance
+    - Zero third-party data sharing
+    - Enterprise-grade security controls
+    
+    Returns:
+        Trust Gateway deployment information and security status
+    """
+    try:
+        info = trust_gateway.get_deployment_info()
+        return {
+            "status": "operational",
+            "gateway_type": "Trust Gateway (Enterprise Private Cloud Router)",
+            "philosophy": "The winner won't be the one with the smartest routing; "
+                         "it will be the one the Enterprise trusts with the keys to the kingdom.",
+            **info
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get gateway status: {str(e)}")
+
+
+@app.post("/gateway/route")
+async def gateway_route_request(
+    request: RouteRequest,
+    user_id: Optional[str] = None,
+    data_classification: Optional[str] = None
+):
+    """
+    Route a request through the Trust Gateway with enterprise security controls.
+    
+    The Trust Gateway provides:
+    1. On-Premises / Private Cloud deployment
+    2. Zero data leakage (data never leaves your infrastructure)
+    3. Full audit trail for compliance
+    4. Configurable security policies
+    5. Authentication and authorization
+    6. Data classification and encryption
+    
+    This endpoint validates the request against security policies, performs
+    heuristic routing, and logs all activity for compliance.
+    
+    Example Use Case:
+    Enterprise CISO requirement: "We cannot send our proprietary financial data
+    to an external middleware service." Solution: Deploy Trust Gateway in your
+    own infrastructure. All routing decisions happen locally with zero external calls.
+    
+    Args:
+        request: RouteRequest with the query to route
+        user_id: User ID making the request (for authentication)
+        data_classification: Classification level (public, internal, confidential, secret)
+    
+    Returns:
+        Routing decision with security context and audit trail
+    """
+    try:
+        result = trust_gateway.route_request(
+            query=request.query,
+            user_id=user_id,
+            data_classification=data_classification
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gateway routing failed: {str(e)}")
+
+
+@app.get("/gateway/info")
+async def gateway_deployment_info():
+    """
+    Get detailed Trust Gateway deployment and security information.
+    
+    Returns comprehensive information about:
+    - Deployment mode (on-prem, private cloud, hybrid, air-gapped)
+    - Security level and policies
+    - Data retention settings
+    - Encryption status
+    - Compliance mode
+    - Trust guarantees
+    
+    Returns:
+        Detailed deployment and security configuration
+    """
+    try:
+        info = trust_gateway.get_deployment_info()
+        return {
+            "gateway_info": info,
+            "deployment_modes": {
+                "on_prem": "Deployed on customer's own servers (maximum control)",
+                "private_cloud": "Deployed in customer's private cloud (AWS VPC, Azure VNet, GCP VPC)",
+                "hybrid": "Hybrid deployment with local processing and cloud backup",
+                "air_gapped": "Completely isolated from internet (maximum security)"
+            },
+            "security_levels": {
+                "standard": "Basic security controls",
+                "high": "Enhanced security (encryption at rest and in transit)",
+                "maximum": "Maximum security (air-gapped, zero data retention)"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get deployment info: {str(e)}")
+
+
+@app.get("/gateway/audit")
+async def gateway_audit_logs(
+    event_type: Optional[str] = None,
+    user_id: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None
+):
+    """
+    Retrieve Trust Gateway audit logs for compliance and security monitoring.
+    
+    Audit logs include:
+    - All routing decisions
+    - Request validation events
+    - Security policy changes
+    - Data access events
+    - User authentication attempts
+    
+    This endpoint supports filtering by:
+    - Event type (e.g., "request_routed", "policy_changed")
+    - User ID
+    - Time range (ISO format timestamps)
+    
+    Example Use Cases:
+    - Compliance audits (GDPR, HIPAA, SOC2)
+    - Security incident investigation
+    - User activity monitoring
+    - Policy change tracking
+    
+    Args:
+        event_type: Filter by event type
+        user_id: Filter by user ID
+        start_time: Start of time range (ISO format)
+        end_time: End of time range (ISO format)
+    
+    Returns:
+        Filtered audit log entries
+    """
+    try:
+        logs = trust_gateway.get_audit_logs(
+            event_type=event_type,
+            user_id=user_id,
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        return {
+            "status": "success",
+            "total_logs": len(logs),
+            "filters_applied": {
+                "event_type": event_type,
+                "user_id": user_id,
+                "start_time": start_time,
+                "end_time": end_time
+            },
+            "audit_logs": logs
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve audit logs: {str(e)}")
+
+
+@app.post("/gateway/validate")
+async def gateway_validate_request(
+    query: str,
+    user_id: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    data_classification: Optional[str] = None
+):
+    """
+    Validate a request against Trust Gateway security policies.
+    
+    This endpoint checks:
+    - Authentication requirements
+    - User authorization (allowed users list)
+    - IP address restrictions
+    - Data classification requirements
+    - Encryption requirements
+    
+    Useful for pre-flight validation before sending actual requests.
+    
+    Args:
+        query: The query to validate
+        user_id: User ID making the request
+        ip_address: IP address of the requester
+        data_classification: Data classification level
+    
+    Returns:
+        Validation result with status, warnings, and violations
+    """
+    try:
+        validation = trust_gateway.validate_request(
+            request_data={"query": query},
+            user_id=user_id,
+            ip_address=ip_address,
+            data_classification=data_classification
+        )
+        
+        return {
+            "status": "success" if validation["valid"] else "failed",
+            "valid": validation["valid"],
+            "warnings": validation["warnings"],
+            "violations": validation["violations"],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+
+
+@app.delete("/gateway/audit")
+async def gateway_clear_audit_logs(user_id: Optional[str] = None):
+    """
+    Clear Trust Gateway audit logs.
+    
+    Note: This operation itself is logged before clearing.
+    Requires proper authorization in production environments.
+    
+    Args:
+        user_id: User ID requesting the clear operation
+    
+    Returns:
+        Clear operation status
+    """
+    try:
+        result = trust_gateway.clear_audit_logs(user_id=user_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear audit logs: {str(e)}")
 
 
 if __name__ == "__main__":
