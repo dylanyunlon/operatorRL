@@ -13,10 +13,11 @@ A managed pipeline for intelligent context extraction and serving. The service a
 🧬 **Metadata Injection**: Enriches chunks with contextual metadata to eliminate "context amnesia"  
 ⏰ **Time-Based Decay**: Prioritizes recent content over old using "The Half-Life of Truth" principle  
 🔥 **Context Triad (Hot, Warm, Cold)**: Intimacy-based three-tier context system that treats context by relevance, not just speed  
+💡 **Pragmatic Truth**: Provides REAL answers, not just OFFICIAL ones - with transparent source citations and conflict detection  
 
 ## The Problem
 
-Traditional context extraction systems require manual configuration and suffer from FOUR major fallacies:
+Traditional context extraction systems require manual configuration and suffer from FIVE major fallacies:
 
 ### 1. The "Flat Chunk Fallacy" (Structure Problem)
 - **Flat Chunk Approach**: Treating all content equally (e.g., splitting every 500 words and embedding)
@@ -45,6 +46,13 @@ Traditional context extraction systems require manual configuration and suffer f
 - No clear prioritization between what's happening NOW vs. what happened LAST YEAR
 - **The Problem**: Traditional systems treat all context with the same priority
 
+### 5. The "Official Truth Fallacy" (Source Problem)
+- **The Naive Approach**: "The Official Documentation is the source of truth"
+- **The Reality**: Official docs are often theoretical; Slack logs contain the actual fix
+- Example: Docs say "API limit is 100" but team knows "it crashes after 50"
+- Traditional AI only shows official answer (misleading)
+- **The Problem**: No distinction between official theory and practical reality
+
 ## The Solution
 
 Context-as-a-Service provides a fully automated pipeline:
@@ -53,7 +61,9 @@ Context-as-a-Service provides a fully automated pipeline:
 2. **Auto-Detect** the structure (e.g., "This looks like a Legal Contract")
 3. **Auto-Tune** the weights (e.g., "Boost the 'Definitions' section by 2x")
 4. **Apply Time Decay** (e.g., "Recent content ranks higher than old content")
-5. **Serve** the perfect context via API
+5. **Track Sources** (e.g., "This is from Slack vs official docs")
+6. **Detect Conflicts** (e.g., "Official says X, team says Y")
+7. **Serve** the perfect context via API with transparent citations
 
 **No manual tuning required** - the service analyzes your corpus and tunes itself.
 
@@ -473,7 +483,80 @@ Traditional systems treat current errors the same as year-old tickets. The Conte
 
 **See [CONTEXT_TRIAD.md](CONTEXT_TRIAD.md) for detailed documentation.**
 
-### 5. Document Type Detection
+### 5. Pragmatic Truth (Solving "Official Truth Fallacy")
+
+The system implements **transparent source tracking** that distinguishes between official documentation and practical reality.
+
+#### **The Naive Approach:**
+```
+"The Official Documentation is the source of truth."
+```
+
+#### **The Engineering Reality:**
+We need to present BOTH official answers and practical experience with full transparency.
+
+#### **Example: API Rate Limits**
+
+**Official Documentation says:**
+> "The API supports 100 requests per minute."
+> Source: [Official Docs] API Documentation v2.1 (2023-07-08)
+
+**Team Experience shows:**
+> "Actually, the API crashes after 50 requests. We've hit this multiple times."
+> Source: [Team Chat] Slack #engineering (2024-01-02)
+
+**AI Response:**
+> "Officially, the docs say the limit is 100. However, looking at recent team discussions and production logs, the real limit appears to be 50 before instability occurs."
+
+#### **Source Types:**
+- `OFFICIAL_DOCS` - Official documentation, specs
+- `TEAM_CHAT` - Slack, Teams conversations
+- `PRACTICAL_LOGS` - Server logs, error logs
+- `RUNBOOK` - Operational runbooks
+- `TICKET_SYSTEM` - Jira, GitHub issues
+- `CODE_COMMENTS` - Inline code comments
+- `WIKI` - Internal wikis
+- `MEETING_NOTES` - Meeting decisions
+
+#### **Features:**
+1. **Source Detection** - Automatically identifies source types
+2. **Citation Tracking** - Every section cites its source with timestamp
+3. **Conflict Detection** - Identifies when official and practical sources disagree
+4. **Transparent Responses** - Shows both perspectives with recommendations
+5. **Time Priority** - Recent practical experience weighs more than old docs
+
+#### **Usage Example:**
+
+```python
+from caas.storage import ContextExtractor
+
+extractor = ContextExtractor(
+    store,
+    enable_citations=True,      # Include source citations
+    detect_conflicts=True,      # Detect conflicts between sources
+    enable_time_decay=True      # Prioritize recent information
+)
+
+context, metadata = extractor.extract_context(
+    document_id="doc-123",
+    query="server restart",
+    max_tokens=2000
+)
+
+# Check citations
+print(f"Sources: {len(metadata['citations'])}")
+
+# Check conflicts
+if metadata['conflicts']:
+    print("⚠️ Conflict detected between official and practical sources!")
+```
+
+**Why This Matters:**
+Traditional RAG systems treat all sources equally, leading to misleading responses when official documentation is outdated. Our Pragmatic Truth approach ensures users get the real answer with full transparency about sources and conflicts. When a 2-day-old Slack conversation contradicts 6-month-old docs, the AI shows both and recommends the practical approach.
+
+**See [PRAGMATIC_TRUTH.md](PRAGMATIC_TRUTH.md) for detailed documentation.**
+
+### 6. Document Type Detection
 
 The service analyzes content to detect document types:
 - **Legal Contracts**: Looks for "whereas", "party", "hereby", "indemnify"
@@ -481,7 +564,7 @@ The service analyzes content to detect document types:
 - **Research Papers**: Detects "abstract", "methodology", "results"
 - **Source Code**: Recognizes programming patterns
 
-### 5. Base Weight Assignment
+### 7. Base Weight Assignment
 
 Each document type has optimized base weights:
 
@@ -497,7 +580,7 @@ Technical Documentation:
   - Parameters: 1.6x
 ```
 
-### 7. Content-Based Adjustments
+### 8. Content-Based Adjustments
 
 Weights are further adjusted based on:
 - **Code Examples**: +20% weight
@@ -506,11 +589,11 @@ Weights are further adjusted based on:
 - **Length**: +10% for substantial sections (>500 chars)
 - **Position**: +15% for first section, +10% for last
 
-### 8. Query Boosting
+### 9. Query Boosting
 
 When a query is provided, sections matching the query get +50% weight boost.
 
-### 9. Corpus Learning
+### 10. Corpus Learning
 
 The system analyzes patterns across all documents to:
 - Identify common section structures
@@ -670,9 +753,10 @@ TYPE_SPECIFIC_WEIGHTS = {
 context-as-a-service/
 ├── caas/
 │   ├── __init__.py
-│   ├── models.py           # Data models (includes ContentTier, Section with hierarchy)
+│   ├── models.py           # Data models (includes ContentTier, Section with hierarchy, SourceType)
 │   ├── enrichment.py       # Metadata enrichment for contextual injection
 │   ├── decay.py            # Time-based decay calculations
+│   ├── pragmatic_truth.py  # Source tracking, citations, and conflict detection
 │   ├── cli.py              # CLI tool
 │   ├── ingestion/          # Document processors
 │   │   ├── __init__.py
@@ -686,7 +770,7 @@ context-as-a-service/
 │   │   └── tuner.py
 │   ├── storage/            # Document storage
 │   │   ├── __init__.py
-│   │   └── store.py        # Context extraction with time decay
+│   │   └── store.py        # Context extraction with time decay and citations
 │   ├── triad.py            # Context Triad manager (Hot, Warm, Cold)
 │   └── api/                # REST API
 │       ├── __init__.py
@@ -697,8 +781,10 @@ context-as-a-service/
 ├── test_metadata_injection.py  # Metadata injection/enrichment tests
 ├── test_time_decay.py      # Time-based decay tests
 ├── test_context_triad.py   # Context Triad tests
+├── test_pragmatic_truth.py # Pragmatic Truth tests
 ├── demo_time_decay.py      # Time decay demonstration
 ├── demo_context_triad.py   # Context Triad demonstration
+├── demo_pragmatic_truth.py # Pragmatic Truth demonstration
 ├── requirements.txt
 ├── setup.py
 └── README.md
@@ -722,11 +808,17 @@ python test_time_decay.py
 # Run context triad tests
 python test_context_triad.py
 
+# Run pragmatic truth tests
+python test_pragmatic_truth.py
+
 # Run time decay demonstration
 python demo_time_decay.py
 
 # Run context triad demonstration
 python demo_context_triad.py
+
+# Run pragmatic truth demonstration
+python demo_pragmatic_truth.py
 
 # Install dev dependencies (if needed)
 pip install pytest pytest-asyncio httpx
