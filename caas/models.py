@@ -76,7 +76,7 @@ class Section(BaseModel):
     end_pos: int = 0
     parent_section: Optional[str] = None  # Parent section title for hierarchical context
     chapter: Optional[str] = None  # Chapter or major section name
-    source_citation: Optional['SourceCitation'] = None  # Citation for pragmatic truth tracking
+    source_citation: Optional[SourceCitation] = None  # Citation for pragmatic truth tracking
 
 
 class Document(BaseModel):
@@ -90,7 +90,7 @@ class Document(BaseModel):
     metadata: Dict[str, Any] = {}
     weights: Dict[str, float] = {}
     ingestion_timestamp: Optional[str] = None
-    source_citation: Optional['SourceCitation'] = None  # Document-level citation
+    source_citation: Optional[SourceCitation] = None  # Document-level citation
 
 
 class ContextRequest(BaseModel):
@@ -128,7 +128,7 @@ class ContextResponse(BaseModel):
     total_tokens: int
     weights_applied: Dict[str, float] = {}
     metadata: Dict[str, Any] = {}
-    source_citations: List['SourceCitation'] = Field(
+    source_citations: List[SourceCitation] = Field(
         default=[],
         description="Citations for all sources used in the context"
     )
@@ -188,9 +188,9 @@ class SourceConflict(BaseModel):
     """Represents a conflict between official and practical sources."""
     topic: str  # What the conflict is about
     official_answer: str  # What official docs say
-    official_source: 'SourceCitation'  # Citation for official answer
+    official_source: SourceCitation  # Citation for official answer
     practical_answer: str  # What practical sources say (logs, chat, etc.)
-    practical_source: 'SourceCitation'  # Citation for practical answer
+    practical_source: SourceCitation  # Citation for practical answer
     recommendation: str  # Which to trust and why
     conflict_severity: str = Field(
         default="medium",

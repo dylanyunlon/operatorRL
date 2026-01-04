@@ -362,7 +362,8 @@ class CitationFormatter:
                 dt = datetime.fromisoformat(citation.timestamp.replace('Z', '+00:00'))
                 time_str = dt.strftime('%Y-%m-%d')
                 parts.append(f"({time_str})")
-            except:
+            except (ValueError, TypeError):
+                # Skip malformed timestamps
                 pass
         
         # URL
