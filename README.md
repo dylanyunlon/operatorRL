@@ -556,7 +556,7 @@ result = manager.get_full_context(
 **Why This Matters:**
 Traditional systems treat current errors the same as year-old tickets. The Context Triad ensures the right context is available at the right time with the right priority. Current situation (hot) always takes precedence, user persona (warm) is always on, and historical data (cold) never pollutes the working context unless explicitly requested.
 
-**See [CONTEXT_TRIAD.md](CONTEXT_TRIAD.md) for detailed documentation.**
+**See [CONTEXT_TRIAD.md](docs/CONTEXT_TRIAD.md) for detailed documentation.**
 
 ### 5. Pragmatic Truth (Solving "Official Truth Fallacy")
 
@@ -629,7 +629,7 @@ if metadata['conflicts']:
 **Why This Matters:**
 Traditional RAG systems treat all sources equally, leading to misleading responses when official documentation is outdated. Our Pragmatic Truth approach ensures users get the real answer with full transparency about sources and conflicts. When a 2-day-old Slack conversation contradicts 6-month-old docs, the AI shows both and recommends the practical approach.
 
-**See [PRAGMATIC_TRUTH.md](PRAGMATIC_TRUTH.md) for detailed documentation.**
+**See [PRAGMATIC_TRUTH.md](docs/PRAGMATIC_TRUTH.md) for detailed documentation.**
 
 ### 6. Heuristic Router (Speed > Smarts)
 
@@ -728,7 +728,7 @@ Traditional systems use AI classifiers for routing, adding 500ms+ latency before
 - 1000 daily greetings with heuristic router: $0/day
 - **Annual savings**: $3,650
 
-**See [HEURISTIC_ROUTER.md](HEURISTIC_ROUTER.md) for detailed documentation.**
+**See [HEURISTIC_ROUTER.md](docs/HEURISTIC_ROUTER.md) for detailed documentation.**
 
 ### 7. Sliding Window Conversation Management (Solving "The Brutal Squeeze")
 
@@ -1001,7 +1001,7 @@ SaaS Router: $1,700/month + breach risk
 Trust Gateway: $100/month + full control  
 **Annual Savings: $19,200 + eliminated security risk**
 
-**See [TRUST_GATEWAY.md](TRUST_GATEWAY.md) for detailed documentation.**
+**See [TRUST_GATEWAY.md](docs/TRUST_GATEWAY.md) for detailed documentation.**
 
 
 ### 8. Document Type Detection
@@ -1205,6 +1205,8 @@ context-as-a-service/
 │   ├── enrichment.py       # Metadata enrichment for contextual injection
 │   ├── decay.py            # Time-based decay calculations
 │   ├── pragmatic_truth.py  # Source tracking, citations, and conflict detection
+│   ├── conversation.py     # Conversation manager with sliding window
+│   ├── triad.py            # Context Triad manager (Hot, Warm, Cold)
 │   ├── cli.py              # CLI tool
 │   ├── ingestion/          # Document processors
 │   │   ├── __init__.py
@@ -1219,34 +1221,51 @@ context-as-a-service/
 │   ├── storage/            # Document storage
 │   │   ├── __init__.py
 │   │   └── store.py        # Context extraction with time decay and citations
-│   ├── triad.py            # Context Triad manager (Hot, Warm, Cold)
 │   ├── routing/            # Heuristic routing
 │   │   ├── __init__.py
 │   │   └── heuristic_router.py  # Deterministic routing (Speed > Smarts)
-│   ├── conversation.py     # Conversation manager with sliding window
 │   ├── gateway/            # Trust Gateway (Enterprise Private Cloud Router)
 │   │   ├── __init__.py
 │   │   └── trust_gateway.py  # On-prem/private cloud deployment
 │   └── api/                # REST API
 │       ├── __init__.py
 │       └── server.py
-├── examples/               # Example documents
-├── test_functionality.py   # Basic functionality tests
-├── test_structure_aware_indexing.py  # Structure-aware indexing tests
-├── test_metadata_injection.py  # Metadata injection/enrichment tests
-├── test_time_decay.py      # Time-based decay tests
-├── test_context_triad.py   # Context Triad tests
-├── test_pragmatic_truth.py # Pragmatic Truth tests
-├── test_heuristic_router.py # Heuristic Router tests
-├── test_conversation_manager.py # Conversation Manager tests
-├── test_trust_gateway.py   # Trust Gateway tests
-├── demo_time_decay.py      # Time decay demonstration
-├── demo_context_triad.py   # Context Triad demonstration
-├── demo_pragmatic_truth.py # Pragmatic Truth demonstration
-├── demo_heuristic_router.py # Heuristic Router demonstration
-├── demo_conversation_manager.py # Conversation Manager demonstration
-├── demo_trust_gateway.py   # Trust Gateway demonstration
-├── TRUST_GATEWAY.md        # Trust Gateway documentation
+├── tests/                  # Test suite
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_functionality.py
+│   ├── test_structure_aware_indexing.py
+│   ├── test_metadata_injection.py
+│   ├── test_time_decay.py
+│   ├── test_context_triad.py
+│   ├── test_pragmatic_truth.py
+│   ├── test_heuristic_router.py
+│   ├── test_conversation_manager.py
+│   └── test_trust_gateway.py
+├── examples/               # Example usage and demos
+│   ├── agents/            # Sample agent implementations
+│   │   ├── intelligent_document_analyzer.py
+│   │   └── enterprise_security_agent.py
+│   ├── usage_example.py
+│   ├── auth_module.py
+│   ├── demo.py
+│   ├── demo_time_decay.py
+│   ├── demo_context_triad.py
+│   ├── demo_pragmatic_truth.py
+│   ├── demo_heuristic_router.py
+│   ├── demo_conversation_manager.py
+│   └── demo_trust_gateway.py
+├── docs/                   # Documentation
+│   ├── TESTING.md
+│   ├── CONTRIBUTING.md
+│   ├── STRUCTURE_AWARE_INDEXING.md
+│   ├── METADATA_INJECTION.md
+│   ├── CONTEXT_TRIAD.md
+│   ├── PRAGMATIC_TRUTH.md
+│   ├── HEURISTIC_ROUTER.md
+│   ├── SLIDING_WINDOW.md
+│   └── TRUST_GATEWAY.md
+├── run_tests.py           # Test runner
 ├── requirements.txt
 ├── setup.py
 └── README.md
@@ -1254,57 +1273,57 @@ context-as-a-service/
 
 ### Running Tests
 
+Run all tests:
 ```bash
-# Run basic functionality tests
-python test_functionality.py
+python run_tests.py
+```
 
-# Run structure-aware indexing tests
-python test_structure_aware_indexing.py
+Run individual tests:
+```bash
+python -m tests.test_functionality
+python -m tests.test_heuristic_router
+python -m tests.test_trust_gateway
+```
 
-# Run metadata injection tests
-python test_metadata_injection.py
+See [TESTING.md](docs/TESTING.md) for detailed testing guide.
 
-# Run time-based decay tests
-python test_time_decay.py
+### Sample Agents
 
-# Run context triad tests
-python test_context_triad.py
+Try the comprehensive sample agents:
 
-# Run pragmatic truth tests
-python test_pragmatic_truth.py
+**Intelligent Document Analyzer** (uses 6+ modules):
+```bash
+PYTHONPATH=. python examples/agents/intelligent_document_analyzer.py
+```
 
-# Run heuristic router tests
-python test_heuristic_router.py
+**Enterprise Security Agent** (Trust Gateway + routing):
+```bash
+PYTHONPATH=. python examples/agents/enterprise_security_agent.py
+```
 
-# Run conversation manager tests
-python test_conversation_manager.py
+### Running Demos
 
-# Run trust gateway tests
-python test_trust_gateway.py
+```bash
+# Structure-aware indexing demo
+PYTHONPATH=. python examples/demo_structure_aware.py
 
-# Run time decay demonstration
-python demo_time_decay.py
+# Time-based decay demo
+PYTHONPATH=. python examples/demo_time_decay.py
 
-# Run context triad demonstration
-python demo_context_triad.py
+# Context Triad demo
+PYTHONPATH=. python examples/demo_context_triad.py
 
-# Run pragmatic truth demonstration
-python demo_pragmatic_truth.py
+# Pragmatic Truth demo
+PYTHONPATH=. python examples/demo_pragmatic_truth.py
 
-# Run heuristic router demonstration
-python demo_heuristic_router.py
+# Heuristic Router demo
+PYTHONPATH=. python examples/demo_heuristic_router.py
 
-# Run conversation manager demonstration
-python demo_conversation_manager.py
+# Conversation Manager demo
+PYTHONPATH=. python examples/demo_conversation_manager.py
 
-# Run trust gateway demonstration
-python demo_trust_gateway.py
-
-# Install dev dependencies (if needed)
-pip install pytest pytest-asyncio httpx
-
-# Run tests (when available)
-pytest
+# Trust Gateway demo
+PYTHONPATH=. python examples/demo_trust_gateway.py
 ```
 
 ## Use Cases
@@ -1332,7 +1351,9 @@ Full interactive API documentation available at:
 
 ## Contributing
 
-Contributions welcome! Areas for enhancement:
+Contributions welcome! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+
+Areas for enhancement:
 - Additional document type detectors
 - More sophisticated weight tuning algorithms
 - Support for more file formats
