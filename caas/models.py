@@ -221,3 +221,36 @@ class RoutingDecision(BaseModel):
 class RouteRequest(BaseModel):
     """Request for routing a query to the appropriate model."""
     query: str = Field(description="The user query to route")
+
+
+class ConversationTurn(BaseModel):
+    """Represents a single turn in a conversation (user message + AI response)."""
+    id: str
+    user_message: str
+    ai_response: Optional[str] = None
+    timestamp: str
+    metadata: Dict[str, Any] = {}
+
+
+class ConversationState(BaseModel):
+    """Represents the conversation history with sliding window."""
+    turns: List[ConversationTurn] = []
+    max_turns: int = Field(default=10, ge=1, le=100)
+    total_turns_ever: int = 0  # Track total turns including deleted ones
+
+
+class AddTurnRequest(BaseModel):
+    """Request to add a conversation turn."""
+    user_message: str = Field(description="The user's message")
+    ai_response: Optional[str] = Field(default=None, description="The AI's response (optional)")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional metadata")
+
+
+class ConversationHistoryResponse(BaseModel):
+    """Response containing conversation history."""
+    turns: List[ConversationTurn]
+    total_turns: int
+    max_turns: int
+    total_turns_ever: int
+    oldest_turn_timestamp: Optional[str] = None
+    newest_turn_timestamp: Optional[str] = None

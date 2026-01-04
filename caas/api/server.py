@@ -22,6 +22,8 @@ from caas.models import (
     RouteRequest,
     RoutingDecision,
     ModelTier,
+    AddTurnRequest,
+    ConversationHistoryResponse,
 )
 from caas.ingestion import ProcessorFactory
 from caas.detection import DocumentTypeDetector, StructureAnalyzer
@@ -29,6 +31,7 @@ from caas.tuning import WeightTuner, CorpusAnalyzer
 from caas.storage import DocumentStore, ContextExtractor
 from caas.triad import ContextTriadManager
 from caas.routing import HeuristicRouter
+from caas.conversation import ConversationManager
 
 
 # Initialize FastAPI app
@@ -46,6 +49,7 @@ weight_tuner = WeightTuner()
 corpus_analyzer = CorpusAnalyzer()
 triad_manager = ContextTriadManager()
 heuristic_router = HeuristicRouter()
+conversation_manager = ConversationManager(max_turns=10)  # Sliding window with 10 turns
 # Note: context_extractor is created per-request with user-specified decay settings
 
 
@@ -66,6 +70,12 @@ async def root():
             "triad": "/triad",
             "triad_hot": "/triad/hot",
             "triad_warm": "/triad/warm",
+            "triad_cold": "/triad/cold",
+            "conversation": "/conversation",
+            "conversation_add": "/conversation/turn",
+            "conversation_stats": "/conversation/stats",
+        }
+    }
             "triad_cold": "/triad/cold",
         }
     }
@@ -658,6 +668,214 @@ async def clear_all_context():
     """Clear all context layers."""
     triad_manager.clear_all()
     return {"status": "success", "message": "All context cleared"}
+
+
+# ===========================
+# Conversation Manager Endpoints (Sliding Window / FIFO)
+# ===========================
+
+@app.post("/conversation/turn")
+async def add_conversation_turn(request: AddTurnRequest):
+    """
+    Add a conversation turn to the history using Sliding Window (FIFO).
+    
+    The Brutal Squeeze Philosophy:
+    Instead of asking an AI to summarize conversation history (which costs money 
+    and loses nuance), we use a brutal "Sliding Window" approach:
+    - Keep the last 10 turns perfectly intact
+    - Delete turn 11 (FIFO - First In First Out)
+    - No summarization = No lossy compression
+    
+    Why this works:
+    - Users rarely refer back to what they said 20 minutes ago
+    - They constantly refer to the exact code snippet they pasted 30 seconds ago
+    - Summary = Lossy Compression (loses specific error codes, exact wording)
+    - Chopping = Lossless Compression (of the recent past)
+    
+    Example:
+    Turn 1: "I tried X and it failed with error code 500"
+    With Summarization: "User attempted troubleshooting" (ERROR CODE LOST!)
+    With Chopping: After 10 new turns, this is deleted entirely
+                   But turns 2-11 are perfectly intact with all details
+    
+    Args:
+        request: AddTurnRequest with user_message, ai_response, and metadata
+    
+    Returns:
+        Created turn ID and current conversation statistics
+    """
+    try:
+        turn_id = conversation_manager.add_turn(
+            user_message=request.user_message,
+            ai_response=request.ai_response,
+            metadata=request.metadata
+        )
+        
+        stats = conversation_manager.get_statistics()
+        
+        return {
+            "status": "success",
+            "turn_id": turn_id,
+            "message": "Conversation turn added successfully",
+            "statistics": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add turn: {str(e)}")
+
+
+@app.get("/conversation")
+async def get_conversation_history(
+    format_text: bool = True,
+    include_metadata: bool = False
+):
+    """
+    Get the conversation history (last N turns).
+    
+    Returns the history in FIFO order (oldest to newest).
+    All turns are perfectly intact - no summarization, no loss.
+    
+    The Sliding Window ensures:
+    1. Recent precision: Last N turns are perfectly intact
+    2. Zero summarization cost: No AI calls needed
+    3. No information loss: What's kept is lossless
+    4. Predictable behavior: Always know what's in context
+    
+    Philosophy: In a frugal architecture, we value Recent Precision over Vague History.
+    
+    Args:
+        format_text: If True, return formatted text; if False, return structured data
+        include_metadata: Whether to include metadata in text format
+    
+    Returns:
+        Conversation history (formatted or structured)
+    """
+    try:
+        if format_text:
+            history_text = conversation_manager.get_conversation_history(
+                include_metadata=include_metadata,
+                format_as_text=True
+            )
+            return {"history": history_text}
+        else:
+            turns = conversation_manager.get_conversation_history(format_as_text=False)
+            stats = conversation_manager.get_statistics()
+            
+            return ConversationHistoryResponse(
+                turns=turns,
+                total_turns=len(turns),
+                max_turns=conversation_manager.state.max_turns,
+                total_turns_ever=conversation_manager.state.total_turns_ever,
+                oldest_turn_timestamp=turns[0].timestamp if turns else None,
+                newest_turn_timestamp=turns[-1].timestamp if turns else None
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
+
+
+@app.get("/conversation/stats")
+async def get_conversation_statistics():
+    """
+    Get statistics about the conversation history.
+    
+    Returns:
+        Statistics including current turns, deleted turns, and timestamps
+    """
+    try:
+        stats = conversation_manager.get_statistics()
+        return {
+            "status": "success",
+            "statistics": stats,
+            "sliding_window_info": {
+                "max_turns": conversation_manager.state.max_turns,
+                "policy": "FIFO (First In First Out)",
+                "philosophy": "Chopping > Summarizing",
+                "benefits": [
+                    "Recent precision: Last N turns perfectly intact",
+                    "Zero AI cost: No summarization needed",
+                    "No information loss: Lossless compression of recent past",
+                    "Predictable: Always know what's in context"
+                ]
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+
+@app.get("/conversation/recent")
+async def get_recent_turns(n: int = 5):
+    """
+    Get the N most recent conversation turns.
+    
+    Args:
+        n: Number of recent turns to retrieve (default: 5)
+    
+    Returns:
+        Recent conversation turns
+    """
+    try:
+        turns = conversation_manager.get_recent_turns(n=n)
+        return {
+            "status": "success",
+            "recent_turns": turns,
+            "count": len(turns),
+            "requested": n
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get recent turns: {str(e)}")
+
+
+@app.patch("/conversation/turn/{turn_id}")
+async def update_turn_response(turn_id: str, ai_response: str):
+    """
+    Update the AI response for a specific turn.
+    
+    Useful when you add a turn with just the user message
+    and want to update it with the AI response later.
+    
+    Args:
+        turn_id: The ID of the turn to update
+        ai_response: The AI response to add
+    
+    Returns:
+        Update status
+    """
+    try:
+        success = conversation_manager.update_turn_response(turn_id, ai_response)
+        if success:
+            return {
+                "status": "success",
+                "turn_id": turn_id,
+                "message": "AI response updated successfully"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Turn not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update turn: {str(e)}")
+
+
+@app.delete("/conversation")
+async def clear_conversation():
+    """
+    Clear all conversation history.
+    
+    Note: The total_turns_ever counter is preserved to track
+    how many turns have been processed across the lifetime.
+    
+    Returns:
+        Deletion status
+    """
+    try:
+        conversation_manager.clear_conversation()
+        return {
+            "status": "success",
+            "message": "Conversation history cleared",
+            "total_turns_ever": conversation_manager.state.total_turns_ever
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear conversation: {str(e)}")
+
 
 
 if __name__ == "__main__":
