@@ -38,10 +38,17 @@ class HeuristicRouter:
     Philosophy: Fast even if occasionally wrong > Slow but always right
     """
     
-    # Greeting patterns (case-insensitive)
+    # Greeting patterns (case-insensitive) - explicit greetings and farewells
     GREETING_PATTERNS = [
-        "hi", "hello", "hey", "thanks", "thank you", "thx", "ok", "okay",
-        "got it", "cool", "great", "awesome", "perfect", "bye", "goodbye"
+        "hi", "hello", "hey", "thanks", "thank you", "thx", 
+        "bye", "goodbye"
+    ]
+    
+    # Acknowledgment patterns (case-insensitive) - positive responses
+    # Note: These are kept separate to avoid false positives in complex queries
+    # e.g., "That's great, now analyze this data" should not be treated as greeting
+    ACKNOWLEDGMENT_PATTERNS = [
+        "ok", "okay", "got it", "cool", "great", "awesome", "perfect"
     ]
     
     # Smart model keywords (case-insensitive)
@@ -139,31 +146,39 @@ class HeuristicRouter:
     
     def _is_greeting(self, query_lower: str) -> bool:
         """
-        Check if the query is a greeting.
+        Check if the query is a greeting or acknowledgment.
         
         Args:
             query_lower: Lowercase query string
             
         Returns:
-            True if query is a greeting
+            True if query is a greeting or acknowledgment
         """
-        # Check for exact matches (for single-word greetings)
-        if query_lower in self.GREETING_PATTERNS:
+        # Combine greeting and acknowledgment patterns
+        all_patterns = self.GREETING_PATTERNS + self.ACKNOWLEDGMENT_PATTERNS
+        
+        # Check for exact matches (for single-word greetings/acknowledgments)
+        if query_lower in all_patterns:
             return True
         
-        # Check if query is very short and starts with a greeting
+        # Check if query is very short and contains a greeting as a complete word
         words = query_lower.split()
         if len(words) <= 3:  # Short phrases like "hi there", "thank you"
-            for pattern in self.GREETING_PATTERNS:
-                if query_lower.startswith(pattern) or query_lower.endswith(pattern):
+            for pattern in all_patterns:
+                # Use word boundary matching to avoid false positives like "thinking" matching "hi"
+                if pattern in words:
+                    return True
+                # Also check for phrases that start/end with greeting as complete word
+                if len(words) == 2 and (words[0] == pattern or words[1] == pattern):
                     return True
         
         return False
     
     def _get_matched_greetings(self, query_lower: str) -> List[str]:
-        """Get list of matched greeting patterns."""
+        """Get list of matched greeting/acknowledgment patterns."""
         matched = []
-        for pattern in self.GREETING_PATTERNS:
+        all_patterns = self.GREETING_PATTERNS + self.ACKNOWLEDGMENT_PATTERNS
+        for pattern in all_patterns:
             if pattern in query_lower:
                 matched.append(pattern)
         return matched

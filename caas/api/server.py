@@ -440,7 +440,7 @@ async def route_query(request: RouteRequest):
         decision = heuristic_router.route(request.query)
         
         # If it's a canned response, include the actual response
-        response_data = decision.dict()
+        response_data = decision.model_dump()
         if decision.model_tier == ModelTier.CANNED:
             canned_response = heuristic_router.get_canned_response(request.query)
             if canned_response:
