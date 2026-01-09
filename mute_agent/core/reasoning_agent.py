@@ -24,6 +24,9 @@ class ReasoningAgent:
     execute actions directly but proposes them based on graph constraints.
     """
     
+    # Maximum size for reasoning history to prevent memory bloat
+    MAX_HISTORY_SIZE = 1000
+    
     def __init__(
         self,
         knowledge_graph: MultidimensionalKnowledgeGraph,
@@ -42,12 +45,16 @@ class ReasoningAgent:
         """
         routing_result = self.router.route(context)
         
-        # Store reasoning step
+        # Store reasoning step (with size limit to prevent memory bloat)
         self.reasoning_history.append({
             "context": context,
-            "routing_result": routing_result,
+            "selected_dimensions": routing_result.selected_dimensions,
             "available_actions": len(routing_result.pruned_action_space)
         })
+        
+        # Trim history if it exceeds maximum size
+        if len(self.reasoning_history) > self.MAX_HISTORY_SIZE:
+            self.reasoning_history = self.reasoning_history[-self.MAX_HISTORY_SIZE:]
         
         return routing_result
     

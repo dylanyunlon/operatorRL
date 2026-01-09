@@ -1,1 +1,1 @@
-Examples directory
+"""Examples demonstrating the Mute Agent system."""

@@ -7,6 +7,10 @@ from dataclasses import dataclass, field
 from .graph_elements import Node, Edge, NodeType, EdgeType
 
 
+# Wildcard constant for matching any value in context
+WILDCARD_VALUE = "*"
+
+
 @dataclass
 class Dimension:
     """A dimension in the multidimensional knowledge graph."""
@@ -105,10 +109,10 @@ class Subgraph:
         # Check if any context attributes match node attributes
         for key, value in context.items():
             if key in node.attributes:
-                if node.attributes[key] == value or value == "*":
+                if node.attributes[key] == value or value == WILDCARD_VALUE:
                     return True
             if key in node.metadata:
-                if node.metadata[key] == value or value == "*":
+                if node.metadata[key] == value or value == WILDCARD_VALUE:
                     return True
         
         return False

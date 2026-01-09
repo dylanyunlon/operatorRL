@@ -118,8 +118,8 @@ class SuperSystemRouter:
         
         return {
             "total_routings": total_routings,
-            "avg_dimensions_per_routing": total_dimensions / total_routings,
-            "avg_actions_per_routing": total_actions / total_routings,
+            "avg_dimensions_per_routing": total_dimensions / total_routings if total_routings > 0 else 0,
+            "avg_actions_per_routing": total_actions / total_routings if total_routings > 0 else 0,
             "dimension_usage": self._get_dimension_usage_stats()
         }
     
