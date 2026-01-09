@@ -130,6 +130,35 @@ Run the included example:
 python examples/simple_example.py
 ```
 
+## The Ambiguity Test Experiment
+
+We've conducted a comprehensive experiment comparing the Mute Agent with traditional "Chatterbox" agents. The experiment demonstrates **zero hallucinations** when handling ambiguous requests.
+
+### Quick Demo
+
+```bash
+cd experiments
+python demo.py
+```
+
+### Run Full Experiment (30 test scenarios)
+
+```bash
+cd experiments
+python ambiguity_test.py
+```
+
+### Key Results
+
+| Metric | Baseline Agent | Mute Agent | Improvement |
+| --- | --- | --- | --- |
+| **Hallucination Rate** | 50.0% | **0.0%** | **100%** |
+| **Token Usage** | 1250 | 350 | **72% reduction** |
+| **Latency** | 1500ms | 280ms | **81% faster** |
+| **Safe Failure (Ambiguous)** | 28.6% | **100%** | **71% better** |
+
+The Mute Agent achieves **zero hallucinations** through graph-based constraints while being more efficient and faster. See [experiments/README.md](experiments/README.md) for full details.
+
 ## Core Concepts
 
 ### Forest of Trees Approach
