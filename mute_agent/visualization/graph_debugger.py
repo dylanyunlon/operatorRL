@@ -358,7 +358,7 @@ class GraphDebugger:
         else:
             return "#3498db", "Pending"
     
-    def _add_edges_from_knowledge_graph(self, net: Network, trace: ExecutionTrace):
+    def _add_edges_from_knowledge_graph(self, net, trace: ExecutionTrace):
         """Add edges from the knowledge graph to the visualization."""
         if not self.knowledge_graph:
             return
