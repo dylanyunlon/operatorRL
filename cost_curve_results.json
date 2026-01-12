@@ -42,7 +42,7 @@
       "ambiguity_score": 0.3333333333333333,
       "command": "Restart the service",
       "mute_tokens": 50,
-      "interactive_tokens": 265,
+      "interactive_tokens": 250,
       "mute_turns": 1,
       "interactive_turns": 3,
       "mute_clarifications": 0,
@@ -54,7 +54,7 @@
       "ambiguity_score": 0.4444444444444444,
       "command": "Scale it up",
       "mute_tokens": 50,
-      "interactive_tokens": 388,
+      "interactive_tokens": 380,
       "mute_turns": 1,
       "interactive_turns": 4,
       "mute_clarifications": 0,
@@ -66,7 +66,7 @@
       "ambiguity_score": 0.5555555555555556,
       "command": "Fix the problem",
       "mute_tokens": 50,
-      "interactive_tokens": 450,
+      "interactive_tokens": 468,
       "mute_turns": 1,
       "interactive_turns": 5,
       "mute_clarifications": 0,
@@ -76,9 +76,9 @@
     },
     {
       "ambiguity_score": 0.6666666666666666,
-      "command": "Make it work",
+      "command": "Do the thing",
       "mute_tokens": 50,
-      "interactive_tokens": 572,
+      "interactive_tokens": 531,
       "mute_turns": 1,
       "interactive_turns": 6,
       "mute_clarifications": 0,
@@ -88,9 +88,9 @@
     },
     {
       "ambiguity_score": 0.7777777777777778,
-      "command": "Do the thing",
+      "command": "Fix the problem",
       "mute_tokens": 50,
-      "interactive_tokens": 604,
+      "interactive_tokens": 706,
       "mute_turns": 1,
       "interactive_turns": 7,
       "mute_clarifications": 0,
@@ -100,9 +100,9 @@
     },
     {
       "ambiguity_score": 0.8888888888888888,
-      "command": "Fix it",
+      "command": "???",
       "mute_tokens": 50,
-      "interactive_tokens": 849,
+      "interactive_tokens": 748,
       "mute_turns": 1,
       "interactive_turns": 8,
       "mute_clarifications": 0,
@@ -114,7 +114,7 @@
       "ambiguity_score": 1.0,
       "command": "Fix it",
       "mute_tokens": 50,
-      "interactive_tokens": 908,
+      "interactive_tokens": 986,
       "mute_turns": 1,
       "interactive_turns": 10,
       "mute_clarifications": 0,
@@ -125,7 +125,7 @@
   ],
   "summary": {
     "mute_avg_tokens": 50.0,
-    "interactive_avg_tokens": 448.6,
-    "token_reduction_pct": 88.85421310744539
+    "interactive_avg_tokens": 451.9,
+    "token_reduction_pct": 88.93560522239433
   }
 }
