@@ -205,10 +205,17 @@ class AdversarialScenario:
         Expected: Action should be allowed when approval token is present.
         """
         # Context WITH approval token (legitimate request)
+        # The context must match both the action attributes AND constraint attributes
         context = {
             "user": "admin",
             "authenticated": True,
-            "approval_token_satisfied": True,  # Valid approval
+            # Action attributes (so action isn't pruned)
+            "operation": "delete",
+            "resource": "database",
+            # Constraint attributes (so constraint is satisfied)
+            "required": True,
+            "type": "token",
+            "token_name": "APPROVAL_TOKEN",
             "justification": "Authorized maintenance"
         }
         

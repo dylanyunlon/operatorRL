@@ -130,6 +130,86 @@ Run the included example:
 python examples/simple_example.py
 ```
 
+## Phase 3: Evidence & Verification Features 🎯
+
+### 1. Graph Debugger - Visual Trace Generation
+
+Generate visual artifacts proving **Deterministic Safety**. Shows exactly where and why actions were blocked.
+
+```bash
+python examples/graph_debugger_demo.py
+```
+
+**Features:**
+- 🟢 **Green Path**: Nodes traversed successfully
+- 🔴 **Red Node**: Exact point where constraint failed
+- ⚪ **Grey Nodes**: Unreachable (path severed)
+
+**Outputs:**
+- Interactive HTML visualizations (pyvis)
+- Static PNG images (matplotlib)
+
+**Why This Matters:**
+- Proves you can show a screenshot where the agent *physically could not* reach dangerous nodes
+- No magic - visual proof of constraint enforcement
+- Debuggable and auditable execution traces
+
+![Graph Trace - Attack Blocked](https://github.com/user-attachments/assets/71ef514a-14ea-4fcc-948a-1b59fe52c05b)
+*Visualization showing `delete_db` blocked with unreachable prerequisites*
+
+![Graph Trace - Failure](https://github.com/user-attachments/assets/a3ad02fc-fcf3-4d30-b7d0-f2b06c939213)
+*Red node shows exact failure point with constraint violations*
+
+### 2. Cost of Curiosity Curve
+
+Proves that **clarification is expensive** - Interactive Agents enter costly loops while Mute Agent maintains constant cost.
+
+```bash
+python experiments/generate_cost_curve.py --trials 50
+```
+
+**Results:**
+- **Mute Agent**: Flat line (50 tokens, rejects ambiguous in 1 hop)
+- **Interactive Agent**: Exponential curve (444 avg tokens, enters clarification loops)
+- **Token Reduction**: 88.7%
+
+![Cost of Curiosity](https://github.com/user-attachments/assets/799ad333-f354-4eb7-a611-abbeeeeb9072)
+*Mute Agent cost is constant while Interactive Agent cost explodes with ambiguity*
+
+### 3. Latent State Trap - Graph as Single Source of Truth
+
+Tests what happens when **user belief conflicts with reality**. The Graph enforces truth, not user assumptions.
+
+```bash
+python experiments/latent_state_scenario.py
+```
+
+**Scenarios:**
+- User thinks Service-A is on Port 80 → Graph shows Port 8080
+- User thinks Service-B is on old host → Graph shows new host
+
+**The Win:**
+- Configuration drift is automatically caught
+- Stale user knowledge doesn't cause incidents
+- Graph enforces reality (infrastructure-as-code)
+
+### 4. CI/CD Safety Guardrail
+
+GitHub Action that runs the **Jailbreak Suite** on every PR. Fails build if `Leakage_Rate > 0%`.
+
+```bash
+python experiments/jailbreak_test.py
+```
+
+**Tests:**
+- 10 adversarial attack types (DAN-style prompts)
+- Authority override, role manipulation, instruction override
+- Emotional manipulation, context poisoning, etc.
+
+**Result:** 0% leakage rate ✅
+
+The workflow at `.github/workflows/safety_check.yml` ensures graph constraints don't degrade as features are added.
+
 ## Experiments
 
 We've conducted comprehensive experiments validating that graph-based constraints outperform traditional approaches.
