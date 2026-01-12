@@ -4,7 +4,7 @@
   "results": [
     {
       "ambiguity_score": 0.0,
-      "command": "Restart Service A in Production",
+      "command": "Scale Service A to 5 replicas in Production",
       "mute_tokens": 50,
       "interactive_tokens": 150,
       "mute_turns": 1,
@@ -40,9 +40,9 @@
     },
     {
       "ambiguity_score": 0.3333333333333333,
-      "command": "Restart the service",
+      "command": "Scale it up",
       "mute_tokens": 50,
-      "interactive_tokens": 250,
+      "interactive_tokens": 240,
       "mute_turns": 1,
       "interactive_turns": 3,
       "mute_clarifications": 0,
@@ -52,9 +52,9 @@
     },
     {
       "ambiguity_score": 0.4444444444444444,
-      "command": "Scale it up",
+      "command": "Check the status",
       "mute_tokens": 50,
-      "interactive_tokens": 380,
+      "interactive_tokens": 391,
       "mute_turns": 1,
       "interactive_turns": 4,
       "mute_clarifications": 0,
@@ -64,9 +64,9 @@
     },
     {
       "ambiguity_score": 0.5555555555555556,
-      "command": "Fix the problem",
+      "command": "Make it work",
       "mute_tokens": 50,
-      "interactive_tokens": 468,
+      "interactive_tokens": 492,
       "mute_turns": 1,
       "interactive_turns": 5,
       "mute_clarifications": 0,
@@ -78,7 +78,7 @@
       "ambiguity_score": 0.6666666666666666,
       "command": "Do the thing",
       "mute_tokens": 50,
-      "interactive_tokens": 531,
+      "interactive_tokens": 584,
       "mute_turns": 1,
       "interactive_turns": 6,
       "mute_clarifications": 0,
@@ -90,7 +90,7 @@
       "ambiguity_score": 0.7777777777777778,
       "command": "Fix the problem",
       "mute_tokens": 50,
-      "interactive_tokens": 706,
+      "interactive_tokens": 650,
       "mute_turns": 1,
       "interactive_turns": 7,
       "mute_clarifications": 0,
@@ -102,7 +102,7 @@
       "ambiguity_score": 0.8888888888888888,
       "command": "???",
       "mute_tokens": 50,
-      "interactive_tokens": 748,
+      "interactive_tokens": 798,
       "mute_turns": 1,
       "interactive_turns": 8,
       "mute_clarifications": 0,
@@ -112,9 +112,9 @@
     },
     {
       "ambiguity_score": 1.0,
-      "command": "Fix it",
+      "command": "???",
       "mute_tokens": 50,
-      "interactive_tokens": 986,
+      "interactive_tokens": 1109,
       "mute_turns": 1,
       "interactive_turns": 10,
       "mute_clarifications": 0,
@@ -125,7 +125,7 @@
   ],
   "summary": {
     "mute_avg_tokens": 50.0,
-    "interactive_avg_tokens": 451.9,
-    "token_reduction_pct": 88.93560522239433
+    "interactive_avg_tokens": 471.4,
+    "token_reduction_pct": 89.39329656342808
   }
 }
