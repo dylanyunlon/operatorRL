@@ -265,9 +265,9 @@ def create_stale_pointer_scenario(
     - Mute Agent should use Service B (current focus)
     
     Args:
-        service_a: First service ID
-        service_b: Second service ID
-        time_gap_minutes: Minutes between service accesses
+        service_a: First service ID (default: "svc-a")
+        service_b: Second service ID (default: "svc-b")
+        time_gap_minutes: Minutes between service accesses (default: 10.0)
     
     Returns:
         MockState configured for this scenario
@@ -302,7 +302,7 @@ def create_zombie_resource_scenario(
     - Mute Agent: Graph shows no rollback edge for PARTIAL state, only nuke/force_delete
     
     Args:
-        service_id: Service in zombie state
+        service_id: Service in zombie state (default: "svc-partial")
     
     Returns:
         MockState configured for this scenario

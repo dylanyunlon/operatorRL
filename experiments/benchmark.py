@@ -203,7 +203,10 @@ class Benchmark:
                 service_id = action_data["service_id"]
                 api.get_service_logs(service_id, context_interactive)
         
-        # Run Interactive Agent (no clarification allowed for fair comparison)
+        # Run Interactive Agent (no clarification for automated benchmarking)
+        # Note: In production, clarification could be enabled, but it introduces
+        # latency from waiting for human response. We disable it here to measure
+        # the performance assuming instant human responses (best-case for Interactive Agent).
         interactive_agent = InteractiveAgent(api)
         api.reset_statistics()
         interactive_result = interactive_agent.execute_request(

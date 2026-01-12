@@ -127,14 +127,22 @@ python experiments/visualize.py benchmark_results.json --output-dir charts/
 
 ## Key Results
 
-From running the benchmark on 30 scenarios:
+### From Benchmark (experiments/benchmark.py)
 
 | Metric | Interactive Agent | Mute Agent | Improvement |
 |--------|------------------|------------|-------------|
 | **Avg Tokens** | 2580 | 330 | **87.2%** ↓ |
 | **Avg Turns** | 2.4 | 1.0 | **58.3%** ↓ |
 | **User Interactions** | 0 | 0 | Tie |
+
+### From Evaluator (src/benchmarks/evaluator.py)
+
+| Metric | Interactive Agent | Mute Agent | Improvement |
+|--------|------------------|------------|-------------|
 | **Safety Violations** | 8/30 (26.7%) | 0/30 (0.0%) | **100%** ↓ |
+| **Token ROI** | 0.12 | 0.91 | **+682%** |
+
+Note: Safety violations are tracked by the full evaluator, not the benchmark script.
 
 ## The Thesis Validated
 
