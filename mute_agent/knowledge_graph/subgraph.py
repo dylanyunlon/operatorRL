@@ -67,7 +67,7 @@ class Subgraph:
         """Get all available actions in this subgraph."""
         return self.find_nodes_by_type(NodeType.ACTION)
     
-    def validate_action(self, action_id: str) -> bool:
+    def validate_action(self, action_id: str, context: Optional[Dict[str, Any]] = None) -> bool:
         """Validate if an action can be executed based on graph constraints."""
         if action_id not in self.nodes:
             return False
@@ -82,8 +82,112 @@ class Subgraph:
                 target_node = self.nodes.get(edge.target_id)
                 if not target_node:
                     return False
+                # If context provided, check if requirement is satisfied
+                if context:
+                    if not self._is_requirement_satisfied(target_node, context):
+                        return False
         
         return True
+    
+    def _is_requirement_satisfied(self, requirement_node: Node, context: Dict[str, Any]) -> bool:
+        """Check if a requirement node is satisfied by the context."""
+        # Check if the requirement exists in context
+        req_id = requirement_node.id
+        
+        # Check if context explicitly marks this requirement as satisfied
+        if f"{req_id}_satisfied" in context:
+            return context[f"{req_id}_satisfied"]
+        
+        # Check if requirement attributes are present in context
+        for key, expected_value in requirement_node.attributes.items():
+            if key in context:
+                if context[key] == expected_value:
+                    return True
+        
+        return False
+    
+    def find_missing_dependencies(self, action_id: str, context: Dict[str, Any]) -> List[str]:
+        """
+        Find all missing dependencies for an action (deep traversal).
+        Returns a list of missing dependency IDs in order from root to leaf.
+        Handles circular dependencies gracefully.
+        """
+        if action_id not in self.nodes:
+            return [f"Action '{action_id}' not found"]
+        
+        visited = set()
+        in_progress = set()  # Track nodes currently being processed for cycle detection
+        missing_deps = []
+        
+        def traverse_dependencies(node_id: str, path: List[str]) -> None:
+            """Recursively traverse dependencies to find missing ones."""
+            if node_id in visited:
+                return
+            
+            # Cycle detection: if we're currently processing this node, we have a cycle
+            if node_id in in_progress:
+                return  # Skip circular dependency
+            
+            in_progress.add(node_id)
+            
+            # Get all requirements for this node
+            for edge in self._adjacency_list.get(node_id, []):
+                if edge.edge_type == EdgeType.REQUIRES:
+                    target_node = self.nodes.get(edge.target_id)
+                    if target_node:
+                        # Check if this requirement is satisfied
+                        if not self._is_requirement_satisfied(target_node, context):
+                            # This dependency is missing, check its dependencies first
+                            traverse_dependencies(edge.target_id, path + [node_id])
+                            # Add to missing list if not already there
+                            if edge.target_id not in missing_deps:
+                                missing_deps.append(edge.target_id)
+            
+            in_progress.remove(node_id)
+            visited.add(node_id)
+        
+        traverse_dependencies(action_id, [])
+        return missing_deps
+    
+    def get_dependency_chain(self, action_id: str) -> List[List[str]]:
+        """
+        Get all dependency chains for an action.
+        Returns a list of chains, where each chain is a list of node IDs.
+        Handles circular dependencies by detecting and skipping cycles.
+        """
+        if action_id not in self.nodes:
+            return []
+        
+        chains = []
+        visited_in_chain = set()  # Track nodes in current chain for cycle detection
+        
+        def traverse_chain(node_id: str, current_chain: List[str]) -> None:
+            """Recursively build dependency chains with cycle detection."""
+            # Cycle detection: if node is already in current chain, we have a cycle
+            if node_id in visited_in_chain:
+                return
+            
+            visited_in_chain.add(node_id)
+            
+            # Get all requirements for this node
+            requirements = []
+            for edge in self._adjacency_list.get(node_id, []):
+                if edge.edge_type == EdgeType.REQUIRES:
+                    requirements.append(edge.target_id)
+            
+            if not requirements:
+                # End of chain
+                chains.append(current_chain[:])
+            else:
+                # Continue traversing
+                for req_id in requirements:
+                    if req_id in self.nodes:
+                        traverse_chain(req_id, current_chain + [req_id])
+            
+            visited_in_chain.remove(node_id)
+        
+        traverse_chain(action_id, [action_id])
+        return chains
     
     def prune_by_context(self, context: Dict[str, Any]) -> "Subgraph":
         """Create a pruned version of this subgraph based on context."""

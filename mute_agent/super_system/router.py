@@ -8,6 +8,38 @@ from ..knowledge_graph.multidimensional_graph import MultidimensionalKnowledgeGr
 from ..knowledge_graph.graph_elements import Node
 
 
+# Normalization mappings for common synonyms and colloquialisms
+# Note: "east" and "west" map to -1 and -2 regions respectively as these are
+# the most commonly used primary regions in AWS US availability zones
+REGION_SYNONYMS = {
+    "virginia": "us-east-1",
+    "n. virginia": "us-east-1",
+    "northern virginia": "us-east-1",
+    "us-east": "us-east-1",
+    "east": "us-east-1",  # Maps to primary east region
+    "oregon": "us-west-2",
+    "us-west": "us-west-2",
+    "west": "us-west-2",  # Maps to primary west region (Oregon, not N. California)
+    "california": "us-west-1",
+    "ohio": "us-east-2",
+}
+
+ENVIRONMENT_SYNONYMS = {
+    "production": "prod",
+    "production environment": "prod",
+    "the prod env": "prod",
+    "prod env": "prod",
+    "live": "prod",
+    "development": "dev",
+    "development environment": "dev",
+    "the dev env": "dev",
+    "dev env": "dev",
+    "staging": "stage",
+    "stage": "stage",
+    "test": "test",
+}
+
+
 @dataclass
 class RoutingResult:
     """Result of routing a context through the Super System."""
@@ -26,6 +58,40 @@ class SuperSystemRouter:
     def __init__(self, knowledge_graph: MultidimensionalKnowledgeGraph):
         self.knowledge_graph = knowledge_graph
         self.routing_history: List[RoutingResult] = []
+        self.normalization_enabled = True
+        self.custom_synonyms: Dict[str, Dict[str, str]] = {
+            "region": REGION_SYNONYMS.copy(),
+            "environment": ENVIRONMENT_SYNONYMS.copy(),
+            "env": ENVIRONMENT_SYNONYMS.copy(),
+        }
+    
+    def add_synonym_mapping(self, field_name: str, synonym: str, canonical: str) -> None:
+        """Add a custom synonym mapping for normalization."""
+        if field_name not in self.custom_synonyms:
+            self.custom_synonyms[field_name] = {}
+        self.custom_synonyms[field_name][synonym.lower()] = canonical
+    
+    def normalize_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize context values using synonym mappings.
+        This helps prevent "False Positive" rejections when users use colloquial terms.
+        """
+        if not self.normalization_enabled:
+            return context
+        
+        normalized = context.copy()
+        
+        for key, value in context.items():
+            if not isinstance(value, str):
+                continue
+            
+            # Check if we have synonym mappings for this field
+            if key in self.custom_synonyms:
+                value_lower = value.lower()
+                if value_lower in self.custom_synonyms[key]:
+                    normalized[key] = self.custom_synonyms[key][value_lower]
+        
+        return normalized
     
     def route(self, context: Dict[str, Any]) -> RoutingResult:
         """
@@ -33,8 +99,11 @@ class SuperSystemRouter:
         This is the core routing mechanism that implements the
         "Forest of Trees" approach.
         """
+        # Step 0: Normalize context to handle synonyms
+        normalized_context = self.normalize_context(context)
+        
         # Step 1: Find relevant dimensions based on context
-        relevant_dimensions = self.knowledge_graph.find_relevant_dimensions(context)
+        relevant_dimensions = self.knowledge_graph.find_relevant_dimensions(normalized_context)
         
         if not relevant_dimensions:
             # If no specific dimensions match, use all dimensions
@@ -44,7 +113,7 @@ class SuperSystemRouter:
         action_spaces = {}
         for dim_name in relevant_dimensions:
             action_space = self.knowledge_graph.get_pruned_action_space(
-                dim_name, context
+                dim_name, normalized_context
             )
             action_spaces[dim_name] = action_space
         
@@ -60,6 +129,7 @@ class SuperSystemRouter:
             pruned_action_space=pruned_action_space,
             routing_metadata={
                 "context": context,
+                "normalized_context": normalized_context,
                 "action_count_by_dimension": {
                     dim: len(actions) for dim, actions in action_spaces.items()
                 },

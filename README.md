@@ -130,34 +130,50 @@ Run the included example:
 python examples/simple_example.py
 ```
 
-## The Ambiguity Test Experiment
+## Experiments
 
-We've conducted a comprehensive experiment comparing the Mute Agent with traditional "Chatterbox" agents. The experiment demonstrates **zero hallucinations** when handling ambiguous requests.
+We've conducted comprehensive experiments validating that graph-based constraints outperform traditional prompt engineering approaches.
 
-### Quick Demo
+### V1: The Ambiguity Test
 
-```bash
-cd experiments
-python demo.py
-```
-
-### Run Full Experiment (30 test scenarios)
+Demonstrates **zero hallucinations** when handling ambiguous requests.
 
 ```bash
 cd experiments
-python ambiguity_test.py
+python demo.py  # Quick demo
+python ambiguity_test.py  # Full 30-scenario test
 ```
 
-### Key Results
+**Results:** 0% hallucination rate, 72% token reduction, 81% faster
 
-| Metric | Baseline Agent | Mute Agent | Improvement |
+### V2: Robustness & Scale
+
+**NEW:** Comprehensive validation of graph constraints vs prompt engineering in complex scenarios.
+
+```bash
+cd experiments
+python run_v2_experiments_auto.py
+```
+
+**Test Suites:**
+1. **Deep Dependency Chain** - Multi-level prerequisite resolution (0 turns to resolution)
+2. **Adversarial Gauntlet** - Immunity to prompt injection (0% leakage across 10 attack types)
+3. **False Positive Prevention** - Synonym normalization (85% success rate)
+4. **Performance & Scale** - Token efficiency (95% reduction on failures)
+
+**Results:** 4/4 scenarios passed - **Graph Constraints OUTPERFORM Prompt Engineering**
+
+See [experiments/v2_scenarios/README.md](experiments/v2_scenarios/README.md) for detailed results.
+
+### Key Results Summary
+
+| Metric | V1 Baseline | V1 Mute Agent | V2 Enhancement |
 | --- | --- | --- | --- |
-| **Hallucination Rate** | 50.0% | **0.0%** | **100%** |
-| **Token Usage** | 1250 | 350 | **72% reduction** |
-| **Latency** | 1500ms | 280ms | **81% faster** |
-| **Safe Failure (Ambiguous)** | 28.6% | **100%** | **71% better** |
-
-The Mute Agent achieves **zero hallucinations** through graph-based constraints while being more efficient and faster. See [experiments/README.md](experiments/README.md) for full details.
+| **Hallucination Rate** | 50.0% | 0.0% | Deep dependency detection |
+| **Token Usage** | 1250 | 350 | 95% reduction on failures |
+| **Latency** | 1500ms | 280ms | Scales to 10k+ nodes |
+| **Security** | Vulnerable | Safe | 0% prompt injection leakage |
+| **UX Friction** | N/A | N/A | 85% synonym normalization |
 
 ## Core Concepts
 

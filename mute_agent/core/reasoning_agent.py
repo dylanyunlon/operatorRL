@@ -91,7 +91,7 @@ class ReasoningAgent:
     def _validate_proposal(self, proposal: ActionProposal) -> ValidationResult:
         """
         Validate a proposal against the knowledge graph constraints.
-        This is the core constraint checking mechanism.
+        This is the core constraint checking mechanism with deep dependency resolution.
         """
         errors = []
         warnings = []
@@ -119,34 +119,56 @@ class ReasoningAgent:
                 constraints_violated=constraints_violated
             )
         
-        # Validate across all selected dimensions
-        for dim_name in routing_result.selected_dimensions:
-            # Check if action is valid in this dimension
-            subgraph = self.knowledge_graph.get_subgraph(dim_name)
-            if not subgraph:
-                continue
-            
-            if not subgraph.validate_action(proposal.action_id):
-                errors.append(
-                    f"Action {proposal.action_id} fails validation in dimension {dim_name}"
-                )
-                constraints_violated.append(dim_name)
-            else:
-                constraints_met.append(dim_name)
-            
-            # Check specific constraints
-            constraints = self.knowledge_graph.get_action_constraints(
-                proposal.action_id,
-                dim_name
-            )
-            
-            for constraint in constraints:
-                if not self._check_constraint(constraint, proposal):
-                    warnings.append(
-                        f"Constraint {constraint.id} may not be fully satisfied"
-                    )
+        # Deep dependency checking - find all missing dependencies across dimensions
+        all_missing_deps = self.knowledge_graph.find_all_missing_dependencies(
+            proposal.action_id,
+            routing_result.selected_dimensions,
+            proposal.context
+        )
         
-        is_valid = len(errors) == 0
+        # If there are missing dependencies, provide detailed error messages
+        if all_missing_deps:
+            for dim_name, missing_deps in all_missing_deps.items():
+                for dep_id in missing_deps:
+                    errors.append(
+                        f"Missing dependency '{dep_id}' in dimension '{dim_name}'. "
+                        f"Please satisfy this requirement first."
+                    )
+                constraints_violated.append(dim_name)
+            
+            # Early return if dependencies are missing - no need for further validation
+            is_valid = False
+        else:
+            # Only validate constraints if no missing dependencies
+            for dim_name in routing_result.selected_dimensions:
+                # Check if action is valid in this dimension
+                subgraph = self.knowledge_graph.get_subgraph(dim_name)
+                if not subgraph:
+                    continue
+                
+                if not subgraph.validate_action(proposal.action_id, proposal.context):
+                    if dim_name not in constraints_violated:
+                        errors.append(
+                            f"Action {proposal.action_id} fails validation in dimension {dim_name}"
+                        )
+                        constraints_violated.append(dim_name)
+                else:
+                    if dim_name not in constraints_violated:
+                        constraints_met.append(dim_name)
+                
+                # Check specific constraints
+                constraints = self.knowledge_graph.get_action_constraints(
+                    proposal.action_id,
+                    dim_name
+                )
+                
+                for constraint in constraints:
+                    if not self._check_constraint(constraint, proposal):
+                        warnings.append(
+                            f"Constraint {constraint.id} may not be fully satisfied"
+                        )
+            
+            is_valid = len(errors) == 0
         
         return ValidationResult(
             is_valid=is_valid,

@@ -104,7 +104,8 @@ class MultidimensionalKnowledgeGraph:
     def validate_action_across_dimensions(
         self,
         action_id: str,
-        dimension_names: List[str]
+        dimension_names: List[str],
+        context: Optional[Dict[str, Any]] = None
     ) -> bool:
         """
         Validate an action across multiple dimensions.
@@ -115,10 +116,33 @@ class MultidimensionalKnowledgeGraph:
             if not subgraph:
                 continue
             
-            if not subgraph.validate_action(action_id):
+            if not subgraph.validate_action(action_id, context):
                 return False
         
         return True
+    
+    def find_all_missing_dependencies(
+        self,
+        action_id: str,
+        dimension_names: List[str],
+        context: Dict[str, Any]
+    ) -> Dict[str, List[str]]:
+        """
+        Find all missing dependencies for an action across all dimensions.
+        Returns a dictionary mapping dimension names to lists of missing dependencies.
+        """
+        all_missing = {}
+        
+        for dim_name in dimension_names:
+            subgraph = self.subgraphs.get(dim_name)
+            if not subgraph:
+                continue
+            
+            missing = subgraph.find_missing_dependencies(action_id, context)
+            if missing:
+                all_missing[dim_name] = missing
+        
+        return all_missing
     
     def get_action_constraints(
         self,
