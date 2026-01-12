@@ -134,9 +134,36 @@ python examples/simple_example.py
 
 We've conducted comprehensive experiments validating that graph-based constraints outperform traditional approaches.
 
-### Steel Man Evaluation (v2.0) - **LATEST** 🎉
+### Steel Man Benchmark (v2.0) - **LATEST** 🎉
 
-**NEW:** The definitive comparison against a State-of-the-Art reflective baseline in real-world infrastructure scenarios.
+**NEW:** The definitive comparison against a State-of-the-Art reflective baseline (InteractiveAgent) in real-world infrastructure scenarios.
+
+#### Run the Benchmark
+
+Compare Mute Agent vs Interactive Agent side-by-side:
+
+```bash
+python experiments/benchmark.py \
+    --scenarios src/benchmarks/scenarios.json \
+    --output benchmark_results.json
+```
+
+#### Generate Visualizations
+
+Create charts showing the "Cost of Curiosity":
+
+```bash
+python experiments/visualize.py benchmark_results.json --output-dir charts/
+```
+
+This generates:
+- **Cost vs. Ambiguity Chart**: Shows Mute Agent's flat cost line vs Interactive Agent's exploding cost
+- **Metrics Comparison**: Token usage, latency, turns, and user interactions
+- **Scenario Breakdown**: Performance by scenario class
+
+#### Original Evaluator
+
+Run the full evaluator with detailed safety metrics:
 
 ```bash
 python -m src.benchmarks.evaluator \
@@ -149,18 +176,27 @@ python -m src.benchmarks.evaluator \
 - **Ghost Resources**: Services stuck in partial/zombie states  
 - **Privilege Escalation**: Users attempting unauthorized operations
 
-**The Baseline:** A competent reflective agent with:
+**The Baseline:** The InteractiveAgent - a competent reflective agent with:
 - System state access (`kubectl get all`)
 - Reflection loop (retry up to 3 times)
-- Clarification capability
+- Clarification capability (Human-in-the-Loop)
 
-**Results:**
+**Key Results:**
 - ✅ **Safety Violations:** 0.0% vs 26.7% (100% reduction)
 - ✅ **Token ROI:** 0.91 vs 0.12 (+682% improvement)
-- ✅ **Token Reduction:** 85.5% average
-- 🎉 **Mute Agent WINS 2/3 key metrics**
+- ✅ **Token Reduction:** 87.2% average (330 vs 2580 tokens)
+- ✅ **Turns Reduction:** 58.3% (1.0 vs 2.4 turns)
+- 🎉 **Mute Agent WINS on efficiency metrics**
 
-**[Read Full Analysis →](STEEL_MAN_RESULTS.md)**
+**Visualizations:**
+
+![Cost vs Ambiguity](charts/cost_vs_ambiguity.png)
+*The "Cost of Curiosity": Mute Agent maintains constant cost while Interactive Agent cost explodes with ambiguity*
+
+![Metrics Comparison](charts/metrics_comparison.png)
+*Key metrics: 87% token reduction, 58% fewer turns*
+
+**[Read Full Analysis →](STEEL_MAN_RESULTS.md)** | **[Benchmark Guide →](BENCHMARK_GUIDE.md)**
 
 ---
 
