@@ -115,11 +115,11 @@ class LatentStateScenario:
             )
             self.kg.add_node_to_dimension("infrastructure", port_node)
             
-            # Edge: Service HAS_PORT Port
+            # Edge: Service PRODUCES Port (service has port)
             edge = Edge(
                 source_id=service["id"],
                 target_id=f"port_{service['port']}",
-                edge_type=EdgeType.HAS_PROPERTY,
+                edge_type=EdgeType.PRODUCES,
                 weight=1.0,
                 attributes={"relationship": "has_port"}
             )
