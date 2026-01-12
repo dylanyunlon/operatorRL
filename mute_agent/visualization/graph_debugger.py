@@ -18,12 +18,24 @@ import os
 
 try:
     import networkx as nx
+    NETWORKX_AVAILABLE = True
+except ImportError:
+    NETWORKX_AVAILABLE = False
+
+try:
     from pyvis.network import Network
+    PYVIS_AVAILABLE = True
+except ImportError:
+    PYVIS_AVAILABLE = False
+
+try:
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
-    VISUALIZATION_AVAILABLE = True
+    MATPLOTLIB_AVAILABLE = True
 except ImportError:
-    VISUALIZATION_AVAILABLE = False
+    MATPLOTLIB_AVAILABLE = False
+
+VISUALIZATION_AVAILABLE = NETWORKX_AVAILABLE and (PYVIS_AVAILABLE or MATPLOTLIB_AVAILABLE)
 
 
 class NodeState(Enum):
@@ -65,7 +77,14 @@ class GraphDebugger:
         self.traces: List[ExecutionTrace] = []
         
         if not VISUALIZATION_AVAILABLE:
-            print("Warning: Visualization libraries not available.")
+            missing = []
+            if not NETWORKX_AVAILABLE:
+                missing.append("networkx")
+            if not PYVIS_AVAILABLE:
+                missing.append("pyvis")
+            if not MATPLOTLIB_AVAILABLE:
+                missing.append("matplotlib")
+            print(f"Warning: Visualization libraries not available: {', '.join(missing)}")
             print("Install with: pip install matplotlib networkx pyvis")
     
     def create_trace(
@@ -400,8 +419,12 @@ class GraphDebugger:
             
             with open(html_path, 'w') as f:
                 f.write(html_content)
+        except FileNotFoundError:
+            print(f"Warning: Could not find HTML file: {html_path}")
+        except PermissionError:
+            print(f"Warning: Permission denied writing to: {html_path}")
         except Exception as e:
-            print(f"Warning: Could not inject legend: {e}")
+            print(f"Warning: Could not inject legend: {type(e).__name__}: {e}")
     
     def generate_comparison_visualization(
         self,
