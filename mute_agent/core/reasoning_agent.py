@@ -135,37 +135,40 @@ class ReasoningAgent:
                         f"Please satisfy this requirement first."
                     )
                 constraints_violated.append(dim_name)
-        
-        # Validate across all selected dimensions
-        for dim_name in routing_result.selected_dimensions:
-            # Check if action is valid in this dimension
-            subgraph = self.knowledge_graph.get_subgraph(dim_name)
-            if not subgraph:
-                continue
             
-            if not subgraph.validate_action(proposal.action_id, proposal.context):
-                if dim_name not in constraints_violated:
-                    errors.append(
-                        f"Action {proposal.action_id} fails validation in dimension {dim_name}"
-                    )
-                    constraints_violated.append(dim_name)
-            else:
-                if dim_name not in constraints_violated:
-                    constraints_met.append(dim_name)
+            # Early return if dependencies are missing - no need for further validation
+            is_valid = False
+        else:
+            # Only validate constraints if no missing dependencies
+            for dim_name in routing_result.selected_dimensions:
+                # Check if action is valid in this dimension
+                subgraph = self.knowledge_graph.get_subgraph(dim_name)
+                if not subgraph:
+                    continue
+                
+                if not subgraph.validate_action(proposal.action_id, proposal.context):
+                    if dim_name not in constraints_violated:
+                        errors.append(
+                            f"Action {proposal.action_id} fails validation in dimension {dim_name}"
+                        )
+                        constraints_violated.append(dim_name)
+                else:
+                    if dim_name not in constraints_violated:
+                        constraints_met.append(dim_name)
+                
+                # Check specific constraints
+                constraints = self.knowledge_graph.get_action_constraints(
+                    proposal.action_id,
+                    dim_name
+                )
+                
+                for constraint in constraints:
+                    if not self._check_constraint(constraint, proposal):
+                        warnings.append(
+                            f"Constraint {constraint.id} may not be fully satisfied"
+                        )
             
-            # Check specific constraints
-            constraints = self.knowledge_graph.get_action_constraints(
-                proposal.action_id,
-                dim_name
-            )
-            
-            for constraint in constraints:
-                if not self._check_constraint(constraint, proposal):
-                    warnings.append(
-                        f"Constraint {constraint.id} may not be fully satisfied"
-                    )
-        
-        is_valid = len(errors) == 0
+            is_valid = len(errors) == 0
         
         return ValidationResult(
             is_valid=is_valid,

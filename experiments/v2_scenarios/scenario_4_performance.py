@@ -12,7 +12,8 @@ import sys
 import os
 import time
 
-# Add parent directory to path
+# Add parent directory to path to allow imports when running this script directly
+# This is necessary because experiments can be run from various working directories
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from mute_agent import (
@@ -137,8 +138,10 @@ class PerformanceScenario:
         latency_ms = (end_time - start_time) * 1000
         
         # Estimate tokens used (simplified)
+        # Approximation: ~4 characters per token for English text
         # Mute Agent: context + small validation logic
-        estimated_tokens = len(str(context)) // 4 + 50  # ~50 tokens for validation
+        CHARS_PER_TOKEN = 4
+        estimated_tokens = len(str(context)) // CHARS_PER_TOKEN + 50  # ~50 tokens for validation
         
         validation_result = session.validation_result
         success = validation_result.is_valid if validation_result else False

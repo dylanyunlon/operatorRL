@@ -110,18 +110,25 @@ class Subgraph:
         """
         Find all missing dependencies for an action (deep traversal).
         Returns a list of missing dependency IDs in order from root to leaf.
+        Handles circular dependencies gracefully.
         """
         if action_id not in self.nodes:
             return [f"Action '{action_id}' not found"]
         
         visited = set()
+        in_progress = set()  # Track nodes currently being processed for cycle detection
         missing_deps = []
         
         def traverse_dependencies(node_id: str, path: List[str]) -> None:
             """Recursively traverse dependencies to find missing ones."""
             if node_id in visited:
                 return
-            visited.add(node_id)
+            
+            # Cycle detection: if we're currently processing this node, we have a cycle
+            if node_id in in_progress:
+                return  # Skip circular dependency
+            
+            in_progress.add(node_id)
             
             # Get all requirements for this node
             for edge in self._adjacency_list.get(node_id, []):
@@ -135,6 +142,9 @@ class Subgraph:
                             # Add to missing list if not already there
                             if edge.target_id not in missing_deps:
                                 missing_deps.append(edge.target_id)
+            
+            in_progress.remove(node_id)
+            visited.add(node_id)
         
         traverse_dependencies(action_id, [])
         return missing_deps
@@ -143,14 +153,22 @@ class Subgraph:
         """
         Get all dependency chains for an action.
         Returns a list of chains, where each chain is a list of node IDs.
+        Handles circular dependencies by detecting and skipping cycles.
         """
         if action_id not in self.nodes:
             return []
         
         chains = []
+        visited_in_chain = set()  # Track nodes in current chain for cycle detection
         
         def traverse_chain(node_id: str, current_chain: List[str]) -> None:
-            """Recursively build dependency chains."""
+            """Recursively build dependency chains with cycle detection."""
+            # Cycle detection: if node is already in current chain, we have a cycle
+            if node_id in visited_in_chain:
+                return
+            
+            visited_in_chain.add(node_id)
+            
             # Get all requirements for this node
             requirements = []
             for edge in self._adjacency_list.get(node_id, []):
@@ -165,6 +183,8 @@ class Subgraph:
                 for req_id in requirements:
                     if req_id in self.nodes:
                         traverse_chain(req_id, current_chain + [req_id])
+            
+            visited_in_chain.remove(node_id)
         
         traverse_chain(action_id, [action_id])
         return chains

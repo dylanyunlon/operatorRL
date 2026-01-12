@@ -9,15 +9,17 @@ from ..knowledge_graph.graph_elements import Node
 
 
 # Normalization mappings for common synonyms and colloquialisms
+# Note: "east" and "west" map to -1 and -2 regions respectively as these are
+# the most commonly used primary regions in AWS US availability zones
 REGION_SYNONYMS = {
     "virginia": "us-east-1",
     "n. virginia": "us-east-1",
     "northern virginia": "us-east-1",
     "us-east": "us-east-1",
-    "east": "us-east-1",
+    "east": "us-east-1",  # Maps to primary east region
     "oregon": "us-west-2",
     "us-west": "us-west-2",
-    "west": "us-west-2",
+    "west": "us-west-2",  # Maps to primary west region (Oregon, not N. California)
     "california": "us-west-1",
     "ohio": "us-east-2",
 }

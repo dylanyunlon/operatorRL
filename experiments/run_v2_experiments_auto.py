@@ -9,7 +9,8 @@ import os
 import json
 from datetime import datetime
 
-# Add parent directory to path
+# Add parent directory to path to allow imports when running this script directly
+# This is necessary because experiments can be run from various working directories
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from v2_scenarios.scenario_1_deep_dependency import run_deep_dependency_experiment
