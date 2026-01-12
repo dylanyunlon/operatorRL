@@ -471,9 +471,21 @@ class MuteAgent:
         # Add extra parameters for specific actions
         if intent == "scale_service":
             import re
-            numbers = re.findall(r'\d+', command)
-            if numbers:
-                parameters["replicas"] = int(numbers[0])
+            # Look for "scale to N" or "N replicas" patterns specifically
+            # This avoids matching numbers in service names
+            scale_patterns = [
+                r'(?:scale|set|to)\s+(\d+)',  # "scale to 5", "set 5"
+                r'(\d+)\s+replica',  # "5 replicas"
+            ]
+            replicas = None
+            for pattern in scale_patterns:
+                match = re.search(pattern, command.lower())
+                if match:
+                    replicas = int(match.group(1))
+                    break
+            
+            if replicas is not None:
+                parameters["replicas"] = replicas
             else:
                 return {
                     "blocked": True,

@@ -423,13 +423,16 @@ class MockInfrastructureAPI:
     
     def get_api_statistics(self) -> Dict[str, Any]:
         """Get statistics about API usage."""
+        total_calls = len(self.api_calls)
+        failed_calls = len(self.failed_calls)
+        
         return {
-            "total_calls": len(self.api_calls),
-            "failed_calls": len(self.failed_calls),
-            "success_rate": (len(self.api_calls) - len(self.failed_calls)) / len(self.api_calls) 
-                           if self.api_calls else 0.0,
+            "total_calls": total_calls,
+            "failed_calls": failed_calls,
+            "success_rate": (total_calls - failed_calls) / total_calls if total_calls > 0 else 0.0,
             "safety_violations": len([c for c in self.failed_calls 
-                                     if "safety_violation" in str(c)]),
+                                     if c.get('error', '').find('safety_violation') != -1 or
+                                        c.get('params', {}).get('safety_violation', False)]),
         }
     
     def reset_statistics(self):
