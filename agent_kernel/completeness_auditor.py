@@ -10,7 +10,7 @@ we generate a "Competence Patch" to prevent future laziness.
 
 import logging
 import uuid
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from .models import AgentOutcome, CompletenessAudit, GiveUpSignal
@@ -37,7 +37,7 @@ class CompletenessAuditor:
             teacher_model: High-reasoning model for auditing (e.g., "o1-preview", "o1", "claude-opus")
         """
         self.teacher_model = teacher_model
-        self.audit_history: list[CompletenessAudit] = []
+        self.audit_history: List[CompletenessAudit] = []
         self.audit_count = 0
         self.lazy_detection_count = 0
     
@@ -229,6 +229,6 @@ class CompletenessAuditor:
             "audits_no_data": sum(1 for a in self.audit_history if not a.teacher_found_data)
         }
     
-    def get_audit_history(self, limit: int = 100) -> list[CompletenessAudit]:
+    def get_audit_history(self, limit: int = 100) -> List[CompletenessAudit]:
         """Get audit history."""
         return self.audit_history[-limit:]
