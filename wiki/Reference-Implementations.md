@@ -158,6 +158,6 @@ pytest tests/ -v
 
 ## See Also
 
-- [DUAL_LOOP_ARCHITECTURE.md](../DUAL_LOOP_ARCHITECTURE.md) - Detailed architecture
-- [THREE_FAILURE_TYPES.md](../THREE_FAILURE_TYPES.md) - Failure taxonomy
-- [ENHANCED_FEATURES.md](../ENHANCED_FEATURES.md) - Advanced features
+- [Dual-Loop Architecture](./Dual-Loop-Architecture.md) - Detailed architecture
+- [Three Failure Types](./Three-Failure-Types.md) - Failure taxonomy
+- [Enhanced Features](./Enhanced-Features.md) - Advanced features

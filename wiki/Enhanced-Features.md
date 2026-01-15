@@ -606,7 +606,7 @@ Expected improvements in production:
 
 ## See Also
 
-- [README.md](README.md) - Main documentation
-- [DUAL_LOOP_ARCHITECTURE.md](DUAL_LOOP_ARCHITECTURE.md) - Architecture overview
+- [README](../README.md) - Main documentation
+- [Dual-Loop Architecture](./Dual-Loop-Architecture.md) - Architecture overview
 - [examples/enhanced_features_demo.py](examples/enhanced_features_demo.py) - Interactive demo
 - [tests/test_enhanced_features.py](tests/test_enhanced_features.py) - Test suite
