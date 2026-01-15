@@ -265,7 +265,9 @@ class CompletenessAuditor:
             "i don't have access",
             "not available",
             "no information",
-            "doesn't exist"
+            "doesn't exist",
+            "does not exist",
+            "not in the current"  # e.g., "not in the current registry"
         ]
         
         # Check if response contains lazy signals
@@ -279,8 +281,23 @@ class CompletenessAuditor:
         
         # Laziness is detected if:
         # 1. Response contains a lazy signal AND
-        # 2. Tool output is empty or indicates a problem
+        # 2. Either:
+        #    a) Tool output is empty/problematic, OR
+        #    b) Tool output is None (no tool was called)
         # This suggests the agent gave up without trying alternatives
+        
+        # Additional check: "doesn't exist" or "not in current" specifically suggests
+        # the agent should have checked archived/historical sources
+        has_archival_laziness = any(
+            phrase in response_lower 
+            for phrase in ["doesn't exist", "does not exist", "not in the current", "not in current"]
+        )
+        
+        if has_archival_laziness and tool_is_empty:
+            # This is definitely lazy - should have checked archived sources
+            return True
+        
+        # General laziness check
         is_lazy = has_lazy_signal and (tool_is_empty or tool_output is None or "denied" in response_lower)
         
         return is_lazy
