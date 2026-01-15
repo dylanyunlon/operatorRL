@@ -108,10 +108,15 @@ class NudgeMechanism:
         # Add context-specific enhancements
         if include_tool_reminder and outcome.tool_telemetry:
             called_tools = [t.tool_name for t in outcome.tool_telemetry]
-            if not called_tools:
-                nudge_prompt += "\n\nNote: It appears no tools were called. Please use available tools to complete the task."
-            else:
+            if called_tools:
+                # Tools were called
                 nudge_prompt += f"\n\nNote: You previously used tools: {', '.join(called_tools)}. Consider using additional tools or different parameters."
+            else:
+                # Telemetry exists but no tools were called
+                nudge_prompt += "\n\nNote: It appears no tools were called. Please use available tools to complete the task."
+        elif include_tool_reminder:
+            # No telemetry at all
+            nudge_prompt += "\n\nNote: It appears no tools were called. Please use available tools to complete the task."
         
         # Add original prompt reminder
         nudge_prompt += f"\n\nOriginal request: {outcome.user_prompt}"

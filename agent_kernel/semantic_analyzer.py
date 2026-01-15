@@ -7,8 +7,7 @@ rather than just pattern matching.
 """
 
 import logging
-import re
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 from .models import SemanticAnalysis
 
