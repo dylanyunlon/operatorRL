@@ -54,6 +54,8 @@ pip install -e .
 
 ## Quick Start
 
+> 💡 **New to the concepts?** Check out [REFERENCE_IMPLEMENTATIONS.md](REFERENCE_IMPLEMENTATIONS.md) for simplified examples of the three core components: Completeness Auditor, Shadow Teacher, and Memory Manager.
+
 ### Loop 1: Handling Failures (Safety)
 
 ```python
@@ -396,6 +398,20 @@ For detailed workflow diagrams, see [DUAL_LOOP_ARCHITECTURE.md](DUAL_LOOP_ARCHIT
 - **Audit Efficiency**: Only 5-10% of interactions trigger audits
 - **Laziness Detection**: 30-50% of audits find agent errors
 - **Sustained Performance**: 6+ months without degradation
+
+## Reference Implementations
+
+For educational purposes and to understand the core concepts, see the simplified reference implementations:
+
+- **[REFERENCE_IMPLEMENTATIONS.md](REFERENCE_IMPLEMENTATIONS.md)** - Overview and guide
+- **`agent_kernel/auditor.py`** - Simplified Completeness Auditor
+- **`agent_kernel/teacher.py`** - Shadow Teacher diagnosis function
+- **`agent_kernel/memory_manager.py`** - Lesson lifecycle manager
+
+Run the demo:
+```bash
+python examples/reference_demo.py
+```
 
 ## Contributing
 
