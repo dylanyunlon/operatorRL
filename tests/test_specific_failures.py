@@ -172,21 +172,33 @@ class TestHallucination(unittest.TestCase):
         patcher = AgentPatcher()
         
         # Test with quoted entity
+        trace1 = FailureTrace(
+            user_prompt="Query recent users",
+            chain_of_thought=["Querying"],
+            failed_action={"query": "SELECT * FROM recent_users"},
+            error_details="Table 'recent_users' does not exist"
+        )
         failure1 = AgentFailure(
             agent_id="test",
             failure_type=FailureType.INVALID_ACTION,
             error_message="Table 'recent_users' does not exist",
-            failed_action={"query": "SELECT * FROM recent_users"}
+            failure_trace=trace1
         )
         entity1 = patcher._extract_hallucinated_entity(failure1)
         self.assertEqual(entity1, "recent_users")
         
-        # Test with CamelCase entity
+        # Test with CamelCase entity in failed_action
+        trace2 = FailureTrace(
+            user_prompt="Get project",
+            chain_of_thought=["Getting"],
+            failed_action={"action": "get", "entity": "Project_Alpha"},
+            error_details="Project does not exist"
+        )
         failure2 = AgentFailure(
             agent_id="test",
             failure_type=FailureType.INVALID_ACTION,
             error_message="Project does not exist",
-            failed_action={"action": "get", "entity": "Project_Alpha"}
+            failure_trace=trace2
         )
         entity2 = patcher._extract_hallucinated_entity(failure2)
         self.assertEqual(entity2, "Project_Alpha")

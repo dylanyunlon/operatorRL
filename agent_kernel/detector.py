@@ -137,9 +137,10 @@ class FailureDetector:
         """Classify the type of failure based on error message and context."""
         error_lower = error_message.lower()
         
-        # Check for control plane blocking
+        # Check for control plane blocking (including policy violations)
         if any(keyword in error_lower for keyword in [
-            "blocked", "control plane", "policy", "unauthorized", "forbidden"
+            "blocked", "control plane", "policy", "unauthorized", "forbidden",
+            "cannot advise", "cannot provide", "not allowed to"
         ]):
             return FailureType.BLOCKED_BY_CONTROL_PLANE
         
@@ -147,8 +148,11 @@ class FailureDetector:
         if any(keyword in error_lower for keyword in ["timeout", "timed out", "deadline"]):
             return FailureType.TIMEOUT
         
-        # Check for invalid action
-        if any(keyword in error_lower for keyword in ["invalid", "not allowed", "unsupported"]):
+        # Check for invalid action (including UUID/parameter type errors)
+        if any(keyword in error_lower for keyword in [
+            "invalid", "unsupported", "expected", "uuid", 
+            "does not exist", "not found", "format", "parameter"
+        ]):
             return FailureType.INVALID_ACTION
         
         # Check for resource exhaustion

@@ -487,12 +487,22 @@ class AgentPatcher:
         if quoted_match:
             return quoted_match.group(1)
         
-        # Pattern: Entity_Name or Project_Alpha (CamelCase or Snake_Case)
+        # Pattern: Entity_Name or Project_Alpha (CamelCase or Snake_Case with underscores)
         if failure.failure_trace and failure.failure_trace.failed_action:
             action_str = str(failure.failure_trace.failed_action)
-            camel_match = re.search(r'\b([A-Z][a-z]+(?:_[A-Z][a-z]+)*)\b', action_str)
+            # Look for CamelCase or underscore-separated capitalized words
+            camel_match = re.search(r'\b([A-Z][a-z]*(?:_[A-Z][a-z]*)+)\b', action_str)
             if camel_match:
                 return camel_match.group(1)
+            # Also try looking for simple CamelCase 
+            camel_match2 = re.search(r'\b([A-Z][a-z]+[A-Z][a-z]+(?:[A-Z][a-z]+)*)\b', action_str)
+            if camel_match2:
+                return camel_match2.group(1)
+        
+        # Try to find in error message
+        camel_match3 = re.search(r'\b([A-Z][a-z]*(?:_[A-Z][a-z]*)+)\b', failure.error_message)
+        if camel_match3:
+            return camel_match3.group(1)
         
         return None
     
