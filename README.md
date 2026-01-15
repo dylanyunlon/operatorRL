@@ -38,6 +38,14 @@ The Self-Correcting Agent Kernel implements a **Dual-Loop Architecture** that so
 - 🧹 **Context Hygiene** - Prevents unbounded prompt growth
 - ⏱️ **Sustained Performance** - Agents work reliably for 6+ months
 
+### Enhanced Features (NEW)
+- 🔧 **Tool Execution Telemetry** - Distinguishes valid empty results from laziness
+- 🧠 **Semantic Analysis** - Goes beyond regex to catch subtle refusals
+- 💡 **Nudge Mechanism** - Automatic retry logic without human intervention
+- 📊 **Value Delivery Metrics** - Focus on competence, not just safety
+
+> 📘 **See [ENHANCED_FEATURES.md](ENHANCED_FEATURES.md) for detailed documentation on these enhancements**
+
 ## Installation
 
 ```bash

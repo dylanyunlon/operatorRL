@@ -19,12 +19,16 @@ from .kernel import SelfCorrectingAgentKernel
 from .models import (
     AgentFailure, FailureAnalysis, CorrectionPatch,
     AgentOutcome, CompletenessAudit, ClassifiedPatch,
-    OutcomeType, GiveUpSignal, PatchDecayType
+    OutcomeType, GiveUpSignal, PatchDecayType,
+    ToolExecutionTelemetry, ToolExecutionStatus,
+    SemanticAnalysis, NudgeResult
 )
 from .outcome_analyzer import OutcomeAnalyzer
 from .completeness_auditor import CompletenessAuditor
 from .semantic_purge import SemanticPurge, PatchClassifier
 from .triage import FailureTriage, FixStrategy
+from .semantic_analyzer import SemanticAnalyzer
+from .nudge_mechanism import NudgeMechanism
 
 # Reference implementations (simplified examples)
 from .auditor import CompletenessAuditor as SimpleCompletenessAuditor
@@ -42,12 +46,18 @@ __all__ = [
     "OutcomeType",
     "GiveUpSignal",
     "PatchDecayType",
+    "ToolExecutionTelemetry",
+    "ToolExecutionStatus",
+    "SemanticAnalysis",
+    "NudgeResult",
     "OutcomeAnalyzer",
     "CompletenessAuditor",
     "SemanticPurge",
     "PatchClassifier",
     "FailureTriage",
     "FixStrategy",
+    "SemanticAnalyzer",
+    "NudgeMechanism",
     # Reference implementations
     "SimpleCompletenessAuditor",
     "diagnose_failure",
