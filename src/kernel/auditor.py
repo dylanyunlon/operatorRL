@@ -13,6 +13,8 @@ import uuid
 from typing import Optional, List
 from datetime import datetime
 
+# Note: Import from agent_kernel.models (not .models) because src/kernel/
+# does not have its own models.py - all models are in agent_kernel/models.py
 from agent_kernel.models import AgentOutcome, CompletenessAudit, GiveUpSignal
 
 logger = logging.getLogger(__name__)

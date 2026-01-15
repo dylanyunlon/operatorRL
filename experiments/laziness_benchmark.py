@@ -8,7 +8,6 @@ The goal is to stress-test the CompletenessAuditor's ability to detect
 when agents give up prematurely vs. when they correctly identify unavailable data.
 """
 
-import asyncio
 import sys
 import os
 
@@ -19,7 +18,7 @@ from src.kernel.auditor import CompletenessAuditor
 from src.mocks import MockAgent
 
 
-async def run_laziness_stress_test():
+def run_laziness_stress_test():
     """
     Run the laziness stress test.
     
@@ -167,7 +166,7 @@ def main():
     print()
     
     # Run the benchmark
-    result = asyncio.run(run_laziness_stress_test())
+    result = run_laziness_stress_test()
     
     # Return exit code based on accuracy
     if result["accuracy"] >= 0.8:
