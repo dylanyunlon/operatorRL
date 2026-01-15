@@ -26,6 +26,7 @@ from .models import (
 from .outcome_analyzer import OutcomeAnalyzer
 from .completeness_auditor import CompletenessAuditor
 from .semantic_purge import SemanticPurge, PatchClassifier
+from .triage import FailureTriage, FixStrategy
 from .semantic_analyzer import SemanticAnalyzer
 from .nudge_mechanism import NudgeMechanism
 
@@ -53,6 +54,8 @@ __all__ = [
     "CompletenessAuditor",
     "SemanticPurge",
     "PatchClassifier",
+    "FailureTriage",
+    "FixStrategy",
     "SemanticAnalyzer",
     "NudgeMechanism",
     # Reference implementations

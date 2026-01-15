@@ -8,6 +8,7 @@ Implements the Dual-Loop Architecture:
 
 import logging
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 from .models import (
     AgentFailure, FailureAnalysis, SimulationResult, CorrectionPatch, AgentState,
@@ -21,6 +22,7 @@ from .patcher import AgentPatcher
 from .outcome_analyzer import OutcomeAnalyzer
 from .completeness_auditor import CompletenessAuditor
 from .semantic_purge import SemanticPurge
+from .triage import FailureTriage, FixStrategy
 from .nudge_mechanism import NudgeMechanism
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,12 @@ class SelfCorrectingAgentKernel:
         self.semantic_purge = SemanticPurge()
         self.nudge_mechanism = NudgeMechanism()
         
+        # Triage Engine: Decides sync (JIT) vs async (batch) correction
+        self.triage = FailureTriage(config=self.config.get("triage_config", {}))
+        
+        # Background queue for async failures (placeholder for production implementation)
+        self.async_failure_queue = []
+        
         # Model version tracking for semantic purge
         self.current_model_version = self.config.get("model_version", "gpt-4o")
         
@@ -78,6 +86,7 @@ class SelfCorrectingAgentKernel:
         logger.info(f"  Loop 2 (Offline): Alignment Engine (Quality & Efficiency)")
         logger.info(f"    - Completeness Auditor: {self.completeness_auditor.teacher_model}")
         logger.info(f"    - Semantic Purge: Active")
+        logger.info(f"    - Failure Triage: Active (Sync/Async routing)")
         logger.info(f"    - Semantic Analysis: {use_semantic_analysis}")
         logger.info(f"    - Nudge Mechanism: Active")
         logger.info(f"  Model Version: {self.current_model_version}")
@@ -100,12 +109,13 @@ class SelfCorrectingAgentKernel:
         auto_patch: bool = True,
         user_prompt: Optional[str] = None,
         chain_of_thought: Optional[List[str]] = None,
-        failed_action: Optional[Dict[str, Any]] = None
+        failed_action: Optional[Dict[str, Any]] = None,
+        user_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Handle an agent failure through the full self-correction pipeline.
         
-        Enhanced to support full trace capture and cognitive diagnosis.
+        Enhanced to support full trace capture, cognitive diagnosis, and triage routing.
         
         This is the main entry point when an agent fails in production.
         
@@ -118,6 +128,7 @@ class SelfCorrectingAgentKernel:
             user_prompt: Original user prompt (for full trace)
             chain_of_thought: Agent's reasoning steps (for cognitive analysis)
             failed_action: The specific action that failed
+            user_metadata: User metadata (e.g., VIP status) for triage decisions
             
         Returns:
             Dictionary containing the results of the self-correction process
@@ -127,6 +138,53 @@ class SelfCorrectingAgentKernel:
         logger.info(f"Agent ID: {agent_id}")
         logger.info(f"Error: {error_message}")
         logger.info(f"=" * 80)
+        
+        # Step 0: Triage - Decide sync (JIT) or async (batch) correction strategy
+        if user_prompt:
+            tool_name = context.get("action") if context else None
+            
+            # Prepare enhanced context for triage including failed_action and chain_of_thought
+            triage_context = dict(context) if context else {}
+            if failed_action:
+                triage_context["failed_action"] = failed_action
+            if chain_of_thought:
+                triage_context["chain_of_thought"] = chain_of_thought
+            
+            strategy = self.triage.decide_strategy(
+                prompt=user_prompt,
+                tool_name=tool_name,
+                user_metadata=user_metadata,
+                context=triage_context
+            )
+            
+            logger.info(f"[TRIAGE] Decision: {strategy.value}")
+            
+            if strategy == FixStrategy.ASYNC_BATCH:
+                logger.info(">> Non-Critical Failure. Queuing for async optimization.")
+                logger.info(">> Returning error to user immediately (low latency).")
+                
+                # Add to async queue for later processing
+                self.async_failure_queue.append({
+                    "agent_id": agent_id,
+                    "error_message": error_message,
+                    "context": context,
+                    "stack_trace": stack_trace,
+                    "user_prompt": user_prompt,
+                    "chain_of_thought": chain_of_thought,
+                    "failed_action": failed_action,
+                    "timestamp": datetime.utcnow()
+                })
+                
+                return {
+                    "success": False,
+                    "strategy": strategy,
+                    "message": "Non-critical failure queued for async correction",
+                    "queued": True,
+                    "error": error_message
+                }
+            else:
+                logger.info(">> Critical Failure Detected. Entering Self-Correction Mode (User Waiting)...")
+                logger.info(">> High latency path - fixing immediately for reliability.")
         
         # Step 1: Detect and classify failure with full trace
         logger.info("[1/5] Detecting and classifying failure (capturing full trace)...")
@@ -595,4 +653,89 @@ class SelfCorrectingAgentKernel:
         return {
             "purgeable": self.semantic_purge.get_purgeable_patches(),
             "permanent": self.semantic_purge.get_permanent_patches()
+        }
+    
+    def process_async_queue(self, batch_size: int = 10) -> Dict[str, Any]:
+        """
+        Process failures from the async queue (background/nightly processing).
+        
+        This method would typically run in a background worker or during
+        off-peak hours to fix non-critical failures that were queued.
+        
+        Args:
+            batch_size: Maximum number of failures to process in this batch
+            
+        Returns:
+            Dictionary with processing statistics
+        """
+        logger.info(f"=" * 80)
+        logger.info(f"ASYNC QUEUE PROCESSING - Processing up to {batch_size} failures")
+        logger.info(f"Queue size: {len(self.async_failure_queue)}")
+        logger.info(f"=" * 80)
+        
+        processed = 0
+        succeeded = 0
+        failed = 0
+        
+        # Process up to batch_size items
+        while self.async_failure_queue and processed < batch_size:
+            failure_data = self.async_failure_queue.pop(0)
+            processed += 1
+            
+            logger.info(f"Processing async failure {processed}/{batch_size}")
+            logger.info(f"  Agent: {failure_data['agent_id']}")
+            logger.info(f"  Error: {failure_data['error_message']}")
+            
+            try:
+                # Process the failure without triage (already decided async)
+                # Temporarily remove user_prompt to skip triage
+                user_prompt = failure_data.pop('user_prompt', None)
+                
+                result = self.handle_failure(
+                    agent_id=failure_data['agent_id'],
+                    error_message=failure_data['error_message'],
+                    context=failure_data.get('context'),
+                    stack_trace=failure_data.get('stack_trace'),
+                    auto_patch=True,
+                    user_prompt=None,  # Skip triage by not providing user_prompt
+                    chain_of_thought=failure_data.get('chain_of_thought'),
+                    failed_action=failure_data.get('failed_action')
+                )
+                
+                if result.get('success') and result.get('patch_applied'):
+                    succeeded += 1
+                    logger.info(f"  ✓ Fixed successfully")
+                else:
+                    failed += 1
+                    logger.info(f"  ✗ Fix failed")
+            except Exception as e:
+                failed += 1
+                logger.error(f"  ✗ Error processing: {str(e)}")
+        
+        logger.info(f"=" * 80)
+        logger.info(f"ASYNC QUEUE PROCESSING COMPLETE")
+        logger.info(f"  Processed: {processed}")
+        logger.info(f"  Succeeded: {succeeded}")
+        logger.info(f"  Failed: {failed}")
+        logger.info(f"  Remaining in queue: {len(self.async_failure_queue)}")
+        logger.info(f"=" * 80)
+        
+        return {
+            "processed": processed,
+            "succeeded": succeeded,
+            "failed": failed,
+            "remaining": len(self.async_failure_queue)
+        }
+    
+    def get_triage_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about triage decisions.
+        
+        Returns:
+            Dictionary with triage statistics
+        """
+        return {
+            "async_queue_size": len(self.async_failure_queue),
+            "critical_tools": len(self.triage.critical_tools),
+            "high_effort_keywords": len(self.triage.high_effort_keywords)
         }

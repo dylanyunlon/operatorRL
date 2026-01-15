@@ -192,6 +192,38 @@ print(f"Suggested Fixes: {result['analysis'].suggested_fixes}")
 print(f"Alternative Path: {len(result['simulation'].alternative_path)} steps")
 ```
 
+### Example 4: Failure Triage (Sync vs Async Routing)
+
+```python
+from agent_kernel import SelfCorrectingAgentKernel
+
+kernel = SelfCorrectingAgentKernel()
+
+# Critical operation → SYNC_JIT (user waits, high reliability)
+result = kernel.handle_failure(
+    agent_id="payment-agent",
+    error_message="Payment gateway timeout",
+    user_prompt="Process refund for customer order",
+    context={"action": "execute_payment", "amount": 99.99}
+)
+print(f"Strategy: {result.get('strategy')}")  # SYNC_JIT
+print(f"Fixed: {result['patch_applied']}")    # True
+
+# Read operation → ASYNC_BATCH (fast response, fix later)
+result = kernel.handle_failure(
+    agent_id="query-agent",
+    error_message="Cache miss",
+    user_prompt="Show recent blog posts",
+    context={"action": "fetch_data"}
+)
+print(f"Strategy: {result.get('strategy')}")  # ASYNC_BATCH
+print(f"Queued: {result.get('queued')}")      # True
+
+# Process async queue in background/nightly
+stats = kernel.process_async_queue(batch_size=10)
+print(f"Processed: {stats['processed']}, Succeeded: {stats['succeeded']}")
+```
+
 ### Example 2: Timeout Handling
 
 ```python
@@ -216,10 +248,52 @@ The Self-Correcting Agent Kernel implements a **Dual-Loop Architecture**:
 
 ### Loop 1: Runtime (Constraint Engine - Safety)
 Handles traditional failures through the existing control plane integration:
-1. **Failure Detector** - Detects and classifies failures
-2. **Failure Analyzer** - Identifies root causes with cognitive diagnosis
-3. **Path Simulator** - Simulates alternative solutions with Shadow Agent
-4. **Agent Patcher** - Applies corrections automatically
+1. **Failure Triage** - Routes failures to sync (JIT) or async (batch) correction
+2. **Failure Detector** - Detects and classifies failures
+3. **Failure Analyzer** - Identifies root causes with cognitive diagnosis
+4. **Path Simulator** - Simulates alternative solutions with Shadow Agent
+5. **Agent Patcher** - Applies corrections automatically
+
+#### Failure Triage Engine
+
+The Triage Engine sits between Failure Detection and Correction, deciding whether to fix failures synchronously (user waits) or asynchronously (fast response, fix later).
+
+**Triage Decision Rules (in priority order):**
+1. **Cognitive Failures with Full Trace** → SYNC_JIT (deep diagnosis needed)
+2. **Critical Operations** (write/delete/payment) → SYNC_JIT (high reliability)
+3. **High-Effort Prompts** (carefully/critical/important) → SYNC_JIT (deep thinking)
+4. **VIP Users** → SYNC_JIT (priority treatment)
+5. **Read/Query Operations** → ASYNC_BATCH (fast response, eventual consistency)
+
+**Benefits:**
+- **"Think Fast"** for non-critical failures (async) - Low latency for users
+- **"Think Slow"** for critical failures (sync) - High reliability when needed
+- **Dynamic Routing** - Runtime decision based on context, not static rules
+- **Queue Management** - Background processing of async failures
+
+Example:
+```python
+# Critical operation - user waits for fix
+result = kernel.handle_failure(
+    agent_id="payment-agent",
+    error_message="Payment gateway error",
+    user_prompt="Process refund for order #12345",
+    context={"action": "execute_payment"}
+)
+# Result: Fixed synchronously (SYNC_JIT)
+
+# Read operation - fast response
+result = kernel.handle_failure(
+    agent_id="query-agent",
+    error_message="Cache miss",
+    user_prompt="Get latest blog posts",
+    context={"action": "fetch_data"}
+)
+# Result: Queued for async processing (ASYNC_BATCH)
+
+# Process async queue in background
+kernel.process_async_queue(batch_size=10)
+```
 
 ### Loop 2: Offline (Alignment Engine - Quality & Efficiency)
 
@@ -301,8 +375,10 @@ kernel = SelfCorrectingAgentKernel(config={
 
 **Loop 1 (Runtime - Safety)**
 
-- `handle_failure(agent_id, error_message, context=None, ...)` - Handle agent failures
+- `handle_failure(agent_id, error_message, context=None, user_prompt=None, user_metadata=None, ...)` - Handle agent failures with triage routing
 - `wake_up_and_fix(agent_id, error_message, context=None)` - Convenience method for automatic fixing
+- `process_async_queue(batch_size=10)` - Process queued async failures in background
+- `get_triage_stats()` - Get triage statistics (queue size, critical tools, etc.)
 
 **Loop 2 (Offline - Quality & Efficiency)**
 
@@ -321,16 +397,13 @@ kernel = SelfCorrectingAgentKernel(config={
 ## Running Tests
 
 ```bash
-# Run all tests (46 tests)
-python -m pytest tests/ -v
+# Run all tests (57 tests)
+python -m unittest discover tests -v
 
 # Run specific test suites
-python -m pytest tests/test_kernel.py -v          # Core functionality (17 tests)
-python -m pytest tests/test_specific_failures.py -v  # Cognitive failures (10 tests)
-python -m pytest tests/test_dual_loop.py -v       # Dual-Loop Architecture (19 tests)
-
-# Run with coverage
-python -m pytest tests/ --cov=agent_kernel
+python -m unittest tests.test_kernel -v          # Core functionality
+python -m unittest tests.test_specific_failures -v  # Cognitive failures
+python -m unittest tests.test_triage -v         # Failure Triage (14 tests)
 ```
 
 ## Running Examples
@@ -339,12 +412,22 @@ python -m pytest tests/ --cov=agent_kernel
 # Basic example (traditional failures)
 python examples/basic_example.py
 
+# Failure Triage demo (sync vs async routing)
+python examples/triage_demo.py
+
 # Dual-Loop Architecture demo
 python examples/dual_loop_demo.py
 
 # Enhanced features demo
 python examples/enhanced_demo.py
 ```
+
+The Triage demo shows:
+1. Critical operations routing to SYNC_JIT (user waits)
+2. High-effort prompts routing to SYNC_JIT (deep thinking)
+3. VIP users routing to SYNC_JIT (priority)
+4. Read/query operations routing to ASYNC_BATCH (fast response)
+5. Background processing of async queue
 
 The Dual-Loop demo shows:
 1. Completeness Auditor detecting agent laziness
