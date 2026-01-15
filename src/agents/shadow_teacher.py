@@ -19,10 +19,13 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # Import models from agent_kernel for backward compatibility
-try:
-    from agent_kernel.models import DiagnosisJSON, CognitiveGlitch, ShadowAgentResult
-except ImportError:
-    from ...agent_kernel.models import DiagnosisJSON, CognitiveGlitch, ShadowAgentResult
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
+from agent_kernel.models import DiagnosisJSON, CognitiveGlitch, ShadowAgentResult
 
 
 def _sanitize_input(text: str, max_length: int = 1000) -> str:
@@ -196,7 +199,7 @@ async def counterfactual_run(
     prompt: str,
     context: Optional[Dict[str, Any]] = None,
     enhanced_context: bool = True
-) -> ShadowAgentResult:
+) -> Dict[str, Any]:
     """
     Run a counterfactual simulation with the Shadow Teacher.
     
@@ -213,7 +216,7 @@ async def counterfactual_run(
         enhanced_context: Whether to provide enhanced context
         
     Returns:
-        ShadowAgentResult with outcome and analysis
+        dict with success, response, reasoning, tools_used, confidence
     """
     logger.info(f"🎯 Shadow Teacher attempting counterfactual run...")
     
@@ -239,15 +242,15 @@ async def counterfactual_run(
     """
     
     # Simulate successful completion
-    result = ShadowAgentResult(
-        success=True,
-        response="Task completed successfully with exhaustive search.",
-        reasoning="Shadow Teacher checked all sources including archived data and found results.",
-        tools_used=["search_primary", "search_archives", "verify_entity"],
-        confidence=0.90
-    )
+    result = {
+        "success": True,
+        "response": "Task completed successfully with exhaustive search.",
+        "reasoning": "Shadow Teacher checked all sources including archived data and found results.",
+        "tools_used": ["search_primary", "search_archives", "verify_entity"],
+        "confidence": 0.90
+    }
     
-    logger.info(f"✅ Shadow Teacher succeeded: {result.response[:60]}...")
+    logger.info(f"✅ Shadow Teacher succeeded: {result['response'][:60]}...")
     
     return result
 
@@ -315,20 +318,20 @@ class ShadowTeacher:
             "model": self.model
         }
     
-    def _analyze_gap(self, failed_response: str, counterfactual: ShadowAgentResult) -> str:
+    def _analyze_gap(self, failed_response: str, counterfactual: Dict[str, Any]) -> str:
         """
         Analyze the gap between failed agent and successful Shadow Teacher.
         
         Args:
             failed_response: What agent did
-            counterfactual: What Shadow Teacher did
+            counterfactual: What Shadow Teacher did (dict with success, response, reasoning, tools_used)
             
         Returns:
             str: Gap analysis
         """
         gap = f"Agent failed with: '{failed_response[:100]}'. "
-        gap += f"Shadow Teacher succeeded by: {counterfactual.reasoning}. "
-        gap += f"Key difference: Shadow Teacher used {len(counterfactual.tools_used)} tools systematically."
+        gap += f"Shadow Teacher succeeded by: {counterfactual['reasoning']}. "
+        gap += f"Key difference: Shadow Teacher used {len(counterfactual['tools_used'])} tools systematically."
         
         return gap
     

@@ -20,10 +20,13 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 # Import models from agent_kernel for backward compatibility
-try:
-    from agent_kernel.models import AgentState, AgentOutcome, GiveUpSignal
-except ImportError:
-    from ...agent_kernel.models import AgentState, AgentOutcome, GiveUpSignal
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
+from agent_kernel.models import AgentState, AgentOutcome, GiveUpSignal, OutcomeType
 
 
 class AgentStatus(Enum):
@@ -134,12 +137,18 @@ Follow these guidelines:
             # Detect give-up signals
             give_up_signal = self._detect_give_up_signal(response)
             
+            # Determine outcome type
+            if give_up_signal:
+                outcome_type = OutcomeType.GIVE_UP
+            else:
+                outcome_type = OutcomeType.SUCCESS
+            
             outcome = AgentOutcome(
                 agent_id=self.agent_id,
+                outcome_type=outcome_type,
                 user_prompt=user_prompt,
                 agent_response=response,
                 give_up_signal=give_up_signal,
-                execution_time_ms=100,  # Simulated
                 context=context or {}
             )
             

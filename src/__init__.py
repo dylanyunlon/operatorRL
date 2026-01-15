@@ -7,14 +7,20 @@ This package implements the Partner-level repository structure with:
 - src/interfaces/: External interfaces (telemetry)
 """
 
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 __version__ = "2.0.0"
 
 # Import key components for easy access
-from .kernel.triage import FailureTriage, FixStrategy
-from .kernel.memory import MemoryManager, PatchClassifier, SemanticPurge, LessonType
-from .agents.shadow_teacher import ShadowTeacher, diagnose_failure, counterfactual_run
-from .agents.worker import AgentWorker, WorkerPool, AgentStatus
-from .interfaces.telemetry import TelemetryEmitter, OutcomeAnalyzer, AuditLog, EventType
+from src.kernel.triage import FailureTriage, FixStrategy
+from src.kernel.memory import MemoryManager, PatchClassifier, SemanticPurge, LessonType
+from src.agents.shadow_teacher import ShadowTeacher, diagnose_failure, counterfactual_run
+from src.agents.worker import AgentWorker, WorkerPool, AgentStatus
+from src.interfaces.telemetry import TelemetryEmitter, OutcomeAnalyzer, AuditLog, EventType
 
 __all__ = [
     # Kernel components

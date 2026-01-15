@@ -25,17 +25,16 @@ from collections import Counter
 logger = logging.getLogger(__name__)
 
 # Import models from agent_kernel for backward compatibility
-try:
-    from agent_kernel.models import (
-        CorrectionPatch, ClassifiedPatch, PatchDecayType,
-        CognitiveGlitch, CompletenessAudit
-    )
-except ImportError:
-    # Fallback for testing or standalone usage
-    from ...agent_kernel.models import (
-        CorrectionPatch, ClassifiedPatch, PatchDecayType,
-        CognitiveGlitch, CompletenessAudit
-    )
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
+from agent_kernel.models import (
+    CorrectionPatch, ClassifiedPatch, PatchDecayType,
+    CognitiveGlitch, CompletenessAudit
+)
 
 
 class LessonType(Enum):
