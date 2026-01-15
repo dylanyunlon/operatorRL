@@ -9,6 +9,34 @@ completeness_auditor.py modules with full trace capture and cognitive diagnosis.
 """
 
 
+def _sanitize_input(text: str, max_length: int = 1000) -> str:
+    """
+    Sanitize input to prevent prompt injection.
+    
+    Args:
+        text: Input text to sanitize
+        max_length: Maximum allowed length
+        
+    Returns:
+        Sanitized text
+    """
+    if not text:
+        return ""
+    
+    # Truncate to max length
+    text = str(text)[:max_length]
+    
+    # Remove potential prompt injection patterns
+    # In production, use more sophisticated sanitization
+    dangerous_patterns = ["ignore previous", "ignore all", "disregard", "new instructions"]
+    text_lower = text.lower()
+    for pattern in dangerous_patterns:
+        if pattern in text_lower:
+            text = text.replace(pattern, "[FILTERED]")
+    
+    return text
+
+
 async def diagnose_failure(prompt, failed_response, tool_trace):
     """
     Uses a 'Reasoning Model' (e.g., o1 or Claude 3.5 Sonnet) 
@@ -22,11 +50,16 @@ async def diagnose_failure(prompt, failed_response, tool_trace):
     Returns:
         dict: Diagnosis with cause and lesson_patch
     """
-    teacher_prompt = f"""
-    The Agent failed to complete this task: '{prompt}'.
+    # Sanitize inputs to prevent prompt injection
+    safe_prompt = _sanitize_input(prompt)
+    safe_response = _sanitize_input(failed_response)
+    safe_trace = _sanitize_input(tool_trace)
     
-    Agent Output: {failed_response}
-    Tool Trace: {tool_trace}
+    teacher_prompt = f"""
+    The Agent failed to complete this task: '{safe_prompt}'.
+    
+    Agent Output: {safe_response}
+    Tool Trace: {safe_trace}
     
     Task:
     1. Did the agent try hard enough? (Laziness)

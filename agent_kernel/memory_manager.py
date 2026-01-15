@@ -10,6 +10,7 @@ classification algorithms and decay metadata tracking.
 
 from enum import Enum
 from datetime import datetime
+from collections import Counter
 
 
 class LessonType(Enum):
@@ -77,6 +78,5 @@ class MemoryManager:
     
     def get_lesson_count(self):
         """Get count of lessons by type."""
-        from collections import Counter
         type_counts = Counter(entry["type"] for entry in self.vector_store)
         return dict(type_counts)
