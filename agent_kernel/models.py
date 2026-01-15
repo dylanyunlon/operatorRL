@@ -26,6 +26,44 @@ class FailureSeverity(str, Enum):
     CRITICAL = "critical"
 
 
+class CognitiveGlitch(str, Enum):
+    """Types of cognitive glitches that can occur in agent reasoning."""
+    HALLUCINATION = "hallucination"  # Agent invents facts not in context
+    LOGIC_ERROR = "logic_error"  # Agent misunderstands instructions or makes faulty inferences
+    CONTEXT_GAP = "context_gap"  # Agent lacks necessary information in prompt/schema
+    PERMISSION_ERROR = "permission_error"  # Agent attempts unauthorized actions
+    SCHEMA_MISMATCH = "schema_mismatch"  # Agent references non-existent tables/fields
+    NONE = "none"  # No cognitive glitch detected
+
+
+class FailureTrace(BaseModel):
+    """Full trace of an agent failure including reasoning chain."""
+    
+    user_prompt: str = Field(..., description="Original user prompt that led to failure")
+    chain_of_thought: List[str] = Field(default_factory=list, description="Agent's reasoning steps")
+    failed_action: Dict[str, Any] = Field(..., description="The action that failed")
+    error_details: str = Field(..., description="Detailed error information")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "user_prompt": "Delete the recent user records",
+                "chain_of_thought": [
+                    "User wants to delete records",
+                    "I need to identify which records are 'recent'",
+                    "I'll delete from users table"
+                ],
+                "failed_action": {
+                    "action": "execute_sql",
+                    "query": "DELETE FROM users WHERE created_at > '2024-01-01'"
+                },
+                "error_details": "Action blocked by control plane: Dangerous SQL query"
+            }
+        }
+    )
+
+
 class AgentFailure(BaseModel):
     """Represents a failure detected in an agent."""
     
@@ -36,6 +74,7 @@ class AgentFailure(BaseModel):
     error_message: str = Field(..., description="Error message from the failure")
     context: Dict[str, Any] = Field(default_factory=dict, description="Additional context")
     stack_trace: Optional[str] = Field(None, description="Stack trace if available")
+    failure_trace: Optional[FailureTrace] = Field(None, description="Full failure trace if available")
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -72,6 +111,34 @@ class FailureAnalysis(BaseModel):
     )
 
 
+class DiagnosisJSON(BaseModel):
+    """Structured diagnosis identifying cognitive glitches in agent reasoning."""
+    
+    cognitive_glitch: CognitiveGlitch = Field(..., description="Primary cognitive glitch identified")
+    deep_problem: str = Field(..., description="Deep analysis of the problem")
+    evidence: List[str] = Field(default_factory=list, description="Evidence supporting diagnosis")
+    hint: str = Field(..., description="Hint to inject for counterfactual simulation")
+    expected_fix: str = Field(..., description="Expected outcome of applying the hint")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in diagnosis")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "cognitive_glitch": "hallucination",
+                "deep_problem": "Agent invented table name 'recent_users' that doesn't exist in schema",
+                "evidence": [
+                    "Query references 'recent_users' table",
+                    "Schema only contains 'users' table",
+                    "No context provided about table names"
+                ],
+                "hint": "Available tables: users, orders, products. Use 'users' table with date filter.",
+                "expected_fix": "Agent will query 'users' table with proper date filter",
+                "confidence": 0.92
+            }
+        }
+    )
+
+
 class SimulationResult(BaseModel):
     """Result of simulating an alternative path."""
     
@@ -99,6 +166,36 @@ class SimulationResult(BaseModel):
     )
 
 
+class ShadowAgentResult(BaseModel):
+    """Result of running a shadow agent with counterfactual simulation."""
+    
+    shadow_id: str
+    original_prompt: str = Field(..., description="Original user prompt")
+    injected_hint: str = Field(..., description="Hint injected into the prompt")
+    modified_prompt: str = Field(..., description="Full prompt with hint")
+    execution_success: bool = Field(..., description="Whether execution succeeded")
+    output: str = Field(..., description="Output from shadow agent")
+    reasoning_chain: List[str] = Field(default_factory=list, description="Shadow agent's reasoning")
+    action_taken: Optional[Dict[str, Any]] = Field(None, description="Action the shadow agent took")
+    verified: bool = Field(..., description="Whether the fix actually works")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "shadow_id": "shadow-789",
+                "original_prompt": "Delete recent user records",
+                "injected_hint": "Available tables: users. 'Recent' means created_at > 7 days ago",
+                "modified_prompt": "Delete recent user records. [HINT: Available tables: users. 'Recent' means created_at > 7 days ago]",
+                "execution_success": True,
+                "output": "Query executed successfully",
+                "reasoning_chain": ["Parse user request", "Check hint for table info", "Build safe query"],
+                "action_taken": {"action": "execute_sql", "query": "DELETE FROM users WHERE created_at > NOW() - INTERVAL 7 DAY"},
+                "verified": True
+            }
+        }
+    )
+
+
 class CorrectionPatch(BaseModel):
     """A patch to correct an agent's behavior."""
     
@@ -111,6 +208,8 @@ class CorrectionPatch(BaseModel):
     applied: bool = Field(default=False)
     applied_at: Optional[datetime] = None
     rollback_available: bool = Field(default=True)
+    diagnosis: Optional["DiagnosisJSON"] = Field(None, description="Cognitive diagnosis if available")
+    shadow_result: Optional[ShadowAgentResult] = Field(None, description="Shadow agent verification result")
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -128,6 +227,15 @@ class CorrectionPatch(BaseModel):
             }
         }
     )
+
+
+class PatchStrategy(str, Enum):
+    """Strategy for applying patches."""
+    SYSTEM_PROMPT = "system_prompt"  # Easy fix: Update system prompt
+    RAG_MEMORY = "rag_memory"  # Hard fix: Inject into vector store
+    CODE_CHANGE = "code_change"  # Direct code modification
+    CONFIG_UPDATE = "config_update"  # Configuration change
+    RULE_UPDATE = "rule_update"  # Policy/rule update
 
 
 class AgentState(BaseModel):

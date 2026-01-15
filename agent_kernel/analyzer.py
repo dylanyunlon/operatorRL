@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional, Dict
 from collections import Counter
 
-from .models import AgentFailure, FailureAnalysis, FailureType
+from .models import AgentFailure, FailureAnalysis, FailureType, DiagnosisJSON, CognitiveGlitch
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,171 @@ class FailureAnalyzer:
             confidence += 0.1
         
         return min(1.0, confidence)
+    
+    def diagnose_cognitive_glitch(self, failure: AgentFailure) -> DiagnosisJSON:
+        """
+        Deep diagnosis to identify cognitive glitches in agent reasoning.
+        
+        This is "The Analyst" - looking at the reasoning that led to the error,
+        not just the error itself.
+        
+        Args:
+            failure: AgentFailure with full trace
+            
+        Returns:
+            DiagnosisJSON with cognitive glitch identification
+        """
+        logger.info(f"Diagnosing cognitive glitch for agent {failure.agent_id}")
+        
+        if not failure.failure_trace:
+            # Fall back to basic diagnosis if no trace available
+            return self._basic_diagnosis(failure)
+        
+        trace = failure.failure_trace
+        
+        # Identify cognitive glitch type
+        glitch = self._identify_cognitive_glitch(failure, trace)
+        
+        # Deep problem analysis
+        deep_problem = self._analyze_deep_problem(failure, trace, glitch)
+        
+        # Collect evidence
+        evidence = self._collect_evidence(failure, trace, glitch)
+        
+        # Generate hint for counterfactual simulation
+        hint = self._generate_hint(failure, trace, glitch)
+        
+        # Expected fix description
+        expected_fix = self._describe_expected_fix(glitch, hint)
+        
+        # Calculate confidence
+        confidence = self._calculate_diagnosis_confidence(failure, trace, evidence)
+        
+        diagnosis = DiagnosisJSON(
+            cognitive_glitch=glitch,
+            deep_problem=deep_problem,
+            evidence=evidence,
+            hint=hint,
+            expected_fix=expected_fix,
+            confidence=confidence
+        )
+        
+        logger.info(f"Diagnosis complete: {glitch.value} (confidence: {confidence:.2f})")
+        return diagnosis
+    
+    def _identify_cognitive_glitch(self, failure: AgentFailure, trace) -> CognitiveGlitch:
+        """Identify the type of cognitive glitch."""
+        error_lower = failure.error_message.lower()
+        
+        # Check for hallucination (inventing facts)
+        if trace.failed_action:
+            action_str = str(trace.failed_action).lower()
+            # Look for signs of invented table names, fields, etc.
+            if any(keyword in error_lower for keyword in ["not found", "does not exist", "unknown table", "unknown column"]):
+                return CognitiveGlitch.HALLUCINATION
+            if "schema" in error_lower and "mismatch" in action_str:
+                return CognitiveGlitch.SCHEMA_MISMATCH
+        
+        # Check for logic error (misunderstanding)
+        if trace.chain_of_thought:
+            cot_text = " ".join(trace.chain_of_thought).lower()
+            # Look for misinterpretation of terms like "recent", "delete", etc.
+            if any(keyword in cot_text for keyword in ["i think", "probably", "assume", "guess"]):
+                return CognitiveGlitch.LOGIC_ERROR
+        
+        # Check for context gap (missing information)
+        if not trace.chain_of_thought or len(trace.chain_of_thought) < 2:
+            return CognitiveGlitch.CONTEXT_GAP
+        
+        # Check for permission errors
+        if any(keyword in error_lower for keyword in ["permission", "unauthorized", "forbidden", "blocked"]):
+            return CognitiveGlitch.PERMISSION_ERROR
+        
+        return CognitiveGlitch.LOGIC_ERROR  # Default
+    
+    def _analyze_deep_problem(self, failure: AgentFailure, trace, glitch: CognitiveGlitch) -> str:
+        """Analyze the deep problem behind the glitch."""
+        if glitch == CognitiveGlitch.HALLUCINATION:
+            return f"Agent invented non-existent entities in action: {trace.failed_action}"
+        elif glitch == CognitiveGlitch.LOGIC_ERROR:
+            return f"Agent misunderstood user intent in prompt: '{trace.user_prompt}'"
+        elif glitch == CognitiveGlitch.CONTEXT_GAP:
+            return f"Agent lacked necessary context (schema/permissions) to safely execute action"
+        elif glitch == CognitiveGlitch.PERMISSION_ERROR:
+            return f"Agent attempted unauthorized action without checking permissions first"
+        elif glitch == CognitiveGlitch.SCHEMA_MISMATCH:
+            return f"Agent referenced incorrect schema elements in action"
+        return "Unknown deep problem"
+    
+    def _collect_evidence(self, failure: AgentFailure, trace, glitch: CognitiveGlitch) -> List[str]:
+        """Collect evidence supporting the diagnosis."""
+        evidence = []
+        
+        evidence.append(f"User prompt: '{trace.user_prompt}'")
+        evidence.append(f"Failed action: {trace.failed_action}")
+        evidence.append(f"Error: {failure.error_message}")
+        
+        if trace.chain_of_thought:
+            evidence.append(f"Reasoning steps: {len(trace.chain_of_thought)} steps")
+            if trace.chain_of_thought:
+                evidence.append(f"Last thought: '{trace.chain_of_thought[-1]}'")
+        
+        return evidence
+    
+    def _generate_hint(self, failure: AgentFailure, trace, glitch: CognitiveGlitch) -> str:
+        """Generate a hint to inject for counterfactual simulation."""
+        if glitch == CognitiveGlitch.HALLUCINATION:
+            return "HINT: Always verify entity names against the provided schema before using them. Available tables/resources must be explicitly listed."
+        elif glitch == CognitiveGlitch.LOGIC_ERROR:
+            return f"HINT: When interpreting '{trace.user_prompt}', be precise about terms like 'recent', 'delete', 'modify'. Ask for clarification if ambiguous."
+        elif glitch == CognitiveGlitch.CONTEXT_GAP:
+            return "HINT: Before executing actions, ensure you have: 1) Complete schema information, 2) Permission requirements, 3) Clear action scope."
+        elif glitch == CognitiveGlitch.PERMISSION_ERROR:
+            return "HINT: Always check permissions before attempting actions. Use validate_permissions() first."
+        elif glitch == CognitiveGlitch.SCHEMA_MISMATCH:
+            return "HINT: Available schema elements must be verified before use. Do not assume table/column names."
+        return "HINT: Proceed with caution and verify all assumptions."
+    
+    def _describe_expected_fix(self, glitch: CognitiveGlitch, hint: str) -> str:
+        """Describe the expected outcome of applying the hint."""
+        if glitch == CognitiveGlitch.HALLUCINATION:
+            return "Agent will verify schema before action and use only existing entities"
+        elif glitch == CognitiveGlitch.LOGIC_ERROR:
+            return "Agent will correctly interpret user intent and clarify ambiguous terms"
+        elif glitch == CognitiveGlitch.CONTEXT_GAP:
+            return "Agent will request necessary context before proceeding with action"
+        elif glitch == CognitiveGlitch.PERMISSION_ERROR:
+            return "Agent will validate permissions before attempting action"
+        return "Agent will handle the situation correctly"
+    
+    def _calculate_diagnosis_confidence(self, failure: AgentFailure, trace, evidence: List[str]) -> float:
+        """Calculate confidence in the diagnosis."""
+        confidence = 0.5  # Base
+        
+        # More confidence with complete trace
+        if trace.chain_of_thought and len(trace.chain_of_thought) > 2:
+            confidence += 0.2
+        
+        # More confidence with detailed action
+        if trace.failed_action and len(trace.failed_action) > 0:
+            confidence += 0.15
+        
+        # More confidence with rich evidence
+        if len(evidence) >= 4:
+            confidence += 0.15
+        
+        return min(1.0, confidence)
+    
+    def _basic_diagnosis(self, failure: AgentFailure) -> DiagnosisJSON:
+        """Fallback diagnosis when no trace is available."""
+        return DiagnosisJSON(
+            cognitive_glitch=CognitiveGlitch.NONE,
+            deep_problem=f"No trace available. Basic error: {failure.error_message}",
+            evidence=[f"Error message: {failure.error_message}"],
+            hint="HINT: Ensure proper validation before actions.",
+            expected_fix="Action will be validated before execution",
+            confidence=0.5
+        )
     
     def find_similar_failures(self, failure: AgentFailure, history: List[AgentFailure]) -> List[AgentFailure]:
         """Find similar failures in history."""
