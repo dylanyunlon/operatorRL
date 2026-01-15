@@ -7,7 +7,7 @@ import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
-from .models import (
+from agent_kernel.models import (
     FailureAnalysis, SimulationResult, CorrectionPatch, AgentState,
     DiagnosisJSON, ShadowAgentResult, PatchStrategy, CognitiveGlitch,
     AgentFailure

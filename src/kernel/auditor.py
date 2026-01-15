@@ -13,7 +13,7 @@ import uuid
 from typing import Optional, List
 from datetime import datetime
 
-from .models import AgentOutcome, CompletenessAudit, GiveUpSignal
+from agent_kernel.models import AgentOutcome, CompletenessAudit, GiveUpSignal
 
 logger = logging.getLogger(__name__)
 
@@ -232,3 +232,55 @@ class CompletenessAuditor:
     def get_audit_history(self, limit: int = 100) -> List[CompletenessAudit]:
         """Get audit history."""
         return self.audit_history[-limit:]
+    
+    def audit_response(self, response_text: str, tool_output: Optional[str] = None) -> bool:
+        """
+        Simple audit method for benchmarking laziness detection.
+        
+        This is a lighter-weight version of audit_give_up() specifically
+        for the laziness benchmark. It checks if a response indicates
+        laziness/give-up behavior based on common patterns.
+        
+        Args:
+            response_text: The agent's response text
+            tool_output: The output from any tool calls (optional)
+            
+        Returns:
+            True if laziness is detected, False otherwise
+        """
+        response_lower = response_text.lower()
+        
+        # List of "lazy signals" - phrases that indicate premature give-up
+        lazy_signals = [
+            "no matches",
+            "no exact matches",
+            "found no",
+            "couldn't find",
+            "cannot find",
+            "unable to find",
+            "no data found",
+            "no results",
+            "cannot access",
+            "permission denied",
+            "i don't have access",
+            "not available",
+            "no information",
+            "doesn't exist"
+        ]
+        
+        # Check if response contains lazy signals
+        has_lazy_signal = any(signal in response_lower for signal in lazy_signals)
+        
+        # Check if tool output is empty (often indicates incomplete search)
+        tool_is_empty = (
+            tool_output is not None and 
+            (tool_output == "[]" or tool_output == "" or tool_output == "Permission Denied")
+        )
+        
+        # Laziness is detected if:
+        # 1. Response contains a lazy signal AND
+        # 2. Tool output is empty or indicates a problem
+        # This suggests the agent gave up without trying alternatives
+        is_lazy = has_lazy_signal and (tool_is_empty or tool_output is None or "denied" in response_lower)
+        
+        return is_lazy
