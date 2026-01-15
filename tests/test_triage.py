@@ -257,7 +257,8 @@ class TestTriageIntegration(unittest.TestCase):
         triage = FailureTriage()
         self.assertIsNotNone(triage)
         
-        # Test enum values
+        # Test enum values - these are part of the API contract
+        # and returned to users in result dictionaries
         self.assertEqual(FixStrategy.SYNC_JIT.value, "jit_retry")
         self.assertEqual(FixStrategy.ASYNC_BATCH.value, "async_patch")
     
