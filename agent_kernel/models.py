@@ -33,6 +33,8 @@ class CognitiveGlitch(str, Enum):
     CONTEXT_GAP = "context_gap"  # Agent lacks necessary information in prompt/schema
     PERMISSION_ERROR = "permission_error"  # Agent attempts unauthorized actions
     SCHEMA_MISMATCH = "schema_mismatch"  # Agent references non-existent tables/fields
+    TOOL_MISUSE = "tool_misuse"  # Agent uses tool with wrong parameter types or values
+    POLICY_VIOLATION = "policy_violation"  # Agent violates policy boundaries (e.g., medical advice)
     NONE = "none"  # No cognitive glitch detected
 
 

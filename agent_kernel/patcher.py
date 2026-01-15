@@ -9,7 +9,8 @@ from datetime import datetime
 
 from .models import (
     FailureAnalysis, SimulationResult, CorrectionPatch, AgentState,
-    DiagnosisJSON, ShadowAgentResult, PatchStrategy, CognitiveGlitch
+    DiagnosisJSON, ShadowAgentResult, PatchStrategy, CognitiveGlitch,
+    AgentFailure
 )
 
 logger = logging.getLogger(__name__)
@@ -249,13 +250,26 @@ class AgentPatcher:
         diagnosis: Optional[DiagnosisJSON]
     ) -> PatchStrategy:
         """
-        Determine patch strategy: Easy Fix (system_prompt) or Hard Fix (RAG).
+        Determine patch strategy based on the problem statement requirements:
         
-        Easy Fix: Simple rules that can be added to system prompt
-        Hard Fix: Complex patterns requiring RAG memory
+        - Tool Misuse → Schema Injection (update tool definition in prompt)
+        - Hallucination → RAG Patch (add negative constraint to context)
+        - Policy Violation → Constitutional Update (prepend refusal rule to system prompt)
         """
         if not diagnosis:
             return PatchStrategy.CODE_CHANGE
+        
+        # Tool Misuse: Schema Injection - update tool definition in the prompt
+        if diagnosis.cognitive_glitch == CognitiveGlitch.TOOL_MISUSE:
+            return PatchStrategy.SYSTEM_PROMPT
+        
+        # Policy Violation: Constitutional Update - prepend refusal rule to system prompt
+        if diagnosis.cognitive_glitch == CognitiveGlitch.POLICY_VIOLATION:
+            return PatchStrategy.SYSTEM_PROMPT
+        
+        # Hallucination: RAG Patch - add negative constraint to memory
+        if diagnosis.cognitive_glitch == CognitiveGlitch.HALLUCINATION:
+            return PatchStrategy.RAG_MEMORY
         
         # Easy fixes: Simple cognitive glitches that can be addressed with rules
         if diagnosis.cognitive_glitch in [
@@ -267,7 +281,6 @@ class AgentPatcher:
         
         # Hard fixes: Complex patterns requiring historical context
         if diagnosis.cognitive_glitch in [
-            CognitiveGlitch.HALLUCINATION,
             CognitiveGlitch.SCHEMA_MISMATCH,
             CognitiveGlitch.LOGIC_ERROR
         ]:
@@ -347,11 +360,53 @@ class AgentPatcher:
         diagnosis: Optional[DiagnosisJSON],
         analysis: FailureAnalysis
     ) -> str:
-        """Generate a rule to add to system prompt (Easy Fix)."""
+        """
+        Generate a rule to add to system prompt.
+        
+        Implements:
+        - Tool Misuse → Schema Injection (stricter tool definition)
+        - Policy Violation → Constitutional Update (refusal rule)
+        """
         if not diagnosis:
             return f"Always validate before: {analysis.suggested_fixes[0] if analysis.suggested_fixes else 'executing actions'}"
         
-        # Convert hint into a permanent rule
+        # Tool Misuse: Schema Injection - Make tool definition stricter
+        if diagnosis.cognitive_glitch == CognitiveGlitch.TOOL_MISUSE:
+            failure = analysis.failure
+            # Extract specific tool information from the failure
+            tool_info = ""
+            if failure.failure_trace and failure.failure_trace.failed_action:
+                action_name = failure.failure_trace.failed_action.get("action", "tool")
+                tool_info = f" for {action_name}"
+            return f"SCHEMA INJECTION: Tool definitions{tool_info} require strict parameter type checking. Always verify parameter types match the schema exactly (e.g., UUID format for id parameters, not names or strings)."
+        
+        # Policy Violation: Constitutional Update - Prepend refusal rule
+        if diagnosis.cognitive_glitch == CognitiveGlitch.POLICY_VIOLATION:
+            # Determine the specific policy domain from the failure
+            failure = analysis.failure
+            domain = "restricted topics"
+            
+            # Check error message first
+            error_lower = failure.error_message.lower()
+            if any(kw in error_lower for kw in ["medical", "health"]):
+                domain = "medical issues"
+            elif any(kw in error_lower for kw in ["legal", "law"]):
+                domain = "legal matters"
+            elif any(kw in error_lower for kw in ["investment", "financial"]):
+                domain = "investment advice"
+            # Then check failure trace if available
+            elif failure.failure_trace and failure.failure_trace.user_prompt:
+                prompt_lower = failure.failure_trace.user_prompt.lower()
+                if any(kw in prompt_lower for kw in ["medical", "health", "diagnosis", "treatment", "medicine"]):
+                    domain = "medical issues"
+                elif any(kw in prompt_lower for kw in ["legal", "law", "attorney", "sue", "lawsuit"]):
+                    domain = "legal matters"
+                elif any(kw in prompt_lower for kw in ["investment", "financial", "stock", "invest"]):
+                    domain = "investment advice"
+            
+            return f"CONSTITUTIONAL REFUSAL RULE: You must refuse to provide advice on {domain}. Politely decline and explain that you are not qualified to advise on such matters."
+        
+        # Convert hint into a permanent rule for other glitches
         if diagnosis.cognitive_glitch == CognitiveGlitch.PERMISSION_ERROR:
             return "Always check permissions before attempting any action. Use validate_permissions() first."
         elif diagnosis.cognitive_glitch == CognitiveGlitch.CONTEXT_GAP:
@@ -371,11 +426,17 @@ class AgentPatcher:
         analysis: FailureAnalysis,
         shadow_result: Optional[ShadowAgentResult]
     ) -> Dict[str, Any]:
-        """Generate RAG memory content (Hard Fix)."""
+        """
+        Generate RAG memory content (Hard Fix).
+        
+        For Hallucination: Add negative constraint to the context.
+        Example: "Project_Alpha is deprecated" or "Entity X does not exist"
+        """
         failure = analysis.failure
         
         # Create a memory entry
         memory_text = f"In {failure.timestamp.year}, "
+        negative_constraint = None
         
         if failure.failure_trace:
             memory_text += f"user asked: '{failure.failure_trace.user_prompt}', "
@@ -383,6 +444,14 @@ class AgentPatcher:
             
             if diagnosis:
                 memory_text += f"The problem was {diagnosis.cognitive_glitch.value}: {diagnosis.deep_problem}. "
+                
+                # For hallucinations, extract the hallucinated entity and create negative constraint
+                if diagnosis.cognitive_glitch == CognitiveGlitch.HALLUCINATION:
+                    # Extract hallucinated entity from error message or failed action
+                    hallucinated_entity = self._extract_hallucinated_entity(failure)
+                    if hallucinated_entity:
+                        negative_constraint = f"{hallucinated_entity} does not exist and is deprecated. Do not reference it."
+                        memory_text += f"NEGATIVE CONSTRAINT: {negative_constraint} "
             
             if shadow_result and shadow_result.verified:
                 memory_text += f"The correct approach is: {shadow_result.output}. "
@@ -397,9 +466,35 @@ class AgentPatcher:
             "failure_context": memory_text,
             "correct_logic": shadow_result.output if shadow_result else analysis.suggested_fixes[0] if analysis.suggested_fixes else "Unknown",
             "cognitive_glitch": diagnosis.cognitive_glitch.value if diagnosis else "unknown",
+            "negative_constraint": negative_constraint,  # New field for hallucinations
             "timestamp": datetime.utcnow().isoformat(),
             "verified_by_shadow": shadow_result.verified if shadow_result else False
         }
+    
+    def _extract_hallucinated_entity(self, failure: AgentFailure) -> Optional[str]:
+        """Extract the hallucinated entity name from failure context."""
+        error_lower = failure.error_message.lower()
+        
+        # Common patterns for hallucinations
+        # "Project_Alpha does not exist" -> "Project_Alpha"
+        # "Table 'recent_users' not found" -> "recent_users"
+        # "Unknown entity: XYZ" -> "XYZ"
+        
+        import re
+        
+        # Pattern: 'entity_name' or "entity_name" in error message
+        quoted_match = re.search(r"['\"]([^'\"]+)['\"]", failure.error_message)
+        if quoted_match:
+            return quoted_match.group(1)
+        
+        # Pattern: Entity_Name or Project_Alpha (CamelCase or Snake_Case)
+        if failure.failure_trace and failure.failure_trace.failed_action:
+            action_str = str(failure.failure_trace.failed_action)
+            camel_match = re.search(r'\b([A-Z][a-z]+(?:_[A-Z][a-z]+)*)\b', action_str)
+            if camel_match:
+                return camel_match.group(1)
+        
+        return None
     
     def _generate_code_change_content(
         self,

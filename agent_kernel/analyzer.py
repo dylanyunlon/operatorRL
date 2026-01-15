@@ -253,12 +253,34 @@ class FailureAnalyzer:
         """Identify the type of cognitive glitch."""
         error_lower = failure.error_message.lower()
         
-        # Check for hallucination (inventing facts)
+        # Check for tool misuse (wrong parameter types) - high priority
+        if any(keyword in error_lower for keyword in ["type error", "invalid type", "expected uuid", "wrong parameter type", "parameter type mismatch"]):
+            return CognitiveGlitch.TOOL_MISUSE
+        if "uuid" in error_lower or ("id" in error_lower and any(kw in error_lower for kw in ["invalid", "malformed", "not a valid", "format"])):
+            # Check if this looks like a tool misuse scenario
+            if trace.failed_action:
+                action_str = str(trace.failed_action).lower()
+                if any(kw in action_str for kw in ["name", "username", "email", "params", "id"]):
+                    return CognitiveGlitch.TOOL_MISUSE
+            return CognitiveGlitch.TOOL_MISUSE
+        
+        # Check for policy violations (e.g., medical advice, legal advice) - high priority
+        if any(keyword in error_lower for keyword in ["policy violation", "violates policy", "not allowed to", "cannot advise", "cannot provide"]):
+            return CognitiveGlitch.POLICY_VIOLATION
+        # Check for specific policy domains in combination with blocking
+        if trace.user_prompt:
+            prompt_lower = trace.user_prompt.lower()
+            if any(domain in prompt_lower for domain in ["medical", "health", "diagnosis", "treatment", "medicine", "legal", "attorney", "sue", "investment", "stock"]):
+                if any(keyword in error_lower for keyword in ["blocked", "violation", "not permitted", "cannot", "policy"]):
+                    return CognitiveGlitch.POLICY_VIOLATION
+        
+        # Check for hallucination (inventing facts) - check early before context gap
+        if any(keyword in error_lower for keyword in ["not found", "does not exist", "unknown", "deprecated", "invalid reference", "no such"]):
+            return CognitiveGlitch.HALLUCINATION
+        
+        # Check for schema mismatch
         if trace.failed_action:
             action_str = str(trace.failed_action).lower()
-            # Look for signs of invented table names, fields, etc.
-            if any(keyword in error_lower for keyword in ["not found", "does not exist", "unknown table", "unknown column"]):
-                return CognitiveGlitch.HALLUCINATION
             if "schema" in error_lower and "mismatch" in action_str:
                 return CognitiveGlitch.SCHEMA_MISMATCH
         
@@ -269,13 +291,20 @@ class FailureAnalyzer:
             if any(keyword in cot_text for keyword in ["i think", "probably", "assume", "guess"]):
                 return CognitiveGlitch.LOGIC_ERROR
         
-        # Check for context gap (missing information)
+        # Check for context gap (missing information) - lower priority
         if not trace.chain_of_thought or len(trace.chain_of_thought) < 2:
+            # Don't default to context gap if we have other clear signals
+            if trace.failed_action and ("uuid" in error_lower or "id" in error_lower):
+                return CognitiveGlitch.TOOL_MISUSE
+            if any(keyword in error_lower for keyword in ["not found", "does not exist"]):
+                return CognitiveGlitch.HALLUCINATION
             return CognitiveGlitch.CONTEXT_GAP
         
         # Check for permission errors
-        if any(keyword in error_lower for keyword in ["permission", "unauthorized", "forbidden", "blocked"]):
-            return CognitiveGlitch.PERMISSION_ERROR
+        if any(keyword in error_lower for keyword in ["permission", "unauthorized", "forbidden"]):
+            # Distinguish from policy violations
+            if "policy" not in error_lower and "violates" not in error_lower:
+                return CognitiveGlitch.PERMISSION_ERROR
         
         return CognitiveGlitch.LOGIC_ERROR  # Default
     
@@ -291,6 +320,10 @@ class FailureAnalyzer:
             return f"Agent attempted unauthorized action without checking permissions first"
         elif glitch == CognitiveGlitch.SCHEMA_MISMATCH:
             return f"Agent referenced incorrect schema elements in action"
+        elif glitch == CognitiveGlitch.TOOL_MISUSE:
+            return f"Agent used tool with wrong parameter type or value: {trace.failed_action}"
+        elif glitch == CognitiveGlitch.POLICY_VIOLATION:
+            return f"Agent violated policy boundaries by attempting: '{trace.user_prompt}'"
         return "Unknown deep problem"
     
     def _collect_evidence(self, failure: AgentFailure, trace, glitch: CognitiveGlitch) -> List[str]:
@@ -320,6 +353,10 @@ class FailureAnalyzer:
             return "HINT: Always check permissions before attempting actions. Use validate_permissions() first."
         elif glitch == CognitiveGlitch.SCHEMA_MISMATCH:
             return "HINT: Available schema elements must be verified before use. Do not assume table/column names."
+        elif glitch == CognitiveGlitch.TOOL_MISUSE:
+            return "HINT: Always verify parameter types match the tool schema. For example, use UUIDs where required, not names or strings."
+        elif glitch == CognitiveGlitch.POLICY_VIOLATION:
+            return "HINT: Some topics are outside your policy boundaries. Refuse requests for medical advice, legal advice, or other restricted domains."
         return "HINT: Proceed with caution and verify all assumptions."
     
     def _describe_expected_fix(self, glitch: CognitiveGlitch, hint: str) -> str:
@@ -332,6 +369,10 @@ class FailureAnalyzer:
             return "Agent will request necessary context before proceeding with action"
         elif glitch == CognitiveGlitch.PERMISSION_ERROR:
             return "Agent will validate permissions before attempting action"
+        elif glitch == CognitiveGlitch.TOOL_MISUSE:
+            return "Agent will use correct parameter types according to tool schema"
+        elif glitch == CognitiveGlitch.POLICY_VIOLATION:
+            return "Agent will refuse to provide advice in restricted domains"
         return "Agent will handle the situation correctly"
     
     def _calculate_diagnosis_confidence(self, failure: AgentFailure, trace, evidence: List[str]) -> float:
