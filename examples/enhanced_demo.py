@@ -118,7 +118,7 @@ def example_context_gap():
     
     user_prompt = "Update the user's email address"
     chain_of_thought = [
-        "User wants to update email"
+        "User wants to update email",
         # Very short chain - indicating context gap
     ]
     failed_action = {

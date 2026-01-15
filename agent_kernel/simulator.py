@@ -5,9 +5,8 @@ Path simulation system to test alternative solutions.
 import logging
 import uuid
 from typing import List, Dict, Any, Optional
-import random
 
-from .models import FailureAnalysis, SimulationResult, DiagnosisJSON, ShadowAgentResult, AgentFailure
+from .models import FailureAnalysis, SimulationResult, DiagnosisJSON, ShadowAgentResult, AgentFailure, CognitiveGlitch
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,7 @@ class ShadowAgent:
         
         # Simulate a corrected action
         # In reality, this would be the actual agent's output
-        if diagnosis.cognitive_glitch.value == "hallucination":
+        if diagnosis.cognitive_glitch == CognitiveGlitch.HALLUCINATION:
             # Agent would verify schema
             action = {
                 "action": "execute_with_validation",
@@ -111,7 +110,7 @@ class ShadowAgent:
             }
             success = True
             output = "Action validated and executed successfully"
-        elif diagnosis.cognitive_glitch.value == "permission_error":
+        elif diagnosis.cognitive_glitch == CognitiveGlitch.PERMISSION_ERROR:
             # Agent would check permissions first
             action = {
                 "action": "check_permissions_then_execute",
@@ -125,8 +124,8 @@ class ShadowAgent:
                 "action": "safe_execute",
                 "hint_applied": True
             }
-            # Success probability based on diagnosis confidence
-            success = random.random() < diagnosis.confidence
+            # Success based on diagnosis confidence (deterministic)
+            success = diagnosis.confidence > 0.7
             output = "Action executed with safety checks" if success else "Action still failed"
         
         return success, output, reasoning, action

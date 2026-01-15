@@ -99,9 +99,9 @@ class AgentPatcher:
         
         try:
             # Apply patch based on type
-            if patch.patch_type == "system_prompt" or patch.patch_type == PatchStrategy.SYSTEM_PROMPT.value:
+            if patch.patch_type in [PatchStrategy.SYSTEM_PROMPT.value, "system_prompt"]:
                 self._apply_system_prompt_patch(patch)
-            elif patch.patch_type == "rag_memory" or patch.patch_type == PatchStrategy.RAG_MEMORY.value:
+            elif patch.patch_type in [PatchStrategy.RAG_MEMORY.value, "rag_memory"]:
                 self._apply_rag_memory_patch(patch)
             elif patch.patch_type == "code":
                 self._apply_code_patch(patch)
@@ -199,9 +199,9 @@ class AgentPatcher:
         
         try:
             # Rollback based on patch type
-            if patch.patch_type in ["system_prompt", PatchStrategy.SYSTEM_PROMPT.value]:
+            if patch.patch_type in [PatchStrategy.SYSTEM_PROMPT.value, "system_prompt"]:
                 self._rollback_system_prompt(patch)
-            elif patch.patch_type in ["rag_memory", PatchStrategy.RAG_MEMORY.value]:
+            elif patch.patch_type in [PatchStrategy.RAG_MEMORY.value, "rag_memory"]:
                 self._rollback_rag_memory(patch)
             
             # Mark as not applied
