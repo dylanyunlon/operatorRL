@@ -24,6 +24,7 @@ from .models import (
 from .outcome_analyzer import OutcomeAnalyzer
 from .completeness_auditor import CompletenessAuditor
 from .semantic_purge import SemanticPurge, PatchClassifier
+from .triage import FailureTriage, FixStrategy
 
 # Reference implementations (simplified examples)
 from .auditor import CompletenessAuditor as SimpleCompletenessAuditor
@@ -45,6 +46,8 @@ __all__ = [
     "CompletenessAuditor",
     "SemanticPurge",
     "PatchClassifier",
+    "FailureTriage",
+    "FixStrategy",
     # Reference implementations
     "SimpleCompletenessAuditor",
     "diagnose_failure",
