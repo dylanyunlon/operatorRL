@@ -48,7 +48,8 @@ class FailureTriage:
             "delete_file",
             "execute_sql",
             "write_file",
-            "modify_permissions"
+            "modify_permissions",
+            "delete_user"  # User deletion is critical
         ])
         
         # Keywords indicating high-effort prompts requiring deep thinking
@@ -73,9 +74,11 @@ class FailureTriage:
         Decide whether to fix this failure sync (JIT) or async (batch).
         
         Decision Rules (in priority order):
-        1. Safety/Write Operations → SYNC_JIT
-        2. High Effort Prompts → SYNC_JIT  
-        3. Default (Read/Query) → ASYNC_BATCH
+        1. Cognitive failures with full trace → SYNC_JIT (deep diagnosis needed)
+        2. Safety/Write Operations → SYNC_JIT
+        3. High Effort Prompts → SYNC_JIT  
+        4. VIP Users → SYNC_JIT
+        5. Default (Read/Query) → ASYNC_BATCH
         
         Args:
             prompt: The user prompt that led to the failure
@@ -86,6 +89,14 @@ class FailureTriage:
         Returns:
             FixStrategy indicating sync (JIT) or async (batch) correction
         """
+        # Rule 0: Cognitive failures with full trace (chain_of_thought + failed_action)
+        # These warrant immediate deep analysis with Shadow Teacher
+        if context:
+            has_chain = context.get("chain_of_thought") is not None
+            has_failed_action = context.get("failed_action") is not None
+            if has_chain and has_failed_action:
+                return FixStrategy.SYNC_JIT
+        
         # Rule 1: Safety/Write Operations are always Critical
         if tool_name and tool_name in self.critical_tools:
             return FixStrategy.SYNC_JIT
@@ -95,6 +106,13 @@ class FailureTriage:
             action = context.get("action", "")
             if action in self.critical_tools:
                 return FixStrategy.SYNC_JIT
+            
+            # Also check failed_action if present
+            failed_action = context.get("failed_action")
+            if failed_action and isinstance(failed_action, dict):
+                failed_action_name = failed_action.get("action", "")
+                if failed_action_name in self.critical_tools:
+                    return FixStrategy.SYNC_JIT
         
         # Rule 2: "High Effort" prompts request deep thinking
         prompt_lower = prompt.lower()

@@ -136,11 +136,19 @@ class SelfCorrectingAgentKernel:
         # Step 0: Triage - Decide sync (JIT) or async (batch) correction strategy
         if user_prompt:
             tool_name = context.get("action") if context else None
+            
+            # Prepare enhanced context for triage including failed_action and chain_of_thought
+            triage_context = dict(context) if context else {}
+            if failed_action:
+                triage_context["failed_action"] = failed_action
+            if chain_of_thought:
+                triage_context["chain_of_thought"] = chain_of_thought
+            
             strategy = self.triage.decide_strategy(
                 prompt=user_prompt,
                 tool_name=tool_name,
                 user_metadata=user_metadata,
-                context=context
+                context=triage_context
             )
             
             logger.info(f"[TRIAGE] Decision: {strategy.value}")
