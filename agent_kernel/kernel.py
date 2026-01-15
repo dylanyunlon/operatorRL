@@ -60,10 +60,15 @@ class SelfCorrectingAgentKernel:
         error_message: str,
         context: Optional[Dict[str, Any]] = None,
         stack_trace: Optional[str] = None,
-        auto_patch: bool = True
+        auto_patch: bool = True,
+        user_prompt: Optional[str] = None,
+        chain_of_thought: Optional[List[str]] = None,
+        failed_action: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Handle an agent failure through the full self-correction pipeline.
+        
+        Enhanced to support full trace capture and cognitive diagnosis.
         
         This is the main entry point when an agent fails in production.
         
@@ -73,49 +78,75 @@ class SelfCorrectingAgentKernel:
             context: Additional context about the failure
             stack_trace: Optional stack trace
             auto_patch: Whether to automatically apply the patch (default: True)
+            user_prompt: Original user prompt (for full trace)
+            chain_of_thought: Agent's reasoning steps (for cognitive analysis)
+            failed_action: The specific action that failed
             
         Returns:
             Dictionary containing the results of the self-correction process
         """
         logger.info(f"=" * 80)
-        logger.info(f"AGENT FAILURE DETECTED - Starting self-correction process")
+        logger.info(f"AGENT FAILURE DETECTED - Starting enhanced self-correction process")
         logger.info(f"Agent ID: {agent_id}")
         logger.info(f"Error: {error_message}")
         logger.info(f"=" * 80)
         
-        # Step 1: Detect and classify failure
-        logger.info("[1/4] Detecting and classifying failure...")
+        # Step 1: Detect and classify failure with full trace
+        logger.info("[1/5] Detecting and classifying failure (capturing full trace)...")
         failure = self.detector.detect_failure(
             agent_id=agent_id,
             error_message=error_message,
             context=context,
-            stack_trace=stack_trace
+            stack_trace=stack_trace,
+            user_prompt=user_prompt,
+            chain_of_thought=chain_of_thought,
+            failed_action=failed_action
         )
         
-        # Step 2: Analyze failure
-        logger.info("[2/4] Analyzing failure to identify root cause...")
+        # Step 2: Deep cognitive analysis
+        logger.info("[2/5] Analyzing failure (identifying cognitive glitches)...")
         failure_history = self.detector.get_failure_history(agent_id=agent_id)
         similar_failures = self.analyzer.find_similar_failures(failure, failure_history)
         analysis = self.analyzer.analyze(failure, similar_failures)
         
+        # Generate cognitive diagnosis if trace available
+        diagnosis = None
+        if failure.failure_trace:
+            logger.info("      → Performing deep cognitive analysis...")
+            diagnosis = self.analyzer.diagnose_cognitive_glitch(failure)
+            logger.info(f"      → Cognitive glitch: {diagnosis.cognitive_glitch.value}")
+        
         # Step 3: Simulate alternative path
-        logger.info("[3/4] Simulating alternative path...")
+        logger.info("[3/5] Simulating alternative path...")
         simulation = self.simulator.simulate(analysis)
         
-        if not simulation.success:
+        # Step 4: Counterfactual simulation with Shadow Agent
+        shadow_result = None
+        if diagnosis and failure.failure_trace:
+            logger.info("[4/5] Running counterfactual simulation (Shadow Agent)...")
+            shadow_result = self.simulator.simulate_counterfactual(diagnosis, failure)
+            logger.info(f"      → Shadow agent verified: {shadow_result.verified}")
+        else:
+            logger.info("[4/5] Skipping Shadow Agent (no trace available)")
+        
+        if not simulation.success and (not shadow_result or not shadow_result.verified):
             logger.warning("Simulation did not produce a viable alternative path")
             return {
                 "success": False,
                 "failure": failure,
                 "analysis": analysis,
+                "diagnosis": diagnosis,
                 "simulation": simulation,
+                "shadow_result": shadow_result,
                 "patch": None,
                 "message": "Could not find a viable alternative path"
             }
         
-        # Step 4: Create and optionally apply patch
-        logger.info("[4/4] Creating correction patch...")
-        patch = self.patcher.create_patch(agent_id, analysis, simulation)
+        # Step 5: Create and optionally apply patch
+        logger.info("[5/5] Creating correction patch (The Optimizer)...")
+        patch = self.patcher.create_patch(
+            agent_id, analysis, simulation, diagnosis, shadow_result
+        )
         
         patch_applied = False
         if auto_patch:
@@ -127,6 +158,9 @@ class SelfCorrectingAgentKernel:
         logger.info(f"=" * 80)
         logger.info(f"SELF-CORRECTION COMPLETE")
         logger.info(f"Patch ID: {patch.patch_id}")
+        logger.info(f"Patch Type: {patch.patch_type}")
+        if diagnosis:
+            logger.info(f"Cognitive Glitch: {diagnosis.cognitive_glitch.value}")
         logger.info(f"Patch Applied: {patch_applied}")
         logger.info(f"Expected Success Rate: {simulation.estimated_success_rate:.2%}")
         logger.info(f"=" * 80)
@@ -135,7 +169,9 @@ class SelfCorrectingAgentKernel:
             "success": True,
             "failure": failure,
             "analysis": analysis,
+            "diagnosis": diagnosis,
             "simulation": simulation,
+            "shadow_result": shadow_result,
             "patch": patch,
             "patch_applied": patch_applied,
             "message": "Agent successfully patched" if patch_applied else "Patch created, awaiting manual approval"
