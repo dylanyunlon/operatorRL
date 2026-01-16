@@ -15,6 +15,21 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime
 from uuid import uuid4
+from enum import Enum
+
+
+class MemoryTier(str, Enum):
+    """
+    Three-tier memory hierarchy for deterministic lesson routing.
+    
+    This implements "Scale by Subtraction" by injecting only relevant context:
+    - Tier 1: Always active (safety-critical)
+    - Tier 2: Conditionally injected (tool-specific)
+    - Tier 3: Retrieved on-demand (long-tail edge cases)
+    """
+    TIER_1_KERNEL = "kernel"           # Permanent System Prompt
+    TIER_2_SKILL_CACHE = "skill_cache" # Injected based on active Tool
+    TIER_3_ARCHIVE = "rag_archive"     # Semantic Search
 
 
 # 1. The Atomic Lesson (What we learned)
@@ -39,6 +54,24 @@ class Lesson(BaseModel):
         description="Teacher's confidence in this fix (0.0-1.0)"
     )
     created_at: datetime = Field(default_factory=datetime.now)
+    
+    # Tiering metadata
+    tier: Optional[MemoryTier] = Field(
+        None,
+        description="The memory tier where this lesson is stored"
+    )
+    retrieval_count: int = Field(
+        default=0,
+        description="Number of times this lesson was retrieved (for promotion logic)"
+    )
+    last_retrieved_at: Optional[datetime] = Field(
+        None,
+        description="Last time this lesson was retrieved from Tier 3"
+    )
+    last_triggered_at: Optional[datetime] = Field(
+        None,
+        description="Last time this lesson triggered a block/correction (for demotion logic)"
+    )
     
     model_config = {
         "json_schema_extra": {

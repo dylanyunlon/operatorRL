@@ -7,7 +7,10 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from .triage import FailureTriage, FixStrategy
-from .memory import MemoryManager, PatchClassifier, SemanticPurge, LessonType
+from .memory import (
+    MemoryManager, PatchClassifier, SemanticPurge, LessonType,
+    MemoryController, MockRedisCache, MockVectorStore
+)
 
 # Note: auditor and patcher are imported from agent_kernel for backward compatibility
 from agent_kernel.completeness_auditor import CompletenessAuditor
@@ -20,6 +23,9 @@ __all__ = [
     "PatchClassifier",
     "SemanticPurge",
     "LessonType",
+    "MemoryController",
+    "MockRedisCache",
+    "MockVectorStore",
     "CompletenessAuditor",
     "AgentPatcher",
 ]
