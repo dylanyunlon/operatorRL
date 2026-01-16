@@ -89,6 +89,30 @@ class MockRedisCache:
         """Delete key."""
         if key in self.store:
             del self.store[key]
+    
+    def clear(self) -> None:
+        """Clear all keys from cache."""
+        self.store.clear()
+    
+    def keys(self, pattern: Optional[str] = None) -> List[str]:
+        """
+        Get all keys, optionally filtered by pattern.
+        
+        Args:
+            pattern: Optional pattern to filter keys (e.g., "skill:*")
+            
+        Returns:
+            List of matching keys
+        """
+        if pattern is None:
+            return list(self.store.keys())
+        
+        # Simple pattern matching (only supports "*" wildcard)
+        if pattern.endswith("*"):
+            prefix = pattern[:-1]
+            return [k for k in self.store.keys() if k.startswith(prefix)]
+        
+        return [k for k in self.store.keys() if k == pattern]
 
 
 class MockVectorStore:
@@ -472,8 +496,10 @@ class MemoryController:
         
         # Scan all skill cache keys
         # In production, this would iterate over all Redis keys with pattern "skill:*"
-        # For now, we'll check the mock cache
-        if hasattr(self.redis_cache, 'store'):
+        keys_to_check = []
+        if hasattr(self.redis_cache, 'keys'):
+            keys_to_check = self.redis_cache.keys('skill:*')
+        elif hasattr(self.redis_cache, 'store'):
             keys_to_check = [k for k in self.redis_cache.store.keys() if k.startswith('skill:')]
             
             for key in keys_to_check:
@@ -485,9 +511,9 @@ class MemoryController:
                     last_retrieved = lesson_dict.get('last_retrieved_at')
                     
                     if last_retrieved:
-                        last_retrieved_dt = datetime.fromisoformat(last_retrieved) if isinstance(last_retrieved, str) else last_retrieved
+                        last_retrieved_dt = self._parse_datetime(last_retrieved)
                         
-                        if last_retrieved_dt < cutoff_date:
+                        if last_retrieved_dt and last_retrieved_dt < cutoff_date:
                             # Evict this lesson
                             lesson_id = lesson_dict.get('id')
                             logger.debug(f"  ❄️  Evicting lesson {lesson_id} from {key}")
@@ -511,6 +537,25 @@ class MemoryController:
         
         logger.info(f"✨ Evicted {evicted} cold cache entries")
         return {"evicted_count": evicted, "threshold_days": unused_days}
+    
+    def _parse_datetime(self, value) -> Optional[datetime]:
+        """
+        Parse datetime from various formats.
+        
+        Args:
+            value: Value to parse (datetime object or ISO string)
+            
+        Returns:
+            Optional[datetime]: Parsed datetime or None if parsing fails
+        """
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except (ValueError, TypeError):
+                return None
+        return None
     
     def _update_tier_tag_in_vector_db(self, lesson_id: str, new_tier: MemoryTier) -> None:
         """

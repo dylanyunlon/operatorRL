@@ -76,6 +76,9 @@ class SkillMapper:
     - _check_semantic_match(): Phase 2 - keyword-based matching
     """
     
+    # Confidence threshold for semantic matching (minimum keyword matches required)
+    SEMANTIC_CONFIDENCE_THRESHOLD = 2
+    
     def __init__(self, custom_registry: Optional[Dict[str, ToolSignature]] = None):
         """
         Initialize SkillMapper with tool registry.
@@ -266,8 +269,8 @@ class SkillMapper:
         best_tool = max(scores, key=scores.get)
         best_score = scores[best_tool]
         
-        # Require at least 2 keyword matches for confidence
-        if best_score >= 2:
+        # Require minimum threshold for confidence
+        if best_score >= self.SEMANTIC_CONFIDENCE_THRESHOLD:
             return best_tool
         
         return None

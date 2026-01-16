@@ -254,22 +254,25 @@ class LessonRubric:
         Returns:
             bool: True if text appears to reference specific instances
         """
-        # Check for digits (IDs, dates)
-        if any(char.isdigit() for char in text):
+        # Check for digits (IDs, dates) using regex for efficiency
+        import re
+        if re.search(r'\d', text):
             # Filter out common non-specific numeric patterns
+            text_lower = text.lower()
             non_specific_patterns = [
                 "top 10", "limit 10", "200", "404", "500",  # HTTP codes
                 "24 hours", "30 days", "365 days"  # Time periods
             ]
-            if not any(pattern in text.lower() for pattern in non_specific_patterns):
+            if not any(pattern in text_lower for pattern in non_specific_patterns):
                 return True
         
         # Check for specific entity markers
+        text_lower = text.lower()
         specific_markers = [
             "named", "called", "id:", "user:", "project:", "customer:",
             "account:", "order:", "ticket:"
         ]
-        if any(marker in text.lower() for marker in specific_markers):
+        if any(marker in text_lower for marker in specific_markers):
             return True
         
         return False

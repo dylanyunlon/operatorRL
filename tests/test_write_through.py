@@ -14,6 +14,11 @@ from src.kernel.memory import MemoryController
 from src.kernel.schemas import Lesson, PatchRequest, MemoryTier
 
 
+# Test constants
+EVICTION_THRESHOLD_DAYS_OLD = 45  # Days since last retrieval
+EVICTION_THRESHOLD_DAYS_NEW = 30  # Eviction threshold parameter
+
+
 class TestWriteThroughArchitecture(unittest.TestCase):
     """Tests for Write-Through Pattern and Safe Purge Protocol."""
     
@@ -122,7 +127,7 @@ class TestWriteThroughArchitecture(unittest.TestCase):
             rule_text="Old lesson",
             lesson_type="syntax",
             confidence_score=0.85,
-            last_retrieved_at=datetime.now() - timedelta(days=45)  # 45 days old
+            last_retrieved_at=datetime.now() - timedelta(days=EVICTION_THRESHOLD_DAYS_OLD)
         )
         patch = PatchRequest(
             trace_id="trace-4",
@@ -140,10 +145,10 @@ class TestWriteThroughArchitecture(unittest.TestCase):
         self.assertGreater(len(cached_before), 0)
         
         # Run eviction with 30-day threshold
-        result = self.controller.evict_from_cache(unused_days=30)
+        result = self.controller.evict_from_cache(unused_days=EVICTION_THRESHOLD_DAYS_NEW)
         
         # Verify eviction happened
-        self.assertEqual(result["threshold_days"], 30)
+        self.assertEqual(result["threshold_days"], EVICTION_THRESHOLD_DAYS_NEW)
         # Note: Mock implementation may not fully simulate eviction
         # In production, this would remove the entry from Redis
     
@@ -211,8 +216,8 @@ class TestWriteThroughArchitecture(unittest.TestCase):
             )
             self.controller.commit_lesson(patch)
         
-        # Simulate Redis crash by clearing cache
-        self.controller.redis_cache = type(self.controller.redis_cache)()
+        # Simulate Redis crash - use clear() method
+        self.controller.redis_cache.clear()
         
         # Verify cache is empty
         sql_cache = self.controller.redis_cache.lrange("skill:sql_query", 0, -1)

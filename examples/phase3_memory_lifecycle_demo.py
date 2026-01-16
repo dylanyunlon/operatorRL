@@ -270,10 +270,10 @@ def demo_write_through_architecture():
     print(f"  ✓ Committed 2 more lessons to cache")
     
     # Simulate Redis crash
-    original_cache_size = len([k for k in controller.redis_cache.store.keys() if k.startswith('skill:')])
-    print(f"  Cache size before crash: {original_cache_size} tool caches")
+    original_cache_keys = controller.redis_cache.keys('skill:*')
+    print(f"  Cache size before crash: {len(original_cache_keys)} tool caches")
     
-    controller.redis_cache = type(controller.redis_cache)()  # Clear cache
+    controller.redis_cache.clear()  # Clear cache
     print(f"  💥 Simulated Redis crash (cache cleared)")
     
     # Rebuild
