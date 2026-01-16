@@ -289,7 +289,7 @@ self-correcting-agent-kernel/
 │   └── chaos_engineering/   # Robustness test
 ├── examples/                # Demos and examples
 ├── wiki/                    # Comprehensive documentation
-└── tests/                   # Test suite (141 tests)
+└── tests/                   # Test suite (183 tests)
 ```
 
 ---
@@ -329,15 +329,15 @@ python examples/phase3_memory_lifecycle_demo.py
 ## **13. Running Tests**
 
 ```bash
-# Run all tests (141 tests)
-python -m unittest discover tests -v
+# Run all tests (183 tests)
+python -m pytest tests/ -v
 
 # Run specific test suites
-python -m unittest tests.test_kernel -v          # Core functionality
-python -m unittest tests.test_triage -v          # Triage routing (14 tests)
-python -m unittest tests.test_memory_controller -v  # Memory (22 tests)
-python -m unittest tests.test_skill_mapper -v    # Skill mapping (13 tests)
-python -m unittest tests.test_rubric -v          # Lesson scoring (15 tests)
+python -m pytest tests/test_kernel.py -v          # Core functionality
+python -m pytest tests/test_triage.py -v          # Triage routing
+python -m pytest tests/test_memory_controller.py -v  # Memory management
+python -m pytest tests/test_skill_mapper.py -v    # Skill mapping
+python -m pytest tests/test_rubric.py -v          # Lesson scoring
 ```
 
 ---
@@ -486,7 +486,7 @@ kernel = SelfCorrectingAgentKernel(config=config)
 - Type-safe data contracts (Pydantic)
 - Structured telemetry (JSON, not print statements)
 - Async-first architecture
-- 141 comprehensive tests
+- 183 comprehensive tests
 - Zero security vulnerabilities
 
 ---
@@ -521,4 +521,4 @@ For questions or issues, please open an issue on GitHub.
 
 ---
 
-**Status**: ✅ Production Ready | **Tests**: 141/141 Passing | **Security**: 🔒 Zero Vulnerabilities
+**Status**: ✅ Production Ready | **Tests**: 183 tests | **Security**: 🔒 Zero Vulnerabilities
