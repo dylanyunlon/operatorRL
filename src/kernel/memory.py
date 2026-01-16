@@ -89,6 +89,30 @@ class MockRedisCache:
         """Delete key."""
         if key in self.store:
             del self.store[key]
+    
+    def clear(self) -> None:
+        """Clear all keys from cache."""
+        self.store.clear()
+    
+    def keys(self, pattern: Optional[str] = None) -> List[str]:
+        """
+        Get all keys, optionally filtered by pattern.
+        
+        Args:
+            pattern: Optional pattern to filter keys (e.g., "skill:*")
+            
+        Returns:
+            List of matching keys
+        """
+        if pattern is None:
+            return list(self.store.keys())
+        
+        # Simple pattern matching (only supports "*" wildcard)
+        if pattern.endswith("*"):
+            prefix = pattern[:-1]
+            return [k for k in self.store.keys() if k.startswith(prefix)]
+        
+        return [k for k in self.store.keys() if k == pattern]
 
 
 class MockVectorStore:
@@ -258,7 +282,16 @@ class MemoryController:
     
     def commit_lesson(self, patch: PatchRequest) -> Dict[str, str]:
         """
-        Commit a lesson to its determined tier.
+        Commit a lesson using Write-Through Architecture.
+        
+        The Write-Through Pattern:
+        1. ALWAYS write to Vector DB (Tier 3) - Permanent storage (Truth)
+        2. CONDITIONALLY write to Redis (Tier 2) - Hot cache (Speed)
+        3. CONDITIONALLY add to Kernel (Tier 1) - Always-active rules
+        
+        This ensures we never "lose" knowledge even if Redis crashes.
+        The tier tag in Vector DB determines active tier, but data always
+        exists in the permanent store.
         
         Args:
             patch: The patch request containing the lesson
@@ -271,28 +304,55 @@ class MemoryController:
         
         # Update lesson metadata
         lesson.tier = tier
+        lesson.created_at = datetime.now()
         
-        logger.info(f"💾 Committing Lesson '{lesson.rule_text[:50]}...' to {tier.value}")
+        logger.info(f"💾 Write-Through: Committing '{lesson.rule_text[:50]}...' to {tier.value}")
         
+        # STEP 1: Always write to Vector DB (permanent storage)
+        self.vector_store.add(
+            documents=[lesson.rule_text],
+            metadatas=[{
+                **lesson.model_dump(),
+                "active_tier": tier.value  # Tag for tier tracking
+            }],
+            ids=[lesson.id]
+        )
+        logger.debug(f"  ✓ Written to Vector DB (permanent) with active_tier={tier.value}")
+        
+        # STEP 2: Conditionally add to tier-specific storage
         if tier == MemoryTier.TIER_1_KERNEL:
             # Append to kernel rules (in production, write to system_prompt file)
             self.kernel_rules.append(lesson)
-            return {"status": "committed", "tier": tier.value, "location": "kernel"}
+            logger.debug(f"  ✓ Added to Kernel (always active)")
+            return {
+                "status": "committed",
+                "tier": tier.value,
+                "location": "kernel+vector_db",
+                "write_through": True
+            }
         
         elif tier == MemoryTier.TIER_2_SKILL_CACHE:
-            # Key is the tool name, Value is the serialized lesson
+            # Write to Redis cache for fast access
             tool_name = self._extract_tool_name(lesson.trigger_pattern)
             self.redis_cache.rpush(f"skill:{tool_name}", lesson.model_dump_json())
-            return {"status": "committed", "tier": tier.value, "tool": tool_name}
+            logger.debug(f"  ✓ Written to Redis cache (tool: {tool_name})")
+            return {
+                "status": "committed",
+                "tier": tier.value,
+                "tool": tool_name,
+                "location": "redis+vector_db",
+                "write_through": True
+            }
         
         elif tier == MemoryTier.TIER_3_ARCHIVE:
-            # Store in vector DB for semantic search
-            self.vector_store.add(
-                documents=[lesson.rule_text],
-                metadatas=[lesson.model_dump()],
-                ids=[lesson.id]
-            )
-            return {"status": "committed", "tier": tier.value, "location": "vector_db"}
+            # Already in Vector DB, no additional storage needed
+            logger.debug(f"  ✓ Archive-only (Vector DB)")
+            return {
+                "status": "committed",
+                "tier": tier.value,
+                "location": "vector_db",
+                "write_through": True
+            }
         
         return {"status": "error", "message": "Unknown tier"}
     
@@ -409,6 +469,202 @@ class MemoryController:
         
         logger.info(f"Demoted {demoted} cold Tier 1 rules")
         return {"demoted_count": demoted}
+    
+    def evict_from_cache(self, unused_days: int = 30) -> Dict[str, int]:
+        """
+        Evict lessons from Redis cache that haven't been used in N days.
+        
+        This implements the "Safe Demotion" pattern:
+        1. Delete from Redis (cache)
+        2. Update active_tier tag in Vector DB to 'archive'
+        3. Lesson remains retrievable via semantic search
+        
+        The Rule: We never "move" data. We just change the tier tag.
+        If Redis crashes, we rebuild it from Vector DB. If we need the
+        lesson later, RAG finds it in the archive.
+        
+        Args:
+            unused_days: Number of days without usage before eviction (default: 30)
+            
+        Returns:
+            dict: Statistics about evictions
+        """
+        logger.info(f"🧹 Evicting unused cache entries (threshold: {unused_days} days)")
+        
+        cutoff_date = datetime.now() - timedelta(days=unused_days)
+        evicted = 0
+        
+        # Scan all skill cache keys
+        # In production, this would iterate over all Redis keys with pattern "skill:*"
+        keys_to_check = []
+        if hasattr(self.redis_cache, 'keys'):
+            keys_to_check = self.redis_cache.keys('skill:*')
+        elif hasattr(self.redis_cache, 'store'):
+            keys_to_check = [k for k in self.redis_cache.store.keys() if k.startswith('skill:')]
+            
+            for key in keys_to_check:
+                lessons = self.redis_cache.lrange(key, 0, -1)
+                updated_lessons = []
+                
+                for lesson_dict in lessons:
+                    # Check last retrieval time
+                    last_retrieved = lesson_dict.get('last_retrieved_at')
+                    
+                    if last_retrieved:
+                        last_retrieved_dt = self._parse_datetime(last_retrieved)
+                        
+                        if last_retrieved_dt and last_retrieved_dt < cutoff_date:
+                            # Evict this lesson
+                            lesson_id = lesson_dict.get('id')
+                            logger.debug(f"  ❄️  Evicting lesson {lesson_id} from {key}")
+                            evicted += 1
+                            
+                            # Update tier tag in Vector DB (safe demotion)
+                            self._update_tier_tag_in_vector_db(lesson_id, MemoryTier.TIER_3_ARCHIVE)
+                        else:
+                            # Keep this lesson
+                            updated_lessons.append(lesson_dict)
+                    else:
+                        # No retrieval time - keep it for now
+                        updated_lessons.append(lesson_dict)
+                
+                # Update the cache with filtered lessons
+                if len(updated_lessons) < len(lessons):
+                    # Re-populate the key with remaining lessons
+                    self.redis_cache.delete(key)
+                    for lesson_dict in updated_lessons:
+                        self.redis_cache.rpush(key, json.dumps(lesson_dict))
+        
+        logger.info(f"✨ Evicted {evicted} cold cache entries")
+        return {"evicted_count": evicted, "threshold_days": unused_days}
+    
+    def _parse_datetime(self, value) -> Optional[datetime]:
+        """
+        Parse datetime from various formats.
+        
+        Args:
+            value: Value to parse (datetime object or ISO string)
+            
+        Returns:
+            Optional[datetime]: Parsed datetime or None if parsing fails
+        """
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except (ValueError, TypeError):
+                return None
+        return None
+    
+    def _update_tier_tag_in_vector_db(self, lesson_id: str, new_tier: MemoryTier) -> None:
+        """
+        Update the active_tier tag in Vector DB.
+        
+        This is the "safe demotion" mechanism - we don't delete data,
+        we just update its tier classification.
+        
+        Args:
+            lesson_id: The lesson ID to update
+            new_tier: The new tier to assign
+        """
+        # In production, this would update the metadata in the vector DB
+        # For the mock implementation, we'll update the document metadata
+        if hasattr(self.vector_store, 'documents'):
+            for doc in self.vector_store.documents:
+                if doc['id'] == lesson_id:
+                    doc['metadata']['active_tier'] = new_tier.value
+                    logger.debug(f"  📝 Updated {lesson_id} tier tag to {new_tier.value}")
+                    break
+    
+    def rebuild_cache_from_db(self) -> Dict[str, int]:
+        """
+        Rebuild Redis cache from Vector DB.
+        
+        This is the disaster recovery mechanism. If Redis crashes or
+        is flushed, we can rebuild the Tier 2 cache from the permanent
+        Vector DB storage.
+        
+        Process:
+        1. Query Vector DB for all lessons with active_tier='skill_cache'
+        2. Group by tool name
+        3. Repopulate Redis
+        
+        Returns:
+            dict: Statistics about rebuild
+        """
+        logger.info("🔄 Rebuilding cache from Vector DB...")
+        
+        rebuilt_count = 0
+        tools_rebuilt = set()
+        
+        # Query Vector DB for Tier 2 lessons
+        if hasattr(self.vector_store, 'documents'):
+            tier2_docs = [
+                doc for doc in self.vector_store.documents
+                if doc['metadata'].get('active_tier') == MemoryTier.TIER_2_SKILL_CACHE.value
+            ]
+            
+            # Group by tool
+            tools: Dict[str, List[Dict]] = {}
+            for doc in tier2_docs:
+                # Extract tool from trigger_pattern
+                trigger = doc['metadata'].get('trigger_pattern', '')
+                tool_name = self._extract_tool_name(trigger)
+                
+                if tool_name not in tools:
+                    tools[tool_name] = []
+                tools[tool_name].append(doc['metadata'])
+            
+            # Repopulate Redis
+            for tool_name, lessons in tools.items():
+                # Clear existing cache for this tool
+                self.redis_cache.delete(f"skill:{tool_name}")
+                
+                # Add all lessons
+                for lesson_meta in lessons:
+                    # Convert datetime objects to ISO format strings for JSON serialization
+                    serialized_meta = self._serialize_metadata(lesson_meta)
+                    self.redis_cache.rpush(
+                        f"skill:{tool_name}",
+                        json.dumps(serialized_meta)
+                    )
+                    rebuilt_count += 1
+                
+                tools_rebuilt.add(tool_name)
+                logger.debug(f"  ✓ Rebuilt {len(lessons)} lessons for tool: {tool_name}")
+        
+        logger.info(f"✨ Cache rebuilt: {rebuilt_count} lessons across {len(tools_rebuilt)} tools")
+        return {
+            "rebuilt_count": rebuilt_count,
+            "tools_rebuilt": len(tools_rebuilt),
+            "tool_list": list(tools_rebuilt)
+        }
+    
+    def _serialize_metadata(self, metadata: Dict) -> Dict:
+        """
+        Serialize metadata for JSON storage, converting datetime to ISO format.
+        
+        Args:
+            metadata: The metadata dictionary to serialize
+            
+        Returns:
+            dict: Serialized metadata with datetime objects converted to strings
+        """
+        serialized = {}
+        for key, value in metadata.items():
+            if isinstance(value, datetime):
+                serialized[key] = value.isoformat()
+            elif isinstance(value, dict):
+                serialized[key] = self._serialize_metadata(value)
+            elif isinstance(value, list):
+                serialized[key] = [
+                    self._serialize_metadata(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                serialized[key] = value
+        return serialized
 
 
 class LessonType(Enum):
