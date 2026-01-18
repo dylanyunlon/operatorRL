@@ -10,7 +10,7 @@ The **SCAK GAIA Laziness Benchmark** is a collection of 50 vague queries designe
 - **Repository:** https://github.com/imran-siddique/self-correcting-agent-kernel
 - **Paper:** [To be published on arXiv]
 - **Leaderboard:** N/A
-- **Point of Contact:** research@scak.ai
+- **Point of Contact:** imransiddique@live.com
 
 ### Supported Tasks
 
@@ -216,4 +216,4 @@ for example in dataset["test"]:
 
 **Last Updated:** 2026-01-18  
 **Version:** 1.0  
-**Contact:** research@scak.ai
+**Contact:** imransiddique@live.com
