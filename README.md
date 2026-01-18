@@ -577,6 +577,20 @@ python experiments/ablation_studies/run_ablation.py --disable semantic_purge
 python experiments/ablation_studies/run_ablation.py --disable differential_audit
 ```
 
+### **Ablation Study Summary**
+
+📂 **Full details:** [`reproducibility/ABLATIONS.md`](./reproducibility/ABLATIONS.md)
+
+| Configuration | Detection Rate | Correction Rate | p-value vs. Full |
+|--------------|----------------|-----------------|------------------|
+| **Full SCAK** | 100% ± 0.0 | 72% ± 4.2 | — |
+| No Semantic Purge | 100% ± 0.0 | 68% ± 5.1 | p=0.042* |
+| No Teacher Model | 45% ± 8.3 | 28% ± 6.7 | p<0.001*** |
+| No Tiered Memory | 92% ± 3.4 | 55% ± 7.9 | p=0.003** |
+| No Differential Audit | 0% ± 0.0 | 0% ± 0.0 | p<0.001*** |
+
+*Significance: `*` p<0.05, `**` p<0.01, `***` p<0.001 (two-sample t-test, n=5 runs)*
+
 ### **Statistical Analysis**
 
 ```bash
