@@ -1,8 +1,21 @@
 # Limitations & Failure Modes
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-01-18  
 **Purpose:** Honest discussion of system limitations for academic paper submission
+
+---
+
+## Executive Summary
+
+| Category | Limitation | Impact | Future Work |
+|----------|-----------|--------|-------------|
+| **Dataset** | Synthetic/controlled (GAIA extensions, red-team prompts) | Real-world enterprise tasks may vary | Collect production traces |
+| **Stochasticity** | LLM non-determinism (±2-5% variance) | Results averaged over 5 runs; higher variance possible in production | Increase to 10+ runs, temperature=0 |
+| **Scope** | Primarily text/tool agents | Multi-modal (vision/audio) and long-horizon tasks need more evaluation | Extend to multi-modal benchmarks |
+| **Cost** | Teacher model (o1-preview) is expensive | ~10x cost increase for audited interactions | Distill to smaller teacher, explore self-reflection |
+| **Teacher Dependency** | Requires stronger external model | Single point of failure; teacher errors propagate | Ensemble teachers, self-improvement loop |
+| **Cold Start** | New agents start with empty memory | Lower initial performance (60% → 80% over 7 days) | Pre-populated skill caches, transfer learning |
 
 ---
 
