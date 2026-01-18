@@ -25,11 +25,8 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-# Import tool registry
-try:
-    from .tool_registry import ToolRegistry, ToolDefinition
-except ImportError:
-    from src.interfaces.tool_registry import ToolRegistry, ToolDefinition
+# Import tool registry - use relative imports within package
+from .tool_registry import ToolRegistry, ToolDefinition
 
 logger = logging.getLogger(__name__)
 

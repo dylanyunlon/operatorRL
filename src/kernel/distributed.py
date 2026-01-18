@@ -39,7 +39,6 @@ logger = logging.getLogger(__name__)
 # Ray imports (optional dependency)
 try:
     import ray
-    from ray import serve
     RAY_AVAILABLE = True
 except ImportError:
     RAY_AVAILABLE = False

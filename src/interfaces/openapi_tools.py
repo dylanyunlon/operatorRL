@@ -24,11 +24,8 @@ import yaml
 import json
 from enum import Enum
 
-# Import tool registry
-try:
-    from .tool_registry import ToolRegistry, ToolDefinition, ToolParameter, ToolType
-except ImportError:
-    from src.interfaces.tool_registry import ToolRegistry, ToolDefinition, ToolParameter, ToolType
+# Import tool registry - use relative imports within package
+from .tool_registry import ToolRegistry, ToolDefinition, ToolParameter, ToolType
 
 logger = logging.getLogger(__name__)
 

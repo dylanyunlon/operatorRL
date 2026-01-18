@@ -27,14 +27,27 @@ import asyncio
 import logging
 from uuid import uuid4
 
-# Import enhanced multi-agent capabilities
+# Import enhanced multi-agent capabilities (backward compatible)
+_PUBSUB_AVAILABLE = True
+_CONFLICT_RESOLUTION_AVAILABLE = True
+
 try:
     from .pubsub import InMemoryPubSub, PubSubBackend, AgentSwarm, MessagePriority
+except ImportError:
+    _PUBSUB_AVAILABLE = False
+    InMemoryPubSub = None
+    PubSubBackend = None
+    AgentSwarm = None
+    MessagePriority = None
+
+try:
     from .conflict_resolution import ConflictResolver, AgentVote, ConflictType, VoteType
 except ImportError:
-    # Fallback for backward compatibility
-    InMemoryPubSub = None
+    _CONFLICT_RESOLUTION_AVAILABLE = False
     ConflictResolver = None
+    AgentVote = None
+    ConflictType = None
+    VoteType = None
 
 logger = logging.getLogger(__name__)
 
@@ -165,23 +178,32 @@ class Orchestrator:
         self.conflict_resolver: Optional[ConflictResolver] = None
         self.swarms: Dict[str, AgentSwarm] = {}
         
-        if enable_pubsub and InMemoryPubSub:
-            self.pubsub = message_broker if message_broker else InMemoryPubSub()
-            logger.info("Pub-sub messaging enabled")
+        if enable_pubsub:
+            if not _PUBSUB_AVAILABLE:
+                logger.warning("Pub-sub requested but module not available")
+            elif message_broker:
+                self.pubsub = message_broker
+                logger.info("Pub-sub messaging enabled (custom broker)")
+            elif InMemoryPubSub:
+                self.pubsub = InMemoryPubSub()
+                logger.info("Pub-sub messaging enabled (in-memory)")
         
-        if enable_conflict_resolution and ConflictResolver:
-            # Find supervisor agent for escalation
-            supervisor_id = None
-            for agent in agents:
-                if agent.role == AgentRole.SUPERVISOR:
-                    supervisor_id = agent.agent_id
-                    break
-            
-            self.conflict_resolver = ConflictResolver(
-                default_vote_type=VoteType.MAJORITY,
-                supervisor_agent_id=supervisor_id
-            )
-            logger.info(f"Conflict resolution enabled (supervisor: {supervisor_id})")
+        if enable_conflict_resolution:
+            if not _CONFLICT_RESOLUTION_AVAILABLE:
+                logger.warning("Conflict resolution requested but module not available")
+            elif ConflictResolver:
+                # Find supervisor agent for escalation
+                supervisor_id = None
+                for agent in agents:
+                    if agent.role == AgentRole.SUPERVISOR:
+                        supervisor_id = agent.agent_id
+                        break
+                
+                self.conflict_resolver = ConflictResolver(
+                    default_vote_type=VoteType.MAJORITY,
+                    supervisor_agent_id=supervisor_id
+                )
+                logger.info(f"Conflict resolution enabled (supervisor: {supervisor_id})")
         
         logger.info(f"Orchestrator initialized with {len(agents)} agents")
     
@@ -526,8 +548,8 @@ class Orchestrator:
         Returns:
             AgentSwarm instance or None if pub-sub not enabled
         """
-        if not self.pubsub or not AgentSwarm:
-            logger.warning("Pub-sub not enabled, cannot create swarm")
+        if not self.pubsub or not _PUBSUB_AVAILABLE or not AgentSwarm:
+            logger.warning("Pub-sub not available, cannot create swarm")
             return None
         
         # Validate all agents exist
@@ -559,10 +581,10 @@ class Orchestrator:
             vote_type: Voting mechanism (majority, weighted, etc.)
             
         Returns:
-            Resolution dict or None if conflict resolution not enabled
+            Resolution dict or None if conflict resolution not available
         """
-        if not self.conflict_resolver or not AgentVote or not ConflictType:
-            logger.warning("Conflict resolution not enabled")
+        if not self.conflict_resolver or not _CONFLICT_RESOLUTION_AVAILABLE or not AgentVote or not ConflictType:
+            logger.warning("Conflict resolution not available")
             return None
         
         # Convert dicts to AgentVote objects

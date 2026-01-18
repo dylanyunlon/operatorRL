@@ -16,9 +16,9 @@ Architectural Pattern:
 - Message replay for debugging
 """
 
-from typing import Dict, Any, List, Optional, Callable, Awaitable, Set
-from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional, Callable, Awaitable, Tuple
 from enum import Enum
+from pydantic import BaseModel, Field
 from datetime import datetime
 import asyncio
 import logging
@@ -88,7 +88,7 @@ class InMemoryPubSub(PubSubBackend):
         """Initialize in-memory pub-sub."""
         self.subscribers: Dict[str, List[Callable]] = defaultdict(list)
         self.message_history: List[PubSubMessage] = []
-        self.dead_letter_queue: List[tuple[PubSubMessage, Exception]] = []
+        self.dead_letter_queue: List[Tuple[PubSubMessage, Exception]] = []
         
         logger.info("InMemoryPubSub initialized")
     
