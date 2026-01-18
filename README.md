@@ -510,6 +510,9 @@ self-correcting-agent-kernel/
 ## **12. Running Examples**
 
 ```bash
+# 🎯 NEW: Production Features Demo (recommended starting point)
+python examples/production_features_demo.py
+
 # Partner-level demo (all three experiments)
 python examples/partner_level_demo.py
 
