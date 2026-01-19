@@ -2,7 +2,7 @@
 
 **Project:** Self-Correcting Agent Kernel (SCAK)  
 **Target:** NeurIPS 2026 / ICML 2026 (Main Track or Self-Improving AI Workshop)  
-**Status:** Early draft stage  
+**Status:** Draft v0.2 (polished skeleton)  
 **arXiv Preprint Target:** January 20–22, 2026
 
 ---
@@ -11,7 +11,8 @@
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `paper_draft.md` | Full markdown draft (main content) | ✅ Complete structure |
+| `draft_main.md` | **Primary paper draft** (camera-ready skeleton) | ✅ Complete |
+| `paper_draft.md` | Extended draft with notes & alternatives | Reference |
 | `bibliography.bib` | BibTeX references (30+ citations) | ✅ Ready |
 | `PAPER_CHECKLIST.md` | Submission checklist & progress tracker | ✅ Updated |
 | `LLM_DISCLOSURE.md` | Required LLM usage disclosure | ✅ Complete |
