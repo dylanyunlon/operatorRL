@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 
 # LangChain imports (these are optional dependencies)
 try:
-    from langchain.schema import BaseMemory, BaseMessage, SystemMessage, HumanMessage
+    from langchain.schema import BaseMemory, BaseMessage, SystemMessage, HumanMessage, AIMessage
     from langchain.callbacks.base import BaseCallbackHandler, AsyncCallbackHandler
     from langchain.schema.runnable import Runnable, RunnableConfig
     from langchain.schema.agent import AgentFinish, AgentAction
@@ -41,6 +41,7 @@ except ImportError:
     Runnable = object
     BaseMessage = object
     SystemMessage = object
+    AIMessage = object
     AgentFinish = object
 
 # SCAK imports
@@ -90,10 +91,12 @@ class SCAKMemory(BaseMemory if LANGCHAIN_AVAILABLE else object):
     reducing latency and improving accuracy.
     """
     
-    memory_key: str = "history"
-    system_patch_key: str = "system_patch"
+    # Instance attributes (initialized in __init__)
+    memory_key: str
+    system_patch_key: str
     controller: MemoryController
-    return_messages: bool = True
+    return_messages: bool
+    chat_history: List[BaseMessage]
     
     def __init__(
         self,
@@ -228,7 +231,6 @@ class SCAKMemory(BaseMemory if LANGCHAIN_AVAILABLE else object):
         if "output" in outputs:
             # Determine message type based on output
             # In LangChain, agent responses are typically in "output" key
-            from langchain.schema import AIMessage
             self.chat_history.append(AIMessage(content=outputs["output"]))
         
         logger.debug(f"Saved context to memory. History length: {len(self.chat_history)}")
@@ -278,8 +280,12 @@ class SCAKCallbackHandler(AsyncCallbackHandler if LANGCHAIN_AVAILABLE else objec
     safety constraints but fails to deliver value.
     """
     
+    # Instance attributes (initialized in __init__)
     auditor: CompletenessAuditor
     agent_id: str
+    total_executions: int
+    give_up_count: int
+    audit_count: int
     
     # Give-up signal patterns (aligned with GiveUpSignal enum)
     GIVE_UP_PATTERNS = [
@@ -550,10 +556,14 @@ class SelfCorrectingRunnable(Runnable if LANGCHAIN_AVAILABLE else object):
     failures without requiring manual debugging or prompt engineering.
     """
     
+    # Instance attributes (initialized in __init__)
     agent: Runnable
     triage: FailureTriage
     patcher: AgentPatcher
     agent_id: str
+    execution_count: int
+    failure_count: int
+    correction_count: int
     
     def __init__(
         self,
