@@ -73,7 +73,7 @@
 \maketitle
 
 % ===== Abstract =====
-\begin{abstract}
+\begin{abstract}\footnote{LLMs (Claude Opus 4.5, o1-preview) assisted with outlining and grammar refinement; all claims, experiments, and analysis are author-original.}
 Production AI agents face a ``Reliability Wall'' defined by two invisible pathologies: \textbf{laziness} (premature give-ups on achievable tasks) and \textbf{context rot} (performance degradation due to accumulated prompt instructions). Existing architectures often exacerbate these issues by treating ``more context'' as the solution to every failure, leading to the \textbf{Accumulation Paradox}. We present the \textbf{Self-Correcting Agent Kernel (\scak{})}, a dual-loop OODA architecture grounded in the principle of \emph{Scale by Subtraction}.
 
 \scak{}'s \textbf{Runtime Loop} ensures deterministic safety, while the \textbf{Alignment Loop} implements \textbf{Differential Auditing}: a probabilistic mechanism that compares a weak agent (GPT-4o) against a stronger teacher (o1-preview) only on ``give-up signals'' (5--10\% of interactions). This catches capability failures that explicit error handlers miss. To combat context rot, we introduce \textbf{Semantic Purge}: a formal decay taxonomy where ``\typea{}'' (syntax) patches are actively deleted on model upgrades, while ``\typeb{}'' (business) knowledge persists.
