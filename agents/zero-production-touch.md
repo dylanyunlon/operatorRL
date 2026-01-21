@@ -1,54 +1,134 @@
 ---
-# METADATA
 name: Zero Production Touch
 version: 0.1.0
 description: Automated safety dashboard to replace manual reviews of unsafe production changes; keep work in Learn platform, maintain only (on hold).
 category: orchestrator
 maturity: deprecated
-supersedes: []
-related-agents: ['Release Freshness Agent', 'SRE Agent']
-# CAPABILITIES
-tools: ['policy_checker', 'release_diff', 'alerting']
-handoffs: []
-integrations: ['Learn Platform', 'ADO Pipelines']
-orchestration-role: coordinator
-context-files: ['prod-safety-rules.md']
-# RISK ASSESSMENT
-autonomy-level: guided
-blast-radius: external-system
-reversibility: fully
-data-sensitivity: internal-only
-human-checkpoints:
-  - "Before flagging a release as unsafe"
-  - "Before blocking a release pipeline"
-cost-profile: moderate
-failure-modes: ['False positives blocking release']
-# WORKFLOW INTEGRATION
-trigger-scenarios:
-  - Pre-deploy safety review
-input-contract:
-  - name: release_candidate
-    type: string
-    required: true
-    description: Release branch/build identifier
-output-contract:
-  - name: safety_report
-    type: markdown
-    location: stdout
-    description: Findings and required mitigations
-upstream-agents:
-  - Release Freshness Agent
-downstream-agents:
-  - Release Managers
-persona: Strict but fair release guardian
-# EVALUATION & ADOPTION
-success-metrics: ['Reduction in unsafe pushes', 'Reduced manual bi-weekly review time']
-time-to-value: Per release cycle
-adoption-prerequisites: ['Access to pipeline and repo policies']
-learning-curve: minimal
-# GOVERNANCE
-owner: "AX&E Engineering"
+owner: AX&E Engineering
 last-validated: 2026-01-21
-changelog: ['0.1.0: Initial', '0.1.1: Status set to On Hold']
-deprecation-policy: Paused until capacity constraints resolved
 ---
+
+# Zero Production Touch
+
+> ⛔ **DEPRECATED** — This agent is on hold until capacity constraints are resolved.
+
+Automated safety dashboard to replace manual reviews of unsafe production changes; keep work in Learn platform, maintain only.
+
+| Property | Value |
+|----------|-------|
+| **Version** | 0.1.0 |
+| **Category** | orchestrator |
+| **Maturity** | ⛔ deprecated |
+| **Owner** | AX&E Engineering |
+| **Orchestration Role** | coordinator |
+
+## Related Agents
+
+- [Release Freshness Agent](release-freshness-agent.md)
+- [SRE Agent](sre-agent.md)
+
+---
+
+## Capabilities
+
+### Tools
+| Tool | Description |
+|------|-------------|
+| `policy_checker` | Check release policies |
+| `release_diff` | Compare release differences |
+| `alerting` | Send alerts |
+
+### Integrations
+- Learn Platform
+- ADO Pipelines
+
+### Context Files
+- `prod-safety-rules.md`
+
+---
+
+## Risk Assessment
+
+| Risk Factor | Level |
+|-------------|-------|
+| **Autonomy Level** | guided |
+| **Blast Radius** | external-system |
+| **Reversibility** | fully |
+| **Data Sensitivity** | internal-only |
+| **Cost Profile** | moderate |
+
+### Human Checkpoints
+> Points where human approval is required before proceeding.
+
+- [ ] Before flagging a release as unsafe
+- [ ] Before blocking a release pipeline
+
+### Failure Modes
+> Known ways this agent can fail.
+
+- False positives blocking release
+
+---
+
+## Workflow Integration
+
+### Trigger Scenarios
+> When to invoke this agent.
+
+- Pre-deploy safety review
+
+### Input Contract
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `release_candidate` | string | ✅ | Release branch/build identifier |
+
+### Output Contract
+
+| Name | Type | Location | Description |
+|------|------|----------|-------------|
+| `safety_report` | markdown | stdout | Findings and required mitigations |
+
+### Agent Flow
+
+```
+┌─────────────────────────┐     ┌──────────────────────┐     ┌──────────────────┐
+│ Release Freshness Agent │ ──▶ │ Zero Production Touch│ ──▶ │ Release Managers │
+└─────────────────────────┘     └──────────────────────┘     └──────────────────┘
+```
+
+**Persona:** Strict but fair release guardian
+
+---
+
+## Evaluation & Adoption
+
+### Success Metrics
+- ✅ Reduction in unsafe pushes
+- ✅ Reduced manual bi-weekly review time
+
+### Adoption Info
+
+| Factor | Value |
+|--------|-------|
+| **Time to Value** | Per release cycle |
+| **Learning Curve** | minimal |
+
+### Prerequisites
+- Access to pipeline and repo policies
+
+---
+
+## Governance
+
+| Field | Value |
+|-------|-------|
+| **Owner** | AX&E Engineering |
+| **Last Validated** | 2026-01-21 |
+| **Deprecation Policy** | Paused until capacity constraints resolved |
+
+### Changelog
+| Version | Notes |
+|---------|-------|
+| 0.1.0 | Initial |
+| 0.1.1 | Status set to On Hold |
