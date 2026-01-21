@@ -74,6 +74,31 @@ class Node:
 
 
 @dataclass
+class ExecutionTrace:
+    """Record of a single execution attempt in the verification loop."""
+    step_id: int
+    code_generated: str
+    verifier_feedback: str
+    status: str  # "success" or "failed"
+    strategy_used: Optional[str] = None  # e.g. "recursive", "numpy", "brute_force"
+
+
+@dataclass
+class NodeState:
+    """Tracks the state of a single problem-solving node."""
+    input_query: str
+    current_code: Optional[str] = None
+    status: str = "pending"  # pending, verified, rejected
+    history: List[ExecutionTrace] = field(default_factory=list)
+    forbidden_strategies: List[str] = field(default_factory=list)
+    
+    @property
+    def fail_count(self) -> int:
+        """Count the number of failed attempts."""
+        return len([t for t in self.history if t.status == "failed"])
+
+
+@dataclass
 class KernelState:
     """Current state of the kernel execution."""
     task_description: str
