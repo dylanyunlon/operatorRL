@@ -2,17 +2,40 @@
 
 This directory contains benchmarking scripts, evaluation datasets, and reproducibility tools for Context-as-a-Service.
 
+[![Dataset on HF](https://img.shields.io/badge/🤗%20Dataset-CaaS%20Benchmark%20Corpus-yellow)](https://huggingface.co/datasets/mosiddi/caas-benchmark-corpus-v1)
+
+## 🗂️ Sample Corpus
+
+We provide a diverse benchmark corpus available both locally and on Hugging Face:
+
+**Local:** `benchmarks/data/sample_corpus/` (16 documents)
+
+**Hugging Face:** [`mosiddi/caas-benchmark-corpus-v1`](https://huggingface.co/datasets/mosiddi/caas-benchmark-corpus-v1)
+
+### Corpus Contents
+
+| Category | Files | Description |
+|----------|-------|-------------|
+| **Code** | `auth_module.py`, `data_processor.py` | Production Python code |
+| **Docs** | `api_reference.md`, `contribution_guide.md`, `troubleshooting_guide.md` | Technical documentation |
+| **Legal** | `software_license_agreement.md`, `privacy_policy.md` | Legal contracts |
+| **HR** | `employee_handbook.md`, `onboarding_checklist.md`, `remote_work_policy.html` | HR policies |
+| **Engineering** | `config_example.yaml`, `database_schema.sql`, `release_notes.md` | Engineering artifacts |
+| **Business** | `meeting_notes.md`, `incident_report.md` | Business documents |
+
 ## Structure
 
 ```
 benchmarks/
 ├── README.md              # This file
-├── baseline_comparison.py # Compare CaaS against baseline RAG approaches
-├── ablation_study.py      # Ablation studies for each feature
-├── performance_metrics.py # Performance and latency measurements
+├── run_evaluation.py      # Main evaluation script with table output
 ├── statistical_tests.py   # Statistical significance testing utilities
+├── verify_sample_corpus.py # Verify corpus integrity
+├── data/
+│   └── sample_corpus/     # Benchmark documents (16 files)
+│       ├── DATASET_CARD.md # Hugging Face dataset card
+│       └── *.{py,md,sql,yaml,html}
 └── results/              # Benchmark results and logs
-    ├── .gitkeep
     └── README.md         # Results documentation
 ```
 
@@ -45,11 +68,17 @@ python benchmarks/performance_metrics.py --corpus-path eval/sample_corpus/
 
 ## Evaluation Datasets
 
-We provide sample evaluation datasets in the `eval/` directory:
+We provide sample evaluation datasets in `benchmarks/data/sample_corpus/`:
 
-- **sample_corpus/**: 50 diverse documents (PDF, HTML, code) for testing
-- **query_sets/**: Benchmark query sets with ground truth answers
-- **baselines/**: Pre-computed baseline results for comparison
+- **16 diverse documents** covering code, policies, legal docs, and engineering artifacts
+- **Multiple formats**: Python, Markdown, HTML, SQL, YAML  
+- **Realistic enterprise content** for testing structure detection, time decay, and more
+
+**📥 Download from Hugging Face:**
+```python
+from datasets import load_dataset
+dataset = load_dataset("mosiddi/caas-benchmark-corpus-v1")
+```
 
 For larger-scale evaluation, consider:
 - [MS MARCO](https://microsoft.github.io/msmarco/): Large-scale QA dataset

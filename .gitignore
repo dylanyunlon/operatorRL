@@ -70,3 +70,4 @@ benchmarks/results/
 # Pre-commit
 .pre-commit-config.yaml.bak
 
+.pypirc

@@ -2,11 +2,12 @@
 
 [![CI](https://github.com/imran-siddique/context-as-a-service/actions/workflows/ci.yml/badge.svg)](https://github.com/imran-siddique/context-as-a-service/actions/workflows/ci.yml)
 [![Lint](https://github.com/imran-siddique/context-as-a-service/actions/workflows/lint.yml/badge.svg)](https://github.com/imran-siddique/context-as-a-service/actions/workflows/lint.yml)
-[![PyPI](https://img.shields.io/pypi/v/context-as-a-service.svg)](https://pypi.org/project/context-as-a-service/)
+[![PyPI version](https://badge.fury.io/py/context-as-a-service.svg)](https://pypi.org/project/context-as-a-service/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://github.com/imran-siddique/context-as-a-service/blob/main/Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Dataset on HF](https://img.shields.io/badge/🤗%20Dataset-CaaS%20Benchmark-yellow)](https://huggingface.co/datasets/mosiddi/caas-benchmark-corpus-v1)
 
 A managed pipeline for intelligent context extraction and serving. The service automatically ingests, analyzes, and serves optimized context from various document formats.
 
