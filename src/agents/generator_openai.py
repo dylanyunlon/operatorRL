@@ -4,7 +4,7 @@ This agent uses GPT-4o or similar models to generate creative solutions.
 """
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from .base_agent import BaseAgent
@@ -95,6 +95,68 @@ class OpenAIGenerator(BaseAgent):
         except Exception as e:
             logger.error(f"Error during generation: {e}")
             return self._mock_generation(task)
+    
+    def generate_solution(self, query: str, context: Optional[str] = None, forbidden_strategies: Optional[List[str]] = None) -> str:
+        """
+        Generate a solution for the given query with optional constraints.
+        
+        This method is designed for use with the Lateral Thinking feature (Feature 2).
+        It enforces constraints on forbidden strategies to enable branching to different approaches.
+        
+        Args:
+            query: The problem statement
+            context: Optional context string (e.g., previous failure feedback)
+            forbidden_strategies: List of strategies to avoid (e.g., ["recursive", "brute_force"])
+            
+        Returns:
+            String containing the generated Python code
+        """
+        logger.info(f"Generating solution with {self.model_name}")
+        
+        # 1. Construct the Constraint Block
+        constraint_prompt = ""
+        if forbidden_strategies and len(forbidden_strategies) > 0:
+            constraint_prompt = "\n\nCRITICAL CONSTRAINTS - DO NOT USE THE FOLLOWING STRATEGIES:\n"
+            for strategy in forbidden_strategies:
+                constraint_prompt += f"- {strategy}\n"
+            constraint_prompt += "You MUST choose a fundamentally different algorithmic approach.\n"
+        
+        # 2. Build Full Prompt
+        full_prompt = f"""
+GOAL: Write Python code to solve the following problem.
+PROBLEM: {query}
+
+CONTEXT: {context if context else "None"}
+
+{constraint_prompt}
+
+OUTPUT: Return ONLY the Python code block.
+"""
+        
+        # 3. Call OpenAI API
+        try:
+            if self.client is None:
+                # Fallback for testing without API
+                logger.warning("Using mock generation (API not available)")
+                return f"# Mock solution for: {query}\npass"
+            
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": full_prompt}
+                ],
+                temperature=self.config.get("temperature", 0.7),
+                max_tokens=self.config.get("max_tokens", 2000)
+            )
+            
+            content = response.choices[0].message.content
+            logger.info("Solution generated successfully")
+            return content
+            
+        except Exception as e:
+            logger.error(f"Error during generation: {e}")
+            return f"# Error generating solution: {e}\npass"
     
     def verify(self, context: Dict[str, Any]) -> VerificationResult:
         """

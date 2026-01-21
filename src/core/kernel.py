@@ -5,7 +5,7 @@ This is the deterministic logic that manages the Generator -> Verifier -> Graph 
 Core Philosophy: "Trust, but Verify (with a different brain)."
 """
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import yaml
 from pathlib import Path
 
@@ -328,3 +328,26 @@ class VerificationKernel:
         """
         self.graph.export_conversation_trace(filepath)
         logger.info(f"Exported conversation trace to {filepath}")
+    
+    def _format_history(self, history: List[VerificationResult]) -> str:
+        """
+        Helper to summarize previous failures for the Generator.
+        
+        Args:
+            history: List of verification results from previous attempts
+            
+        Returns:
+            Formatted string summary of previous failures
+        """
+        if not history:
+            return ""
+        
+        summary = "PREVIOUS FAILED ATTEMPTS:\n"
+        for i, verification in enumerate(history):
+            summary += f"- Attempt {i}: Failed. Feedback: {verification.reasoning[:100]}...\n"
+            if verification.critical_issues:
+                summary += f"  Critical Issues: {', '.join(verification.critical_issues)}\n"
+            if verification.logic_flaws:
+                summary += f"  Logic Flaws: {', '.join(verification.logic_flaws)}\n"
+        
+        return summary
