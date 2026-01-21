@@ -7,7 +7,6 @@ import subprocess
 import tempfile
 import os
 from typing import Dict, Any, Optional
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
