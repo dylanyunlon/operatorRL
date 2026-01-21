@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-01-21
 
+**🎉 First Public Release!**
+
+- **PyPI**: https://pypi.org/project/context-as-a-service/
+- **Hugging Face Dataset**: https://huggingface.co/datasets/imran-siddique/context-as-a-service
+- **GitHub**: https://github.com/imran-siddique/context-as-a-service
+
 ### Added
 - Initial release of Context-as-a-Service
 - Core features:
