@@ -1,6 +1,8 @@
 pydantic>=2.0.0
 pyyaml>=6.0
 requests>=2.31.0
+networkx>=3.0  # For graph-based anomaly detection
+numpy>=1.24.0  # For vector operations
 
 # LLM Client Dependencies (optional - install as needed)
 openai>=1.0.0  # For OpenAI API integration
