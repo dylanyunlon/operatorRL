@@ -2,7 +2,7 @@
 
 This directory contains benchmarking scripts, evaluation datasets, and reproducibility tools for Context-as-a-Service.
 
-[![Dataset on HF](https://img.shields.io/badge/🤗%20Dataset-CaaS%20Benchmark%20Corpus-yellow)](https://huggingface.co/datasets/mosiddi/caas-benchmark-corpus-v1)
+[![Dataset on HF](https://img.shields.io/badge/🤗%20Dataset-CaaS%20Benchmark%20Corpus-yellow)](https://huggingface.co/datasets/imran-siddique/context-as-a-service)
 
 ## 🗂️ Sample Corpus
 
@@ -10,7 +10,7 @@ We provide a diverse benchmark corpus available both locally and on Hugging Face
 
 **Local:** `benchmarks/data/sample_corpus/` (16 documents)
 
-**Hugging Face:** [`mosiddi/caas-benchmark-corpus-v1`](https://huggingface.co/datasets/mosiddi/caas-benchmark-corpus-v1)
+**Hugging Face:** [`imran-siddique/context-as-a-service`](https://huggingface.co/datasets/imran-siddique/context-as-a-service)
 
 ### Corpus Contents
 
