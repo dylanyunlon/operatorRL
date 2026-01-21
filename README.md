@@ -48,7 +48,7 @@ To add a new agent to this repository:
 - **In Development** - Agent is actively being developed
 - **Testing** - Agent is in testing phase
 - **Active** - Agent is deployed and operational
-- **Maintenance** - Agent is in maintenance mode
+- **Maintenance** - Agent is in maintenance mode, minimal updates
 - **Deprecated** - Agent is no longer being maintained
 
 ## Contributing

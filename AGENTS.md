@@ -82,11 +82,13 @@ When adding a new agent:
 **Last Updated:** YYYY-MM-DD
 ```
 
-## Legend
+## Status Legend
 
-- 🟢 **Active** - Fully operational and in production
-- 🟡 **Testing** - Under testing, not yet in production
-- 🔵 **In Development** - Currently being built
-- ⚪ **Planned** - Planned for future development
-- 🟠 **Maintenance** - In maintenance mode, minimal updates
-- 🔴 **Deprecated** - No longer maintained or used
+Use these status indicators when documenting agents:
+
+- **Planned** - Planned for future development
+- **In Development** - Currently being built
+- **Testing** - Under testing, not yet in production
+- **Active** - Fully operational and in production
+- **Maintenance** - In maintenance mode, minimal updates
+- **Deprecated** - No longer maintained or used
