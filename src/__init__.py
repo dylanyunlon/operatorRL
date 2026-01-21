@@ -14,10 +14,12 @@ from .core import (
     GenerationResult,
     KernelState,
 )
+from .core.kernel import set_reproducibility_seed
 from .agents import (
     BaseAgent,
     OpenAIGenerator,
     GeminiVerifier,
+    AnthropicVerifier,
 )
 from .tools import (
     SandboxExecutor,
@@ -27,6 +29,7 @@ from .tools import (
 __version__ = "1.0.0"
 
 __all__ = [
+    # Core
     "VerificationKernel",
     "GraphMemory",
     "Node",
@@ -35,9 +38,13 @@ __all__ = [
     "VerificationOutcome",
     "GenerationResult",
     "KernelState",
+    "set_reproducibility_seed",
+    # Agents
     "BaseAgent",
     "OpenAIGenerator",
     "GeminiVerifier",
+    "AnthropicVerifier",
+    # Tools
     "SandboxExecutor",
     "WebSearchTool",
 ]

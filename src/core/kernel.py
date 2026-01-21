@@ -5,6 +5,7 @@ This is the deterministic logic that manages the Generator -> Verifier -> Graph 
 Core Philosophy: "Trust, but Verify (with a different brain)."
 """
 import logging
+import random
 from typing import Optional, Dict, Any, List
 import yaml
 from pathlib import Path
@@ -18,6 +19,27 @@ from .trace_logger import TraceLogger
 from ..agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
+
+
+def set_reproducibility_seed(seed: int) -> None:
+    """
+    Set random seeds for reproducibility across all relevant libraries.
+    
+    Args:
+        seed: The random seed to use
+    """
+    random.seed(seed)
+    try:
+        import numpy as np
+        np.random.seed(seed)
+    except ImportError:
+        pass
+    
+    # Set environment variable for hash seed (Python 3.3+)
+    import os
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    logger.info(f"Reproducibility seed set to: {seed}")
 
 
 class VerificationKernel:
@@ -38,7 +60,8 @@ class VerificationKernel:
         generator: BaseAgent,
         verifier: BaseAgent,
         config_path: Optional[str] = None,
-        enable_trace_logging: bool = False
+        enable_trace_logging: bool = False,
+        seed: Optional[int] = None
     ):
         """
         Initialize the kernel.
@@ -48,10 +71,16 @@ class VerificationKernel:
             verifier: The Verifier agent (e.g., Gemini 1.5 Pro)
             config_path: Path to configuration file
             enable_trace_logging: Enable trace logging for research purposes (default: False)
+            seed: Random seed for reproducibility (default: None for non-deterministic)
         """
         self.generator = generator
         self.verifier = verifier
         self.graph = GraphMemory()
+        self.seed = seed
+        
+        # Set reproducibility seed if provided
+        if seed is not None:
+            set_reproducibility_seed(seed)
         
         # Feature 3: Optional TraceLogger for research purposes
         self.trace_logger = TraceLogger() if enable_trace_logging else None
@@ -61,8 +90,17 @@ class VerificationKernel:
         self.max_loops = self.config.get("kernel", {}).get("max_loops", 5)
         self.confidence_threshold = self.config.get("kernel", {}).get("confidence_threshold", 0.85)
         
+        # Check for seed in config if not provided as argument
+        if seed is None:
+            config_seed = self.config.get("kernel", {}).get("seed")
+            if config_seed is not None:
+                self.seed = config_seed
+                set_reproducibility_seed(config_seed)
+        
         logger.info("VerificationKernel initialized")
         logger.info(f"Max loops: {self.max_loops}, Confidence threshold: {self.confidence_threshold}")
+        if self.seed is not None:
+            logger.info(f"Reproducibility seed: {self.seed}")
         if enable_trace_logging:
             logger.info("Trace logging enabled")
     
