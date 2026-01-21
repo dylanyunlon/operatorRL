@@ -1,0 +1,39 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black ruff mypy
+
+    - name: Check code formatting with Black
+      run: |
+        black --check --diff caas/ tests/ || echo "Black formatting check failed (non-blocking)"
+
+    - name: Lint with Ruff
+      run: |
+        ruff check caas/ tests/ || echo "Ruff linting found issues (non-blocking)"
+
+    - name: Type check with mypy
+      run: |
+        mypy caas/ --ignore-missing-imports || echo "Type checking found issues (non-blocking)"
