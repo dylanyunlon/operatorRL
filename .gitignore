@@ -24,6 +24,7 @@ wheels/
 venv/
 ENV/
 env/
+.venv/
 
 # IDE
 .vscode/
@@ -47,3 +48,20 @@ data/
 # OS
 .DS_Store
 Thumbs.db
+
+# Testing and Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Benchmarks results
+benchmarks/results/
+!benchmarks/results/README.md
+
+# Pre-commit
+.pre-commit-config.yaml.bak
+
