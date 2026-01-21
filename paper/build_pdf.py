@@ -21,8 +21,8 @@ SECTIONS = [
     "abstract.md",
     "intro.md",
     "related_work.md",
-    # "method.md",      # TODO
-    # "experiments.md", # TODO
+    "method.md",
+    "experiments.md",
     # "discussion.md",  # TODO
     # "conclusion.md",  # TODO
 ]
