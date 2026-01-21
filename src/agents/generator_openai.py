@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 from .base_agent import BaseAgent
-from ..core.types import GenerationResult, VerificationResult, VerificationOutcome
+from ..core.types import GenerationResult, VerificationResult
 
 logger = logging.getLogger(__name__)
 
