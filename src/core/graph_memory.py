@@ -116,8 +116,13 @@ class GraphMemory:
     
     @staticmethod
     def generate_state_hash(task: str, solution: str, iteration: int) -> str:
-        """Generate a hash representing the current state."""
-        state_str = f"{task}|{solution}|{iteration}"
+        """Generate a hash representing the current state.
+
+        Note: The iteration parameter is accepted for backward compatibility
+        but is not included in the hash to ensure identical task/solution
+        pairs are treated as the same state for loop detection.
+        """
+        state_str = f"{task}|{solution}"
         return hashlib.sha256(state_str.encode()).hexdigest()
     
     def get_stats(self) -> Dict:
