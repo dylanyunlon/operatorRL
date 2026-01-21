@@ -1,7 +1,7 @@
 ---
 name: Design Review Agent
-version: 0.1.0
-description: Provides early feedback on design, architecture, and security using historical data so designs improve before peer review.
+version: 0.2.0
+description: Merges document structure analysis with deep architecture review to provide actionable feedback before peer design reviews.
 category: hybrid
 maturity: beta
 owner: AX&E Engineering
@@ -10,11 +10,44 @@ last-validated: 2026-01-21
 
 # Design Review Agent
 
-> Provides early feedback on design, architecture, and security using historical data so designs improve before peer review.
+> Merges document structure analysis with deep architecture review to provide actionable feedback before peer design reviews.
+
+## 🎯 Vision
+
+**Shift-left design quality** — Catch structural and architectural issues *before* the design review meeting, so discussions focus on strategic decisions rather than surface-level gaps.
+
+### Current State: Merging Two Prototypes
+
+| Prototype | Focus | Status |
+|-----------|-------|--------|
+| **Structure Analyzer** | Document completeness, sections, formatting | ✅ Prototype complete |
+| **Architecture Reviewer** | Deep analysis inside Word docs — key design issues, how to address them | ✅ Prototype complete |
+| **Merged Agent** | Combined capabilities | 🔄 In progress |
+
+### Value Differentiator
+
+> *"Why not just use Researcher?"*
+
+| Capability | Researcher | Design Review Agent |
+|------------|------------|--------------------|
+| General Q&A on design topics | ✅ | ✅ |
+| **Team-specific design patterns** | ❌ | ✅ Learns from your team's past reviews |
+| **Historical precedent lookup** | ❌ | ✅ "We solved this in Project X" |
+| **Security baseline enforcement** | ❌ | ✅ Applies org security rules |
+| **Continuous learning loop** | ❌ | ✅ Improves from each review |
+| **Pre-meeting preparation** | ❌ | ✅ Structured checklist for reviewers |
+
+### Roadmap
+- ✅ Prototype 1: Document structure analysis
+- ✅ Prototype 2: Architecture issue detection
+- 🔄 Merge prototypes into unified agent
+- 🔜 Learning loop from live design discussions
+- 🔜 Pilot with Learn, Localization, Startups teams
+- 🔜 Broader rollout based on feedback
 
 | Property | Value |
 |----------|-------|
-| **Version** | 0.1.0 |
+| **Version** | 0.2.0 |
 | **Category** | hybrid |
 | **Maturity** | 🟡 beta |
 | **Owner** | AX&E Engineering |
@@ -32,11 +65,12 @@ last-validated: 2026-01-21
 ### Tools
 | Tool | Description |
 |------|-------------|
-| `repo_reader` | Read repository contents |
+| `doc_structure_analyzer` | Analyze document completeness and structure |
+| `word_doc_reader` | Deep analysis inside Word/PPTX documents |
+| `repo_reader` | Read repository contents for context |
 | `threat_model_rules` | Apply threat modeling rules |
-| `static_analysis` | Run static code analysis |
-| `office365_search` | Search Office 365 content |
-| `doc_reviewer` | Review documentation |
+| `office365_search` | Search historical designs and precedents |
+| `learning_rules_engine` | 🔜 Incorporate rules from past reviews |
 
 ### Integrations
 - GitHub
@@ -45,8 +79,10 @@ last-validated: 2026-01-21
 - Teams
 
 ### Context Files
-- `design-checklist.md`
-- `security-baselines.md`
+- `design-checklist.md` — Required sections, common gaps
+- `security-baselines.md` — Org security requirements
+- `learned-patterns.md` — 🔜 Rules extracted from past reviews
+- `team-precedents.md` — 🔜 "We solved this before" examples
 
 ---
 
@@ -80,8 +116,9 @@ last-validated: 2026-01-21
 ### Trigger Scenarios
 > When to invoke this agent.
 
-- Draft design doc ready
-- Pre-PR design gate
+- Draft design doc ready for pre-review
+- Before scheduling design review meeting
+- When seeking historical precedent for a pattern
 
 ### Input Contract
 
@@ -94,7 +131,10 @@ last-validated: 2026-01-21
 
 | Name | Type | Location | Description |
 |------|------|----------|-------------|
-| `review_findings` | markdown | stdout | Actionable strengths, risks, and questions |
+| `structure_report` | markdown | stdout | Document completeness gaps |
+| `architecture_findings` | markdown | stdout | Key design issues with suggested fixes |
+| `precedent_links` | json | stdout | Similar past designs for reference |
+| `reviewer_prep` | markdown | stdout | Pre-meeting checklist for reviewers |
 
 ### Agent Flow
 
@@ -114,6 +154,16 @@ last-validated: 2026-01-21
 ### Success Metrics
 - ✅ Actionable findings accepted by team
 - ✅ Reduced rework during implementation
+- 🔜 Design review meetings shorter/more focused
+- 🔜 Fewer "we should have caught this" moments
+
+### Pilot Rollout Plan
+
+| Phase | Teams | Goal |
+|-------|-------|------|
+| **Phase 1** | Learn, Localization, Startups | Early feedback, refine value prop |
+| **Phase 2** | Broader Ecosystems Engineering | Validate at scale |
+| **Phase 3** | Cross-org | Full rollout |
 
 ### Adoption Info
 
@@ -125,6 +175,7 @@ last-validated: 2026-01-21
 ### Prerequisites
 - Access to design repo/wiki
 - Security baseline documents
+- Historical design docs (for precedent lookup)
 
 ---
 
@@ -139,4 +190,5 @@ last-validated: 2026-01-21
 ### Changelog
 | Version | Notes |
 |---------|-------|
+| 0.2.0 | Merged two prototypes, added value differentiator, pilot plan |
 | 0.1.0 | Initial spec from deck |

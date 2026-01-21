@@ -1,105 +1,275 @@
 # SDLC Agents
 
-> A collection of AI agents designed to automate and enhance the Software Development Lifecycle (SDLC).
+> AI agents designed to automate and enhance the Software Development Lifecycle for AX&E Engineering.
 
-## Overview
+---
 
-This repository serves as a central hub for tracking, documenting, and maintaining the status of various AI agents designed to support and automate different phases of the software development lifecycle. Each agent follows a standardized specification format to ensure consistency, evaluability, and safe adoption.
+## 📊 Status Summary
+
+| Status | Icon | Count | Description |
+|--------|------|-------|-------------|
+| Experimental | 🧪 | 4 | Early exploration, expect breaking changes |
+| Beta | 🟡 | 5 | Functional but still being refined |
+| Stable | 🟢 | 1 | Production-ready |
+| On Hold | ⛔ | 1 | Paused due to constraints |
+| **Total** | | **11** | |
+
+---
+
+## 🗂️ Quick Reference
+
+| Agent | Category | Maturity | Role | Key Status |
+|-------|----------|----------|------|------------|
+| [Planning Agent](agents/planning-agent.md) | orchestrator | 🟡 beta | coordinator | Localization ✅, Learn 🔄 |
+| [Onboarding Agent](agents/onboarding-agent.md) | capture | 🧪 experimental | worker | Just kicking off |
+| [Design Review Agent](agents/design-review-agent.md) | hybrid | 🟡 beta | standalone | Merging 2 prototypes |
+| [Accessibility Agent](agents/accessibility-agent.md) | hybrid | 🟡 beta | worker | PR integration planned |
+| [Productivity Agent](agents/productivity-agent.md) | analyst | 🧪 experimental | worker | Partnership approach |
+| [Unit & Scenario Testing](agents/unit-and-scenario-testing-agent.md) | analyst | 🟡 beta | worker | ⭐ Sponsored, org-wide rollout |
+| [S360 Agent](agents/s360-agent.md) | hybrid | 🟡 beta | coordinator | 3 workstreams, heavily adopted |
+| [Release Freshness Agent](agents/release-freshness-agent.md) | analyst | 🧪 experimental | worker | Dashboard ✅, agent 🔜 |
+| [Zero Production Touch](agents/zero-production-touch.md) | orchestrator | ⛔ on hold | coordinator | No sponsorship |
+| [SRE Agent](agents/sre-agent.md) | orchestrator | 🧪 experimental | coordinator | Sev3 self-service goal |
+| [DRI Report Agent](agents/dri-report-agent.md) | analyst | 🟢 stable | worker | ⭐ Org-wide, saving hours |
+
+---
+
+## 📋 Agents by SDLC Phase
+
+### Planning & Requirements
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| [Planning Agent](agents/planning-agent.md) | 🟡 beta | Engineering productivity: ADO hygiene, Power Operating Model compliance |
+| [Onboarding Agent](agents/onboarding-agent.md) | 🧪 experimental | Generate blessed artifacts (C4, dataflow) for repos |
+
+### Design & Architecture
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| [Design Review Agent](agents/design-review-agent.md) | 🟡 beta | Early feedback on design; merging structure + architecture prototypes |
+
+### Development & Coding
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| [Accessibility Agent](agents/accessibility-agent.md) | 🟡 beta | A11y checks at PR time; fix suggestions |
+| [Productivity Agent](agents/productivity-agent.md) | 🧪 experimental | IDE monitoring for before/after AI productivity measurement |
+
+### Testing & Quality
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| [Unit & Scenario Testing](agents/unit-and-scenario-testing-agent.md) | 🟡 beta | ⭐ **Sponsored** — AI-assisted test generation, org-wide rollout |
+| [S360 Agent](agents/s360-agent.md) | 🟡 beta | S360 explainer + WIT creator + auto-fix generator |
+
+### Deployment & Operations
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| [Release Freshness Agent](agents/release-freshness-agent.md) | 🧪 experimental | Dashboard live; agent automation planned |
+| [Zero Production Touch](agents/zero-production-touch.md) | ⛔ on hold | Dashboard working; AI automation needs sponsorship |
+
+### Monitoring & Maintenance
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| [SRE Agent](agents/sre-agent.md) | 🧪 experimental | Sev3 self-service goal; evaluating tools |
+
+### Reporting
+
+| Agent | Status | Description |
+|-------|--------|-------------|
+| [DRI Report Agent](agents/dri-report-agent.md) | 🟢 stable | ⭐ Automated DRI reports; saving hours across AX&E |
+
+---
+
+## 🔗 Agent Relationships
+
+```
+                                    ┌─────────────────────┐
+                                    │   Planning Agent    │
+                                    │   (coordinator)     │
+                                    └──────────┬──────────┘
+                                               │
+                    ┌──────────────────────────┼──────────────────────────┐
+                    │                          │                          │
+                    ▼                          ▼                          ▼
+         ┌──────────────────┐       ┌──────────────────┐       ┌──────────────────┐
+         │ Design Review    │       │ DRI Report Agent │       │ Onboarding Agent │
+         │ Agent            │       │                  │       │                  │
+         └────────┬─────────┘       └────────┬─────────┘       └──────────────────┘
+                  │                          │
+                  ▼                          ▼
+         ┌──────────────────┐       ┌──────────────────┐
+         │ Unit & Scenario  │       │    S360 Agent    │◀─────────────────┐
+         │ Testing Agent    │       │   (coordinator)  │                  │
+         └──────────────────┘       └────────┬─────────┘                  │
+                                             │                            │
+                                             ▼                            │
+                                    ┌──────────────────┐       ┌──────────────────┐
+                                    │ Accessibility    │       │ Release Freshness│
+                                    │ Agent            │       │ Agent            │
+                                    └──────────────────┘       └────────┬─────────┘
+                                                                        │
+                                                                        ▼
+                                                               ┌──────────────────┐
+                                                               │    SRE Agent     │
+                                                               │   (coordinator)  │
+                                                               └──────────────────┘
+```
+
+---
+
+## 🧭 Strategic Considerations
+
+> Areas we're still brainstorming and need to think through.
+
+### 🔴 Open Questions (To-Do)
+
+| Area | Questions to Answer | Status |
+|------|---------------------|--------|
+| **Culture & Adoption** | How do we drive adoption? What behavior changes are needed? | 🤔 Not started |
+| **Success Measurement** | How do we measure overall SDLC agent success? What KPIs? | 🤔 Not started |
+| **Build vs Buy vs Leverage** | Build custom? Use Microsoft tools only? Allow OSS? | 🤔 Not started |
+| **Agent Framework** | Which framework for multi-agent scenarios? AutoGen? Semantic Kernel? | 🤔 Not started |
+| **Microsoft vs OSS** | Microsoft-only stack or open to OSS solutions? | 🤔 Not started |
+| **Multi-Agent Orchestration** | How do agents communicate and hand off work? | 🤔 Not started |
+| **Governance Model** | Who approves new agents? Who maintains them? | 🤔 Not started |
+| **Security & Compliance** | What guardrails are needed for production use? | 🤔 Not started |
+
+### 📝 Notes
+
+These are early-stage brainstorming items. We haven't thought through these aspects yet but they're critical for scaling the SDLC agent initiative.
+
+#### Culture Changes Needed
+- *To be defined*
+
+#### Success Metrics (Overall Initiative)
+- *To be defined*
+
+#### Technology Decisions
+- *To be defined*
+
+---
 
 ## 📋 Agent Specification
 
-All agents in this repository follow the [Agent Specification v1.0](agent-specification.md), which defines:
+All agents follow the [Agent Specification v1.0](agent-specification.md), which defines:
 
-- **Metadata** – Identity, versioning, and categorization
-- **Capabilities** – Tools, handoffs, and integrations
-- **Risk Assessment** – Autonomy level, blast radius, and failure modes
-- **Workflow Integration** – Triggers, inputs, outputs, and agent relationships
-- **Evaluation & Adoption** – Success metrics and prerequisites
-- **Governance** – Ownership and lifecycle management
+| Section | What It Covers |
+|---------|----------------|
+| **1. Metadata** | Name, version, category, maturity |
+| **2. Capabilities** | Tools, integrations, orchestration role |
+| **3. Risk Assessment** | Autonomy, blast radius, failure modes |
+| **4. Workflow Integration** | Triggers, inputs, outputs, agent relationships |
+| **5. Evaluation & Adoption** | Success metrics, prerequisites |
+| **6. Governance** | Ownership, changelog, deprecation |
 
-## Repository Structure
+### Agent Categories
+
+| Category | Description |
+|----------|-------------|
+| **capture** | Gather and structure information |
+| **coach** | Guide and teach users |
+| **analyst** | Research, analyze, and report |
+| **orchestrator** | Coordinate workflows and other agents |
+| **hybrid** | Combine multiple capabilities |
+
+### Maturity Levels
+
+| Level | Icon | Description |
+|-------|------|-------------|
+| `experimental` | 🧪 | Early exploration, expect breaking changes |
+| `beta` | 🟡 | Functional but still being refined |
+| `stable` | 🟢 | Production-ready |
+| `deprecated` / `on hold` | ⛔ | No longer actively maintained or paused |
+
+---
+
+## 📁 Repository Structure
 
 ```
 sdlc_agents/
 ├── README.md                    # This file
-├── agent-specification.md       # Formal taxonomy for agent specs
+├── agent-specification.md       # Formal taxonomy for agent specs (v1.0)
 └── agents/
     ├── accessibility-agent.md
     ├── design-review-agent.md
-    ├── fun-report-agent.md
+    ├── dri-report-agent.md
     ├── onboarding-agent.md
     ├── planning-agent.md
     ├── productivity-agent.md
     ├── release-freshness-agent.md
-    ├── sfi-agent.md
+    ├── s360-agent.md
     ├── sre-agent.md
     ├── unit-and-scenario-testing-agent.md
     └── zero-production-touch.md
 ```
 
-## 🤖 Available Agents
-
-| Agent | Category | Maturity | Description |
-|-------|----------|----------|-------------|
-| [Planning Agent](agents/planning-agent.md) | orchestrator | 🟡 beta | Summarizes sprint plans, creates and updates ADO items, and maintains hygiene |
-| [Design Review Agent](agents/design-review-agent.md) | hybrid | 🟡 beta | Provides early feedback on design, architecture, and security |
-| [Accessibility Agent](agents/accessibility-agent.md) | hybrid | 🟡 beta | Automates accessibility checks and bug fixing with code fix proposals |
-| [Unit & Scenario Testing Agent](agents/unit-and-scenario-testing-agent.md) | analyst | 🟡 beta | Generates AI-assisted unit and scenario tests for increased coverage |
-| [SFI Agent](agents/sfi-agent.md) | hybrid | 🟡 beta | Manages SFI work, tracks KPIs, and automates ADO WIT creation |
-| [FUN Report Agent](agents/fun-report-agent.md) | analyst | 🟡 beta | Centralized reporting for LSI/SFI metrics |
-| [Release Freshness Agent](agents/release-freshness-agent.md) | analyst | 🟡 beta | Tracks production freshness and follows up on delayed deployments |
-| [SRE Agent](agents/sre-agent.md) | orchestrator | 🧪 experimental | Self-serve live site incident assistant with 24×7 monitoring |
-| [Onboarding Agent](agents/onboarding-agent.md) | capture | 🧪 experimental | Reduces onboarding time by generating engineering artifacts |
-| [Productivity Agent](agents/productivity-agent.md) | analyst | 🧪 experimental | Automates measurement of coding productivity with dashboards |
-| [Zero Production Touch](agents/zero-production-touch.md) | orchestrator | ⛔ deprecated | Automated safety dashboard for production changes (on hold) |
-
-### Maturity Legend
-
-| Icon | Level | Description |
-|------|-------|-------------|
-| 🧪 | `experimental` | Early exploration, expect breaking changes |
-| 🟡 | `beta` | Functional but still being refined |
-| 🟢 | `stable` | Production-ready |
-| ⛔ | `deprecated` | No longer actively maintained |
-
-## Agent Categories
-
-Our SDLC agents are organized using the [Agent Specification](agent-specification.md) categories:
-
-| Category | Description |
-|----------|-------------|
-| **capture** | Agents that gather and structure information |
-| **coach** | Agents that guide and teach users |
-| **analyst** | Agents that research, analyze, and report |
-| **orchestrator** | Agents that coordinate workflows and other agents |
-| **hybrid** | Agents that combine multiple capabilities |
-
-## 🚀 Getting Started
-
-1. **Browse agents** – Review the agent specifications in the [`agents/`](agents/) directory
-2. **Understand the spec** – Read the [Agent Specification](agent-specification.md) to understand the taxonomy
-3. **Evaluate fit** – Use the risk assessment and adoption prerequisites to determine if an agent suits your needs
-4. **Integrate** – Follow the workflow integration section to connect agents to your processes
+---
 
 ## 🤝 Contributing
 
-To add a new agent:
+### Adding a New Agent
 
-1. Create a new `.md` file in the `agents/` directory
-2. Follow the [Agent Specification v1.0](agent-specification.md) format
-3. Include all required fields for each section
-4. Set appropriate maturity level (start with `experimental`)
-5. Define clear human checkpoints for any risky operations
+1. **Create file** in `agents/` directory
+2. **Follow the spec** — Use [Agent Specification v1.0](agent-specification.md) format
+3. **Use the template**:
 
-## Status Definitions
+```markdown
+---
+name: Agent Name
+version: 0.1.0
+description: One-line description
+category: analyst | capture | coach | orchestrator | hybrid
+maturity: experimental | beta | stable | deprecated
+owner: AX&E Engineering
+last-validated: YYYY-MM-DD
+---
 
-| Maturity | Description |
-|----------|-------------|
-| `experimental` | Early exploration, expect breaking changes |
-| `beta` | Functional but still being refined |
-| `stable` | Production-ready |
-| `deprecated` | No longer actively maintained |
+# Agent Name
 
-## License
+> One-line description
 
-Internal use only – AX&E Engineering
+## 🎯 Vision
+(What problem does this solve?)
+
+## Related Agents
+(Links to related agents)
+
+## Capabilities
+(Tools, integrations)
+
+## Risk Assessment
+(Autonomy, blast radius, checkpoints)
+
+## Workflow Integration
+(Triggers, inputs, outputs, flow diagram)
+
+## Evaluation & Adoption
+(Metrics, status, prerequisites)
+
+## Governance
+(Owner, changelog)
+```
+
+4. **Start with `experimental`** maturity
+5. **Update this README** — Add to the quick reference and appropriate SDLC phase section
+
+### Updating an Agent
+
+1. Update the agent file
+2. Bump the version number
+3. Add entry to changelog
+4. Update `last-validated` date
+
+---
+
+## 📚 Resources
+
+- [Agent Specification v1.0](agent-specification.md) — Formal taxonomy for agent definitions
+
+---
+
+*Last updated: 2026-01-21 · Owner: AX&E Engineering*

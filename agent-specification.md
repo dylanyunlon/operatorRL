@@ -2,6 +2,33 @@
 
 > A formal taxonomy for describing AI agents—enabling humans to evaluate usefulness, detect duplication, assess adoption fit, understand risk, and determine workflow integration.
 
+**Owner:** AX&E Engineering  
+**Last Updated:** 2026-01-21
+
+---
+
+## Document Format
+
+Agents in this repository use a **hybrid format**:
+- **YAML frontmatter** — Machine-readable metadata (name, version, category, maturity, owner, last-validated)
+- **Markdown body** — Human-readable documentation with tables, diagrams, and sections
+
+### Minimal Frontmatter
+
+```yaml
+---
+name: Agent Name
+version: 0.1.0
+description: One-line description
+category: analyst | capture | coach | orchestrator | hybrid
+maturity: experimental | beta | stable | deprecated
+owner: AX&E Engineering
+last-validated: YYYY-MM-DD
+---
+```
+
+The rest of the specification fields are documented in the markdown body using tables and sections for readability.
+
 ---
 
 ## 1. Metadata

@@ -1,7 +1,7 @@
 ---
 name: Productivity Agent
 version: 0.1.0
-description: Automates measurement of coding productivity with reliable metrics and dashboards.
+description: IDE-integrated monitoring to measure engineer productivity and velocity before/after using AI agents.
 category: analyst
 maturity: experimental
 owner: AX&E Engineering
@@ -10,7 +10,42 @@ last-validated: 2026-01-21
 
 # Productivity Agent
 
-> Automates measurement of coding productivity with reliable metrics and dashboards.
+> IDE-integrated monitoring to measure engineer productivity and velocity before/after using AI agents.
+
+## 🎯 Vision
+
+**Measure the impact of AI agents** — Attach to existing IDEs (VS Code, etc.), monitor activity, and show engineers how productive they've been with and without AI assistance.
+
+### The Idea
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        VS Code / IDE                                 │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  Productivity Agent (monitoring)                                 │  │
+│  │  ────────────────────────────────────────────────────────────  │  │
+│  │  • Tracks activity BEFORE using AI agents                       │  │
+│  │  • Tracks activity AFTER using AI agents                        │  │
+│  │  • Shows: "Here's how productive you've been"                   │  │
+│  │  • Shows: "Here's your velocity improvement"                    │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Target Audiences (Phased)
+
+| Phase | Audience | Status |
+|-------|----------|--------|
+| **Phase 1** | Engineers (individual insights) | 🔄 Current focus |
+| **Phase 2** | Managers (team insights) | 🔜 Future |
+
+### Build Approach
+
+| Aspect | Approach |
+|--------|----------|
+| **Building from scratch?** | ❌ No |
+| **Partnership** | Working with a team who has already built this |
+| **Our role** | Leverage their work, potentially fork to customize |
 
 | Property | Value |
 |----------|-------|
@@ -23,27 +58,28 @@ last-validated: 2026-01-21
 ## Related Agents
 
 - [Planning Agent](planning-agent.md)
-- [FUN Report Agent](fun-report-agent.md)
+- [DRI Report Agent](dri-report-agent.md)
 
 ---
 
 ## Capabilities
 
 ### Tools
-| Tool | Description |
-|------|-------------|
-| `git_metrics` | Git repository metrics |
-| `ado_activity` | Azure DevOps activity tracking |
-| `telemetry_aggregator` | Aggregate telemetry data |
-| `power_bi` | Power BI dashboard creation |
+| Tool | Status | Description |
+|------|--------|-------------|
+| `ide_activity_monitor` | 🔄 Exploring | VS Code activity tracking |
+| `agent_usage_tracker` | 🔄 Exploring | Track before/after agent usage |
+| `velocity_calculator` | 🔄 Exploring | Calculate productivity metrics |
+| `insights_dashboard` | 🔜 Planned | Personal productivity dashboard |
 
 ### Integrations
-- Git
-- Azure DevOps
-- Power BI
+- VS Code (primary)
+- Other IDEs (future)
+- AI agents (to measure impact)
 
 ### Context Files
-- `metric-definitions.md`
+- `metric-definitions.md` — What we measure and why
+- `privacy-guidelines.md` — What data is collected and how it's used
 
 ---
 
@@ -52,10 +88,10 @@ last-validated: 2026-01-21
 | Risk Factor | Level |
 |-------------|-------|
 | **Autonomy Level** | guided |
-| **Blast Radius** | external-system |
+| **Blast Radius** | local-file |
 | **Reversibility** | fully |
-| **Data Sensitivity** | internal-only |
-| **Cost Profile** | moderate |
+| **Data Sensitivity** | internal-only (engineer activity data) |
+| **Cost Profile** | minimal |
 
 ### Human Checkpoints
 > Points where human approval is required before proceeding.
@@ -76,47 +112,66 @@ last-validated: 2026-01-21
 ### Trigger Scenarios
 > When to invoke this agent.
 
-- Quarterly/Monthly productivity review
+- **Continuous** — passively monitors IDE activity
+- Engineer wants to see their productivity insights
+- Before/after comparison when adopting new AI tools
 
 ### Input Contract
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `repos` | string[] | ✅ | Repositories to analyze |
+| `activity_data` | telemetry | ✅ | IDE activity (automatic collection) |
+| `agent_sessions` | json | ❌ | AI agent usage sessions |
 
 ### Output Contract
 
 | Name | Type | Location | Description |
 |------|------|----------|-------------|
-| `productivity_dashboard` | url | stdout | Published dashboard URL |
+| `productivity_insights` | markdown | IDE panel | Personal productivity summary |
+| `velocity_comparison` | chart | IDE panel | Before/after AI agent adoption |
 
 ### Agent Flow
 
 ```
-┌──────────────────────┐     ┌───────────────────┐
-│ Productivity Agent   │ ──▶ │ Leadership Review │
-└──────────────────────┘     └───────────────────┘
+┌──────────────────┐     ┌────────────────────┐     ┌────────────────────────┐
+│ IDE Activity     │ ──▶ │ Productivity Agent │ ──▶ │ Engineer sees:         │
+│ (continuous)     │     └────────────────────┘     │ • Productivity score    │
+└──────────────────┘                              │ • Velocity metrics      │
+                                                  │ • AI impact comparison  │
+                                                  └────────────────────────┘
 ```
 
-**Persona:** Neutral analyst focused on outcomes not vanity metrics
+**Persona:** Non-judgmental productivity companion
 
 ---
 
 ## Evaluation & Adoption
 
 ### Success Metrics
-- ✅ Agreement on metric definitions
-- ✅ Adoption across teams
+- 🔜 Engineers find insights valuable
+- 🔜 Measurable productivity improvement with AI agents
+- 🔜 Adoption rate among engineers
+
+### Current Status: 🧪 Very Experimental
+
+| Aspect | Status |
+|--------|--------|
+| Partnership with existing team | 🔄 In progress |
+| Exploring their solution | 🔄 In progress |
+| Potential fork for customization | 🔜 If needed |
+| Engineer-facing insights | 🔜 Phase 1 |
+| Manager-facing insights | 🔜 Phase 2 (future) |
 
 ### Adoption Info
 
 | Factor | Value |
 |--------|-------|
-| **Time to Value** | 1-2 weeks for baseline |
-| **Learning Curve** | moderate |
+| **Time to Value** | TBD — exploring |
+| **Learning Curve** | minimal (passive monitoring) |
 
 ### Prerequisites
-- Access to repos and ADO
+- VS Code or supported IDE
+- Opt-in to activity monitoring
 
 ---
 
@@ -131,4 +186,4 @@ last-validated: 2026-01-21
 ### Changelog
 | Version | Notes |
 |---------|-------|
-| 0.1.0 | Initial |
+| 0.1.0 | Initial — exploring partnership approach |

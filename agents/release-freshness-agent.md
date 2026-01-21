@@ -1,22 +1,64 @@
 ---
 name: Release Freshness Agent
 version: 0.1.0
-description: Tracks production freshness and automatically follows up on delayed deployments and pending changes across services.
+description: Dashboard for tracking production freshness; future agent will automate follow-ups with service owners.
 category: analyst
-maturity: beta
+maturity: experimental
 owner: AX&E Engineering
 last-validated: 2026-01-21
 ---
 
 # Release Freshness Agent
 
-> Tracks production freshness and automatically follows up on delayed deployments and pending changes across services.
+> Dashboard for tracking production freshness; future agent will automate follow-ups with service owners.
+
+## 🎯 Vision
+
+**From manual follow-up to automated nudges** — Today we have dashboards. Tomorrow an agent will do the follow-up work automatically.
+
+### Tool vs Agent: Where We Are
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Dashboard (Tool)** | ✅ Live | Shows freshness delta for each production pipeline |
+| **Agent (AI)** | 🔜 Not started | Automates follow-up with owners |
+
+### Current Manual Process
+
+```
+┌──────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ Dashboard shows   │     │ Human looks at it   │     │ Human follows up    │
+│ freshness delta   │ ──▶ │ identifies issues   │ ──▶ │ with service owners │
+└──────────────────┘     └─────────────────────┘     └─────────────────────┘
+         ✅                      ❌ Manual                    ❌ Manual
+```
+
+### Future State (Agent)
+
+```
+┌──────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ Dashboard shows   │     │ Agent detects       │     │ Agent notifies      │
+│ freshness delta   │ ──▶ │ large deltas        │ ──▶ │ owners, tracks      │
+└──────────────────┘     └─────────────────────┘     │ resolution          │
+         ✅                      🔜 AI                   └─────────────────────┘
+                                                              🔜 AI
+```
+
+### What the Agent Will Do
+
+| Capability | Description |
+|------------|-------------|
+| **Detect** | Identify pipelines with large commit-to-production delta |
+| **Investigate** | Check if there's a valid reason (hotfix branch, planned hold) |
+| **Notify** | Message service owners with specific details |
+| **Follow up** | Track acknowledgment, remind if no action |
+| **Escalate** | Alert leadership if SLA exceeded |
 
 | Property | Value |
 |----------|-------|
 | **Version** | 0.1.0 |
 | **Category** | analyst |
-| **Maturity** | 🟡 beta |
+| **Maturity** | 🧪 experimental (dashboard live, agent not started) |
 | **Owner** | AX&E Engineering |
 | **Orchestration Role** | worker |
 
@@ -31,12 +73,13 @@ last-validated: 2026-01-21
 ## Capabilities
 
 ### Tools
-| Tool | Description |
-|------|-------------|
-| `ado_release_api` | ADO release pipeline API |
-| `git_diff_checker` | Check git diffs |
-| `power_bi` | Power BI dashboard creation |
-| `notifier` | Send notifications |
+| Tool | Status | Description |
+|------|--------|-------------|
+| `ado_release_api` | ✅ In use | ADO release pipeline API |
+| `git_diff_checker` | ✅ In use | Check git diffs for freshness |
+| `power_bi` | ✅ In use | Freshness dashboard |
+| `notifier` | 🔜 Planned | Send notifications to owners |
+| `owner_lookup` | 🔜 Planned | Find service owner from pipeline |
 
 ### Integrations
 - ADO Pipelines
@@ -78,8 +121,14 @@ last-validated: 2026-01-21
 ### Trigger Scenarios
 > When to invoke this agent.
 
-- Daily freshness scan
-- Missed SLA window
+**Today (Dashboard):**
+- On-demand freshness check
+- Weekly freshness review
+
+**Future (Agent):**
+- Daily automated scan
+- Threshold exceeded alert
+- SLA window approaching
 
 ### Input Contract
 
@@ -89,34 +138,53 @@ last-validated: 2026-01-21
 
 ### Output Contract
 
-| Name | Type | Location | Description |
-|------|------|----------|-------------|
-| `freshness_report` | markdown | stdout | Services behind, suggested follow-ups |
+| Name | Type | Status | Description |
+|------|------|--------|-------------|
+| `freshness_dashboard` | url | ✅ Live | Power BI dashboard showing all pipelines |
+| `freshness_report` | markdown | 🔜 Planned | Services behind, suggested follow-ups |
+| `owner_notifications` | messages | 🔜 Planned | Automated messages to service owners |
 
 ### Agent Flow
 
 ```
-┌────────────────┐     ┌─────────────────────────┐     ┌────────────────┐
-│ Planning Agent │ ──▶ │ Release Freshness Agent │ ──▶ │ SRE Agent      │
-└────────────────┘     └─────────────────────────┘     │ Service Owners │
-                                                        └────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  TODAY: Dashboard → Human review → Manual follow-up            │
+│  FUTURE: Dashboard → Agent detects → Auto-notify → Track       │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Persona:** Data-first release analyst
+**Persona:** Persistent release tracker that doesn't let stale deployments slip
 
 ---
 
 ## Evaluation & Adoption
 
 ### Success Metrics
-- ✅ Reduction in stale deployments
-- ✅ Time-to-follow-up < 24h
+
+**Dashboard (Today):**
+- ✅ Visibility into all pipeline freshness
+- ✅ Single source of truth for deployment status
+
+**Agent (Future):**
+- 🔜 Reduction in stale deployments
+- 🔜 Time-to-follow-up < 24h (automated)
+- 🔜 Human hours saved on manual follow-up
+
+### Current Status
+
+| Component | Status |
+|-----------|--------|
+| Freshness dashboard | ✅ Live and working |
+| Pipeline-to-commit delta calculation | ✅ Working |
+| Service owner mapping | 🔜 Needed for automation |
+| Notification automation | 🔜 Not started |
+| Follow-up tracking | 🔜 Not started |
 
 ### Adoption Info
 
 | Factor | Value |
 |--------|-------|
-| **Time to Value** | Within first scan cycle |
+| **Time to Value** | Dashboard: immediate \| Agent: TBD |
 | **Learning Curve** | minimal |
 
 ### Prerequisites

@@ -1,7 +1,7 @@
 ---
 name: Zero Production Touch
 version: 0.1.0
-description: Automated safety dashboard to replace manual reviews of unsafe production changes; keep work in Learn platform, maintain only (on hold).
+description: Dashboard tracking production touches with manual follow-up process; AI automation paused due to lack of sponsorship.
 category: orchestrator
 maturity: deprecated
 owner: AX&E Engineering
@@ -10,15 +10,56 @@ last-validated: 2026-01-21
 
 # Zero Production Touch
 
-> ⛔ **DEPRECATED** — This agent is on hold until capacity constraints are resolved.
+> ⛔ **ON HOLD** — AI automation paused due to lack of sponsorship. Dashboard and manual process continue.
 
-Automated safety dashboard to replace manual reviews of unsafe production changes; keep work in Learn platform, maintain only.
+## Current State
+
+### Tool vs Agent: Similar to Release Freshness
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Dashboard (Tool)** | ✅ Live & working well | Shows production touch metrics — we're doing awesome |
+| **Manual Process** | ✅ Active | Weekly follow-up with developers on production touches |
+| **Agent (AI)** | ⛔ **On hold** | No sponsorship — unknown when we'll resume |
+
+### Current Manual Process
+
+```
+┌──────────────────┐     ┌───────────────────────────────────────────────────────┐
+│ Dashboard shows  │     │                    Manual Process                     │
+│ production       │ ──▶ ├───────────────────────────────────────────────────────┤
+│ touches          │     │  1. Review weekly production touches                     │
+└──────────────────┘     │  2. Follow up with developers — why did they do it?      │
+         ✅               │  3. False alarm? → Work with dashboard/service owners   │
+                         │  4. Real issue? → Note it, track resolution             │
+                         └───────────────────────────────────────────────────────┘
+                                              ❌ Manual effort
+```
+
+### What AI Automation Would Do (If Sponsored)
+
+| Step | Current | With Agent |
+|------|---------|------------|
+| Review production touches | Manual | Automated |
+| Follow up with developers | Manual | Auto-notify |
+| Classify false alarm vs real | Manual | AI-assisted |
+| Work with service owners | Manual | Auto-route |
+| Track and note issues | Manual | Auto-log |
+
+### Why On Hold
+
+| Factor | Status |
+|--------|--------|
+| Dashboard | ✅ Working great |
+| Manual process | ✅ Working (but time-consuming) |
+| Sponsorship for AI automation | ❌ **Not available** |
+| Resume date | ❓ Unknown |
 
 | Property | Value |
 |----------|-------|
 | **Version** | 0.1.0 |
 | **Category** | orchestrator |
-| **Maturity** | ⛔ deprecated |
+| **Maturity** | ⛔ on hold (no sponsorship) |
 | **Owner** | AX&E Engineering |
 | **Orchestration Role** | coordinator |
 
@@ -32,11 +73,12 @@ Automated safety dashboard to replace manual reviews of unsafe production change
 ## Capabilities
 
 ### Tools
-| Tool | Description |
-|------|-------------|
-| `policy_checker` | Check release policies |
-| `release_diff` | Compare release differences |
-| `alerting` | Send alerts |
+| Tool | Status | Description |
+|------|--------|-------------|
+| `zpt_dashboard` | ✅ Live | Production touch tracking dashboard |
+| `policy_checker` | 🔜 Planned | Check release policies |
+| `auto_followup` | 🔜 Planned | Automated developer follow-up |
+| `false_alarm_classifier` | 🔜 Planned | AI classification of touches |
 
 ### Integrations
 - Learn Platform
@@ -104,14 +146,28 @@ Automated safety dashboard to replace manual reviews of unsafe production change
 ## Evaluation & Adoption
 
 ### Success Metrics
-- ✅ Reduction in unsafe pushes
-- ✅ Reduced manual bi-weekly review time
+
+**Dashboard (Working):**
+- ✅ Visibility into all production touches
+- ✅ Metrics trending well — "we're doing awesome"
+
+**Agent (If Resumed):**
+- 🔜 Reduction in manual follow-up time
+- 🔜 Faster false alarm resolution
+
+### Current Status
+
+| Component | Status |
+|-----------|--------|
+| Dashboard | ✅ Live and showing great results |
+| Manual weekly process | ✅ Active |
+| AI automation | ⛔ On hold — no sponsorship |
 
 ### Adoption Info
 
 | Factor | Value |
 |--------|-------|
-| **Time to Value** | Per release cycle |
+| **Time to Value** | Dashboard: immediate \| Agent: TBD |
 | **Learning Curve** | minimal |
 
 ### Prerequisites
@@ -125,10 +181,11 @@ Automated safety dashboard to replace manual reviews of unsafe production change
 |-------|-------|
 | **Owner** | AX&E Engineering |
 | **Last Validated** | 2026-01-21 |
-| **Deprecation Policy** | Paused until capacity constraints resolved |
+| **Status** | On hold — no sponsorship for AI automation |
+| **Resume** | Unknown |
 
 ### Changelog
 | Version | Notes |
 |---------|-------|
+| 0.1.1 | Clarified tool vs agent status; on hold due to no sponsorship |
 | 0.1.0 | Initial |
-| 0.1.1 | Status set to On Hold |

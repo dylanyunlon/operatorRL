@@ -1,7 +1,7 @@
 ---
 name: Onboarding Agent
 version: 0.1.0
-description: Reduces onboarding time by generating key engineering artifacts from existing wiki/SharePoint/code and auto-creating initial ADO items.
+description: Generates blessed artifacts (C4 diagrams, dataflow diagrams, etc.) from existing sources to help coding agents and engineers understand repositories.
 category: capture
 maturity: experimental
 owner: AX&E Engineering
@@ -10,7 +10,47 @@ last-validated: 2026-01-21
 
 # Onboarding Agent
 
-> Reduces onboarding time by generating key engineering artifacts from existing wiki/SharePoint/code and auto-creating initial ADO items.
+> Generates blessed artifacts (C4 diagrams, dataflow diagrams, etc.) from existing sources to help coding agents and engineers understand repositories.
+
+## 🎯 Vision
+
+**Blessed artifacts in every repo** — Generate canonical documentation artifacts from scattered sources (SharePoint, OneDrive, wikis), get expert approval, and commit them to the repository where they help both AI agents and humans.
+
+### The Idea
+
+```
+┌───────────────────┐     ┌──────────────────┐     ┌─────────────────┐     ┌───────────────────┐
+│ Scattered Sources   │     │ Onboarding Agent │     │ Expert Review   │     │ Artifacts in Repo │
+│ ───────────────── │ ──▶ │ ──────────────── │ ──▶ │ ─────────────── │ ──▶ │ ───────────────── │
+│ • SharePoint         │     │ Generates:       │     │ Approves/blesses│     │ Helps:            │
+│ • OneDrive           │     │ • C4 diagrams    │     │ artifacts       │     │ • GitHub Copilot  │
+│ • Wikis              │     │ • Dataflow       │     └─────────────────┘     │ • Coding agents   │
+│ • Existing docs      │     │ • Architecture   │                           │ • New engineers   │
+└───────────────────┘     └──────────────────┘                           └───────────────────┘
+```
+
+### Why This Matters
+
+| Beneficiary | How Blessed Artifacts Help |
+|-------------|---------------------------|
+| **GitHub Copilot** | Better context → better code suggestions |
+| **Other coding agents** | Understand architecture before making changes |
+| **New engineers** | Open repo, ask questions, get accurate answers |
+| **Existing team** | Single source of truth, always up-to-date |
+
+### Artifacts to Generate
+
+| Artifact | Description | Format |
+|----------|-------------|--------|
+| C4 Context Diagram | System context and external dependencies | Mermaid/PlantUML |
+| C4 Container Diagram | High-level technical building blocks | Mermaid/PlantUML |
+| Dataflow Diagrams | How data moves through the system | Mermaid |
+| Architecture Decision Records | Key decisions and rationale | Markdown |
+| Component Overview | What each major component does | Markdown |
+
+### Current Status: 🧪 Just Kicking Off
+
+We know the vision. Now exploring how to execute it.
 
 | Property | Value |
 |----------|-------|
@@ -33,18 +73,20 @@ last-validated: 2026-01-21
 | Tool | Description |
 |------|-------------|
 | `sharepoint_reader` | Read SharePoint content |
+| `onedrive_reader` | Read OneDrive documents |
 | `repo_reader` | Read repository contents |
-| `ado_api` | Azure DevOps API integration |
-| `doc_summarizer` | Summarize documentation |
+| `diagram_generator` | Generate C4/dataflow diagrams |
+| `doc_summarizer` | Summarize existing documentation |
 
 ### Integrations
 - SharePoint
+- OneDrive
 - GitHub/ADO Repos
-- Azure DevOps
+- Mermaid/PlantUML rendering
 
 ### Context Files
-- `onboarding-template.md`
-- `team-handbook.md`
+- `artifact-templates/` — Templates for each artifact type
+- `c4-model-guide.md` — C4 diagram standards
 
 ---
 
@@ -61,8 +103,9 @@ last-validated: 2026-01-21
 ### Human Checkpoints
 > Points where human approval is required before proceeding.
 
-- [ ] Before publishing onboarding guide
-- [ ] Before creating ADO onboarding items
+- [ ] **Expert review of generated artifacts** — critical before committing
+- [ ] Before committing artifacts to repository
+- [ ] Periodic review to ensure artifacts stay current
 
 ### Failure Modes
 > Known ways this agent can fail.
@@ -77,49 +120,74 @@ last-validated: 2026-01-21
 ### Trigger Scenarios
 > When to invoke this agent.
 
-- New hire joins
-- Team rotation
+- Repository lacks architectural documentation
+- New project setup
+- Major architecture changes requiring doc refresh
+- New engineer joining (artifacts should already exist)
 
 ### Input Contract
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `team_sources` | string[] | ✅ | Links to wikis/repos |
+| `source_links` | string[] | ✅ | Links to SharePoint, OneDrive, wikis |
+| `repo_url` | string | ✅ | Target repository for artifacts |
 
 ### Output Contract
 
 | Name | Type | Location | Description |
 |------|------|----------|-------------|
-| `onboarding_guide` | markdown | stdout | Role-specific starter guide |
+| `c4_diagrams` | files | repo `/docs` | Context and container diagrams |
+| `dataflow_diagrams` | files | repo `/docs` | Data flow documentation |
+| `architecture_overview` | markdown | repo `/docs` | Component overview and decisions |
 
 ### Agent Flow
 
 ```
-┌────────────────┐     ┌──────────────────┐     ┌───────────┐
-│ Planning Agent │ ──▶ │ Onboarding Agent │ ──▶ │ New Hire  │
-└────────────────┘     └──────────────────┘     │ Manager   │
-                                                 └───────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│ Onboarding Agent │ ──▶ │ Expert Approval  │ ──▶ │ Artifacts in Repo   │
+└──────────────────┘     └──────────────────┘     └─────────────────────┘
+                                                            │
+                         ┌──────────────────────────────────┘
+                         ▼
+         ┌───────────────────────────────────────────────────┐
+         │  Blessed artifacts help:                          │
+         │  • GitHub Copilot gives better suggestions         │
+         │  • New engineers ask questions, get good answers   │
+         │  • Coding agents understand before changing        │
+         └───────────────────────────────────────────────────┘
 ```
 
-**Persona:** Supportive coach with curated, minimal path
+**Persona:** Diligent documentation curator
 
 ---
 
 ## Evaluation & Adoption
 
 ### Success Metrics
-- ✅ Time-to-first-PR
-- ✅ Time-to-environment-setup
+- 🔜 Repos with blessed artifacts vs. without
+- 🔜 Copilot suggestion quality in repos with artifacts
+- 🔜 Time-to-productivity for new engineers
+- 🔜 Questions answered accurately from repo context
+
+### Current Status: Exploration Phase
+
+| What We Know | What We're Figuring Out |
+|--------------|------------------------|
+| ✅ The vision is clear | 🤔 Best artifact formats |
+| ✅ The value proposition | 🤔 Source discovery automation |
+| ✅ Expert approval is critical | 🤔 Keeping artifacts fresh |
 
 ### Adoption Info
 
 | Factor | Value |
 |--------|-------|
-| **Time to Value** | Same day |
-| **Learning Curve** | minimal |
+| **Time to Value** | TBD — exploring |
+| **Learning Curve** | TBD |
 
 ### Prerequisites
-- Access to team repositories and wikis
+- Access to source documentation (SharePoint, OneDrive)
+- Target repository write access
+- Domain expert available for review
 
 ---
 
@@ -134,4 +202,4 @@ last-validated: 2026-01-21
 ### Changelog
 | Version | Notes |
 |---------|-------|
-| 0.1.0 | Initial |
+| 0.1.0 | Initial — vision defined, exploration starting |

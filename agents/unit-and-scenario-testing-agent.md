@@ -1,7 +1,7 @@
 ---
 name: Unit & Scenario Testing Agent
-version: 0.1.0
-description: Generates AI-assisted unit and scenario tests and integrates with pipelines to increase coverage and defect detection.
+version: 1.0.0
+description: AI-assisted unit and scenario test generation to improve coverage across AX&E Engineering.
 category: analyst
 maturity: beta
 owner: AX&E Engineering
@@ -10,14 +10,25 @@ last-validated: 2026-01-21
 
 # Unit & Scenario Testing Agent
 
-> Generates AI-assisted unit and scenario tests and integrates with pipelines to increase coverage and defect detection.
+> AI-assisted unit and scenario test generation to improve coverage across AX&E Engineering.
+
+## ⭐ Sponsored Initiative
+
+| | |
+|---|---|
+| **Sponsor** | AX&E Engineering |
+| **Status** | 🚀 **Rolling out org-wide** |
+| **Baselines** | ✅ Established |
+| **Plan** | ✅ In place |
+
+This agent is **blessed by AX&E Engineering** and actively rolling out across all engineering teams.
 
 | Property | Value |
 |----------|-------|
-| **Version** | 0.1.0 |
+| **Version** | 1.0.0 |
 | **Category** | analyst |
-| **Maturity** | 🟡 beta |
-| **Owner** | AX&E Engineering |
+| **Maturity** | 🟡 beta (org-wide rollout in progress) |
+| **Owner** | AX&E Engineering (Sponsor) |
 | **Orchestration Role** | worker |
 
 ## Related Agents
@@ -110,6 +121,17 @@ last-validated: 2026-01-21
 ### Success Metrics
 - ✅ Coverage delta per PR
 - ✅ Defects caught before release
+- ✅ Baseline coverage established
+- 🔄 Coverage improvement trending up
+
+### Rollout Status
+
+| Scope | Status |
+|-------|--------|
+| **Baselines** | ✅ Established |
+| **Rollout plan** | ✅ In place |
+| **Org-wide adoption** | 🔄 In progress — going well |
+| **All engineers** | 🔜 Target |
 
 ### Adoption Info
 
@@ -135,4 +157,5 @@ last-validated: 2026-01-21
 ### Changelog
 | Version | Notes |
 |---------|-------|
+| 1.0.0 | Org-wide rollout; blessed by AX&E Engineering |
 | 0.1.0 | Initial |

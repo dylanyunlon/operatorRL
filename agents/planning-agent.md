@@ -1,7 +1,7 @@
 ---
 name: Planning Agent
-version: 0.1.0
-description: Summarizes sprint plans, creates and updates Azure DevOps (ADO) items, and maintains hygiene; provides dashboards for alignment and status.
+version: 0.2.0
+description: Helps engineers stay productive by automating ADO hygiene, Power Operating Model compliance, and day-to-day tracking tasks.
 category: orchestrator
 maturity: beta
 owner: AX&E Engineering
@@ -10,11 +10,35 @@ last-validated: 2026-01-21
 
 # Planning Agent
 
-> Summarizes sprint plans, creates and updates Azure DevOps (ADO) items, and maintains hygiene; provides dashboards for alignment and status.
+> Helps engineers stay productive by automating ADO hygiene, Power Operating Model compliance, and day-to-day tracking tasks.
+
+## 🎯 Vision
+
+**Engineer velocity, not overhead** — Automate the tracking busywork so engineers can focus on building. This agent handles the "hundreds of things" that need attention: dates, assignments, goals, hygiene, and compliance.
+
+> 📝 **Naming consideration:** Is "Planning Agent" the right name? This is really about **engineering productivity** and **tracking**, not product planning. Consider: *Tracking Agent*, *Velocity Agent*, *Hygiene Agent*?
+
+### What This Agent Helps With
+
+| Area | Examples |
+|------|----------|
+| **Power Operating Model** | Start dates, end dates, project goals, work assignments |
+| **ADO Hygiene** | Missing fields, stale items, incorrect states, orphaned work |
+| **Sprint Tracking** | Summaries, status, blockers, carryover |
+| **Compliance** | Required fields, area paths, iteration alignment |
+
+### Current State
+
+| What's Working | What's Coming |
+|----------------|---------------|
+| ✅ Core hygiene checks | 🔜 More Power Operating Model rules |
+| ✅ Sprint summaries | 🔜 Proactive notifications |
+| ✅ ADO updates | 🔜 Cross-team visibility |
+| ✅ Basic dashboards | 🔜 Advanced analytics |
 
 | Property | Value |
 |----------|-------|
-| **Version** | 0.1.0 |
+| **Version** | 0.2.0 |
 | **Category** | orchestrator |
 | **Maturity** | 🟡 beta |
 | **Owner** | AX&E Engineering |
@@ -22,8 +46,8 @@ last-validated: 2026-01-21
 
 ## Related Agents
 
-- [FUN Report Agent](fun-report-agent.md)
-- [SFI Agent](sfi-agent.md)
+- [DRI Report Agent](dri-report-agent.md)
+- [S360 Agent](s360-agent.md)
 - [Design Review Agent](design-review-agent.md)
 
 ---
@@ -46,8 +70,9 @@ last-validated: 2026-01-21
 - Microsoft Teams
 
 ### Context Files
-- `planning-rules.md`
-- `ado-templates.md`
+- `power-operating-model-rules.md` — Required fields and compliance rules
+- `hygiene-rules.md` — ADO hygiene standards
+- `ado-templates.md` — Work item templates
 
 ---
 
@@ -81,34 +106,37 @@ last-validated: 2026-01-21
 ### Trigger Scenarios
 > When to invoke this agent.
 
+- Daily/weekly hygiene checks
 - Sprint planning and kickoff
-- Mid-sprint hygiene checks
-- End-of-sprint summary/reporting
+- Mid-sprint health check
+- Power Operating Model compliance review
+- Before leadership sync (quick status)
 
 ### Input Contract
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `sprint_backlog` | files | ❌ | ADO queries/boards and backlog export |
-| `sprint_goals` | string | ✅ | Natural language statement of goals |
+| `ado_query` | string | ✅ | ADO query or area path to analyze |
+| `check_type` | enum | ❌ | `hygiene` \| `compliance` \| `summary` \| `all` |
 
 ### Output Contract
 
 | Name | Type | Location | Description |
 |------|------|----------|-------------|
-| `hygiene_report` | markdown | stdout | Findings and recommended fixes |
+| `hygiene_report` | markdown | stdout | Issues found and recommended fixes |
+| `compliance_report` | markdown | stdout | Power Operating Model gaps |
 | `ado_changes` | json | file | Created/updated work items with links |
 
 ### Agent Flow
 
 ```
 ┌─────────────┐     ┌────────────────┐     ┌─────────────────┐
-│ FUN Report  │ ──▶ │ Planning Agent │ ──▶ │ FUN Report      │
-└─────────────┘     └────────────────┘     │ SFI Agent       │
+│ DRI Report │ ──▶ │ Planning Agent │ ──▶ │ DRI Report      │
+└─────────────┘     └────────────────┘     │ S360 Agent      │
                                            └─────────────────┘
 ```
 
-**Persona:** Pragmatic release coordinator focused on clarity and actionability
+**Persona:** Efficient engineering assistant focused on reducing busywork
 
 ---
 
@@ -117,7 +145,17 @@ last-validated: 2026-01-21
 ### Success Metrics
 - ✅ < 10 minutes to produce a sprint summary
 - ✅ Hygiene score improves week-over-week
-- ✅ Reduction in manual edits to ADO
+- ✅ Reduction in manual ADO edits
+- 🔜 Time saved per engineer per week
+- 🔜 Power Operating Model compliance rate
+
+### Adoption Status
+
+| Team | Status |
+|------|--------|
+| **Localization** | ✅ Onboarded |
+| **Learn** | 🔄 Onboarding |
+| Other teams | 🔜 After initial feedback |
 
 ### Adoption Info
 
@@ -143,4 +181,5 @@ last-validated: 2026-01-21
 ### Changelog
 | Version | Notes |
 |---------|-------|
+| 0.2.0 | Clarified focus on engineering productivity; added Power Operating Model; adoption status |
 | 0.1.0 | Initial spec import from SDLC deck |

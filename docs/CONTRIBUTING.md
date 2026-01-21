@@ -7,140 +7,138 @@ Thank you for contributing to the SDLC Agents repository! This document provides
 - [Getting Started](#getting-started)
 - [How to Contribute](#how-to-contribute)
 - [Adding a New Agent](#adding-a-new-agent)
-- [Updating Agent Information](#updating-agent-information)
+- [Updating an Agent](#updating-an-agent)
 - [Documentation Standards](#documentation-standards)
 - [Pull Request Process](#pull-request-process)
 
+---
+
 ## Getting Started
 
-1. Fork the repository
-2. Clone your fork locally
-3. Create a new branch for your changes
+1. Clone the repository
+2. Read the [Agent Specification v1.0](../agent-specification.md) to understand the taxonomy
+3. Review existing agents in the `agents/` directory for examples
 4. Make your changes
 5. Submit a pull request
 
+---
+
 ## How to Contribute
 
-There are several ways to contribute to this repository:
+| Contribution Type | Description |
+|-------------------|-------------|
+| **Add a new agent** | Document a new SDLC agent following the spec |
+| **Update an agent** | Keep agent status and documentation current |
+| **Improve documentation** | Enhance existing documentation |
+| **Fix issues** | Address any issues or inconsistencies |
 
-1. **Add a new agent** - Document a new SDLC agent
-2. **Update agent information** - Keep agent status and documentation current
-3. **Improve documentation** - Enhance existing documentation
-4. **Fix issues** - Address any issues or inconsistencies
+---
 
 ## Adding a New Agent
 
-To add a new agent to the repository:
+### Step 1: Create Agent File
 
-### Step 1: Create Agent Documentation
+Create a new file in the `agents/` directory:
 
-1. Navigate to the appropriate category directory under `agents/`
-2. Copy the template from `agents/templates/AGENT_TEMPLATE.md`
-3. Create a new file named `[agent-name].md` in the category directory
-4. Fill out all sections of the template with relevant information
-
-Example:
-```bash
-cp agents/templates/AGENT_TEMPLATE.md agents/development/code-review-agent.md
+```
+agents/[agent-name].md
 ```
 
-### Step 2: Update AGENTS.md
+Use the template structure from existing agents. Key sections:
 
-Add an entry for your agent in the [AGENTS.md](../AGENTS.md) file:
+1. **YAML frontmatter** — name, version, description, category, maturity, owner, last-validated
+2. **Vision** — What problem does this solve?
+3. **Capabilities** — Tools, integrations, context files
+4. **Risk Assessment** — Autonomy, blast radius, checkpoints, failure modes
+5. **Workflow Integration** — Triggers, inputs, outputs, flow diagram
+6. **Evaluation & Adoption** — Metrics, status, prerequisites
+7. **Governance** — Owner, changelog
 
-1. Find the appropriate category section
-2. Add your agent following this format:
+### Step 2: Update README.md
 
-```markdown
-### [Agent Name](agents/category/agent-name.md)
+Add your agent to the [README.md](../README.md):
 
-**Status:** Status  
-**Owner:** Your Name/Team  
-**Description:** Brief description  
-**Last Updated:** YYYY-MM-DD
-```
+1. Add to the **Quick Reference** table
+2. Add to the appropriate **SDLC Phase** section
+3. Update the **Status Summary** counts if needed
 
-3. Update the summary count table at the top of the file
+### Step 3: Submit Pull Request
 
-### Step 3: Create a Pull Request
+- Use a clear title: "Add [Agent Name] documentation"
+- Describe what the agent does and why it's needed
+- Start with `experimental` maturity
 
-Submit a pull request with your changes. Make sure to:
-- Use a clear and descriptive title
-- Describe what agent you're adding and why
-- Link to any relevant issues or discussions
+---
 
-## Updating Agent Information
+## Updating an Agent
 
 When updating existing agent information:
 
-1. Edit the agent's documentation file in the `agents/` directory
-2. Update the **Last Updated** date
-3. If the status changes, update both the agent doc and AGENTS.md
-4. Update the summary count in AGENTS.md if status changed
-5. Submit a pull request with your changes
+1. **Edit the agent file** in `agents/`
+2. **Bump the version** if making significant changes
+3. **Update `last-validated`** date
+4. **Add changelog entry** explaining what changed
+5. **Update README.md** if status or description changed
+
+---
 
 ## Documentation Standards
 
 ### File Naming
 
-- Use lowercase with hyphens for file names: `agent-name.md`
+- Use lowercase with hyphens: `agent-name.md`
 - Be descriptive but concise
-- Avoid special characters
 
-### Markdown Style
-
-- Use proper markdown formatting
-- Include code blocks with language specifications
-- Use tables for structured data
-- Keep line length reasonable (80-120 characters)
-
-### Required Information
+### Required Sections
 
 All agent documentation must include:
-- Clear overview and description
-- Current status
-- Owner/responsible party
-- Last updated date
-- Technical details
-- Usage instructions
 
-### Status Updates
+| Section | Required |
+|---------|----------|
+| YAML frontmatter | ✅ |
+| Vision / Description | ✅ |
+| Capabilities (tools, integrations) | ✅ |
+| Risk Assessment | ✅ |
+| Workflow Integration | ✅ |
+| Evaluation & Adoption | ✅ |
+| Governance (owner, changelog) | ✅ |
 
-When updating agent status:
-- Always update the **Last Updated** date
-- Add a changelog entry explaining what changed
-- Update the AGENTS.md summary counts
+### Maturity Levels
+
+| Level | When to Use |
+|-------|-------------|
+| `experimental` | New agents, early exploration |
+| `beta` | Functional, being refined, some adoption |
+| `stable` | Production-ready, widely adopted |
+| `deprecated` | No longer maintained, on hold |
+
+---
 
 ## Pull Request Process
 
 1. **Create a descriptive PR title**
-   - Good: "Add Code Review Agent documentation"
-   - Bad: "Update files"
+   - ✅ Good: "Add Code Review Agent documentation"
+   - ❌ Bad: "Update files"
 
-2. **Provide context in PR description**
+2. **Provide context**
    - What are you adding/changing?
    - Why is this change needed?
-   - Link to related issues
 
 3. **Keep changes focused**
    - One agent per PR when adding new agents
-   - Group related updates together
 
-4. **Review your own PR**
+4. **Self-review**
    - Check for typos and formatting
    - Ensure all links work
-   - Verify status counts are correct
+   - Verify README counts are correct
 
-5. **Respond to feedback**
-   - Address reviewer comments
-   - Make requested changes promptly
-   - Ask questions if unclear
+---
 
 ## Questions?
 
-If you have questions about contributing, please:
+If you have questions:
 - Open an issue for discussion
-- Reach out to the repository maintainers
-- Check existing documentation and issues first
+- Check existing documentation first
+- Review similar agents for examples
 
-Thank you for helping make SDLC Agents better! 🚀
+Thank you for helping improve SDLC Agents! 🚀
