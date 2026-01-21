@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-01-20T17:42:06.655540",
+  "comparison": "CaaS vs Baseline (Naive Chunking)",
+  "metric": "Precision@5",
+  "caas": {
+    "mean": 0.8148,
+    "std": 0.0454,
+    "median": 0.8137,
+    "min": 0.689,
+    "max": 0.9126,
+    "ci_95": [
+      0.8059,
+      0.8235
+    ]
+  },
+  "baseline": {
+    "mean": 0.6413,
+    "std": 0.0572,
+    "median": 0.645,
+    "min": 0.5249,
+    "max": 0.8032,
+    "ci_95": [
+      0.6303,
+      0.6526
+    ]
+  },
+  "statistical_tests": {
+    "paired_ttest": {
+      "t_statistic": 22.3113,
+      "p_value": 0.0,
+      "significant_alpha_05": true
+    },
+    "effect_size": {
+      "cohens_d": 3.3584,
+      "interpretation": "large"
+    }
+  },
+  "improvement": {
+    "absolute": 0.1735,
+    "relative_percent": 27.05
+  }
+}
