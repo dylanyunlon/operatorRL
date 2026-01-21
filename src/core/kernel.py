@@ -247,11 +247,18 @@ class VerificationKernel:
             logger.warning(f"Config file not found: {config_path}, using defaults")
             return {}
         
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
+        try:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            logger.warning(f"Failed to parse YAML config file {config_path}: {e}. Using defaults.")
+            return {}
+        except Exception as e:
+            logger.error(f"Error loading config file {config_path}: {e}. Using defaults.")
+            return {}
         
         logger.info(f"Loaded configuration from {config_path}")
-        return config
+        return config or {}
     
     def get_graph_stats(self) -> Dict:
         """Get statistics about the graph state."""
