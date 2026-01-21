@@ -24,11 +24,27 @@ human-checkpoints:
 cost-profile: moderate
 failure-modes: ['Incorrect KPI mapping', 'Duplicate work items', 'Misclassified SFI types']
 # WORKFLOW INTEGRATION
-trigger-scenarios: ['Weekly/Monthly SFI review', 'SFI intake events']
-input-contract: [{'name': 'sfi_sources', 'type': 'files', 'required': True, 'description': 'Data sources / exports'}]
-output-contract: [{'name': 'kpi_report', 'type': 'markdown', 'location': 'stdout', 'description': 'Trend, goals, and deltas'}, {'name': 'ado_wits', 'type': 'json', 'location': 'file', 'description': 'Created/updated ADO items'}]
-upstream-agents: ['FUN Report']
-downstream-agents: ['SWE Agent']
+trigger-scenarios:
+  - Weekly/Monthly SFI review
+  - SFI intake events
+input-contract:
+  - name: sfi_sources
+    type: files
+    required: true
+    description: Data sources / exports
+output-contract:
+  - name: kpi_report
+    type: markdown
+    location: stdout
+    description: Trend, goals, and deltas
+  - name: ado_wits
+    type: json
+    location: file
+    description: Created/updated ADO items
+upstream-agents:
+  - FUN Report
+downstream-agents:
+  - SWE Agent
 persona: Operationally minded program manager
 # EVALUATION & ADOPTION
 success-metrics: ['KPI freshness within 24h', 'Reduction in manual SFI processing']
@@ -36,7 +52,7 @@ time-to-value: 1-2 days initial, then hours
 adoption-prerequisites: ['ADO area path permissions', 'Power BI workspace']
 learning-curve: moderate
 # GOVERNANCE
-owner: "TBD"
+owner: "AX&E Engineering"
 last-validated: 2026-01-21
 changelog: ['0.1.0: First draft']
 deprecation-policy: N/A

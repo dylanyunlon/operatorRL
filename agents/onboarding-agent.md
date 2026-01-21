@@ -24,11 +24,24 @@ human-checkpoints:
 cost-profile: minimal
 failure-modes: ['Outdated source materials', 'Non-standard team practices']
 # WORKFLOW INTEGRATION
-trigger-scenarios: ['New hire joins', 'Team rotation']
-input-contract: [{'name': 'team_sources', 'type': 'string[]', 'required': True, 'description': 'Links to wikis/repos'}]
-output-contract: [{'name': 'onboarding_guide', 'type': 'markdown', 'location': 'stdout', 'description': 'Role-specific starter guide'}]
-upstream-agents: ['Planning Agent']
-downstream-agents: ['New Hire', 'Manager']
+trigger-scenarios:
+  - New hire joins
+  - Team rotation
+input-contract:
+  - name: team_sources
+    type: string[]
+    required: true
+    description: Links to wikis/repos
+output-contract:
+  - name: onboarding_guide
+    type: markdown
+    location: stdout
+    description: Role-specific starter guide
+upstream-agents:
+  - Planning Agent
+downstream-agents:
+  - New Hire
+  - Manager
 persona: Supportive coach with curated, minimal path
 # EVALUATION & ADOPTION
 success-metrics: ['Time-to-first-PR', 'Time-to-environment-setup']
@@ -36,7 +49,7 @@ time-to-value: Same day
 adoption-prerequisites: ['Access to team repositories and wikis']
 learning-curve: minimal
 # GOVERNANCE
-owner: "TBD"
+owner: "AX&E Engineering"
 last-validated: 2026-01-21
 changelog: ['0.1.0: Initial']
 deprecation-policy: N/A

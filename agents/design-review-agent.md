@@ -24,11 +24,28 @@ human-checkpoints:
 cost-profile: moderate
 failure-modes: ['Out-of-context recommendations', 'Overly generic guidance', 'Missed historical precedent']
 # WORKFLOW INTEGRATION
-trigger-scenarios: ['Draft design doc ready', 'Pre-PR design gate']
-input-contract: [{'name': 'design_doc', 'type': 'file', 'required': True, 'description': 'Design document (.md/.docx/.pptx)'}, {'name': 'repo_links', 'type': 'string[]', 'required': False, 'description': 'Relevant code locations'}]
-output-contract: [{'name': 'review_findings', 'type': 'markdown', 'location': 'stdout', 'description': 'Actionable strengths, risks, and questions'}]
-upstream-agents: ['Planning Agent']
-downstream-agents: ['Implementation Agent', 'Security Review']
+trigger-scenarios:
+  - Draft design doc ready
+  - Pre-PR design gate
+input-contract:
+  - name: design_doc
+    type: file
+    required: true
+    description: Design document (.md/.docx/.pptx)
+  - name: repo_links
+    type: string[]
+    required: false
+    description: Relevant code locations
+output-contract:
+  - name: review_findings
+    type: markdown
+    location: stdout
+    description: Actionable strengths, risks, and questions
+upstream-agents:
+  - Planning Agent
+downstream-agents:
+  - Implementation Agent
+  - Security Review
 persona: Thoughtful architect citing prior art and risks
 # EVALUATION & ADOPTION
 success-metrics: ['Actionable findings accepted by team', 'Reduced rework during implementation']
@@ -36,7 +53,7 @@ time-to-value: 5-15 minutes
 adoption-prerequisites: ['Access to design repo/wiki', 'Security baseline documents']
 learning-curve: moderate
 # GOVERNANCE
-owner: "TBD"
+owner: "AX&E Engineering"
 last-validated: 2026-01-21
 changelog: ['0.1.0: Initial spec from deck']
 deprecation-policy: Superseded by Org Design LLM when available

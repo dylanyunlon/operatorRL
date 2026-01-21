@@ -1,60 +1,105 @@
 # SDLC Agents
 
-This repository maintains information and status about all agents we are building for the Software Development Life Cycle (SDLC).
+> A collection of AI agents designed to automate and enhance the Software Development Lifecycle (SDLC).
 
 ## Overview
 
-This repository serves as a central hub for tracking, documenting, and maintaining the status of various AI agents designed to support and automate different phases of the software development lifecycle.
+This repository serves as a central hub for tracking, documenting, and maintaining the status of various AI agents designed to support and automate different phases of the software development lifecycle. Each agent follows a standardized specification format to ensure consistency, evaluability, and safe adoption.
+
+## 📋 Agent Specification
+
+All agents in this repository follow the [Agent Specification v1.0](agent-specification.md), which defines:
+
+- **Metadata** – Identity, versioning, and categorization
+- **Capabilities** – Tools, handoffs, and integrations
+- **Risk Assessment** – Autonomy level, blast radius, and failure modes
+- **Workflow Integration** – Triggers, inputs, outputs, and agent relationships
+- **Evaluation & Adoption** – Success metrics and prerequisites
+- **Governance** – Ownership and lifecycle management
 
 ## Repository Structure
 
 ```
-.
-├── README.md           # This file - repository overview
-├── AGENTS.md          # Detailed status and information about all agents
-├── agents/            # Directory containing agent-specific documentation
-│   └── templates/     # Templates for documenting new agents
-└── docs/              # Additional documentation and guidelines
+sdlc_agents/
+├── README.md                    # This file
+├── agent-specification.md       # Formal taxonomy for agent specs
+└── agents/
+    ├── accessibility-agent.md
+    ├── design-review-agent.md
+    ├── fun-report-agent.md
+    ├── onboarding-agent.md
+    ├── planning-agent.md
+    ├── productivity-agent.md
+    ├── release-freshness-agent.md
+    ├── sfi-agent.md
+    ├── sre-agent.md
+    ├── unit-and-scenario-testing-agent.md
+    └── zero-production-touch.md
 ```
 
-## Quick Links
+## 🤖 Available Agents
 
-- [Agent Status Dashboard](AGENTS.md) - View all agents and their current status
-- [Agent Template](agents/templates/AGENT_TEMPLATE.md) - Template for adding new agents
-- [Contributing Guidelines](docs/CONTRIBUTING.md) - How to contribute to this repository
+| Agent | Category | Maturity | Description |
+|-------|----------|----------|-------------|
+| [Planning Agent](agents/planning-agent.md) | orchestrator | 🟡 beta | Summarizes sprint plans, creates and updates ADO items, and maintains hygiene |
+| [Design Review Agent](agents/design-review-agent.md) | hybrid | 🟡 beta | Provides early feedback on design, architecture, and security |
+| [Accessibility Agent](agents/accessibility-agent.md) | hybrid | 🟡 beta | Automates accessibility checks and bug fixing with code fix proposals |
+| [Unit & Scenario Testing Agent](agents/unit-and-scenario-testing-agent.md) | analyst | 🟡 beta | Generates AI-assisted unit and scenario tests for increased coverage |
+| [SFI Agent](agents/sfi-agent.md) | hybrid | 🟡 beta | Manages SFI work, tracks KPIs, and automates ADO WIT creation |
+| [FUN Report Agent](agents/fun-report-agent.md) | analyst | 🟡 beta | Centralized reporting for LSI/SFI metrics |
+| [Release Freshness Agent](agents/release-freshness-agent.md) | analyst | 🟡 beta | Tracks production freshness and follows up on delayed deployments |
+| [SRE Agent](agents/sre-agent.md) | orchestrator | 🧪 experimental | Self-serve live site incident assistant with 24×7 monitoring |
+| [Onboarding Agent](agents/onboarding-agent.md) | capture | 🧪 experimental | Reduces onboarding time by generating engineering artifacts |
+| [Productivity Agent](agents/productivity-agent.md) | analyst | 🧪 experimental | Automates measurement of coding productivity with dashboards |
+| [Zero Production Touch](agents/zero-production-touch.md) | orchestrator | ⛔ deprecated | Automated safety dashboard for production changes (on hold) |
+
+### Maturity Legend
+
+| Icon | Level | Description |
+|------|-------|-------------|
+| 🧪 | `experimental` | Early exploration, expect breaking changes |
+| 🟡 | `beta` | Functional but still being refined |
+| 🟢 | `stable` | Production-ready |
+| ⛔ | `deprecated` | No longer actively maintained |
 
 ## Agent Categories
 
-Our SDLC agents are organized into the following categories:
+Our SDLC agents are organized using the [Agent Specification](agent-specification.md) categories:
 
-1. **Planning & Requirements** - Agents that assist with project planning and requirement gathering
-2. **Design & Architecture** - Agents that help with system design and architectural decisions
-3. **Development & Coding** - Agents that support code generation, refactoring, and development tasks
-4. **Testing & Quality Assurance** - Agents that automate testing and quality checks
-5. **Deployment & Operations** - Agents that handle deployment and operational tasks
-6. **Monitoring & Maintenance** - Agents that monitor systems and assist with maintenance
+| Category | Description |
+|----------|-------------|
+| **capture** | Agents that gather and structure information |
+| **coach** | Agents that guide and teach users |
+| **analyst** | Agents that research, analyze, and report |
+| **orchestrator** | Agents that coordinate workflows and other agents |
+| **hybrid** | Agents that combine multiple capabilities |
 
-## Getting Started
+## 🚀 Getting Started
 
-To add a new agent to this repository:
+1. **Browse agents** – Review the agent specifications in the [`agents/`](agents/) directory
+2. **Understand the spec** – Read the [Agent Specification](agent-specification.md) to understand the taxonomy
+3. **Evaluate fit** – Use the risk assessment and adoption prerequisites to determine if an agent suits your needs
+4. **Integrate** – Follow the workflow integration section to connect agents to your processes
 
-1. Create a new document in the `agents/` directory using the [agent template](agents/templates/AGENT_TEMPLATE.md)
-2. Update the [AGENTS.md](AGENTS.md) file with the agent's information and status
-3. Submit a pull request with your changes
+## 🤝 Contributing
+
+To add a new agent:
+
+1. Create a new `.md` file in the `agents/` directory
+2. Follow the [Agent Specification v1.0](agent-specification.md) format
+3. Include all required fields for each section
+4. Set appropriate maturity level (start with `experimental`)
+5. Define clear human checkpoints for any risky operations
 
 ## Status Definitions
 
-- **Planned** - Agent is in planning phase
-- **In Development** - Agent is actively being developed
-- **Testing** - Agent is in testing phase
-- **Active** - Agent is deployed and operational
-- **Maintenance** - Agent is in maintenance mode, minimal updates
-- **Deprecated** - Agent is no longer being maintained
-
-## Contributing
-
-Please read our [Contributing Guidelines](docs/CONTRIBUTING.md) before submitting changes.
+| Maturity | Description |
+|----------|-------------|
+| `experimental` | Early exploration, expect breaking changes |
+| `beta` | Functional but still being refined |
+| `stable` | Production-ready |
+| `deprecated` | No longer actively maintained |
 
 ## License
 
-See the LICENSE file for details.
+Internal use only – AX&E Engineering

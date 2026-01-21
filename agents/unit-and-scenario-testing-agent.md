@@ -24,11 +24,26 @@ human-checkpoints:
 cost-profile: moderate
 failure-modes: ['Flaky tests', 'Overfitting to current UI state']
 # WORKFLOW INTEGRATION
-trigger-scenarios: ['New feature PR', 'Regression bug postmortem']
-input-contract: [{'name': 'target_module', 'type': 'string', 'required': True, 'description': 'Module or feature name'}]
-output-contract: [{'name': 'tests', 'type': 'files', 'location': 'file', 'description': 'Generated test files'}, {'name': 'coverage_report', 'type': 'markdown', 'location': 'stdout', 'description': 'Diff in coverage and risk areas'}]
+trigger-scenarios:
+  - New feature PR
+  - Regression bug postmortem
+input-contract:
+  - name: target_module
+    type: string
+    required: true
+    description: Module or feature name
+output-contract:
+  - name: tests
+    type: files
+    location: file
+    description: Generated test files
+  - name: coverage_report
+    type: markdown
+    location: stdout
+    description: Diff in coverage and risk areas
 upstream-agents: []
-downstream-agents: ['CI/CD']
+downstream-agents:
+  - CI/CD
 persona: Diligent test engineer
 # EVALUATION & ADOPTION
 success-metrics: ['Coverage delta per PR', 'Defects caught before release']
@@ -36,7 +51,7 @@ time-to-value: Per PR within minutes
 adoption-prerequisites: ['Pipeline permissions', 'Test environment']
 learning-curve: moderate
 # GOVERNANCE
-owner: "TBD"
+owner: "AX&E Engineering"
 last-validated: 2026-01-21
 changelog: ['0.1.0: Initial']
 deprecation-policy: N/A
