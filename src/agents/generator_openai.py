@@ -112,12 +112,15 @@ class OpenAIGenerator(BaseAgent):
             prompt_parts.append("\n\nPrevious Verification Feedback:")
             prompt_parts.append(f"Outcome: {feedback.get('outcome', 'N/A')}")
             
-            if feedback.get("critical_issues"):
-                prompt_parts.append(f"Critical Issues: {', '.join(feedback['critical_issues'])}")
-            if feedback.get("logic_flaws"):
-                prompt_parts.append(f"Logic Flaws: {', '.join(feedback['logic_flaws'])}")
-            if feedback.get("missing_edge_cases"):
-                prompt_parts.append(f"Missing Edge Cases: {', '.join(feedback['missing_edge_cases'])}")
+            critical_issues = feedback.get("critical_issues", [])
+            if critical_issues:
+                prompt_parts.append(f"Critical Issues: {', '.join(critical_issues)}")
+            logic_flaws = feedback.get("logic_flaws", [])
+            if logic_flaws:
+                prompt_parts.append(f"Logic Flaws: {', '.join(logic_flaws)}")
+            missing_edge_cases = feedback.get("missing_edge_cases", [])
+            if missing_edge_cases:
+                prompt_parts.append(f"Missing Edge Cases: {', '.join(missing_edge_cases)}")
             
             prompt_parts.append("\nPlease address these issues in your solution.")
         
