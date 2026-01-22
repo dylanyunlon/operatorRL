@@ -73,8 +73,8 @@ Issues = "https://github.com/imran-siddique/context-as-a-service/issues"
 caas = "caas.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["caas*"]
+where = ["src"]
+namespaces = false
 
 [tool.setuptools.package-data]
 caas = ["py.typed"]
@@ -87,14 +87,14 @@ python_functions = ["test_*"]
 addopts = [
     "-v",
     "--strict-markers",
-    "--cov=caas",
+    "--cov=src/caas",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
 ]
 
 [tool.coverage.run]
-source = ["caas"]
+source = ["src/caas"]
 omit = [
     "*/tests/*",
     "*/test_*.py",
