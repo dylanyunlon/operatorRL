@@ -1,5 +1,5 @@
 ---
-name: Planning Agent
+name: ADO Hygine Agent
 version: 0.2.0
 description: Helps engineers stay productive by automating ADO hygiene, Power Operating Model compliance, and day-to-day tracking tasks.
 category: orchestrator
@@ -8,24 +8,22 @@ owner: AX&E Engineering
 last-validated: 2026-01-21
 ---
 
-# Planning Agent
+# ADO Hygine Agent (previously known as Planning Agent)
 
 > Helps engineers stay productive by automating ADO hygiene, Power Operating Model compliance, and day-to-day tracking tasks.
 
 ## 🎯 Vision
 
-**Engineer velocity, not overhead** — Automate the tracking busywork so engineers can focus on building. This agent handles the "hundreds of things" that need attention: dates, assignments, goals, hygiene, and compliance.
+**Engineer velocity, not overhead** — Automate the tracking busywork so engineers can focus on building. This agent handles the "hundreds of things" that need attention: Automatically create user stories based on a technical specification document, linked to a feature work item, assignments, goals, hygiene, and compliance.
 
-> 📝 **Naming consideration:** Is "Planning Agent" the right name? This is really about **engineering productivity** and **tracking**, not product planning. Consider: *Tracking Agent*, *Velocity Agent*, *Hygiene Agent*?
 
 ### What This Agent Helps With
 
 | Area | Examples |
 |------|----------|
-| **Power Operating Model** | Start dates, end dates, project goals, work assignments |
+| **User Stories Creation** | Automatically generate user stories with required fields from a technical specification document and link them to a feature work item |
 | **ADO Hygiene** | Missing fields, stale items, incorrect states, orphaned work |
-| **Sprint Tracking** | Summaries, status, blockers, carryover |
-| **Compliance** | Required fields, area paths, iteration alignment |
+| **Sprint Tracking** | Summarizekey deliveries for a sprint, filtered by area and iteration paths |
 
 ### Current State
 
@@ -43,12 +41,13 @@ last-validated: 2026-01-21
 | **Maturity** | 🟡 beta |
 | **Owner** | AX&E Engineering |
 | **Orchestration Role** | coordinator |
+| **Wiki** | [link](https://dev.azure.com/ceapex/Engineering/_wiki/wikis/Engineering.wiki/11853/Planning-Agent) |
+| **Source Code** | [link](https://dev.azure.com/ceapex/Engineering/_git/scratch_dingyu_planning_agent) |
 
 ## Related Agents
 
-- [DRI Report Agent](dri-report-agent.md)
-- [S360 Agent](s360-agent.md)
 - [Design Review Agent](design-review-agent.md)
+- [Scenario Status Reporting & Hygiene](https://ceapex.visualstudio.com/CEINTL/_wiki/wikis/CEINTL.wiki/12142/Scenario-Status-Reporting-Hygiene)
 
 ---
 
@@ -58,19 +57,15 @@ last-validated: 2026-01-21
 | Tool | Description |
 |------|-------------|
 | `ado_api` | Azure DevOps API integration |
-| `power_bi` | Power BI dashboard creation |
 | `sharepoint_reader` | Read SharePoint content |
 | `teams_notifier` | Send Teams notifications |
 | `office365_search` | Search Office 365 content |
 
 ### Integrations
 - Azure DevOps
-- Power BI
-- SharePoint
 - Microsoft Teams
 
 ### Context Files
-- `power-operating-model-rules.md` — Required fields and compliance rules
 - `hygiene-rules.md` — ADO hygiene standards
 - `ado-templates.md` — Work item templates
 
@@ -153,7 +148,7 @@ last-validated: 2026-01-21
 
 | Team | Status |
 |------|--------|
-| **Localization** | ✅ Onboarded |
+| **Localization** | 🔄 Onboarding |
 | **Learn** | 🔄 Onboarding |
 | Other teams | 🔜 After initial feedback |
 
@@ -166,7 +161,7 @@ last-validated: 2026-01-21
 
 ### Prerequisites
 - ADO project access
-- Power BI workspace access
+
 
 ---
 
