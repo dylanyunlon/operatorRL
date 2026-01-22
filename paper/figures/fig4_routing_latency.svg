@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 400" font-family="Arial, sans-serif">
+  <defs>
+    <linearGradient id="heuristicGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#27AE60;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E8449;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="mlGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F39C12;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E67E22;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="llmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E74C3C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C0392B;stop-opacity:1" />
+    </linearGradient>
+    <filter id="barShadow2" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  
+  <!-- Title -->
+  <text x="350" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#2C3E50">Router Latency Comparison (Log Scale)</text>
+  <text x="350" y="55" text-anchor="middle" font-size="12" fill="#6C757D">CaaS Heuristic Router vs. ML-based and LLM-based alternatives</text>
+  
+  <!-- Chart background -->
+  <rect x="120" y="75" width="480" height="250" fill="#FAFAFA" stroke="#E0E0E0" stroke-width="1"/>
+  
+  <!-- Y-axis (log scale visual) -->
+  <line x1="120" y1="75" x2="120" y2="325" stroke="#495057" stroke-width="2"/>
+  <text x="60" y="205" text-anchor="middle" font-size="13" font-weight="bold" fill="#2C3E50" transform="rotate(-90, 60, 205)">Latency (ms)</text>
+  
+  <!-- Y-axis labels (log scale) -->
+  <text x="110" y="320" text-anchor="end" font-size="10" fill="#6C757D">0.001</text>
+  <line x1="115" y1="316" x2="600" y2="316" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="110" y="280" text-anchor="end" font-size="10" fill="#6C757D">0.01</text>
+  <line x1="115" y1="276" x2="600" y2="276" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="110" y="240" text-anchor="end" font-size="10" fill="#6C757D">0.1</text>
+  <line x1="115" y1="236" x2="600" y2="236" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="110" y="200" text-anchor="end" font-size="10" fill="#6C757D">1</text>
+  <line x1="115" y1="196" x2="600" y2="196" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="110" y="160" text-anchor="end" font-size="10" fill="#6C757D">10</text>
+  <line x1="115" y1="156" x2="600" y2="156" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="110" y="120" text-anchor="end" font-size="10" fill="#6C757D">100</text>
+  <line x1="115" y1="116" x2="600" y2="116" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="110" y="85" text-anchor="end" font-size="10" fill="#6C757D">1000</text>
+  
+  <!-- X-axis -->
+  <line x1="120" y1="325" x2="600" y2="325" stroke="#495057" stroke-width="2"/>
+  
+  <!-- Heuristic Router Bar (0.003ms) - log position ~300 -->
+  <rect x="160" y="298" width="100" height="27" fill="url(#heuristicGrad)" filter="url(#barShadow2)" rx="4"/>
+  <text x="210" y="287" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E8449">0.003ms</text>
+  <text x="210" y="345" text-anchor="middle" font-size="12" fill="#495057" font-weight="bold">Heuristic</text>
+  <text x="210" y="360" text-anchor="middle" font-size="11" fill="#27AE60">(CaaS)</text>
+  
+  <!-- ML Router Bar (15.2ms) - log position ~148 -->
+  <rect x="310" y="148" width="100" height="177" fill="url(#mlGrad)" filter="url(#barShadow2)" rx="4"/>
+  <text x="360" y="138" text-anchor="middle" font-size="14" font-weight="bold" fill="#E67E22">15.2ms</text>
+  <text x="360" y="345" text-anchor="middle" font-size="12" fill="#495057" font-weight="bold">ML-based</text>
+  <text x="360" y="360" text-anchor="middle" font-size="11" fill="#F39C12">(Classifier)</text>
+  
+  <!-- LLM Router Bar (450ms) - log position ~93 -->
+  <rect x="460" y="93" width="100" height="232" fill="url(#llmGrad)" filter="url(#barShadow2)" rx="4"/>
+  <text x="510" y="83" text-anchor="middle" font-size="14" font-weight="bold" fill="#C0392B">450ms</text>
+  <text x="510" y="345" text-anchor="middle" font-size="12" fill="#495057" font-weight="bold">LLM-based</text>
+  <text x="510" y="360" text-anchor="middle" font-size="11" fill="#E74C3C">(GPT-3.5)</text>
+  
+  <!-- Speedup annotations -->
+  <path d="M260 290 Q 285 250 310 200" stroke="#2C3E50" stroke-width="1.5" fill="none" stroke-dasharray="4,2"/>
+  <text x="295" y="235" text-anchor="middle" font-size="11" font-weight="bold" fill="#2C3E50">5,000×</text>
+  <text x="295" y="248" text-anchor="middle" font-size="9" fill="#6C757D">faster</text>
+  
+  <path d="M260 295 Q 360 230 460 160" stroke="#2C3E50" stroke-width="1.5" fill="none" stroke-dasharray="4,2"/>
+  <text x="380" y="200" text-anchor="middle" font-size="11" font-weight="bold" fill="#2C3E50">150,000×</text>
+  <text x="380" y="213" text-anchor="middle" font-size="9" fill="#6C757D">faster</text>
+  
+  <!-- Key insight box -->
+  <rect x="610" y="100" width="80" height="140" rx="6" fill="#E8F8F5" stroke="#27AE60" stroke-width="2"/>
+  <text x="650" y="125" text-anchor="middle" font-size="10" font-weight="bold" fill="#27AE60">Why?</text>
+  <line x1="620" y1="132" x2="680" y2="132" stroke="#27AE60" stroke-width="1"/>
+  <text x="650" y="150" text-anchor="middle" font-size="8" fill="#495057">No ML</text>
+  <text x="650" y="163" text-anchor="middle" font-size="8" fill="#495057">inference</text>
+  <text x="650" y="180" text-anchor="middle" font-size="8" fill="#495057">No API</text>
+  <text x="650" y="193" text-anchor="middle" font-size="8" fill="#495057">calls</text>
+  <text x="650" y="210" text-anchor="middle" font-size="8" fill="#495057">Pure</text>
+  <text x="650" y="223" text-anchor="middle" font-size="8" fill="#495057">heuristics</text>
+  
+  <!-- Bottom note -->
+  <rect x="150" y="375" width="400" height="20" rx="4" fill="#FEF9E7" stroke="#F1C40F" stroke-width="1"/>
+  <text x="350" y="389" text-anchor="middle" font-size="11" fill="#B7950B" font-weight="bold">"Speed > Smarts" — deterministic routing enables real-time RAG</text>
+</svg>

@@ -1,8 +1,33 @@
 # Paper Figures
 
-This folder contains figures for the CaaS paper.
+This folder contains figures for the CaaS paper. All figures are available as SVG (vector) format for high-quality rendering.
 
-## Figure 1: System Architecture
+## Available Figures
+
+| Figure | File | Description |
+|--------|------|-------------|
+| Fig 1 | `fig1_system_architecture.svg` | Complete CaaS system architecture |
+| Fig 2 | `fig2_context_triad.svg` | Context Triad with token budgets |
+| Fig 3 | `fig3_ablation_results.svg` | Ablation study bar chart |
+| Fig 4 | `fig4_routing_latency.svg` | Router latency comparison (log scale) |
+
+## Converting to PNG
+
+To convert SVGs to PNGs for paper submission:
+
+```bash
+# Using Inkscape (recommended)
+inkscape fig1_system_architecture.svg -o fig1_system_architecture.png --export-dpi=300
+
+# Using ImageMagick
+convert -density 300 fig1_system_architecture.svg fig1_system_architecture.png
+
+# Using cairosvg (Python)
+pip install cairosvg
+cairosvg fig1_system_architecture.svg -o fig1_system_architecture.png --dpi 300
+```
+
+## Figure 1: System Architecture (ASCII Reference)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
