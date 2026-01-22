@@ -43,6 +43,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `test_cli.py` - CLI tests
   - `test_reproducibility.py` - Seed/reproducibility tests
 - Pre-commit configuration (`.pre-commit-config.yaml`)
+- Architecture diagrams (`docs/DIAGRAMS.md`)
+  - Mermaid diagrams for architecture, verification loop, state machine
+  - ASCII art diagrams for terminals
+  - Export instructions for draw.io and LaTeX
+  - Color scheme reference
+- arXiv submission checklist (`ARXIV_CHECKLIST.md`)
+  - NeurIPS/ICLR/ICML requirements
+  - LLM usage disclosure templates
+  - Reproducibility checklist
+  - Anonymization guidelines
+- Ablation experiment runner (`experiments/ablation_runner.py`)
+  - Predefined configurations for baselines, cross-model, loop depth
+  - Statistical aggregation across runs
+  - LaTeX table generation
+- Results visualization (`experiments/visualize_results.py`)
+  - ASCII bar charts and tables
+  - SVG chart generation (no dependencies)
+  - LaTeX table export
+- Enhanced PAPER.md
+  - Formal problem definition with mathematical notation
+  - Blind spot reduction theorem
+  - Computational complexity analysis
+  - Expanded related work with positioning table
+  - Complete reference list (14 citations)
 
 ### Changed
 - Pinned all dependency versions in `requirements.txt`

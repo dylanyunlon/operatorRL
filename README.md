@@ -417,12 +417,14 @@ CMVK tracks the following metrics for evaluation:
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: Detailed system architecture
 - **[GETTING_STARTED.md](GETTING_STARTED.md)**: Step-by-step tutorial
 - **[FEATURE_3_TRACEABILITY.md](FEATURE_3_TRACEABILITY.md)**: Trace logging and visualization guide
+- **[SAFETY.md](SAFETY.md)**: Safety, ethics, and responsible use guidelines
+- **[CHANGELOG.md](CHANGELOG.md)**: Version history and changes
 
 ## Contributing
 
 This is a research project. Contributions are welcome! Areas of interest:
 
-- Additional model providers (Anthropic Claude, LLaMA, etc.)
+- Additional model providers (LLaMA, Mistral, etc.)
 - Enhanced prompt engineering for adversarial verification
 - New test datasets (HumanEval, LogicGrids, etc.)
 - Improved graph memory algorithms
