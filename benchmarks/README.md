@@ -77,7 +77,12 @@ We provide sample evaluation datasets in `benchmarks/data/sample_corpus/`:
 **📥 Download from Hugging Face:**
 ```python
 from datasets import load_dataset
-dataset = load_dataset("mosiddi/caas-benchmark-corpus-v1")
+
+# Full dataset
+dataset = load_dataset("imran-siddique/context-as-a-service")
+
+# Or the benchmark corpus variant
+corpus = load_dataset("imran-siddique/caas-benchmark-corpus")
 ```
 
 For larger-scale evaluation, consider:
