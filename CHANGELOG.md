@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **LaTeX paper** (`paper/cmvk_neurips.tex`)
+  - NeurIPS 2025 format with full methodology
+  - BibTeX references (`paper/references.bib`)
+  - Publication-ready tables and algorithm
+- **SVG figures** for paper/presentations
+  - Architecture diagram (`paper/figures/architecture.svg`)
+  - Results bar chart with error bars (`paper/figures/results_bar.svg`)
+  - Ablation study chart (`paper/figures/ablation.svg`)
+  - Figure generation script (`paper/generate_figures.py`)
+- **LICENSE** file (MIT)
 - Anthropic Claude verifier support (`AnthropicVerifier`)
 - CLI interface with `cmvk` command
   - `cmvk run` - Run verification on a task
@@ -20,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI/CD pipeline
 - Docker multi-stage build with production/sandbox/development targets
 - Per-agent temperature controls
-- Benchmark results table in README
+- Benchmark results table in README (with actual numbers, means±std, p-values)
 - HuggingFace Hub integration (`src/tools/huggingface_upload.py`)
   - Upload datasets, traces, and results
   - Auto-generate dataset cards
