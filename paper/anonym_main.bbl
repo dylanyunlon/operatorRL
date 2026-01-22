@@ -19,9 +19,11 @@ John~R Boyd.
 \newblock \emph{A Discourse on Winning and Losing}.
 \newblock Air University Press, 1987.
 
-\bibitem[Hong et~al.(2023)Hong, Zheng, Chen, et~al.]{hong2023metagpt}
-Sirui Hong, Xiawu Zheng, Jonathan Chen, et~al.
-\newblock Metagpt: Meta programming for multi-agent collaborative framework.
+\bibitem[Hong et~al.(2023)Hong, Zhuge, Chen, Zheng, Cheng, Zhang,
+  et~al.]{hong2023metagpt}
+Sirui Hong, Mingchen Zhuge, Jiaqi Chen, Xiawu Zheng, Yuheng Cheng, Ceyao Zhang,
+  et~al.
+\newblock Metagpt: Meta programming for a multi-agent collaborative framework.
 \newblock 2023.
 \newblock URL \url{https://arxiv.org/abs/2308.00352}.
 
@@ -52,10 +54,10 @@ Amirkeivan Mohtashami and Martin Jaggi.
 \newblock 2023.
 \newblock URL \url{https://arxiv.org/abs/2305.16300}.
 
-\bibitem[Shinn et~al.(2023)Shinn, Cassano, Gopinath, Narasimhan, and
+\bibitem[Shinn et~al.(2023)Shinn, Cassano, Berman, Gopinath, Narasimhan, and
   Yao]{shinn2023reflexion}
-Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik Narasimhan, and Shunyu
-  Yao.
+Noah Shinn, Federico Cassano, Edward Berman, Ashwin Gopinath, Karthik
+  Narasimhan, and Shunyu Yao.
 \newblock Reflexion: Language agents with verbal reinforcement learning.
 \newblock In \emph{Advances in Neural Information Processing Systems
   (NeurIPS)}, 2023.

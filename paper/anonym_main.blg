@@ -11,34 +11,34 @@ Warning--empty journal in mohtashami2023landmark
 Warning--empty journal in wang2023voyager
 You've used 11 entries,
             2773 wiz_defined-function locations,
-            645 strings with 6687 characters,
-and the built_in function-call counts, 4964 in all, are:
-= -- 396
-> -- 383
+            645 strings with 6760 characters,
+and the built_in function-call counts, 5164 in all, are:
+= -- 408
+> -- 419
 < -- 2
-+ -- 131
-- -- 120
-* -- 404
-:= -- 819
++ -- 143
+- -- 132
+* -- 428
+:= -- 855
 add.period$ -- 39
 call.type$ -- 11
-change.case$ -- 64
+change.case$ -- 68
 chr.to.int$ -- 11
 cite$ -- 26
 duplicate$ -- 223
 empty$ -- 364
-format.name$ -- 133
-if$ -- 1004
+format.name$ -- 145
+if$ -- 1040
 int.to.chr$ -- 1
 int.to.str$ -- 1
 missing$ -- 11
 newline$ -- 69
 num.names$ -- 44
-pop$ -- 147
+pop$ -- 155
 preamble$ -- 1
-purify$ -- 54
+purify$ -- 58
 quote$ -- 0
-skip$ -- 175
+skip$ -- 179
 stack$ -- 0
 substring$ -- 22
 swap$ -- 9

@@ -24,15 +24,21 @@ John~R Boyd.
 \newblock Regulation (eu) 2024/1689 - artificial intelligence act.
 \newblock Official Journal of the European Union, 2024.
 
-\bibitem[Han et~al.(2024)Han, Zheng, Liu, et~al.]{han2024wildguard}
-Ximing Han, Chulin Zheng, Tianyu Liu, et~al.
+\bibitem[Han et~al.(2024)Han, Rao, Ettinger, Jiang, Lin, Lambert, Choi, and
+  Dziri]{han2024wildguard}
+Seungju Han, Kavel Rao, Allyson Ettinger, Liwei Jiang, Bill~Yuchen Lin, Nathan
+  Lambert, Yejin Choi, and Nouha Dziri.
 \newblock Wildguard: Open one-stop moderation tools for safety risks,
   jailbreaks, and refusals of llms.
-\newblock \emph{arXiv preprint arXiv:2406.18495}, 2024.
+\newblock \emph{Advances in Neural Information Processing Systems (NeurIPS)},
+  2024.
+\newblock URL \url{https://arxiv.org/abs/2406.18495}.
 
-\bibitem[Hong et~al.(2023)Hong, Zheng, Chen, et~al.]{hong2023metagpt}
-Sirui Hong, Xiawu Zheng, Jonathan Chen, et~al.
-\newblock Metagpt: Meta programming for multi-agent collaborative framework.
+\bibitem[Hong et~al.(2023)Hong, Zhuge, Chen, Zheng, Cheng, Zhang,
+  et~al.]{hong2023metagpt}
+Sirui Hong, Mingchen Zhuge, Jiaqi Chen, Xiawu Zheng, Yuheng Cheng, Ceyao Zhang,
+  et~al.
+\newblock Metagpt: Meta programming for a multi-agent collaborative framework.
 \newblock 2023.
 \newblock URL \url{https://arxiv.org/abs/2308.00352}.
 
@@ -78,10 +84,10 @@ Amirkeivan Mohtashami and Martin Jaggi.
 \newblock Research foundations: Reflexion (NeurIPS 2023), Constitutional AI
   (Anthropic 2022), Voyager (arXiv:2305.16291).
 
-\bibitem[Shinn et~al.(2023)Shinn, Cassano, Gopinath, Narasimhan, and
+\bibitem[Shinn et~al.(2023)Shinn, Cassano, Berman, Gopinath, Narasimhan, and
   Yao]{shinn2023reflexion}
-Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik Narasimhan, and Shunyu
-  Yao.
+Noah Shinn, Federico Cassano, Edward Berman, Ashwin Gopinath, Karthik
+  Narasimhan, and Shunyu Yao.
 \newblock Reflexion: Language agents with verbal reinforcement learning.
 \newblock In \emph{Advances in Neural Information Processing Systems
   (NeurIPS)}, 2023.

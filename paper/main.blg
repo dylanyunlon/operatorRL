@@ -6,41 +6,41 @@ The style file: plainnat.bst
 Reallocating 'name_of_file' (item size: 1) to 13 items.
 Database file #1: bibliography.bib
 Warning--entry type for "scak2026" isn't style-file defined
---line 551 of file bibliography.bib
+--line 553 of file bibliography.bib
 Warning--empty journal in hong2023metagpt
 Warning--empty journal in liu2023lost
 Warning--empty journal in mohtashami2023landmark
 Warning--empty journal in wang2023voyager
 You've used 16 entries,
             2773 wiz_defined-function locations,
-            670 strings with 7581 characters,
-and the built_in function-call counts, 6616 in all, are:
-= -- 540
-> -- 461
+            670 strings with 7739 characters,
+and the built_in function-call counts, 7040 in all, are:
+= -- 568
+> -- 534
 < -- 6
-+ -- 160
-- -- 144
-* -- 498
-:= -- 1079
-add.period$ -- 56
++ -- 184
+- -- 168
+* -- 550
+:= -- 1154
+add.period$ -- 57
 call.type$ -- 16
-change.case$ -- 86
+change.case$ -- 95
 chr.to.int$ -- 16
 cite$ -- 36
 duplicate$ -- 303
 empty$ -- 523
-format.name$ -- 162
-if$ -- 1355
+format.name$ -- 186
+if$ -- 1432
 int.to.chr$ -- 1
 int.to.str$ -- 1
 missing$ -- 12
-newline$ -- 96
+newline$ -- 97
 num.names$ -- 64
-pop$ -- 207
+pop$ -- 224
 preamble$ -- 1
-purify$ -- 71
+purify$ -- 80
 quote$ -- 0
-skip$ -- 241
+skip$ -- 249
 stack$ -- 0
 substring$ -- 32
 swap$ -- 15
@@ -51,5 +51,5 @@ type$ -- 171
 warning$ -- 4
 while$ -- 48
 width$ -- 0
-write$ -- 211
+write$ -- 213
 (There were 5 warnings)
