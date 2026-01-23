@@ -10,7 +10,9 @@
 
 In multi-agent systems, tight coupling between agents creates dependency graphs that scale exponentially with system size. When Agent A must know about Agent B, C, and D to communicate, the system becomes rigid and unmaintainable.
 
-We built `amb` because **direct agent coupling creates spaghetti code**. The solution: **Scale by Subtraction**. By removing the requirement for agents to know about each other, we eliminate O(n²) dependencies and replace them with O(1) broadcast semantics. Agents emit signals (`"I am thinking"`, `"I need verification"`) without knowing who listens. The bus stays dumb and fast—it just transports the envelope.
+We built `amb` because **direct agent coupling creates spaghetti code**. The solution: **Scale by Subtraction**. 
+
+By removing the requirement for agents to know about each other, we eliminate O(n²) dependencies and replace them with O(1) broadcast semantics. Agents emit signals (`"I am thinking"`, `"I need verification"`) without knowing who listens. The bus stays dumb and fast—it just transports the envelope.
 
 
 
@@ -23,7 +25,7 @@ pip install amb-core
 For production deployments with Redis, RabbitMQ, or Kafka:
 ```bash
 pip install amb-core[redis]      # Redis support
-pip install amb-core[rabbitmq]   # RabbitMQ support  
+pip install amb-core[rabbitmq]   # RabbitMQ support
 pip install amb-core[kafka]      # Kafka support
 pip install amb-core[all]        # All adapters
 ```
@@ -32,11 +34,11 @@ pip install amb-core[all]        # All adapters
 
 ```python
 import asyncio
-from amb_core import MessageBus
+from amb_core import MessageBus, Message
 
 async def main():
     async with MessageBus() as bus:
-        async def handler(msg): print(msg.payload)
+        async def handler(msg: Message): print(msg.payload)
         await bus.subscribe("agent.events", handler)
         await bus.publish("agent.events", {"status": "ready"})
         await asyncio.sleep(0.1)
