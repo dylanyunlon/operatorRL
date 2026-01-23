@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amb-core"
+version = "0.1.0"
+description = "A lightweight, broker-agnostic message bus designed specifically for AI Agents"
+readme = "README.md"
+authors = [
+    { name = "Imran Siddique" }
+]
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pydantic>=2.0.0",
+    "anyio>=3.0.0",
+]
+
+[project.optional-dependencies]
+redis = ["redis>=4.0.0"]
+rabbitmq = ["aio-pika>=9.0.0"]
+kafka = ["aiokafka>=0.8.0"]
+all = [
+    "redis>=4.0.0",
+    "aio-pika>=9.0.0",
+    "aiokafka>=0.8.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/imran-siddique/amb"
+Repository = "https://github.com/imran-siddique/amb"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["amb_core*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
