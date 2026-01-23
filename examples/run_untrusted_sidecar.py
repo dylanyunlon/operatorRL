@@ -3,6 +3,12 @@ Example: Running an UNTRUSTED agent with the IATP Sidecar
 
 This demonstrates the warning and override mechanism.
 """
+import sys
+import os
+
+# Add SDK to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'sdk', 'python'))
+
 from iatp import (
     create_sidecar,
     CapabilityManifest,
