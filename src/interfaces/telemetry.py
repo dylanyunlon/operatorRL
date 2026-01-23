@@ -108,14 +108,21 @@ class TelemetryEmitter:
     process transparent and analyzable.
     """
     
-    def __init__(self, enable_console: bool = True, enable_file: bool = False):
+    def __init__(
+        self,
+        agent_id: Optional[str] = None,
+        enable_console: bool = True,
+        enable_file: bool = False
+    ):
         """
         Initialize telemetry emitter.
         
         Args:
+            agent_id: Default agent ID for events
             enable_console: Emit to console (stdout/stderr)
             enable_file: Emit to file (optional)
         """
+        self.default_agent_id = agent_id or "scak-kernel"
         self.enable_console = enable_console
         self.enable_file = enable_file
         self.events: List[AuditLog] = []
@@ -130,6 +137,31 @@ class TelemetryEmitter:
         file_handler = logging.FileHandler("kernel_telemetry.jsonl")
         file_handler.setFormatter(logging.Formatter('%(message)s'))  # Raw JSON
         logger.addHandler(file_handler)
+    
+    def emit_event(
+        self,
+        event_type: EventType,
+        data: Dict[str, Any],
+        agent_id: Optional[str] = None,
+        severity: str = "INFO"
+    ) -> None:
+        """
+        Generic event emitter for Layer 4 components.
+        
+        Args:
+            event_type: Type of event to emit
+            data: Event data dictionary
+            agent_id: Agent ID (uses default if not provided)
+            severity: Log severity (INFO, WARNING, ERROR)
+        """
+        event = AuditLog(
+            event_type=event_type,
+            agent_id=agent_id or self.default_agent_id,
+            data=data,
+            severity=severity
+        )
+        event.emit()
+        self.events.append(event)
     
     def emit_failure_detected(
         self,

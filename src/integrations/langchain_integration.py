@@ -39,6 +39,7 @@ except ImportError:
     BaseCallbackHandler = object
     AsyncCallbackHandler = object
     Runnable = object
+    RunnableConfig = object  # Add stub for RunnableConfig
     BaseMessage = object
     SystemMessage = object
     AIMessage = object

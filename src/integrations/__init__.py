@@ -1,15 +1,55 @@
-"""
-LangChain Integration for Self-Correcting Agent Kernel (SCAK).
+"""Integrations for Self-Correcting Agent Kernel (SCAK).
 
-This module provides LangChain-compatible components that enable:
-1. Automatic laziness detection and correction
-2. Dynamic memory management with 3-Tier hierarchy
-3. Runtime failure handling with self-correction
+Layer 4 (Extension/Plugin) integrations:
+
+1. Control Plane Integration (agent-control-plane)
+   - SCAKExtension: Register SCAK as a Control Plane extension
+   - MockControlPlane: For testing without the actual package
+
+2. CMVK Integration (cmvk)
+   - MockCMVKVerifier: For testing without the actual package
+   - ProductionCMVKVerifier: For production with real CMVK
+
+3. LangChain Integration (langchain)
+   - SCAKMemory: SCAK-powered memory for LangChain
+   - SelfCorrectingRunnable: Self-correcting chain wrapper
 
 Usage:
-    from scak.integrations.langchain import SCAKMemory, SCAKCallbackHandler, SelfCorrectingRunnable
+    # With Control Plane
+    from agent_control_plane import ControlPlane
+    from scak.integrations import SCAKExtension
+    
+    cp = ControlPlane()
+    scak = SCAKExtension()
+    cp.register_extension(scak)
+    
+    # With CMVK
+    from cmvk import Verifier
+    from scak.integrations import ProductionCMVKVerifier
+    
+    verifier = ProductionCMVKVerifier(cmvk_client=Verifier())
 """
 
+# Control Plane Integration
+from .control_plane_adapter import (
+    AgentOutcome,
+    CorrectionPatch,
+    MockControlPlane,
+    SCAKExtension,
+    ProductionControlPlaneAdapter,
+    create_control_plane,
+    create_scak_extension,
+)
+
+# CMVK Integration
+from .cmvk_adapter import (
+    VerificationOutcome,
+    MockCMVKVerifier,
+    ProductionCMVKVerifier,
+    create_verifier,
+)
+
+# LangChain Integration
 from .langchain_integration import (
     SCAKMemory,
     SCAKCallbackHandler,
@@ -18,6 +58,22 @@ from .langchain_integration import (
 )
 
 __all__ = [
+    # Control Plane
+    "AgentOutcome",
+    "CorrectionPatch",
+    "MockControlPlane",
+    "SCAKExtension",
+    "ProductionControlPlaneAdapter",
+    "create_control_plane",
+    "create_scak_extension",
+    
+    # CMVK
+    "VerificationOutcome",
+    "MockCMVKVerifier",
+    "ProductionCMVKVerifier",
+    "create_verifier",
+    
+    # LangChain
     "SCAKMemory",
     "SCAKCallbackHandler",
     "SelfCorrectingRunnable",
