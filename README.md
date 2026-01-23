@@ -545,3 +545,106 @@ This is not about building better agents. This is about building **the infrastru
 **License:** MIT  
 **Contact:** GitHub Issues  
 **Website:** https://inter-agent-trust.org (coming soon)
+
+## 🔧 Enterprise Integration
+
+IATP leverages battle-tested PyPI packages for production-grade governance:
+
+### Policy Engine (agent-control-plane)
+
+The sidecar integrates **[agent-control-plane](https://pypi.org/project/agent-control-plane/)** for policy validation:
+
+```python
+from iatp import IATPPolicyEngine, CapabilityManifest
+
+# Create policy engine
+engine = IATPPolicyEngine()
+
+# Add custom policy rules
+engine.add_custom_rule({
+    "name": "RequireIdempotency",
+    "description": "Block agents without idempotency",
+    "action": "deny",
+    "conditions": {"idempotency": [False]}
+})
+
+# Validate manifests
+is_allowed, error, warning = engine.validate_manifest(manifest)
+```
+
+**Features:**
+- ✅ Customizable policy rules
+- ✅ Manifest validation against governance requirements
+- ✅ Integration with existing SecurityValidator
+- ✅ Warn vs. block decision logic
+
+### Recovery Engine (scak)
+
+The sidecar integrates **[scak](https://pypi.org/project/scak/)** (Self-Correcting Agent Kernel) for failure recovery:
+
+```python
+from iatp import IATPRecoveryEngine
+
+# Create recovery engine
+engine = IATPRecoveryEngine()
+
+# Handle failures with compensation
+result = await engine.handle_failure(
+    trace_id="trace-001",
+    error=error,
+    manifest=manifest,
+    payload=payload,
+    compensation_callback=refund_transaction
+)
+
+# Result contains:
+# - strategy: "rollback" | "retry" | "give_up"
+# - success: bool
+# - actions_taken: List[str]
+```
+
+**Features:**
+- ✅ Structured failure tracking with AgentFailure models
+- ✅ Intelligent recovery strategies (rollback, retry, give-up)
+- ✅ Compensation transaction support
+- ✅ Integration with agent reversibility capabilities
+
+### Automatic Integration in Sidecar
+
+The sidecar automatically uses both engines:
+
+```python
+from iatp import create_sidecar, CapabilityManifest
+
+manifest = CapabilityManifest(
+    agent_id="my-agent",
+    trust_level=TrustLevel.TRUSTED,
+    capabilities=AgentCapabilities(
+        reversibility=ReversibilityLevel.FULL,
+        idempotency=True
+    ),
+    privacy_contract=PrivacyContract(
+        retention=RetentionPolicy.EPHEMERAL
+    )
+)
+
+# Sidecar includes policy engine and recovery engine
+sidecar = create_sidecar(
+    agent_url="http://localhost:8000",
+    manifest=manifest
+)
+
+sidecar.run()
+```
+
+**Request Flow:**
+1. **Policy Check** - Validate manifest against rules
+2. **Security Check** - Validate sensitive data policies
+3. **Route** - Forward to backend agent
+4. **Error Handling** - Recovery engine attempts compensation
+
+**Demo:**
+```bash
+python examples/integration_demo.py
+```
+

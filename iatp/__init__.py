@@ -23,6 +23,8 @@ from iatp.models import (
 from iatp.sidecar import SidecarProxy, create_sidecar
 from iatp.security import SecurityValidator, PrivacyScrubber
 from iatp.telemetry import FlightRecorder, TraceIDGenerator
+from iatp.policy_engine import IATPPolicyEngine
+from iatp.recovery import IATPRecoveryEngine
 
 __all__ = [
     # Models
@@ -43,4 +45,8 @@ __all__ = [
     # Telemetry
     "FlightRecorder",
     "TraceIDGenerator",
+    # Policy Engine (agent-control-plane integration)
+    "IATPPolicyEngine",
+    # Recovery Engine (scak integration)
+    "IATPRecoveryEngine",
 ]
