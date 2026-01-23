@@ -42,7 +42,22 @@ htmlcov/
 # Logs
 *.log
 /tmp/iatp_logs/
+flight_recorder.jsonl
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Go
+sidecar/go/iatp-sidecar
+sidecar/go/go.sum
+
+# Docker
+*.tar
+
+# Temporary files
+tmp/
+*.tmp
+.env
+.env.local
+MANIFEST
