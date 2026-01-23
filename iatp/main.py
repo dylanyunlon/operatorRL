@@ -6,7 +6,7 @@ It can be run directly with: uvicorn iatp.main:app --host 0.0.0.0 --port 8081
 
 The sidecar acts as a gateway that:
 1. Intercepts all requests to/from the agent
-2. Validates requests using the Policy Engine (agent-control-plane)
+2. Validates requests using the built-in Policy Engine
 3. Handles failures using the Recovery Engine (scak)
 4. Enforces privacy and security policies
 5. Records all events in the Flight Recorder for distributed tracing
@@ -158,7 +158,7 @@ async def proxy_task(
     Flow:
     1. Generate/validate trace ID
     2. Parse and validate the payload
-    3. Run Policy Engine checks (agent-control-plane)
+    3. Run Policy Engine checks
     4. Run Security Validator checks
     5. Forward to upstream agent
     6. Handle failures with Recovery Engine (scak)
@@ -184,7 +184,7 @@ async def proxy_task(
             }
         )
     
-    # 3. POLICY ENGINE CHECK (agent-control-plane integration)
+    # 3. POLICY ENGINE CHECK
     policy_allowed, policy_error, policy_warning = policy_engine.validate_manifest(manifest)
     
     if not policy_allowed:

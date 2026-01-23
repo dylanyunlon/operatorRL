@@ -1,61 +1,119 @@
 """
-Policy Engine Integration with agent-control-plane.
+IATP Policy Engine - Protocol Layer Policy Validation.
 
-This module wraps the agent-control-plane PolicyEngine to provide
-policy validation for IATP capability manifests.
+This module provides policy validation for IATP capability manifests
+using a standalone, protocol-native implementation.
+
+Design Note: IATP is Layer 2 (Infrastructure/Protocol). It defines the
+message format, handshake protocols, and trust scores. Higher layers
+(like agent-control-plane) USE this protocol; this protocol does NOT
+depend on them.
 """
-from typing import Dict, Any, Tuple, Optional, List
-from agent_control_plane import PolicyEngine, PolicyRule
+from typing import Dict, Any, Tuple, Optional, List, Protocol, runtime_checkable
 from iatp.models import CapabilityManifest, RetentionPolicy, ReversibilityLevel
+
+
+@runtime_checkable
+class PolicyEvaluator(Protocol):
+    """
+    Protocol class for policy evaluation.
+    
+    This allows duck typing for any policy evaluator implementation
+    without requiring a specific import.
+    """
+    
+    def evaluate(self, context: Dict[str, Any]) -> str:
+        """Evaluate context and return action: 'allow', 'warn', or 'deny'."""
+        ...
+
+
+class PolicyRule:
+    """
+    A single policy rule for manifest validation.
+    
+    Rules are evaluated in order and the first matching rule determines
+    the action. Actions can be 'allow', 'warn', or 'deny'.
+    """
+    
+    def __init__(
+        self,
+        name: str,
+        action: str,
+        conditions: Dict[str, List[Any]],
+        description: str = ""
+    ):
+        """
+        Initialize a policy rule.
+        
+        Args:
+            name: Rule identifier
+            action: Action to take ('allow', 'warn', 'deny')
+            conditions: Dictionary mapping field names to allowed values
+            description: Human-readable description
+        """
+        self.name = name
+        self.action = action
+        self.conditions = conditions
+        self.description = description
+    
+    def matches(self, context: Dict[str, Any]) -> bool:
+        """
+        Check if this rule matches the given context.
+        
+        Args:
+            context: Policy evaluation context
+        
+        Returns:
+            True if any condition matches
+        """
+        for key, values in self.conditions.items():
+            if key in context and context[key] in values:
+                return True
+        return False
 
 
 class IATPPolicyEngine:
     """
-    Wrapper around agent-control-plane PolicyEngine for IATP.
+    IATP Policy Engine for capability manifest validation.
     
-    This integrates the agent-control-plane's policy validation
-    capabilities into IATP's handshake and request validation flow.
+    This is a protocol-native policy engine that validates incoming
+    agent manifests against configurable policy rules. It uses the
+    IATP trust scoring algorithm and provides warn/block decisions.
     
-    Note: This uses agent-control-plane's PolicyEngine for governance
-    and extends it with IATP-specific policy logic.
+    The engine is designed to be:
+    - Self-contained (no external dependencies beyond IATP models)
+    - Extensible (custom rules can be added)
+    - Protocol-compliant (follows IATP trust semantics)
     """
     
     def __init__(self):
         """Initialize the IATP Policy Engine."""
-        self.engine = PolicyEngine()
-        self.custom_rules: List[Dict[str, Any]] = []
+        self.rules: List[PolicyRule] = []
         self._setup_default_policies()
     
     def _setup_default_policies(self):
         """Setup default security policies for IATP."""
-        # Define IATP-specific policy rules
+        # Default IATP policy rules
         # These augment (not replace) the SecurityValidator checks
-        # The SecurityValidator handles sensitive data + retention blocking
-        self.custom_rules = [
-            {
-                "name": "WarnUntrustedAgent",
-                "description": "Warn when agents are marked as untrusted",
-                "action": "warn",
-                "conditions": {
-                    "trust_level": ["untrusted"]
-                }
-            },
-            {
-                "name": "RequireReversibility",
-                "description": "Warn when agents don't support reversibility",
-                "action": "warn",
-                "conditions": {
-                    "reversibility": ["none"]
-                }
-            },
-            {
-                "name": "AllowEphemeral",
-                "description": "Allow agents with ephemeral data retention",
-                "action": "allow",
-                "conditions": {
-                    "retention_policy": ["ephemeral"]
-                }
-            }
+        self.rules = [
+            PolicyRule(
+                name="WarnUntrustedAgent",
+                description="Warn when agents are marked as untrusted",
+                action="warn",
+                conditions={"trust_level": ["untrusted"]}
+            ),
+            PolicyRule(
+                name="RequireReversibility",
+                description="Warn when agents don't support reversibility",
+                action="warn",
+                conditions={"reversibility": ["none"]}
+            ),
+            PolicyRule(
+                name="AllowEphemeral",
+                description="Allow agents with ephemeral data retention",
+                action="allow",
+                conditions={"retention_policy": ["ephemeral"]}
+            ),
         ]
     
     def add_custom_rule(self, rule: Dict[str, Any]):
@@ -65,12 +123,18 @@ class IATPPolicyEngine:
         Args:
             rule: Dictionary defining the policy rule with keys:
                 - name: Rule name
-                - description: Rule description
+                - description: Rule description (optional)
                 - action: "allow", "warn", or "deny"
                 - conditions: Dictionary of conditions to match
         """
-        # Insert at the beginning so custom rules take precedence
-        self.custom_rules.insert(0, rule)
+        policy_rule = PolicyRule(
+            name=rule.get("name", "CustomRule"),
+            action=rule.get("action", "warn"),
+            conditions=rule.get("conditions", {}),
+            description=rule.get("description", "")
+        )
+        # Insert at beginning so custom rules take precedence
+        self.rules.insert(0, policy_rule)
     
     def validate_manifest(
         self,
@@ -94,20 +158,20 @@ class IATPPolicyEngine:
         # Convert manifest to policy context
         context = self._manifest_to_context(manifest)
         
-        # Evaluate against custom policy rules
-        permission_action = self._evaluate_rules(context)
+        # Evaluate against policy rules
+        action = self._evaluate_rules(context)
         
         # Generate appropriate response
-        if permission_action == "deny":
+        if action == "deny":
             return False, self._generate_deny_message(manifest, context), None
-        elif permission_action == "warn":
+        elif action == "warn":
             return True, None, self._generate_warn_message(manifest, context)
         else:  # allow
             return True, None, None
     
     def _evaluate_rules(self, context: Dict[str, Any]) -> str:
         """
-        Evaluate custom rules against context.
+        Evaluate policy rules against context.
         
         Args:
             context: Policy evaluation context
@@ -115,33 +179,12 @@ class IATPPolicyEngine:
         Returns:
             Action string: "allow", "warn", or "deny"
         """
-        # Check rules in order of severity: deny, warn, allow
-        for rule in self.custom_rules:
-            if self._rule_matches(rule, context):
-                return rule["action"]
+        for rule in self.rules:
+            if rule.matches(context):
+                return rule.action
         
         # Default to allow if no rules match
         return "allow"
-    
-    def _rule_matches(self, rule: Dict[str, Any], context: Dict[str, Any]) -> bool:
-        """
-        Check if a rule matches the context.
-        
-        Args:
-            rule: Rule definition
-            context: Context to check
-        
-        Returns:
-            True if rule matches
-        """
-        conditions = rule.get("conditions", {})
-        
-        for key, values in conditions.items():
-            if key in context:
-                if context[key] in values:
-                    return True
-        
-        return False
     
     def _manifest_to_context(self, manifest: CapabilityManifest) -> Dict[str, Any]:
         """
@@ -253,7 +296,6 @@ class IATPPolicyEngine:
             Tuple of (is_compatible, error_message)
         """
         if not required_capabilities:
-            # Default requirements
             required_capabilities = []
         
         # Always validate against base policies first

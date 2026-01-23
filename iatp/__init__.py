@@ -16,7 +16,7 @@ Quick Start:
     docker run -p 8081:8081 -e IATP_AGENT_URL=http://my-agent:8000 iatp-sidecar
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from iatp.models import (
     CapabilityManifest,

@@ -5,6 +5,20 @@ All notable changes to the Inter-Agent Trust Protocol (IATP) will be documented 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-23
+
+### Changed
+- **BREAKING**: Removed `agent-control-plane` dependency
+  - IATP is Layer 2 (Infrastructure/Protocol) - it defines the protocol, not the control plane
+  - Higher layers (agent-control-plane) USE IATP; IATP does not depend on them
+  - Policy Engine now uses built-in `PolicyRule` class and Python `Protocol` for extensibility
+- Refactored `IATPPolicyEngine` to be self-contained with duck typing
+- Updated all documentation to reflect architectural changes
+
+### Removed
+- Dependency on `agent-control-plane>=1.1.0`
+- External `PolicyEngine` wrapper - now uses built-in implementation
+
 ## [0.3.0] - 2026-01-22
 
 ### Added

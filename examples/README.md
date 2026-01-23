@@ -57,7 +57,7 @@ python examples/demo_client.py
 ```
 
 ### Integration Demo (`integration_demo.py`)
-- Demonstrates Policy Engine integration (`agent-control-plane`)
+- Demonstrates Policy Engine integration
 - Demonstrates Recovery Engine integration (`scak`)
 - Shows custom rule addition and failure recovery
 

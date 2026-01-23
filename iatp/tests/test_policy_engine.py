@@ -1,5 +1,5 @@
 """
-Tests for the IATP Policy Engine (agent-control-plane integration).
+Tests for the IATP Policy Engine.
 """
 import pytest
 from iatp.policy_engine import IATPPolicyEngine
@@ -17,7 +17,7 @@ def test_policy_engine_initialization():
     """Test that policy engine initializes with default policies."""
     engine = IATPPolicyEngine()
     assert engine is not None
-    assert engine.engine is not None
+    assert len(engine.rules) > 0
 
 
 def test_validate_manifest_ephemeral_allowed():

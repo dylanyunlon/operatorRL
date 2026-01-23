@@ -54,7 +54,7 @@ class SidecarProxy:
         self.flight_recorder = FlightRecorder()
         self.quarantine_sessions: Dict[str, QuarantineSession] = {}
         
-        # New integrations: agent-control-plane and scak
+        # Policy and Recovery engines
         self.policy_engine = IATPPolicyEngine()
         self.recovery_engine = IATPRecoveryEngine()
         
@@ -101,7 +101,7 @@ class SidecarProxy:
                     content={"error": "Invalid JSON payload", "trace_id": trace_id}
                 )
             
-            # Validate using Policy Engine (agent-control-plane integration)
+            # Validate using Policy Engine
             # This provides an additional layer of policy validation
             policy_allowed, policy_error, policy_warning = \
                 self.policy_engine.validate_manifest(self.manifest)

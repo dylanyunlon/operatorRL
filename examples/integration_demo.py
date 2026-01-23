@@ -1,7 +1,7 @@
 """
 Example demonstrating the IATP Policy Engine and Recovery Engine integration.
 
-This shows how the agent-control-plane and scak libraries are integrated
+This shows how the built-in policy engine and scak library are integrated
 into the IATP sidecar to provide policy validation and failure recovery.
 """
 import asyncio
@@ -18,9 +18,9 @@ from iatp import (
 
 
 async def demo_policy_engine():
-    """Demonstrate the Policy Engine integration with agent-control-plane."""
+    """Demonstrate the Policy Engine integration."""
     print("=" * 60)
-    print("DEMO 1: Policy Engine (agent-control-plane integration)")
+    print("DEMO 1: Policy Engine")
     print("=" * 60)
     
     # Create a policy engine
@@ -182,9 +182,9 @@ def demo_sidecar_integration():
     print("=" * 60)
     
     print("""
-The IATP Sidecar now integrates both engines:
+The IATP Sidecar integrates both engines:
 
-1. **Policy Validation (agent-control-plane)**:
+1. **Policy Validation (built-in)**:
    - Validates incoming requests against policy rules
    - Checks capability manifests before routing
    - Provides customizable policy enforcement
@@ -229,7 +229,7 @@ async def main():
     """Run all demos."""
     print("\n" + "=" * 60)
     print("IATP Integration Demo")
-    print("Demonstrating agent-control-plane and scak integration")
+    print("Demonstrating Policy Engine and scak integration")
     print("=" * 60)
     
     await demo_policy_engine()

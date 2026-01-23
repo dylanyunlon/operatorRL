@@ -64,12 +64,13 @@ The sidecar intercepts all incoming requests before they reach the agent:
 
 ### 2. Policy Engine (`iatp/policy_engine.py`)
 
-Wraps `agent-control-plane` for policy validation:
+Built-in policy validation engine:
 
 - Validates capability manifests against customizable policy rules
 - Provides warn vs. block decision logic
 - Supports custom rule addition at runtime
 - Integrates with existing SecurityValidator
+- Uses Protocol classes for extensibility (duck typing)
 
 ### 3. Recovery Engine (`iatp/recovery.py`)
 

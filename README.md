@@ -86,7 +86,7 @@ Our [cascading hallucination experiment](experiments/README.md) demonstrates:
 └─────────────┘         └──────────────┘         └─────────────┘
                               ▼
                     ┌─────────────────────┐
-                    │  Policy Engine      │ (agent-control-plane)
+                    │  Policy Engine      │ (built-in)
                     │  Security Checks    │ (PII detection)
                     │  Flight Recorder    │ (audit trail)
                     │  Recovery Engine    │ (scak)
@@ -159,7 +159,7 @@ iatp scan http://localhost:8081
 ├── iatp/                    # Core Python package
 │   ├── main.py              # Standalone sidecar application
 │   ├── cli.py               # CLI tools (iatp verify, iatp scan)
-│   ├── policy_engine.py     # Policy validation (agent-control-plane)
+│   ├── policy_engine.py     # Policy validation (built-in)
 │   ├── recovery.py          # Failure recovery (scak)
 │   ├── models/              # Data models (CapabilityManifest, etc.)
 │   ├── sidecar/             # FastAPI sidecar proxy

@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="inter-agent-trust-protocol",
-    version="0.3.0",
+    version="0.3.1",
     author="Imran Siddique",
     author_email="",
     description="Inter-Agent Trust Protocol - Envoy for Agents",
@@ -39,7 +39,6 @@ setup(
         "pydantic>=2.5.3",
         "httpx>=0.26.0",
         "python-dateutil>=2.8.2",
-        "agent-control-plane>=1.1.0",
         "scak>=1.1.0",
         "click>=8.0.0",
     ],
