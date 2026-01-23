@@ -302,3 +302,230 @@ best_action = reasoning_agent.select_best_action(context, criteria)
 4. **Conflict Resolution**: Automatic resolution of constraint conflicts
 5. **Temporal Constraints**: Time-based validation and scheduling
 6. **Distributed Knowledge Graphs**: Multi-node graph management
+
+---
+
+## Layer 5: The Listener Agent
+
+### Overview
+
+The Listener Agent is the capstone of the 5-layer architecture. It provides a reference implementation of a passive observer that monitors graph states without interfering until configured thresholds are exceeded.
+
+**Elevator Pitch**: A reference implementation of a "Listener" agent that uses the full stack to monitor graph states without interfering until a threshold is met.
+
+**Publication Target**: GitHub (Reference Repo) OR PyPI (reusable library)
+
+### The Consolidated Stack
+
+The Listener Agent consolidates four lower-layer dependencies:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                Layer 5: Listener Agent                       │
+│                   (This Repository)                          │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │              Pure Wiring - No Logic                  │   │
+│   │                                                      │   │
+│   │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │   │
+│   │  │ Control  │ │   SCAK   │ │   IATP   │ │  CAAS  │ │   │
+│   │  │  Plane   │ │ Adapter  │ │ Adapter  │ │ Adapter│ │   │
+│   │  │ Adapter  │ │          │ │          │ │        │ │   │
+│   │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬────┘ │   │
+│   └───────┼────────────┼────────────┼───────────┼──────┘   │
+│           │            │            │           │          │
+└───────────┼────────────┼────────────┼───────────┼──────────┘
+            │            │            │           │
+            ▼            ▼            ▼           ▼
+┌───────────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐
+│agent-control- │ │   scak    │ │   iatp    │ │   caas    │
+│    plane      │ │           │ │           │ │           │
+│               │ │Intelligence│ │ Security  │ │ Context   │
+│    Base       │ │  Layer    │ │  Layer    │ │  Layer    │
+│Orchestration  │ │           │ │           │ │           │
+└───────────────┘ └───────────┘ └───────────┘ └───────────┘
+    Layer 1         Layer 2       Layer 3       Layer 4
+```
+
+### Allowed Dependencies
+
+Per the Layer 5 specification, the Listener may ONLY depend on:
+
+1. **agent-control-plane** - Base orchestration primitives
+2. **scak** - Structured Contextual Agent Knowledge (intelligence)
+3. **iatp** - Inter-Agent Trust Protocol (security)
+4. **caas** - Context-as-a-Service (context management)
+
+### The Listener Pattern
+
+```
+                     ┌─────────────────────────┐
+                     │    Listener Agent       │
+                     │                         │
+   ┌─────────────────┤  State: OBSERVING       │
+   │                 │                         │
+   │                 └───────────┬─────────────┘
+   │                             │
+   │                             ▼
+   │                 ┌─────────────────────────┐
+   │                 │    State Observer       │
+   │                 │                         │
+   │  Passive ───────┤  • Collect metrics      │
+   │  Observation    │  • Track changes        │
+   │                 │  • Detect anomalies     │
+   │                 │                         │
+   │                 └───────────┬─────────────┘
+   │                             │
+   │                             ▼
+   │                 ┌─────────────────────────┐
+   │                 │  Threshold Evaluation   │
+   │                 │                         │
+   │                 │  • Check all rules      │
+   │  Threshold ─────┤  • Calculate max level  │◄── ThresholdConfig
+   │  Check          │  • Determine action     │
+   │                 │                         │
+   │                 └───────────┬─────────────┘
+   │                             │
+   │                    Threshold exceeded?
+   │                             │
+   │              ┌──────────────┴──────────────┐
+   │              │                             │
+   │              ▼ NO                     YES  ▼
+   │   ┌─────────────────────┐    ┌─────────────────────────┐
+   │   │  Continue Observing │    │  State: INTERVENING     │
+   │   │                     │    │                         │
+   └───┤  No interference    │    │  • Execute action       │
+       │                     │    │  • Log intervention     │
+       │                     │    │  • Notify callbacks     │
+       └─────────────────────┘    │                         │
+                                  └───────────┬─────────────┘
+                                              │
+                                              ▼
+                                  ┌─────────────────────────┐
+                                  │   State: RECOVERING     │
+                                  │                         │
+                                  │  • Verify stability     │
+                                  │  • Return to OBSERVING  │
+                                  │                         │
+                                  └─────────────────────────┘
+```
+
+### Threshold Types
+
+The Listener monitors multiple threshold categories:
+
+| Category | Threshold Types | Default Level |
+|----------|----------------|---------------|
+| Graph State | CONSTRAINT_VIOLATION_COUNT, DIMENSION_CONFLICT_RATIO, ACTION_REJECTION_RATE | WARN |
+| Security | TRUST_SCORE_MINIMUM, PERMISSION_ESCALATION_COUNT, ANOMALY_SCORE_MAXIMUM | HARD_BLOCK/EMERGENCY |
+| Context | CONTEXT_DRIFT_MAXIMUM, STALE_CONTEXT_AGE_SECONDS, AMBIGUITY_SCORE_MAXIMUM | SOFT_BLOCK |
+| Performance | GRAPH_TRAVERSAL_LATENCY_MS, HANDSHAKE_TIMEOUT_MS, QUEUE_DEPTH_MAXIMUM | WARN |
+
+### Intervention Levels
+
+```
+OBSERVE ──> WARN ──> SOFT_BLOCK ──> HARD_BLOCK ──> EMERGENCY
+   │          │          │              │              │
+   │          │          │              │              │
+   ▼          ▼          ▼              ▼              ▼
+ Log       Emit       Require        Reject        Halt
+ only     warning   confirmation    actions       system
+```
+
+### Key Design Principles
+
+1. **Passive by Default**
+   - Observe without interference
+   - Only intervene when thresholds are exceeded
+   - Minimize footprint on normal operations
+
+2. **Threshold-Driven Intervention**
+   - Clear, configurable triggers
+   - Multiple severity levels
+   - Rate limiting to prevent over-intervention
+
+3. **Pure Wiring**
+   - Delegate ALL logic to lower layers
+   - No reimplementation of layer functionality
+   - Adapters provide clean interfaces
+
+4. **Full Audit Trail**
+   - Every intervention is logged
+   - Complete context captured
+   - Callbacks for external integration
+
+### Usage Example
+
+```python
+from mute_agent import (
+    MultidimensionalKnowledgeGraph,
+    HandshakeProtocol,
+    SuperSystemRouter,
+    ListenerAgent,
+    ThresholdConfig,
+    ThresholdType,
+    InterventionLevel,
+)
+
+# Create core components
+kg = MultidimensionalKnowledgeGraph()
+protocol = HandshakeProtocol()
+router = SuperSystemRouter(kg)
+
+# Create and configure listener
+listener = ListenerAgent(
+    knowledge_graph=kg,
+    protocol=protocol,
+    router=router,
+)
+
+# Register intervention callback
+def on_intervention(event):
+    print(f"Intervention: {event.action_taken}")
+    
+listener.register_intervention_callback(on_intervention)
+
+# Start passive observation
+listener.start()
+
+# ... system operates normally ...
+# Listener intervenes automatically when thresholds exceeded
+
+# Stop when done
+listener.stop()
+```
+
+### Refactoring Actions Completed
+
+Per the Layer 5 specification, the following refactoring was performed:
+
+1. **Consolidate**: The Listener Agent wires together the four layer dependencies without redefining any logic that belongs in lower layers.
+
+2. **Adapters**: Clean adapter interfaces created for:
+   - `ControlPlaneAdapter` - agent-control-plane integration
+   - `IntelligenceAdapter` - scak integration
+   - `SecurityAdapter` - iatp integration
+   - `ContextAdapter` - caas integration
+
+3. **Mock Mode**: All adapters support mock mode for testing without actual dependencies installed.
+
+4. **Publication Ready**: Package structure supports both GitHub reference repo and PyPI distribution.
+
+### File Structure
+
+```
+mute_agent/
+├── listener/
+│   ├── __init__.py           # Layer 5 exports
+│   ├── listener.py           # ListenerAgent implementation
+│   ├── threshold_config.py   # Threshold configuration
+│   ├── state_observer.py     # Passive observation
+│   └── adapters/
+│       ├── __init__.py
+│       ├── base_adapter.py        # Common adapter protocol
+│       ├── control_plane_adapter.py
+│       ├── scak_adapter.py
+│       ├── iatp_adapter.py
+│       └── caas_adapter.py
+```
+
