@@ -68,7 +68,7 @@ CMVK sits at **Layer 1 (Primitives)** of the Agent OS. It provides low-level mat
               │
 ┌─────────────────────────────────────────┐
 │  Layer 1: Primitives (THIS LAYER)       │
-│  ├─ cmvk: Verification (THIS PROJECT)   │ ◄── You are here
+│  ├─ cmvk: Verification (THIS PROJECT) * │
 │  ├─ caas: Context-as-a-Service          │
 │  └─ emk: Episodic Memory Kernel         │
 └──────────────────────────────────────────┘
@@ -142,7 +142,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🔗 Links
 
-- **Documentation:** [README](https://github.com/imran-siddique/cross-model-verification-kernel#readme)
+- **Repository:** [github.com/imran-siddique/cross-model-verification-kernel](https://github.com/imran-siddique/cross-model-verification-kernel)
 - **PyPI:** [cmvk](https://pypi.org/project/cmvk/)
 - **Issues:** [GitHub Issues](https://github.com/imran-siddique/cross-model-verification-kernel/issues)
-- **Changelog:** [CHANGELOG.md](CHANGELOG.md)
+- **Changelog:** [CHANGELOG.md](https://github.com/imran-siddique/cross-model-verification-kernel/blob/main/CHANGELOG.md)
