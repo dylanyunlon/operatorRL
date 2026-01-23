@@ -128,5 +128,17 @@ jobs:
           name: dist
           path: dist/
       
-      - name: Publish to PyPI
+      # Option 1: Trusted Publishing (OIDC) - preferred
+      # Configure at: https://pypi.org/manage/account/publishing/
+      - name: Publish to PyPI (Trusted Publishing)
+        if: ${{ !secrets.PYPI_API_TOKEN }}
         uses: pypa/gh-action-pypi-publish@release/v1
+      
+      # Option 2: API Token fallback
+      # Create token at: https://pypi.org/manage/account/token/
+      # Add as secret: PYPI_API_TOKEN
+      - name: Publish to PyPI (API Token)
+        if: ${{ secrets.PYPI_API_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
