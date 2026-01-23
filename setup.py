@@ -11,6 +11,8 @@ setup(
         "pydantic>=2.5.3",
         "httpx>=0.26.0",
         "python-dateutil>=2.8.2",
+        "agent-control-plane>=1.1.0",
+        "scak>=1.1.0",
     ],
     python_requires=">=3.8",
 )
