@@ -1,269 +1,187 @@
-# Cross-Model Verification Kernel (CMVK)
+# CMVK - Cross-Model Verification Kernel
 
+[![PyPI version](https://badge.fury.io/py/cmvk.svg)](https://badge.fury.io/py/cmvk)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/imran-siddique/cross-model-verification-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/imran-siddique/cross-model-verification-kernel/actions)
-[![PyPI version](https://badge.fury.io/py/cross-model-verification-kernel.svg)](https://badge.fury.io/py/cross-model-verification-kernel)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-**Adversarial multi-model verification for more reliable LLM code generation.**
-
-> *"Trust, but Verify (with a different brain)."*
-
-## Quick Start
-
-```bash
-# Install
-pip install cross-model-verification-kernel
-
-# Set API keys
-export OPENAI_API_KEY=sk-...
-export GOOGLE_API_KEY=...
-
-# Run
-cmvk run --task "Write a fast Fibonacci function" \
-         --generator gpt-4o \
-         --verifier gemini-1.5-pro \
-         --max-loops 5
-```
-
-See [docs/getting_started.md](docs/getting_started.md) for detailed setup instructions.
-
-## The Problem
-
-Traditional "self-correcting" AI agents suffer from **correlated error blindness**: when an LLM generates buggy code, it often uses the same flawed logic to "verify" itself—missing its own mistakes.
-
-```
-┌─────────┐      ┌─────────┐
-│ GPT-4o  │ ───→ │ GPT-4o  │
-│Generate │      │ Verify  │
-└─────────┘      └─────────┘
-    Same Model = Shared Blind Spots
-```
-
-## The Solution
-
-CMVK uses **adversarial multi-model verification** where different models with different training data verify each other's work:
-
-```
-┌─────────┐      ┌─────────────┐      ┌─────────┐
-│ GPT-4o  │ ───→ │   Kernel    │ ───→ │ Gemini  │
-│Generator│      │  (Arbiter)  │      │Verifier │
-└─────────┘      └─────────────┘      └─────────┘
-                       │
-              ┌────────▼─────────┐
-              │  Graph of Truth  │
-              │  (State Machine) │
-              └──────────────────┘
-```
-
-**Key insight**: Different models have *different* blind spots. By using an adversarial verifier from a different provider, we dramatically reduce the probability of shared errors.
-
-## Benchmark Results
-
-### HumanEval (n=164, 5 runs)
-
-| Method | Pass@1 | Δ vs Baseline | Avg Loops |
-|--------|--------|---------------|-----------|
-| GPT-4o (baseline) | 84.1% ± 1.2 | — | 1.0 |
-| GPT-4o self-verify | 85.2% ± 1.4 | +1.1 | 1.6 |
-| **CMVK (GPT-4o → Gemini)** | **92.4% ± 0.9** | **+8.3** | 1.8 |
-| **CMVK (GPT-4o → Claude)** | **91.8% ± 1.0** | **+7.7** | 1.7 |
-
-*All CMVK results statistically significant (p < 0.01, Welch's t-test)*
-
-### Sabotage Detection (Prosecutor Mode)
-
-| Method | Recall | Precision | F1 Score |
-|--------|--------|-----------|----------|
-| GPT-4o self-review | 61% | 72% | 0.66 |
-| **CMVK Prosecutor** | **89%** | 84% | **0.86** |
-
-## Usage
-
-### CLI
-
-```bash
-# Basic verification
-cmvk run --task "Implement binary search"
-
-# Specify models
-cmvk run --task "Sort without built-in functions" \
-         --generator gpt-4o \
-         --verifier claude-3-5-sonnet-20241022
-
-# Reproducible experiments
-cmvk run --task "Check if prime" --seed 42 --output json
-
-# List available models
-cmvk models
-```
-
-### Python API
-
-```python
-from cross_model_verification_kernel import (
-    VerificationKernel,
-    OpenAIGenerator,
-    GeminiVerifier,
-)
-
-# Create agents
-generator = OpenAIGenerator(model="gpt-4o")
-verifier = GeminiVerifier(model="gemini-1.5-pro")
-
-# Create kernel
-kernel = VerificationKernel(generator=generator, verifier=verifier)
-
-# Run verification
-result = kernel.run(
-    task="Write a function to find the longest palindrome",
-    max_loops=5,
-)
-
-print(f"Success: {result.success}")
-print(f"Solution:\n{result.final_code}")
-```
-
-### Watch the Adversarial Debate
-
-```bash
-# Replay execution traces
-cmvk trace --latest
-
-# Example output:
-# >>> GPT-4o: I'll solve this using built-in sort...
-# >>> Gemini: OBJECTION! Violates constraint 'without sorted()'
-# >>> Kernel: ⚖️ Objection sustained. Strategy 'Built-In Sort' BANNED.
-# >>> GPT-4o: I'll try iterative sorting instead...
-# >>> Gemini: Verification PASSED. All tests successful.
-# >>> Kernel: ✅ Solution ACCEPTED.
-```
+**Layer 1: The Primitive** — A mathematical and adversarial verification library for calculating drift/hallucination scores between outputs.
 
 ## Installation
 
-### From PyPI
-
 ```bash
-pip install cross-model-verification-kernel
+pip install cmvk
 ```
 
-### From Source (Development)
-
+For enhanced statistical functions (recommended):
 ```bash
-git clone https://github.com/imran-siddique/cross-model-verification-kernel.git
-cd cross-model-verification-kernel
-
-# Install with all dependencies
-pip install -e ".[all]"
-
-# Or install dev dependencies separately
-pip install -e ".[dev]"
+pip install cmvk[scipy]
 ```
 
-### Docker
+## Quick Start
 
-```bash
-docker build -t cmvk:latest .
-docker run -it --rm \
-  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
-  -e GOOGLE_API_KEY="$GOOGLE_API_KEY" \
-  cmvk:latest cmvk run --task "Implement quicksort"
+```python
+from cmvk import verify
+
+# Compare two outputs
+score = verify(
+    output_a="def add(a, b): return a + b",
+    output_b="def add(x, y): return x + y"
+)
+
+print(f"Drift Score: {score.drift_score:.3f}")  # 0.0 = identical, 1.0 = completely different
+print(f"Confidence: {score.confidence:.3f}")
+print(f"Drift Type: {score.drift_type.value}")
 ```
 
-## Project Structure
+## Core Philosophy
 
-```
-cross-model-verification-kernel/
-├── src/cross_model_verification_kernel/  # Main package
-│   ├── core/                # Kernel logic & graph memory
-│   ├── agents/              # LLM interfaces (OpenAI, Gemini, Claude)
-│   ├── tools/               # Sandbox execution, visualization
-│   └── datasets/            # Dataset loaders
-├── tests/                   # Unit & integration tests
-├── experiments/             # Research benchmarks
-│   ├── datasets/           # HumanEval, sabotage tests
-│   └── scripts/            # Experiment runners
-├── docs/                    # Documentation
-├── paper/                   # Research paper & figures
-└── config/                  # Configuration files
-```
+CMVK is a **pure verification tool**. It calculates the mathematical drift between two outputs without any side effects:
 
-## Key Features
+- ✅ `verify(output_a, output_b) -> VerificationScore`
+- ✅ Pure functions with no side effects
+- ✅ Minimal dependencies (numpy only, scipy optional)
+- ❌ No self-correction loops
+- ❌ No agent control plane logic
+- ❌ No LLM API calls
 
-- **Adversarial Verification**: Verifier actively tries to break solutions
-- **Model Diversity**: Enforces different models for generator/verifier
-- **Prosecutor Mode**: Hostile testing catches 89% of bugs
-- **Graph of Truth**: Prevents infinite loops, caches proven solutions
-- **Strategy Banning**: Automatically avoids failing approaches
-- **Full Traceability**: Replay any execution step-by-step
+**CMVK is the tool used to verify; it is not the loop that triggers the correction.**
 
-## Documentation
+## API Reference
 
-| Document | Description |
-|----------|-------------|
-| [Getting Started](docs/getting_started.md) | Installation and first steps |
-| [Architecture](docs/architecture.md) | System design deep-dive |
-| [Safety](docs/safety.md) | Responsible use guidelines |
-| [Paper](paper/PAPER.md) | Full research paper |
+### `verify(output_a: str, output_b: str) -> VerificationScore`
 
-## Running Experiments
+Calculate drift/hallucination score between two text outputs.
 
-```bash
-# Quick sanity check (5 problems)
-python experiments/blind_spot_benchmark.py --dataset experiments/datasets/humaneval_sample.json
+```python
+from cmvk import verify
 
-# Full benchmark (164 problems)
-python experiments/blind_spot_benchmark.py --dataset experiments/datasets/humaneval_full.json
+score = verify(
+    "The capital of France is Paris.",
+    "Paris is the capital city of France."
+)
 
-# Sabotage stress test
-python experiments/sabotage_stress_test.py
+# Returns VerificationScore with:
+# - drift_score: float (0.0 to 1.0)
+# - confidence: float (0.0 to 1.0)
+# - drift_type: DriftType (SEMANTIC, STRUCTURAL, NUMERICAL, LEXICAL)
+# - details: dict with component scores
 ```
 
-## Development
+### `verify_embeddings(embedding_a, embedding_b) -> VerificationScore`
 
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
+Compare pre-computed embedding vectors using cosine distance and euclidean metrics.
 
-# Run tests
-pytest tests/ -v
+```python
+from cmvk import verify_embeddings
+import numpy as np
 
-# Run linting
-pre-commit run --all-files
+emb_a = np.array([0.1, 0.2, 0.3, 0.4])
+emb_b = np.array([0.15, 0.25, 0.28, 0.42])
 
-# Type checking
-mypy src/
+score = verify_embeddings(emb_a, emb_b)
+print(f"Semantic drift: {score.drift_score:.3f}")
 ```
 
-## Contributing
+### `verify_distributions(dist_a, dist_b) -> VerificationScore`
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Compare probability distributions using KL divergence and Jensen-Shannon divergence.
 
-Areas of interest:
-- Additional model providers (LLaMA, Mistral, etc.)
-- Enhanced adversarial prompts
-- New benchmark datasets
-- Improved graph memory algorithms
+```python
+from cmvk import verify_distributions
+import numpy as np
 
-## Citation
+dist_a = np.array([0.2, 0.3, 0.5])
+dist_b = np.array([0.25, 0.25, 0.5])
 
-```bibtex
-@software{cmvk2026,
-  author = {Siddique, Imran},
-  title = {Cross-Model Verification Kernel: Adversarial Multi-Model Verification},
-  year = {2026},
-  url = {https://github.com/imran-siddique/cross-model-verification-kernel}
-}
+score = verify_distributions(dist_a, dist_b)
+print(f"Distribution drift: {score.drift_score:.3f}")
+print(f"KL divergence: {score.details['kl_divergence']:.4f}")
+```
+
+### `verify_sequences(seq_a, seq_b) -> VerificationScore`
+
+Compare sequences using edit distance and longest common subsequence.
+
+```python
+from cmvk import verify_sequences
+
+tokens_a = ["def", "add", "(", "a", ",", "b", ")"]
+tokens_b = ["def", "add", "(", "x", ",", "y", ")"]
+
+score = verify_sequences(tokens_a, tokens_b)
+print(f"Sequence drift: {score.drift_score:.3f}")
+print(f"Edit distance: {score.details['edit_distance']}")
+```
+
+### Batch Operations
+
+```python
+from cmvk import verify_batch, aggregate_scores
+
+outputs_a = ["output 1", "output 2", "output 3"]
+outputs_b = ["output 1 modified", "output 2 changed", "output 3 different"]
+
+scores = verify_batch(outputs_a, outputs_b)
+summary = aggregate_scores(scores)
+
+print(f"Mean drift: {summary['mean_drift']:.3f}")
+print(f"Std drift: {summary['std_drift']:.3f}")
+print(f"Drift distribution: {summary['drift_type_distribution']}")
+```
+
+## Drift Types
+
+| Type | Description |
+|------|-------------|
+| `SEMANTIC` | Meaning/embedding-based differences |
+| `STRUCTURAL` | Code structure, indentation, line count |
+| `NUMERICAL` | Differences in extracted numbers |
+| `LEXICAL` | Word and character-level differences |
+
+## VerificationScore
+
+The `VerificationScore` is an immutable dataclass:
+
+```python
+@dataclass(frozen=True)
+class VerificationScore:
+    drift_score: float    # 0.0 (identical) to 1.0 (completely different)
+    confidence: float     # 0.0 to 1.0
+    drift_type: DriftType # Primary type of drift detected
+    details: dict         # Component scores and metadata
+```
+
+## Dependencies
+
+- **Required**: `numpy>=1.24.0`
+- **Optional**: `scipy>=1.11.0` (enhanced statistical functions)
+
+## Use Cases
+
+1. **LLM Output Verification**: Compare outputs from different models to detect hallucinations
+2. **Hallucination Detection**: Measure drift from ground truth or reference outputs
+3. **Regression Testing**: Track output changes across model versions
+4. **Adversarial Evaluation**: Quantify semantic preservation after perturbations
+5. **Model Comparison**: Systematically compare outputs from different LLM providers
+
+## Example: Detecting Hallucinations
+
+```python
+from cmvk import verify, DriftType
+
+ground_truth = "The speed of light is approximately 299,792,458 meters per second."
+model_output = "The speed of light is approximately 300 million meters per second."
+
+score = verify(ground_truth, model_output)
+
+if score.drift_score > 0.3:
+    print(f"⚠️ Potential hallucination detected!")
+    print(f"Drift score: {score.drift_score:.3f}")
+    print(f"Primary drift type: {score.drift_type.value}")
+else:
+    print(f"✅ Output appears consistent (drift: {score.drift_score:.3f})")
 ```
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  <strong>Core Philosophy</strong>: <em>"Trust, but Verify (with a different brain)."</em>
-</p>

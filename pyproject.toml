@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cross-model-verification-kernel"
-version = "1.1.0"
-description = "Adversarial multi-model verification framework for AI code generation - addressing the 'grading your own homework' problem"
+name = "cmvk"
+version = "0.1.0"
+description = "Mathematical and adversarial verification library for calculating drift/hallucination scores between outputs"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
@@ -13,14 +13,13 @@ authors = [
     { name = "Imran Siddique", email = "imran.siddique@example.com" }
 ]
 keywords = [
-    "llm",
-    "code-generation",
     "verification",
-    "multi-agent",
+    "drift-detection",
+    "hallucination",
     "adversarial",
     "ai-safety",
-    "code-review",
-    "testing",
+    "mathematical",
+    "scoring",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -33,86 +32,58 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Software Development :: Code Generators",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
     "Typing :: Typed",
 ]
 
+# Layer 1: The Primitive - Only scipy/numpy allowed
 dependencies = [
-    "pyyaml>=6.0.2",
-    "python-dotenv>=1.0.1",
-    "openai>=1.59.0",
-    "google-generativeai>=0.8.0",
-    "anthropic>=0.43.0",
-    "dataclasses-json>=0.6.7",
-    "typing-extensions>=4.12.0",
-    "colorlog>=6.9.0",
-    "typer>=0.15.0",
-    "rich>=13.9.0",
+    "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]
+# Optional scipy for enhanced statistical functions
+scipy = [
+    "scipy>=1.11.0",
+]
 dev = [
     "pytest>=8.3.0",
-    "pytest-asyncio>=0.25.0",
     "pytest-cov>=6.0.0",
-    "pytest-mock>=3.14.0",
     "black>=24.10.0",
-    "flake8>=7.1.0",
     "mypy>=1.14.0",
-    "isort>=5.13.0",
     "ruff>=0.9.0",
-    "pre-commit>=4.0.0",
-]
-notebooks = [
-    "jupyter>=1.1.0",
-    "notebook>=7.3.0",
-    "matplotlib>=3.10.0",
-    "seaborn>=0.13.0",
-    "pandas>=2.2.0",
-    "numpy>=2.2.0",
-]
-sandbox = [
-    "docker>=7.1.0",
-]
-search = [
-    "requests>=2.32.0",
-    "beautifulsoup4>=4.12.0",
-]
-huggingface = [
-    "huggingface-hub>=0.27.0",
 ]
 all = [
-    "cross-model-verification-kernel[dev,notebooks,sandbox,search,huggingface]",
+    "cmvk[scipy,dev]",
 ]
 
-[project.scripts]
-cmvk = "cross_model_verification_kernel.cli:app"
-
 [project.urls]
-Homepage = "https://github.com/imran-siddique/cross-model-verification-kernel"
-Documentation = "https://github.com/imran-siddique/cross-model-verification-kernel#readme"
-Repository = "https://github.com/imran-siddique/cross-model-verification-kernel.git"
-Issues = "https://github.com/imran-siddique/cross-model-verification-kernel/issues"
-Changelog = "https://github.com/imran-siddique/cross-model-verification-kernel/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/imran-siddique/cmvk"
+Documentation = "https://github.com/imran-siddique/cmvk#readme"
+Repository = "https://github.com/imran-siddique/cmvk.git"
+Issues = "https://github.com/imran-siddique/cmvk/issues"
+Changelog = "https://github.com/imran-siddique/cmvk/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/src/cross_model_verification_kernel",
-    "/config",
-    "/experiments/datasets",
+    "/src/cmvk",
 ]
 exclude = [
     "/.github",
     "/notebooks",
     "/logs",
+    "/experiments",
+    "/paper",
+    "/docs",
+    "/examples",
+    "/config",
     "*.pyc",
     "__pycache__",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/cross_model_verification_kernel"]
+packages = ["src/cmvk"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -120,20 +91,19 @@ addopts = [
     "-ra",
     "-q",
     "--strict-markers",
-    "--cov=src/cross_model_verification_kernel",
+    "--cov=src/cmvk",
     "--cov-report=term-missing",
     "--cov-report=html:coverage_html",
+    "--ignore=tests/unit",
+    "--ignore=tests/integration",
 ]
-testpaths = ["tests/unit", "tests/integration"]
-asyncio_mode = "auto"
+testpaths = ["tests"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks integration tests requiring API keys",
-    "sandbox: marks tests requiring Docker sandbox",
 ]
 
 [tool.coverage.run]
-source = ["src/cross_model_verification_kernel"]
+source = ["src/cmvk"]
 branch = true
 omit = [
     "*/tests/*",
@@ -173,7 +143,7 @@ exclude = '''
 profile = "black"
 line_length = 100
 skip_gitignore = true
-known_first_party = ["cross_model_verification_kernel"]
+known_first_party = ["cmvk"]
 
 [tool.ruff]
 line-length = 100
