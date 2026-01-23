@@ -1,7 +1,23 @@
 # AMB - Agent Message Bus
+
+[![PyPI version](https://badge.fury.io/py/amb-core.svg)](https://badge.fury.io/py/amb-core)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/imran-siddique/amb/actions/workflows/ci.yml/badge.svg)](https://github.com/imran-siddique/amb/actions/workflows/ci.yml)
+
 ## "The Nervous System" for AI Agents
 
 A lightweight, broker-agnostic transport layer designed specifically for AI Agents. AMB allows agents to emit signals ("I am thinking," "I am stuck," "I need verification") without knowing who is listening. It decouples the "Sender" from the "Receiver" and handles the async nature of agent communication.
+
+### ⚡ Performance Highlights
+
+| Pattern | Latency (100B) | Throughput |
+|---------|---------------|------------|
+| Fire-and-Forget | 0.032 ms | 30,989 msg/s |
+| End-to-End Pub/Sub | 0.091 ms | 10,946 msg/s |
+| Request-Response | 0.096 ms | 10,372 msg/s |
+
+*Benchmarks run with InMemoryBroker, Python 3.13, seed=42. See [experiments/](experiments/) for full results.*
 
 ## Features
 
@@ -282,7 +298,7 @@ The following packages are explicitly **NOT** used to keep the bus pure and fast
 
 ```bash
 # Install dev dependencies
-pip install -e .[dev]
+pip install -e ".[dev]"
 
 # Run tests
 pytest
@@ -291,16 +307,47 @@ pytest
 pytest --cov=amb_core --cov-report=html
 ```
 
+### Running Benchmarks
+
+```bash
+# Run reproducible benchmarks
+python experiments/reproduce_results.py --seed 42 --iterations 500
+
+# Results saved to experiments/results.json
+```
+
 ### Building the Package
 
 ```bash
 python -m build
 ```
 
+## Research
+
+If you use AMB in your research, please cite:
+
+```bibtex
+@software{amb2026,
+  author = {Siddique, Imran},
+  title = {AMB: A Broker-Agnostic Message Bus for AI Agents},
+  year = {2026},
+  url = {https://github.com/imran-siddique/amb},
+  version = {0.1.0}
+}
+```
+
+See the [paper/](paper/) directory for the research whitepaper.
+
 ## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 Contributions are welcome! Please feel free to submit a Pull Request.
