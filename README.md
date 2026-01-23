@@ -29,10 +29,10 @@ pip install inter-agent-trust-protocol
 ## Quick Start
 
 ```python
-from iatp import create_sidecar, CapabilityManifest, TrustLevel
+from iatp import create_sidecar, CapabilityManifest, AgentCapabilities, PrivacyContract, RetentionPolicy
 
-manifest = CapabilityManifest(agent_id="my-agent", trust_level=TrustLevel.VERIFIED_PARTNER)
-sidecar = create_sidecar(agent_url="http://localhost:8000", manifest=manifest, port=8081)
+manifest = CapabilityManifest(agent_id="my-agent", capabilities=AgentCapabilities(), privacy_contract=PrivacyContract(retention=RetentionPolicy.EPHEMERAL))
+sidecar = create_sidecar(agent_url="http://localhost:8000", manifest=manifest, port=8001)
 sidecar.run()
 ```
 
