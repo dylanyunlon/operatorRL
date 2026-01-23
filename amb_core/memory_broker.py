@@ -22,6 +22,7 @@ class InMemoryBroker(BrokerAdapter):
         self._subscriptions: Dict[str, Dict[str, MessageHandler]] = defaultdict(dict)
         self._pending_messages: Dict[str, List[Message]] = defaultdict(list)
         self._response_queues: Dict[str, asyncio.Queue] = {}
+        self._request_message_ids: Set[str] = set()  # Track request message IDs to avoid self-capture
         self._tasks: Set[asyncio.Task] = set()
     
     async def connect(self) -> None:
@@ -44,6 +45,7 @@ class InMemoryBroker(BrokerAdapter):
         self._subscriptions.clear()
         self._pending_messages.clear()
         self._response_queues.clear()
+        self._request_message_ids.clear()
     
     async def publish(self, message: Message, wait_for_confirmation: bool = False) -> Optional[str]:
         """
@@ -64,26 +66,35 @@ class InMemoryBroker(BrokerAdapter):
         # Store message in pending queue
         self._pending_messages[topic].append(message)
         
-        # Deliver to subscribers
-        handlers = self._subscriptions.get(topic, {})
+        # Check if this is a response message for request-response pattern
+        is_response = (
+            message.correlation_id 
+            and message.correlation_id in self._response_queues 
+            and message.id not in self._request_message_ids
+        )
         
-        if wait_for_confirmation:
-            # Wait for all handlers to complete
-            tasks = []
-            for handler in handlers.values():
-                tasks.append(handler(message))
+        # Deliver to subscribers (skip if this is a response message)
+        if not is_response:
+            handlers = self._subscriptions.get(topic, {})
             
-            if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
-        else:
-            # Fire and forget - schedule handlers without waiting
-            for handler in handlers.values():
-                task = asyncio.create_task(handler(message))
-                self._tasks.add(task)
-                task.add_done_callback(self._tasks.discard)
+            if wait_for_confirmation:
+                # Wait for all handlers to complete
+                tasks = []
+                for handler in handlers.values():
+                    tasks.append(handler(message))
+                
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            else:
+                # Fire and forget - schedule handlers without waiting
+                for handler in handlers.values():
+                    task = asyncio.create_task(handler(message))
+                    self._tasks.add(task)
+                    task.add_done_callback(self._tasks.discard)
         
         # Handle request-response pattern
-        if message.correlation_id and message.correlation_id in self._response_queues:
+        # Capture response messages in the response queue
+        if is_response:
             await self._response_queues[message.correlation_id].put(message)
         
         return message.id
@@ -143,6 +154,9 @@ class InMemoryBroker(BrokerAdapter):
         reply_queue: asyncio.Queue = asyncio.Queue()
         self._response_queues[message.correlation_id] = reply_queue
         
+        # Mark this message ID as a request to avoid self-capture
+        self._request_message_ids.add(message.id)
+        
         try:
             # Publish the request
             await self.publish(message, wait_for_confirmation=False)
@@ -158,6 +172,8 @@ class InMemoryBroker(BrokerAdapter):
             # Clean up
             if message.correlation_id in self._response_queues:
                 del self._response_queues[message.correlation_id]
+            if message.id in self._request_message_ids:
+                self._request_message_ids.discard(message.id)
     
     async def get_pending_messages(self, topic: str, limit: int = 10) -> List[Message]:
         """
