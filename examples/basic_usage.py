@@ -15,8 +15,9 @@ def main():
     print("=" * 60)
     print()
     
-    # Create a temporary file for storage
-    temp_file = tempfile.mktemp(suffix=".jsonl")
+    # Create a temporary file for storage using secure method
+    with tempfile.NamedTemporaryFile(mode='w', suffix=".jsonl", delete=False) as tf:
+        temp_file = tf.name
     
     try:
         # 1. Create a FileAdapter

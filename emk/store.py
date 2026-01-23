@@ -293,7 +293,7 @@ try:
             # Handle metadatas consistently
             if 'metadatas' in results and results['metadatas']:
                 # For query results, metadatas is a list of lists
-                if isinstance(results['metadatas'][0], list):
+                if isinstance(results['metadatas'][0], list) if results['metadatas'] else False:
                     metadatas = results['metadatas'][0]
                 else:
                     metadatas = results['metadatas']
@@ -304,14 +304,19 @@ try:
                 return episodes
             
             for metadata in metadatas:
-                # Extract episode fields from metadata
+                # Extract episode fields from metadata (use get to avoid mutation)
+                episode_metadata = {
+                    k: v for k, v in metadata.items()
+                    if k not in ('goal', 'action', 'result', 'reflection', 'timestamp')
+                }
+                
                 episode_data = {
-                    "goal": metadata.pop("goal", ""),
-                    "action": metadata.pop("action", ""),
-                    "result": metadata.pop("result", ""),
-                    "reflection": metadata.pop("reflection", ""),
-                    "timestamp": metadata.pop("timestamp", None),
-                    "metadata": metadata
+                    "goal": metadata.get("goal", ""),
+                    "action": metadata.get("action", ""),
+                    "result": metadata.get("result", ""),
+                    "reflection": metadata.get("reflection", ""),
+                    "timestamp": metadata.get("timestamp", None),
+                    "metadata": episode_metadata
                 }
                 
                 try:
@@ -340,13 +345,20 @@ try:
                     return None
                 
                 metadata = results['metadatas'][0]
+                
+                # Extract episode fields without mutating original metadata
+                episode_metadata = {
+                    k: v for k, v in metadata.items()
+                    if k not in ('goal', 'action', 'result', 'reflection', 'timestamp')
+                }
+                
                 episode_data = {
-                    "goal": metadata.pop("goal", ""),
-                    "action": metadata.pop("action", ""),
-                    "result": metadata.pop("result", ""),
-                    "reflection": metadata.pop("reflection", ""),
-                    "timestamp": metadata.pop("timestamp", None),
-                    "metadata": metadata
+                    "goal": metadata.get("goal", ""),
+                    "action": metadata.get("action", ""),
+                    "result": metadata.get("result", ""),
+                    "reflection": metadata.get("reflection", ""),
+                    "timestamp": metadata.get("timestamp", None),
+                    "metadata": episode_metadata
                 }
                 
                 return Episode(**episode_data)
