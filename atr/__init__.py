@@ -5,7 +5,7 @@ A decentralized marketplace for agent capabilities.
 Provides a standardized interface for tool discovery and registration.
 """
 
-from .schema import ToolSpec, ParameterSpec, ToolMetadata
+from .schema import ToolSpec, ParameterSpec, ToolMetadata, CostLevel, SideEffect
 from .registry import Registry
 from .decorator import register as register_decorator
 
@@ -14,6 +14,8 @@ __all__ = [
     "ToolSpec",
     "ParameterSpec", 
     "ToolMetadata",
+    "CostLevel",
+    "SideEffect",
     "Registry",
     "register",
 ]
