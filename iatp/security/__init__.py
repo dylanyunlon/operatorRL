@@ -11,6 +11,35 @@ from iatp.models import (
 )
 
 
+def _luhn_check(card_number: str) -> bool:
+    """
+    Validate a credit card number using the Luhn algorithm.
+    
+    Args:
+        card_number: String of digits (spaces/dashes already removed)
+    
+    Returns:
+        bool: True if valid according to Luhn algorithm
+    """
+    if not card_number.isdigit() or len(card_number) < 13:
+        return False
+    
+    # Luhn algorithm
+    digits = [int(d) for d in card_number]
+    checksum = 0
+    
+    # Double every second digit from right to left
+    for i in range(len(digits) - 2, -1, -2):
+        doubled = digits[i] * 2
+        checksum += doubled if doubled < 10 else doubled - 9
+    
+    # Add remaining digits
+    for i in range(len(digits) - 1, -1, -2):
+        checksum += digits[i]
+    
+    return checksum % 10 == 0
+
+
 class SecurityValidator:
     """Validates requests against capability manifests and security policies."""
     
@@ -26,13 +55,20 @@ class SecurityValidator:
     def detect_sensitive_data(self, payload: Dict[str, Any]) -> List[str]:
         """
         Detect sensitive data in the request payload.
+        Uses Luhn algorithm to validate credit card numbers.
         Returns a list of detected sensitive data types.
         """
         sensitive_types = []
         payload_str = str(payload)
         
-        if self.CREDIT_CARD_PATTERN.search(payload_str):
-            sensitive_types.append("credit_card")
+        # Check for credit cards with Luhn validation
+        card_matches = self.CREDIT_CARD_PATTERN.finditer(payload_str)
+        for match in card_matches:
+            card_number = match.group().replace(' ', '').replace('-', '')
+            if _luhn_check(card_number):
+                sensitive_types.append("credit_card")
+                break  # Only need to detect once
+        
         if self.SSN_PATTERN.search(payload_str):
             sensitive_types.append("ssn")
         # Email is less sensitive but still PII

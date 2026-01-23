@@ -14,21 +14,27 @@ from iatp.models import (
 
 
 def test_detect_credit_card():
-    """Test credit card detection."""
+    """Test credit card detection with Luhn validation."""
     validator = SecurityValidator()
     
-    # Test various credit card formats
-    payload1 = {"data": "My card is 4532-1234-5678-9010"}
+    # Test various credit card formats (using valid test card numbers)
+    # 4532015112830366 is a valid test Visa card that passes Luhn check
+    payload1 = {"data": "My card is 4532-0151-1283-0366"}
     sensitive1 = validator.detect_sensitive_data(payload1)
     assert "credit_card" in sensitive1
     
-    payload2 = {"data": "My card is 4532 1234 5678 9010"}
+    payload2 = {"data": "My card is 4532 0151 1283 0366"}
     sensitive2 = validator.detect_sensitive_data(payload2)
     assert "credit_card" in sensitive2
     
-    payload3 = {"data": "My card is 4532123456789010"}
+    payload3 = {"data": "My card is 4532015112830366"}
     sensitive3 = validator.detect_sensitive_data(payload3)
     assert "credit_card" in sensitive3
+    
+    # Test with invalid card number (should not be detected)
+    payload4 = {"data": "My card is 1234-5678-9012-3456"}
+    sensitive4 = validator.detect_sensitive_data(payload4)
+    assert "credit_card" not in sensitive4
 
 
 def test_detect_ssn():
@@ -61,7 +67,7 @@ def test_validate_privacy_policy_blocks_credit_card_forever():
         )
     )
     
-    payload = {"credit_card": "4532-1234-5678-9010"}
+    payload = {"credit_card": "4532-0151-1283-0366"}  # Valid test card
     is_valid, error = validator.validate_privacy_policy(manifest, payload)
     
     assert not is_valid
@@ -81,7 +87,7 @@ def test_validate_privacy_policy_allows_credit_card_ephemeral():
         )
     )
     
-    payload = {"credit_card": "4532-1234-5678-9010"}
+    payload = {"credit_card": "4532-0151-1283-0366"}  # Valid test card
     is_valid, error = validator.validate_privacy_policy(manifest, payload)
     
     assert is_valid
@@ -189,7 +195,7 @@ def test_scrub_credit_card():
     payload = {
         "user": "john",
         "payment": {
-            "card": "4532-1234-5678-9010",
+            "card": "4532-0151-1283-0366",  # Valid test card
             "cvv": "123"
         }
     }
@@ -197,7 +203,7 @@ def test_scrub_credit_card():
     scrubbed = PrivacyScrubber.scrub_payload(payload)
     
     scrubbed_str = str(scrubbed)
-    assert "4532-1234-5678-9010" not in scrubbed_str
+    assert "4532-0151-1283-0366" not in scrubbed_str
     assert "[CREDIT_CARD_REDACTED]" in scrubbed_str
 
 

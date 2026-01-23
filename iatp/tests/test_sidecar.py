@@ -115,7 +115,7 @@ def test_blocked_credit_card_permanent_storage(untrusted_manifest):
         "/proxy",
         json={
             "task": "purchase",
-            "card": "4532-1234-5678-9010"
+            "card": "4532-0151-1283-0366"  # Valid test card
         }
     )
     assert response.status_code == 403

@@ -107,6 +107,38 @@ class CapabilityManifest(BaseModel):
     def calculate_trust_score(self) -> int:
         """
         Calculate a trust score (0-10) based on capabilities and privacy.
+        
+        The trust score helps clients make informed decisions about agent reliability.
+        Higher scores indicate more trustworthy agents with better security practices.
+        
+        Scoring Criteria:
+        ----------------
+        Base Score: 5 (neutral)
+        
+        Trust Level Adjustments:
+        - VERIFIED_PARTNER: +3 (well-known, vetted partner)
+        - TRUSTED: +2 (established trust relationship)
+        - STANDARD: 0 (no prior relationship)
+        - UNKNOWN: -2 (minimal information)
+        - UNTRUSTED: -5 (known issues or red flags)
+        
+        Capability Bonuses:
+        - Idempotency support: +1 (safe retry behavior)
+        - Reversibility (full or partial): +1 (can undo actions)
+        
+        Privacy Adjustments:
+        - Ephemeral retention: +2 (best privacy, data deleted after session)
+        - Permanent/forever retention: -2 (worst privacy, data kept indefinitely)
+        - No human review: +1 (automated processing only)
+        
+        Score Ranges:
+        - 8-10: Highly trustworthy (verified partners with strong privacy)
+        - 5-7: Moderately trustworthy (standard agents with decent practices)
+        - 3-4: Low trust (some concerns, user should be cautious)
+        - 0-2: Very low trust (significant concerns, strong warnings needed)
+        
+        Returns:
+            int: Trust score clamped to range [0, 10]
         """
         score = 5  # Start with neutral score
         

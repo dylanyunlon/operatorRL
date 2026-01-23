@@ -21,7 +21,7 @@ from iatp.models import (
     TrustLevel,
 )
 from iatp.security import SecurityValidator, PrivacyScrubber
-from iatp.telemetry import FlightRecorder, TraceIDGenerator
+from iatp.telemetry import FlightRecorder, TraceIDGenerator, _get_utc_timestamp
 
 
 class SidecarProxy:
@@ -146,7 +146,7 @@ class SidecarProxy:
                     trace_id=trace_id,
                     warning_message=warning or "Low trust agent",
                     user_override=True,
-                    timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    timestamp=_get_utc_timestamp(),
                     manifest=self.manifest
                 )
                 self.quarantine_sessions[trace_id] = session
@@ -182,7 +182,11 @@ class SidecarProxy:
                     latency_ms = (time.time() - start_time) * 1000
                     
                     # Log the response
-                    response_data = response.json() if response.status_code == 200 else {}
+                    try:
+                        response_data = response.json() if 200 <= response.status_code < 300 else {}
+                    except Exception:
+                        response_data = {}
+                    
                     self.flight_recorder.log_response(
                         trace_id=trace_id,
                         agent_id=self.manifest.agent_id,

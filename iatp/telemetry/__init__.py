@@ -10,6 +10,11 @@ from iatp.models import TracingContext, QuarantineSession, CapabilityManifest
 from iatp.security import PrivacyScrubber
 
 
+def _get_utc_timestamp() -> str:
+    """Get current UTC timestamp in ISO 8601 format."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 class FlightRecorder:
     """
     Records all requests and responses for audit and debugging.
@@ -33,7 +38,7 @@ class FlightRecorder:
         log_entry = {
             "type": "request",
             "trace_id": trace_id,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": _get_utc_timestamp(),
             "agent_id": agent_id,
             "payload": self.scrubber.scrub_payload(payload),
             "quarantined": quarantined,
@@ -53,7 +58,7 @@ class FlightRecorder:
         log_entry = {
             "type": "response",
             "trace_id": trace_id,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": _get_utc_timestamp(),
             "agent_id": agent_id,
             "status_code": status_code,
             "latency_ms": latency_ms,
@@ -72,7 +77,7 @@ class FlightRecorder:
         log_entry = {
             "type": "error",
             "trace_id": trace_id,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": _get_utc_timestamp(),
             "agent_id": agent_id,
             "error": error,
             "details": details or {}
@@ -91,7 +96,7 @@ class FlightRecorder:
         log_entry = {
             "type": "blocked",
             "trace_id": trace_id,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": _get_utc_timestamp(),
             "agent_id": agent_id,
             "payload": self.scrubber.scrub_payload(payload),
             "reason": reason,
@@ -110,7 +115,7 @@ class FlightRecorder:
         log_entry = {
             "type": "user_override",
             "trace_id": trace_id,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": _get_utc_timestamp(),
             "agent_id": agent_id,
             "warning": warning,
             "quarantine_session": quarantine_session.model_dump()
@@ -151,6 +156,6 @@ class TraceIDGenerator:
         return TracingContext(
             trace_id=trace_id,
             parent_trace_id=parent_trace_id,
-            timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            timestamp=_get_utc_timestamp(),
             agent_id=agent_id
         )

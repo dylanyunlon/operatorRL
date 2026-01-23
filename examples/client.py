@@ -47,7 +47,7 @@ def test_sensitive_data_blocked():
                 "task": "book_flight",
                 "data": {
                     "destination": "NYC",
-                    "credit_card": "4532-1234-5678-9010"  # Test credit card
+                    "credit_card": "4532-0151-1283-0366"  # Test credit card
                 }
             }
         )
