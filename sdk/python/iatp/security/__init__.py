@@ -21,7 +21,8 @@ def _luhn_check(card_number: str) -> bool:
     Returns:
         bool: True if valid according to Luhn algorithm
     """
-    if not card_number.isdigit() or len(card_number) < 13:
+    MIN_CARD_LENGTH = 13  # Minimum valid credit card length
+    if not card_number.isdigit() or len(card_number) < MIN_CARD_LENGTH:
         return False
     
     # Luhn algorithm

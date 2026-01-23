@@ -81,13 +81,15 @@ async def compensate_transaction(transaction_id: str):
     
     This demonstrates the IATP reversibility protocol.
     """
+    UNDO_WINDOW_SECONDS = 300  # 5 minutes
+    
     if transaction_id not in transactions:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
     transaction = transactions[transaction_id]
     
     # Check if still within undo window (5 minutes)
-    if time.time() - transaction["timestamp"] > 300:
+    if time.time() - transaction["timestamp"] > UNDO_WINDOW_SECONDS:
         raise HTTPException(
             status_code=400,
             detail="Undo window expired (5 minutes)"

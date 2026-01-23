@@ -17,8 +17,9 @@ def test_detect_credit_card():
     """Test credit card detection with Luhn validation."""
     validator = SecurityValidator()
     
-    # Test various credit card formats (using valid test card numbers)
-    # 4532015112830366 is a valid test Visa card that passes Luhn check
+    # Test various credit card formats
+    # Note: 4532015112830366 is a valid Visa test card from Payment Card Industry (PCI) test card list
+    # It's safe for testing as it's not a real card and passes Luhn validation
     payload1 = {"data": "My card is 4532-0151-1283-0366"}
     sensitive1 = validator.detect_sensitive_data(payload1)
     assert "credit_card" in sensitive1
