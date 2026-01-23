@@ -5,7 +5,7 @@ Defines the rigorous JSON/Pydantic schema for tool specifications,
 similar to OpenAI Function Calling spec.
 """
 
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, PrivateAttr, ConfigDict
 

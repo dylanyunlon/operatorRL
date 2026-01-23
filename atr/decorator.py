@@ -6,7 +6,6 @@ Provides @atr.register() decorator to turn Python functions into discoverable to
 
 import inspect
 from typing import Callable, Optional, List, Any, get_type_hints, get_origin, get_args, Union
-from functools import wraps
 
 from .schema import (
     ToolSpec,
