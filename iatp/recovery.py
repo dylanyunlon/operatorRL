@@ -117,7 +117,7 @@ class IATPRecoveryEngine:
             "diagnosis": diagnosis,
             "strategy": strategy,
             "result": recovery_result,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
         return recovery_result
