@@ -1,13 +1,37 @@
 # Quick Start Guide - IATP v0.2.0
 
-Get up and running with IATP in 5 minutes.
+Get up and running with IATP in under 2 minutes.
 
-## Installation
+## 🚀 One-Line Deploy (Docker)
+
+```bash
+docker-compose up -d
+```
+
+That's it! You now have:
+- **Secure Bank Agent** + Sidecar at `http://localhost:8081`
+- **Honeypot Agent** + Sidecar at `http://localhost:9001`
+
+Test it:
+```bash
+# Check sidecar health
+curl http://localhost:8081/health
+
+# Get agent capabilities (the IATP handshake)
+curl http://localhost:8081/.well-known/agent-manifest
+
+# Send a request through the sidecar
+curl -X POST http://localhost:8081/proxy \
+  -H "Content-Type: application/json" \
+  -d '{"action": "check_balance", "account": "12345"}'
+```
+
+## 📦 Installation
 
 ### Option 1: PyPI (Recommended)
 
 ```bash
-pip install iatp
+pip install inter-agent-trust-protocol
 ```
 
 ### Option 2: Source
@@ -21,7 +45,32 @@ pip install -e .
 ### Option 3: Docker
 
 ```bash
-docker-compose up
+docker-compose up -d
+```
+
+## 🏃 Running the Sidecar
+
+### Method 1: Direct (uvicorn)
+
+```bash
+# Set environment variables
+export IATP_AGENT_URL=http://localhost:8000
+export IATP_AGENT_ID=my-agent
+export IATP_TRUST_LEVEL=trusted
+
+# Run the sidecar
+uvicorn iatp.main:app --host 0.0.0.0 --port 8081
+```
+
+### Method 2: Docker
+
+```bash
+docker build -t iatp-sidecar .
+docker run -p 8081:8081 \
+  -e IATP_AGENT_URL=http://my-agent:8000 \
+  -e IATP_AGENT_ID=my-agent \
+  -e IATP_TRUST_LEVEL=trusted \
+  iatp-sidecar
 ```
 
 ## Your First Protected Agent
@@ -34,17 +83,44 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
-@app.post("/task")
+@app.post("/process")
 async def handle_task(request: dict):
     # Your agent logic here
     return {"status": "success", "result": "Task completed"}
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-### Step 2: Create IATP Sidecar
+### Step 2: Run Agent + Sidecar
+
+Terminal 1 (Your Agent):
+```bash
+python my_agent.py
+```
+
+Terminal 2 (IATP Sidecar):
+```bash
+IATP_AGENT_URL=http://localhost:8000 uvicorn iatp.main:app --port 8081
+```
+
+### Step 3: Test It
+
+```bash
+# All requests now go through the sidecar (port 8081)
+curl -X POST http://localhost:8081/proxy \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello from IATP!"}'
+```
+
+## 🎯 Using the Python SDK
+
+For programmatic control, use the SDK:
 
 `run_sidecar.py`:
 ```python
@@ -84,18 +160,6 @@ sidecar = create_sidecar(
 
 # Run sidecar
 sidecar.run()
-```
-
-### Step 3: Run Everything
-
-Terminal 1 (Your Agent):
-```bash
-python my_agent.py
-```
-
-Terminal 2 (IATP Sidecar):
-```bash
-python run_sidecar.py
 ```
 
 Terminal 3 (Test):

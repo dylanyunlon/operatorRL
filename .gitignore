@@ -61,3 +61,7 @@ tmp/
 .env
 .env.local
 MANIFEST
+# Secrets - NEVER commit these
+.pypirc
+*.pem
+*.key

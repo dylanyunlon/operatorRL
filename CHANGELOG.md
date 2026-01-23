@@ -5,6 +5,35 @@ All notable changes to the Inter-Agent Trust Protocol (IATP) will be documented 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-22
+
+### Added
+- **Standalone Sidecar Application** (`iatp/main.py`): Production-ready FastAPI application
+  - Direct uvicorn entry point: `uvicorn iatp.main:app --port 8081`
+  - Environment-based configuration (IATP_AGENT_URL, IATP_TRUST_LEVEL, etc.)
+  - Health check, metrics, and distributed tracing endpoints
+  - Full integration with Policy Engine and Recovery Engine
+- **Root Dockerfile**: Simplified Docker image for one-line deployment
+  - `docker build -t iatp-sidecar .`
+  - `docker run -p 8081:8081 -e IATP_AGENT_URL=http://agent:8000 iatp-sidecar`
+- **Demo Client** (`examples/demo_client.py`): Interactive demonstration script
+  - Shows trust negotiation, security blocks, and user override flows
+  - ASCII art banner and color-coded output
+- **Updated docker-compose.yml**: Complete demo environment
+  - Bank Agent + Sidecar (trusted) on ports 8000/8081
+  - Honeypot Agent + Sidecar (untrusted) on ports 9000/9001
+  - Redis for state management
+  - Legacy sidecar support via profiles
+
+### Changed
+- Renamed PyPI package from `iatp` to `inter-agent-trust-protocol` (name conflict)
+- Updated QUICKSTART.md with one-line deploy instructions
+- Improved documentation with access points and test commands
+
+### Fixed
+- Model field compatibility across all components
+- Sidecar module import chain
+
 ## [0.2.0] - 2026-01-23
 
 ### Added

@@ -4,8 +4,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="iatp",
-    version="0.2.0",
+    name="inter-agent-trust-protocol",
+    version="0.3.0",
     author="Imran Siddique",
     author_email="",
     description="Inter-Agent Trust Protocol - Envoy for Agents",

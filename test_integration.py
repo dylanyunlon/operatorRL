@@ -73,13 +73,12 @@ class TestRunner:
                 capabilities=AgentCapabilities(
                     reversibility=ReversibilityLevel.FULL,
                     idempotency=True,
-                    concurrency_limit=100,
-                    sla_latency_ms=2000
+                    sla_latency="2000ms",
+                    rate_limit=100
                 ),
                 privacy_contract=PrivacyContract(
                     retention=RetentionPolicy.EPHEMERAL,
-                    human_in_loop=False,
-                    training_consent=False
+                    human_review=False
                 )
             )
             
@@ -117,8 +116,7 @@ class TestRunner:
                 ),
                 privacy_contract=PrivacyContract(
                     retention=RetentionPolicy.EPHEMERAL,
-                    human_in_loop=False,
-                    training_consent=False
+                    human_review=False
                 )
             )
             
@@ -135,8 +133,7 @@ class TestRunner:
                 ),
                 privacy_contract=PrivacyContract(
                     retention=RetentionPolicy.PERMANENT,
-                    human_in_loop=True,
-                    training_consent=True
+                    human_review=True
                 )
             )
             

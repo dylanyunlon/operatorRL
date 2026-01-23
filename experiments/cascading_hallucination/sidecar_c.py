@@ -32,13 +32,12 @@ def main():
         capabilities=AgentCapabilities(
             reversibility=ReversibilityLevel.NONE,  # Cannot undo
             idempotency=False,
-            concurrency_limit=1,
-            sla_latency_ms=5000
+            sla_latency="5000ms",
+            rate_limit=1
         ),
         privacy_contract=PrivacyContract(
             retention=RetentionPolicy.PERMANENT,  # Stores data
-            human_in_loop=False,
-            training_consent=True  # Uses for training
+            human_review=True  # Requires human review
         )
     )
     

@@ -5,9 +5,18 @@ A Zero-Config Sidecar for Agent Communication that provides:
 - Discovery: Capability manifest exchange
 - Trust: Security validation and privacy checks
 - Reversibility: Transaction tracking and audit logging
+
+Quick Start:
+    pip install inter-agent-trust-protocol
+    
+    # Run as sidecar
+    uvicorn iatp.main:app --host 0.0.0.0 --port 8081
+    
+    # Or use Docker
+    docker run -p 8081:8081 -e IATP_AGENT_URL=http://my-agent:8000 iatp-sidecar
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from iatp.models import (
     CapabilityManifest,
