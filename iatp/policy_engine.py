@@ -29,14 +29,15 @@ class IATPPolicyEngine:
     def _setup_default_policies(self):
         """Setup default security policies for IATP."""
         # Define IATP-specific policy rules
-        # These are custom rules that work with our manifest validation
+        # These augment (not replace) the SecurityValidator checks
+        # The SecurityValidator handles sensitive data + retention blocking
         self.custom_rules = [
             {
-                "name": "StrictPrivacyRetention",
-                "description": "Block agents with permanent data retention",
-                "action": "deny",
+                "name": "WarnUntrustedAgent",
+                "description": "Warn when agents are marked as untrusted",
+                "action": "warn",
                 "conditions": {
-                    "retention_policy": ["permanent", "forever"]
+                    "trust_level": ["untrusted"]
                 }
             },
             {

@@ -44,12 +44,12 @@ def test_validate_manifest_ephemeral_allowed():
     # May have warning for other reasons, but should not block
 
 
-def test_validate_manifest_permanent_blocked():
-    """Test that permanent retention triggers denial."""
+def test_validate_manifest_permanent_warning():
+    """Test that permanent retention generates a warning but doesn't block."""
     engine = IATPPolicyEngine()
     
     manifest = CapabilityManifest(
-        agent_id="untrusted-agent",
+        agent_id="permanent-storage-agent",
         trust_level=TrustLevel.STANDARD,
         capabilities=AgentCapabilities(
             idempotency=False,
@@ -63,10 +63,12 @@ def test_validate_manifest_permanent_blocked():
     
     is_allowed, error_msg, warning_msg = engine.validate_manifest(manifest)
     
-    # Should be blocked by permanent retention policy
-    assert is_allowed is False
-    assert error_msg is not None
-    assert "permanent" in error_msg.lower() or "policy violation" in error_msg.lower()
+    # Should be allowed but may have warnings
+    # (Actual blocking based on sensitive data happens in SecurityValidator)
+    assert is_allowed is True
+    # May have warning about no reversibility
+    if warning_msg:
+        assert "reversal" in warning_msg.lower() or "warning" in warning_msg.lower()
 
 
 def test_validate_manifest_no_reversibility_warning():

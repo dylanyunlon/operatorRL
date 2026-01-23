@@ -22,6 +22,8 @@ from iatp.models import (
 )
 from iatp.security import SecurityValidator, PrivacyScrubber
 from iatp.telemetry import FlightRecorder, TraceIDGenerator, _get_utc_timestamp
+from iatp.policy_engine import IATPPolicyEngine
+from iatp.recovery import IATPRecoveryEngine
 
 
 class SidecarProxy:
@@ -51,6 +53,10 @@ class SidecarProxy:
         self.scrubber = PrivacyScrubber()
         self.flight_recorder = FlightRecorder()
         self.quarantine_sessions: Dict[str, QuarantineSession] = {}
+        
+        # New integrations: agent-control-plane and scak
+        self.policy_engine = IATPPolicyEngine()
+        self.recovery_engine = IATPRecoveryEngine()
         
         self._setup_routes()
     
@@ -95,7 +101,31 @@ class SidecarProxy:
                     content={"error": "Invalid JSON payload", "trace_id": trace_id}
                 )
             
-            # Validate privacy policy
+            # Validate using Policy Engine (agent-control-plane integration)
+            # This provides an additional layer of policy validation
+            policy_allowed, policy_error, policy_warning = \
+                self.policy_engine.validate_manifest(self.manifest)
+            
+            if not policy_allowed:
+                # Policy engine blocked the request
+                self.flight_recorder.log_blocked_request(
+                    trace_id=trace_id,
+                    agent_id=self.manifest.agent_id,
+                    payload=payload,
+                    reason=f"Policy Engine: {policy_error}",
+                    manifest=self.manifest
+                )
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "error": policy_error,
+                        "trace_id": trace_id,
+                        "blocked": True,
+                        "blocked_by": "policy_engine"
+                    }
+                )
+            
+            # Validate privacy policy (existing SecurityValidator)
             is_valid, error_message = self.validator.validate_privacy_policy(
                 self.manifest, payload
             )
@@ -118,8 +148,13 @@ class SidecarProxy:
                     }
                 )
             
-            # Check if warning is needed
+            # Check if warning is needed (combine policy and security warnings)
             warning = self.validator.generate_warning_message(self.manifest, payload)
+            if policy_warning and not warning:
+                warning = policy_warning
+            elif policy_warning and warning:
+                warning = f"{warning}\n{policy_warning}"
+            
             should_quarantine = self.validator.should_quarantine(self.manifest)
             
             # If there's a warning and no user override, return the warning
@@ -212,18 +247,29 @@ class SidecarProxy:
                         media_type="application/json"
                     )
                     
-            except httpx.TimeoutException:
+            except httpx.TimeoutException as e:
                 self.flight_recorder.log_error(
                     trace_id=trace_id,
                     agent_id=self.manifest.agent_id,
                     error="Request timeout",
                     details={"timeout_seconds": 30}
                 )
+                
+                # Attempt recovery using scak integration
+                recovery_result = await self.recovery_engine.handle_failure(
+                    trace_id=trace_id,
+                    error=e,
+                    manifest=self.manifest,
+                    payload=payload,
+                    compensation_callback=None
+                )
+                
                 return JSONResponse(
                     status_code=504,
                     content={
                         "error": "Backend agent timeout",
-                        "trace_id": trace_id
+                        "trace_id": trace_id,
+                        "recovery": recovery_result
                     }
                 )
             except Exception as e:
@@ -233,11 +279,22 @@ class SidecarProxy:
                     error=str(e),
                     details={"exception_type": type(e).__name__}
                 )
+                
+                # Attempt recovery using scak integration
+                recovery_result = await self.recovery_engine.handle_failure(
+                    trace_id=trace_id,
+                    error=e,
+                    manifest=self.manifest,
+                    payload=payload,
+                    compensation_callback=None
+                )
+                
                 return JSONResponse(
                     status_code=502,
                     content={
                         "error": f"Backend agent error: {str(e)}",
-                        "trace_id": trace_id
+                        "trace_id": trace_id,
+                        "recovery": recovery_result
                     }
                 )
         
