@@ -13,11 +13,12 @@ import httpx
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+from iatp import __version__
 from iatp.models import CapabilityManifest, TrustLevel, ReversibilityLevel, RetentionPolicy
 
 
 @click.group()
-@click.version_option(version="0.2.0", prog_name="iatp")
+@click.version_option(version=__version__, prog_name="iatp")
 def cli():
     """
     IATP CLI - Inter-Agent Trust Protocol Developer Tools
@@ -244,7 +245,7 @@ def scan(agent_url: str, timeout: int, verbose: bool):
 @cli.command()
 def version():
     """Show IATP version information."""
-    click.echo("IATP CLI v0.2.0")
+    click.echo(f"IATP CLI v{__version__}")
     click.echo("Inter-Agent Trust Protocol")
     click.echo("https://github.com/imran-siddique/inter-agent-trust-protocol")
 

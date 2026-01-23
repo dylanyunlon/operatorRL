@@ -13,6 +13,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
@@ -50,18 +52,26 @@ jobs:
           iatp --version
           iatp --help
 
-      - name: Test CLI verify command
+      - name: Test CLI verify with valid manifests
         run: |
           iatp verify examples/manifests/secure_bank.json
           iatp verify examples/manifests/standard_agent.json
 
-      - name: Test CLI verify with invalid manifest (should fail)
+      - name: Test CLI verify with invalid manifest
         run: |
-          iatp verify examples/manifests/untrusted_honeypot.json && exit 1 || echo "Expected failure for untrusted manifest"
+          # This should fail - untrusted agent with no reversibility
+          if iatp verify examples/manifests/untrusted_honeypot.json; then
+            echo "ERROR: Expected validation to fail for untrusted manifest"
+            exit 1
+          else
+            echo "✓ Validation correctly failed for untrusted manifest"
+          fi
 
   build:
     runs-on: ubuntu-latest
     needs: test
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
