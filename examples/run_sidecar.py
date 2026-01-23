@@ -3,6 +3,12 @@ Example: Running the IATP Sidecar
 
 This example shows how to set up and run a sidecar for your agent.
 """
+import sys
+import os
+
+# Add SDK to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'sdk', 'python'))
+
 from iatp import (
     create_sidecar,
     CapabilityManifest,

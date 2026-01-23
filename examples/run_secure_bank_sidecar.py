@@ -13,10 +13,9 @@ import os
 # Add parent directory to path to import iatp
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'sdk', 'python'))
 
-from iatp.sidecar import IATPSidecar
+from iatp.sidecar import create_sidecar
 from iatp.models import (
     CapabilityManifest,
-    AgentIdentity,
     TrustLevel,
     AgentCapabilities,
     ReversibilityLevel,
@@ -29,8 +28,7 @@ def main():
     # Define the capability manifest for a secure bank agent
     manifest = CapabilityManifest(
         agent_id="secure-bank-agent-v1.0.0",
-        owner="SecureBank Corp",
-        contact="security@securebank.example.com",
+        agent_version="1.0.0",
         trust_level=TrustLevel.VERIFIED_PARTNER,
         capabilities=AgentCapabilities(
             idempotency=True,
@@ -42,7 +40,8 @@ def main():
             retention=RetentionPolicy.EPHEMERAL,  # Data not retained
             storage_location="us-east-1",
             human_review=False,
-            training_consent=False
+            encryption_at_rest=True,
+            encryption_in_transit=True
         )
     )
     
@@ -72,10 +71,11 @@ def main():
     print("")
     
     # Create and run the sidecar
-    sidecar = IATPSidecar(
+    sidecar = create_sidecar(
+        agent_url="http://localhost:8000",
         manifest=manifest,
-        backend_url="http://localhost:8000",
-        sidecar_port=8001
+        host="0.0.0.0",
+        port=8001
     )
     
     sidecar.run()
