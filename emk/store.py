@@ -289,7 +289,16 @@ try:
             
             # Convert results to Episodes
             episodes = []
-            metadatas = results.get('metadatas', [[]])[0] if 'metadatas' in results else results.get('metadatas', [])
+            
+            # Handle metadatas consistently
+            if 'metadatas' in results and results['metadatas']:
+                # For query results, metadatas is a list of lists
+                if isinstance(results['metadatas'][0], list):
+                    metadatas = results['metadatas'][0]
+                else:
+                    metadatas = results['metadatas']
+            else:
+                metadatas = []
             
             if not metadatas:
                 return episodes

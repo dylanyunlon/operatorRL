@@ -6,8 +6,8 @@ a single agent experience: Goal -> Action -> Result -> Reflection.
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field
+from typing import Any, Dict
+from pydantic import BaseModel, Field, model_validator
 import hashlib
 import json
 
@@ -38,10 +38,10 @@ class Episode(BaseModel):
         description="When the episode was created"
     )
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional context or tags")
-    episode_id: Optional[str] = Field(default=None, description="Unique hash-based identifier")
+    episode_id: str = Field(default="", description="Unique hash-based identifier")
     
     model_config = {
-        "frozen": False,  # Allow setting episode_id after initialization
+        "frozen": True,  # Truly immutable
         "json_schema_extra": {
             "example": {
                 "goal": "Retrieve user preferences",
@@ -53,27 +53,25 @@ class Episode(BaseModel):
         }
     }
     
-    def model_post_init(self, __context: Any) -> None:
-        """Generate episode_id after initialization if not provided."""
-        if self.episode_id is None:
-            object.__setattr__(self, 'episode_id', self._generate_id())
-    
-    def _generate_id(self) -> str:
-        """
-        Generate a unique hash-based ID for this episode.
-        
-        Returns:
-            A SHA-256 hash of the episode content
-        """
-        content = {
-            "goal": self.goal,
-            "action": self.action,
-            "result": self.result,
-            "reflection": self.reflection,
-            "timestamp": self.timestamp.isoformat(),
-        }
-        content_str = json.dumps(content, sort_keys=True)
-        return hashlib.sha256(content_str.encode()).hexdigest()
+    @model_validator(mode='before')
+    @classmethod
+    def generate_episode_id(cls, data: Any) -> Any:
+        """Generate episode_id if not provided."""
+        if isinstance(data, dict):
+            if not data.get('episode_id'):
+                # Generate the hash
+                content = {
+                    "goal": data.get('goal', ''),
+                    "action": data.get('action', ''),
+                    "result": data.get('result', ''),
+                    "reflection": data.get('reflection', ''),
+                    "timestamp": data.get('timestamp', datetime.now(timezone.utc)).isoformat() 
+                                if isinstance(data.get('timestamp'), datetime) 
+                                else data.get('timestamp', datetime.now(timezone.utc).isoformat()),
+                }
+                content_str = json.dumps(content, sort_keys=True)
+                data['episode_id'] = hashlib.sha256(content_str.encode()).hexdigest()
+        return data
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert episode to dictionary format."""

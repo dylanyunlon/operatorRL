@@ -85,7 +85,7 @@ class Indexer:
         Returns:
             SHA-256 hash of the episode content
         """
-        # Use the episode's own ID generation logic
+        # The episode_id is already the content hash
         return episode.episode_id
     
     @staticmethod
