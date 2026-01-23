@@ -1,0 +1,200 @@
+%% CMVK Paper Structure Template
+%% This file maps the research narrative to specific code components
+%% Use as a reference when writing or updating the paper
+
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{listings}
+
+\title{Cross-Model Verification Kernel (CMVK):\\
+Paper Structure and Code Mapping}
+\author{Imran Siddique}
+\date{January 2026}
+
+\begin{document}
+\maketitle
+
+\section*{Paper-to-Code Mapping Guide}
+
+This document maps each paper section to the corresponding code implementation.
+
+%% ============================================================================
+\section{Abstract}
+%% ============================================================================
+
+\textbf{Key Claims to Support:}
+\begin{itemize}
+    \item Adversarial multi-model architecture reduces correlated blind spots
+    \item Strategy banning prevents infinite loops
+    \item Mathematical framework for blind spot reduction
+\end{itemize}
+
+\textbf{Code Reference:} \texttt{src/cmvk/verification.py} - Core verification primitives
+
+%% ============================================================================
+\section{Introduction}
+%% ============================================================================
+
+\subsection{1.1 The Problem: Correlated Error Blindness}
+\textbf{Code Reference:} None (conceptual)
+
+\subsection{1.2 Existing Approaches}
+\textbf{Code Reference:} \texttt{experiments/baseline\_runner.py} - Single-model baseline
+
+\subsection{1.3 Our Contribution}
+\textbf{Code References:}
+\begin{itemize}
+    \item Adversarial Architecture: \texttt{src/cross\_model\_verification\_kernel/core/kernel.py}
+    \item Model Diversity: \texttt{src/cross\_model\_verification\_kernel/kernel.py::\_estimate\_model\_correlation()}
+    \item Strategy Banning: \texttt{src/cross\_model\_verification\_kernel/core/graph\_memory.py}
+    \item Traceability: \texttt{src/cross\_model\_verification\_kernel/core/trace\_logger.py}
+\end{itemize}
+
+%% ============================================================================
+\section{Methodology}
+%% ============================================================================
+
+\subsection{2.1 Architecture Overview}
+\textbf{Code Reference:} \texttt{src/cross\_model\_verification\_kernel/\_\_init\_\_.py}
+
+\textbf{Key Classes:}
+\begin{lstlisting}[language=Python]
+from cross_model_verification_kernel import (
+    VerificationKernel,  # core/kernel.py
+    GraphMemory,         # core/graph_memory.py
+    OpenAIGenerator,     # agents/generator_openai.py
+    GeminiVerifier,      # agents/verifier_gemini.py
+)
+\end{lstlisting}
+
+\subsection{2.2 Component Roles}
+
+\subsubsection{2.2.1 The Generator (System 1)}
+\textbf{Code Reference:} \texttt{src/cross\_model\_verification\_kernel/agents/generator\_openai.py}
+
+\textbf{Key Method:} \texttt{OpenAIGenerator.generate()}
+
+\subsubsection{2.2.2 The Verifier (System 2)}
+\textbf{Code References:}
+\begin{itemize}
+    \item \texttt{agents/verifier\_gemini.py} - Google Gemini implementation
+    \item \texttt{agents/verifier\_anthropic.py} - Anthropic Claude implementation
+\end{itemize}
+
+\textbf{Key Method:} \texttt{GeminiVerifier.verify()}
+
+\subsubsection{2.2.3 The Arbiter (Deterministic Kernel)}
+\textbf{Code Reference:} \texttt{src/cross\_model\_verification\_kernel/core/kernel.py}
+
+\textbf{Key Method:} \texttt{VerificationKernel.execute()}
+
+\subsection{2.3 Mathematical Framework}
+\textbf{Code Reference:} \texttt{src/cross\_model\_verification\_kernel/kernel.py}
+
+\textbf{Key Method:} \texttt{\_calculate\_blind\_spot\_reduction()}
+
+\textbf{Equation (Blind Spot Probability):}
+\begin{equation}
+P(\text{combined error}) = P(\text{error})^2 + \rho \cdot P(\text{error}) \cdot (1 - P(\text{error}))
+\end{equation}
+
+\subsection{2.4 Verification Primitives}
+\textbf{Code Reference:} \texttt{src/cmvk/verification.py}
+
+\textbf{Key Functions:}
+\begin{lstlisting}[language=Python]
+import cmvk
+
+cmvk.verify(output_a, output_b)           # Text comparison
+cmvk.verify_embeddings(emb_a, emb_b)      # Vector comparison
+cmvk.verify_distributions(dist_a, dist_b) # KL divergence
+cmvk.verify_sequences(seq_a, seq_b)       # Sequence alignment
+\end{lstlisting}
+
+%% ============================================================================
+\section{Experiments}
+%% ============================================================================
+
+\subsection{3.1 Experimental Setup}
+\textbf{Code Reference:} \texttt{experiments/reproduce\_results.py}
+
+\textbf{Reproducibility:}
+\begin{lstlisting}[language=bash]
+python experiments/reproduce_results.py --seed 42 --problems 50
+\end{lstlisting}
+
+\subsection{3.2 Datasets}
+\textbf{Code Reference:} \texttt{experiments/datasets/}
+\begin{itemize}
+    \item HumanEval: \texttt{humaneval\_50.json}
+    \item Sabotage Tests: \texttt{sabotage\_tests.json}
+\end{itemize}
+
+\textbf{Data Loader:} \texttt{src/cross\_model\_verification\_kernel/datasets/humaneval\_loader.py}
+
+\subsection{3.3 Baselines}
+\textbf{Code Reference:} \texttt{experiments/baseline\_runner.py}
+
+\subsection{3.4 Ablation Studies}
+\textbf{Code Reference:} \texttt{experiments/ablation\_runner.py}
+
+\subsection{3.5 Results}
+\textbf{Output Location:} \texttt{experiments/results.json}
+
+\textbf{Visualization:} \texttt{experiments/visualize\_results.py}
+
+%% ============================================================================
+\section{Results and Discussion}
+%% ============================================================================
+
+\textbf{Figures:}
+\begin{itemize}
+    \item Figure 1: Architecture diagram - \texttt{paper/figures/architecture.pdf}
+    \item Figure 2: Accuracy comparison - \texttt{paper/figures/accuracy.pdf}
+    \item Figure 3: Blind spot reduction - \texttt{paper/figures/blind\_spots.pdf}
+\end{itemize}
+
+\textbf{Figure Generation:} \texttt{paper/generate\_figures.py}
+
+%% ============================================================================
+\section{Related Work}
+%% ============================================================================
+
+\textbf{Bibliography:} \texttt{paper/references.bib}
+
+%% ============================================================================
+\section{Conclusion and Future Work}
+%% ============================================================================
+
+\subsection{Future Directions}
+\begin{itemize}
+    \item Multi-turn verification loops
+    \item Dynamic model selection based on task type
+    \item Integration with formal verification tools
+    \item Extension to multi-modal outputs
+\end{itemize}
+
+%% ============================================================================
+\section*{Appendix: File Index}
+%% ============================================================================
+
+\begin{tabular}{ll}
+\hline
+\textbf{Component} & \textbf{File Path} \\
+\hline
+PyPI Package (cmvk) & \texttt{src/cmvk/} \\
+Verification Primitives & \texttt{src/cmvk/verification.py} \\
+Full Framework & \texttt{src/cross\_model\_verification\_kernel/} \\
+Kernel Logic & \texttt{src/cross\_model\_verification\_kernel/core/kernel.py} \\
+Graph Memory & \texttt{src/cross\_model\_verification\_kernel/core/graph\_memory.py} \\
+Trace Logger & \texttt{src/cross\_model\_verification\_kernel/core/trace\_logger.py} \\
+Generator Agent & \texttt{src/cross\_model\_verification\_kernel/agents/generator\_openai.py} \\
+Verifier Agents & \texttt{src/cross\_model\_verification\_kernel/agents/verifier\_*.py} \\
+Experiments & \texttt{experiments/} \\
+Reproducibility Script & \texttt{experiments/reproduce\_results.py} \\
+Results Output & \texttt{experiments/results.json} \\
+Paper Source & \texttt{paper/cmvk\_neurips.tex} \\
+\hline
+\end{tabular}
+
+\end{document}
