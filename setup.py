@@ -4,7 +4,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="atr-core",
+    name="agent-tool-registry",
     version="0.1.0",
     author="Agent Tool Registry Contributors",
     description="A decentralized marketplace for agent capabilities",

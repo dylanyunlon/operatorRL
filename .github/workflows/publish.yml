@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/atr-core
+      url: https://test.pypi.org/p/agent-tool-registry
     permissions:
       id-token: write  # Required for OIDC trusted publishing
     steps:
@@ -108,7 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/atr-core
+      url: https://pypi.org/p/agent-tool-registry
     permissions:
       id-token: write  # Required for OIDC trusted publishing
     steps:

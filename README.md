@@ -2,8 +2,8 @@
 
 **"The Hands"** - A decentralized marketplace for agent capabilities.
 
-[![PyPI version](https://badge.fury.io/py/atr-core.svg)](https://badge.fury.io/py/atr-core)
-[![Python Support](https://img.shields.io/pypi/pyversions/atr-core.svg)](https://pypi.org/project/atr-core/)
+[![PyPI version](https://badge.fury.io/py/agent-tool-registry.svg)](https://badge.fury.io/py/agent-tool-registry)
+[![Python Support](https://img.shields.io/pypi/pyversions/agent-tool-registry.svg)](https://pypi.org/project/agent-tool-registry/)
 
 ## Core Value Proposition
 
@@ -12,7 +12,7 @@ ATR allows an agent to say, *"I need a tool that can scrape websites,"* and rece
 ## Installation
 
 ```bash
-pip install atr-core
+pip install agent-tool-registry
 ```
 
 ## Quick Start

@@ -25,7 +25,7 @@ python -m twine upload dist/*
 ## Step 2: Configure Trusted Publishing on PyPI
 
 1. Go to [pypi.org](https://pypi.org) and log in
-2. Navigate to your project: **Your projects** → **atr-core**
+2. Navigate to your project: **Your projects** → **agent-tool-registry**
 3. Go to **Settings** → **Publishing**
 4. Under "Add a new pending publisher" or "Add a new trusted publisher":
 

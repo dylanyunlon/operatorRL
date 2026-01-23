@@ -97,7 +97,7 @@ examples/
 7. **Safe Design**: Registry never executes tools - only stores and returns them
 
 ### PyPI Ready
-- `setup.py` configured for PyPI publication as `atr-core`
+- `setup.py` configured for PyPI publication as `agent-tool-registry`
 - `pyproject.toml` with proper metadata
 - `requirements.txt` with minimal dependencies
 - Comprehensive README.md with examples
@@ -138,6 +138,6 @@ result = func(url="https://example.com", timeout=10)
 
 ## Conclusion
 
-The Agent Tool Registry (ATR) has been fully implemented according to PRD 3 specifications. All requirements have been met, all tests pass, no security vulnerabilities exist, and the package is ready for PyPI publication as `atr-core`.
+The Agent Tool Registry (ATR) has been fully implemented according to PRD 3 specifications. All requirements have been met, all tests pass, no security vulnerabilities exist, and the package is ready for PyPI publication as `agent-tool-registry`.
 
 **Status**: ✅ READY FOR PRODUCTION

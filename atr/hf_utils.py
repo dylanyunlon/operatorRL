@@ -16,7 +16,7 @@ Example:
 Note:
     Requires the `huggingface-hub` package. Install with::
 
-        pip install atr-core[hf]
+        pip install agent-tool-registry[hf]
 
     You must be authenticated with Hugging Face. Run::
 
@@ -51,7 +51,7 @@ def _check_hf_hub_installed() -> None:
     except ImportError as e:
         raise ImportError(
             "huggingface_hub is required for HF integration. "
-            "Install it with: pip install atr-core[hf]"
+            "Install it with: pip install agent-tool-registry[hf]"
         ) from e
 
 
