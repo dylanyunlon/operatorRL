@@ -1,13 +1,24 @@
 # ATR - Agent Tool Registry
 
-**"The Hands"** - A decentralized marketplace for agent capabilities.
-
 [![PyPI version](https://badge.fury.io/py/agent-tool-registry.svg)](https://badge.fury.io/py/agent-tool-registry)
-[![Python Support](https://img.shields.io/pypi/pyversions/agent-tool-registry.svg)](https://pypi.org/project/agent-tool-registry/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/imran-siddique/atr/test.yml?branch=main)](https://github.com/imran-siddique/atr/actions)
 
-## Core Value Proposition
+**A type-safe, decentralized tool registry for autonomous agents. Part of the Agent OS ecosystem.**
 
-ATR allows an agent to say, *"I need a tool that can scrape websites,"* and receive a standardized interface, regardless of who built the tool or where it lives.
+---
+
+## Why This Exists
+
+Most agent frameworks hardcode tools directly into their runtimes. This creates tight coupling: add a new capability, restart the entire system. Change a function signature, update dozens of agents. Scale by addition leads to fragility.
+
+**We built `atr` because tool registration should not require restarting your infrastructure.**  
+
+The Agent Tool Registry decouples tool providers from tool consumers. Agents discover capabilities at runtime through a standardized interface. We subtract the dependency between agent logic and tool implementation to add scale.
+
+This is **Scale by Subtraction** applied to the agent capability layer.
+
+---
 
 ## Installation
 
@@ -15,204 +26,92 @@ ATR allows an agent to say, *"I need a tool that can scrape websites,"* and rece
 pip install agent-tool-registry
 ```
 
+---
+
 ## Quick Start
 
-### 1. Register a Tool
-
-Use the `@atr.register()` decorator to turn any Python function into a discoverable tool:
+Register a tool in 5 lines:
 
 ```python
 import atr
 
-@atr.register(name="web_scraper", cost="low", tags=["web", "scraping"])
-def scrape_website(url: str, timeout: int = 30) -> str:
-    """Scrape content from a website.
-    
-    Args:
-        url: The URL to scrape
-        timeout: Request timeout in seconds
-    """
-    # Your implementation here
-    import requests
-    response = requests.get(url, timeout=timeout)
-    return response.text
+@atr.register(name="calculator", tags=["math"])
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
 ```
 
-**Important:** All parameters MUST have type hints - no magic arguments allowed!
-
-### 2. Discover Tools
+Discover and execute:
 
 ```python
-import atr
-
-# Search for tools
-tools = atr._global_registry.search_tools("scrape")
-
-# List all tools with specific properties
-web_tools = atr._global_registry.list_tools(tag="web")
-low_cost_tools = atr._global_registry.list_tools(cost=atr.CostLevel.LOW)
+tool = atr.get_tool("calculator")
+schema = tool.to_openai_function_schema()  # OpenAI-compatible
+func = atr.get_callable("calculator")
+result = func(a=5, b=3)  # Returns 8
 ```
 
-### 3. Get Tool Specification
-
-```python
-import atr
-
-# Get the tool spec (doesn't execute it!)
-tool_spec = atr._global_registry.get_tool("web_scraper")
-
-# Convert to OpenAI function calling format
-openai_schema = tool_spec.to_openai_function_schema()
-print(openai_schema)
-```
-
-### 4. Execute a Tool (Control Plane's Job)
-
-The registry **does NOT execute tools** - it only stores and returns them. Execution is the responsibility of the Agent Runtime (Control Plane):
-
-```python
-import atr
-
-# Get the callable (but don't execute yet!)
-scraper_func = atr._global_registry.get_callable("web_scraper")
-
-# Now the Agent Runtime can execute it with proper error handling
-try:
-    result = scraper_func(url="https://example.com", timeout=10)
-    print(result)
-except Exception as e:
-    # Handle errors in the Control Plane
-    print(f"Tool execution failed: {e}")
-```
+---
 
 ## Architecture
 
-### The Spec
+`atr` sits in **Layer 2 (Infrastructure)** of the Agent OS stack.
 
-A rigorous Pydantic schema defines:
-- **Inputs**: Strictly typed parameters (no magic arguments!)
-- **Outputs**: Return value specification
-- **Side Effects**: What the tool does (read, write, network, etc.)
-- **Metadata**: Name, description, cost, version, author, tags
+**Responsibility:** Tool registration, discovery, and schema generation.  
+**Not responsible for:** Tool execution (handled by the Agent Control Plane).
 
-### The Registry
+### Design
 
-A lightweight lookup mechanism (local dictionary-based):
-- Stores tool specifications
-- Enables tool discovery and search
-- Returns function objects (doesn't execute them)
+- **Registry:** In-memory dictionary-based lookup (local or distributed).
+- **Decorator:** `@atr.register()` extracts type signatures and validates strict typing.
+- **Spec:** Pydantic schema enforcing inputs, outputs, side effects, and metadata.
+- **Schema Export:** Converts to OpenAI, Anthropic, and other LLM function-calling formats.
 
-### The Decorator
+The registry stores specifications, not callables. Execution happens in the control plane with proper error handling and observability.
 
-`@atr.register()` decorator that:
-- Auto-extracts function signature
-- Converts to ToolSpec schema
-- Validates type hints are present
-- Registers in the global registry
-- Returns original function unchanged
+---
 
-## Key Design Principles
+## The Ecosystem Map
 
-### ✅ Do's
+ATR is one component in a modular Agent OS. Each layer solves a specific problem:
 
-1. **Use strict typing**: Every parameter must have a type hint
-2. **Keep it simple**: Registry is just a lookup mechanism
-3. **Separate concerns**: Registry stores, Agent Runtime executes
+### Primitives (Layer 1)
+- **[caas](https://github.com/imran-siddique/caas)** - Context-as-a-Service: Manages agent memory and state.
+- **[cmvk](https://github.com/imran-siddique/cmvk)** - Context Merkle Verification Kit: Cryptographic verification of context integrity.
+- **[emk](https://github.com/imran-siddique/emk)** - Episodic Memory Kit: Long-term memory storage and retrieval.
 
-### ❌ Don'ts (Anti-Patterns)
+### Infrastructure (Layer 2)
+- **[iatp](https://github.com/imran-siddique/iatp)** - Inter-Agent Trust Protocol: Secure message authentication.
+- **[amb](https://github.com/imran-siddique/amb)** - Agent Message Bus: Decoupled event transport.
+- **[atr](https://github.com/imran-siddique/atr)** - Agent Tool Registry: Tool discovery and schema generation *(you are here)*.
 
-1. **Don't execute tools in the registry**: Return the function, don't call it
-2. **Don't allow magic arguments**: All parameters must be typed
-3. **Don't hardcode specific agents**: Tools are standalone functions
+### Framework (Layer 3)
+- **[agent-control-plane](https://github.com/imran-siddique/agent-control-plane)** - The Core: Agent orchestration and lifecycle management.
+- **[scak](https://github.com/imran-siddique/scak)** - Self-Correction Agent Kit: Automated error recovery and learning.
 
-## Supported Types
+---
 
-Parameters can be any of these types:
-- `str` → ParameterType.STRING
-- `int` → ParameterType.INTEGER
-- `float` → ParameterType.NUMBER
-- `bool` → ParameterType.BOOLEAN
-- `list` → ParameterType.ARRAY
-- `dict` → ParameterType.OBJECT
+## Citation
 
-## Advanced Usage
+If you use ATR in research, please cite:
 
-### Custom Registry
-
-```python
-from atr import Registry, register
-
-# Create a custom registry
-my_registry = Registry()
-
-@register(name="custom_tool", registry=my_registry)
-def my_tool(data: str) -> str:
-    return data.upper()
+```bibtex
+@software{atr2024,
+  title={ATR: Agent Tool Registry},
+  author={Siddique, Imran},
+  year={2024},
+  url={https://github.com/imran-siddique/atr},
+  note={Part of the Agent OS ecosystem}
+}
 ```
 
-### Tool Metadata
-
-```python
-import atr
-
-@atr.register(
-    name="file_reader",
-    cost="low",
-    side_effects=["read", "filesystem"],
-    tags=["file", "io"],
-    version="1.0.0",
-    author="Your Name"
-)
-def read_file(path: str, encoding: str = "utf-8") -> str:
-    """Read a file from disk."""
-    with open(path, "r", encoding=encoding) as f:
-        return f.read()
-```
-
-### OpenAI Function Calling Integration
-
-```python
-import atr
-
-# Get tool spec
-tool_spec = atr._global_registry.get_tool("file_reader")
-
-# Convert to OpenAI format
-function_schema = tool_spec.to_openai_function_schema()
-
-# Use with OpenAI API
-response = openai.ChatCompletion.create(
-    model="gpt-4",
-    messages=[{"role": "user", "content": "Read config.json"}],
-    functions=[function_schema],
-)
-```
-
-## Dependencies
-
-- `pydantic>=2.0.0` - For schema validation
-- Python standard library only
-
-**Strictly forbidden dependencies:**
-- ❌ agent-control-plane (tools are standalone)
-- ❌ mute-agent (no hardcoded agents)
-
-## Contributing
-
-Contributions are welcome! Please ensure:
-1. All parameters have type hints
-2. Registry doesn't execute tools
-3. No forbidden dependencies are added
-4. Tests pass
+---
 
 ## License
 
-MIT License
+MIT License - See [LICENSE](LICENSE) for details.
 
-## Layer
+---
 
-Infrastructure (Layer 2)
-
-## Repository
-
-https://github.com/imran-siddique/atr
+**Repository:** https://github.com/imran-siddique/atr  
+**Documentation:** https://github.com/imran-siddique/atr#readme  
+**Issues:** https://github.com/imran-siddique/atr/issues
