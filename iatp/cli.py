@@ -111,8 +111,12 @@ def verify(manifest_path: str, verbose: bool):
             click.echo(f"\n📊 Detailed Analysis:")
             click.echo(f"   Reversibility: {manifest.capabilities.reversibility.value}")
             click.echo(f"   Idempotency: {manifest.capabilities.idempotency}")
-            click.echo(f"   Concurrency Limit: {manifest.capabilities.concurrency_limit}")
-            click.echo(f"   SLA Latency: {manifest.capabilities.sla_latency}ms")
+            if manifest.capabilities.rate_limit:
+                click.echo(f"   Rate Limit: {manifest.capabilities.rate_limit} req/min")
+            if manifest.capabilities.sla_latency:
+                click.echo(f"   SLA Latency: {manifest.capabilities.sla_latency}")
+            if manifest.capabilities.undo_window:
+                click.echo(f"   Undo Window: {manifest.capabilities.undo_window}")
             click.echo(f"   Retention: {manifest.privacy_contract.retention.value}")
             click.echo(f"   Human Review: {manifest.privacy_contract.human_review}")
         
