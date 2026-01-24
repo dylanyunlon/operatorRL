@@ -1,9 +1,63 @@
 """
 Core data models for the Inter-Agent Trust Protocol (IATP).
+
+This module defines the Pydantic models used for capability manifests,
+trust negotiation, and policy enforcement. These models form the
+foundation of the IATP protocol.
+
+Classes:
+    TrustLevel: Enumeration of agent trust levels.
+    ReversibilityLevel: Enumeration of transaction reversibility support.
+    RetentionPolicy: Enumeration of data retention policies.
+    PrivacyContract: Privacy and data handling policies.
+    AgentCapabilities: Capabilities advertised by an agent.
+    CapabilityManifest: The complete manifest exchanged during handshake.
+    QuarantineSession: Session info for quarantined requests.
+    TracingContext: Distributed tracing context.
+
+Example:
+    Creating a capability manifest::
+
+        from iatp.models import (
+            CapabilityManifest,
+            AgentCapabilities,
+            PrivacyContract,
+            TrustLevel,
+            ReversibilityLevel,
+            RetentionPolicy,
+        )
+
+        manifest = CapabilityManifest(
+            agent_id="my-agent",
+            trust_level=TrustLevel.TRUSTED,
+            capabilities=AgentCapabilities(
+                reversibility=ReversibilityLevel.FULL,
+                idempotency=True,
+            ),
+            privacy_contract=PrivacyContract(
+                retention=RetentionPolicy.EPHEMERAL,
+            ),
+        )
+
+        print(f"Trust Score: {manifest.calculate_trust_score()}/10")
 """
+
+from __future__ import annotations
+
 from enum import Enum
 from typing import Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
+
+__all__ = [
+    "TrustLevel",
+    "ReversibilityLevel",
+    "RetentionPolicy",
+    "PrivacyContract",
+    "AgentCapabilities",
+    "CapabilityManifest",
+    "QuarantineSession",
+    "TracingContext",
+]
 
 
 class TrustLevel(str, Enum):
