@@ -4,16 +4,18 @@ Recovery Engine Integration with SCAK (Self-Correcting Agent Kernel).
 This module wraps the agent_kernel (scak) to provide failure recovery
 and rollback capabilities for IATP.
 """
-from typing import Dict, Any, Optional, Callable
-from enum import Enum
 import asyncio
+import logging
 from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Callable, Dict, Optional
+
 from agent_kernel import (
     AgentFailure,
 )
-from agent_kernel.models import FailureType, FailureSeverity
+from agent_kernel.models import FailureType
+
 from iatp.models import CapabilityManifest
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +30,17 @@ class RecoveryStrategy(str, Enum):
 class IATPRecoveryEngine:
     """
     Wrapper around SCAK for IATP failure recovery.
-    
+
     This integrates the Self-Correcting Agent Kernel (scak) to provide
     automatic failure detection, triage, and recovery for agent interactions.
     """
-    
+
     def __init__(self):
         """Initialize the IATP Recovery Engine."""
         # Note: SelfCorrectingAgentKernel requires specific initialization
         # We'll use the triage and diagnosis functions directly
         self.recovery_history: Dict[str, Any] = {}
-    
+
     async def handle_failure(
         self,
         trace_id: str,
@@ -49,24 +51,24 @@ class IATPRecoveryEngine:
     ) -> Dict[str, Any]:
         """
         Handle a failure in agent communication.
-        
+
         This is the main entry point for failure recovery. It:
         1. Diagnoses the failure using scak
         2. Determines the appropriate recovery strategy
         3. Executes compensation if available
-        
+
         Args:
             trace_id: Unique trace ID for this request
             error: The exception that occurred
             manifest: The agent's capability manifest
             payload: The original request payload
             compensation_callback: Optional callback for rollback
-        
+
         Returns:
             Dictionary with recovery result and actions taken
         """
         logger.info(f"[Recovery] Handling failure for trace {trace_id}")
-        
+
         # Determine failure type from exception
         error_name = type(error).__name__
         if "Timeout" in error_name:
@@ -77,7 +79,7 @@ class IATPRecoveryEngine:
             failure_type = FailureType.INVALID_ACTION
         else:
             failure_type = FailureType.UNKNOWN
-        
+
         # Create failure record using scak's AgentFailure model
         failure = AgentFailure(
             agent_id=manifest.agent_id,
@@ -90,18 +92,18 @@ class IATPRecoveryEngine:
             },
             timestamp=datetime.now(timezone.utc)
         )
-        
+
         # Determine recovery strategy based on manifest and failure type
         # Note: scak's diagnose_failure requires complex tool traces,
         # so we use a simplified diagnosis based on the failure record
         diagnosis = f"{failure_type.value}: {error_name}"
-        
+
         strategy = self._determine_strategy(
             diagnosis,
             manifest,
             compensation_callback is not None
         )
-        
+
         # Execute recovery
         recovery_result = await self._execute_recovery(
             strategy=strategy,
@@ -110,7 +112,7 @@ class IATPRecoveryEngine:
             manifest=manifest,
             compensation_callback=compensation_callback
         )
-        
+
         # Record in history
         self.recovery_history[trace_id] = {
             "failure": failure,
@@ -119,9 +121,9 @@ class IATPRecoveryEngine:
             "result": recovery_result,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        
+
         return recovery_result
-    
+
     def _determine_strategy(
         self,
         diagnosis: str,
@@ -130,18 +132,18 @@ class IATPRecoveryEngine:
     ) -> RecoveryStrategy:
         """
         Determine the appropriate recovery strategy.
-        
+
         Args:
             diagnosis: Failure diagnosis from scak
             manifest: Agent capability manifest
             has_compensation: Whether compensation callback is available
-        
+
         Returns:
             RecoveryStrategy to use for recovery
         """
         # Check if agent supports reversibility
         reversibility = manifest.capabilities.reversibility.value
-        
+
         if reversibility in ["full", "partial"] and has_compensation:
             # Agent supports rollback and we have compensation logic
             return RecoveryStrategy.ROLLBACK
@@ -154,7 +156,7 @@ class IATPRecoveryEngine:
         else:
             # No recovery possible
             return RecoveryStrategy.GIVE_UP
-    
+
     async def _execute_recovery(
         self,
         strategy: RecoveryStrategy,
@@ -165,14 +167,14 @@ class IATPRecoveryEngine:
     ) -> Dict[str, Any]:
         """
         Execute the determined recovery strategy.
-        
+
         Args:
             strategy: Recovery strategy to execute
             trace_id: Trace ID
             failure: Failure details
             manifest: Agent manifest
             compensation_callback: Optional compensation callback
-        
+
         Returns:
             Dictionary with recovery results
         """
@@ -182,11 +184,11 @@ class IATPRecoveryEngine:
             "actions_taken": [],
             "trace_id": trace_id
         }
-        
+
         if strategy == RecoveryStrategy.ROLLBACK:
             logger.info(f"[Recovery] Executing rollback for {trace_id}")
             result["actions_taken"].append("initiated_rollback")
-            
+
             if compensation_callback:
                 try:
                     # Execute compensation transaction
@@ -194,7 +196,7 @@ class IATPRecoveryEngine:
                         await compensation_callback()
                     else:
                         compensation_callback()
-                    
+
                     result["success"] = True
                     result["actions_taken"].append("compensation_executed")
                     logger.info(f"[Recovery] Rollback successful for {trace_id}")
@@ -204,13 +206,13 @@ class IATPRecoveryEngine:
             else:
                 result["actions_taken"].append("no_compensation_available")
                 logger.warning(f"[Recovery] No compensation callback for {trace_id}")
-        
+
         elif strategy == RecoveryStrategy.RETRY:
             logger.info(f"[Recovery] Retry recommended for {trace_id}")
             result["actions_taken"].append("retry_recommended")
             result["retry_possible"] = True
             # Note: Actual retry logic would be implemented by the caller
-        
+
         else:  # GIVE_UP
             logger.info(f"[Recovery] No recovery possible for {trace_id}")
             result["actions_taken"].append("recovery_not_possible")
@@ -218,21 +220,21 @@ class IATPRecoveryEngine:
                 f"Agent '{manifest.agent_id}' does not support rollback and "
                 "error is not recoverable. Transaction may be in inconsistent state."
             )
-        
+
         return result
-    
+
     def get_recovery_history(self, trace_id: str) -> Optional[Dict[str, Any]]:
         """
         Get recovery history for a trace ID.
-        
+
         Args:
             trace_id: Trace ID to look up
-        
+
         Returns:
             Recovery history or None if not found
         """
         return self.recovery_history.get(trace_id)
-    
+
     def should_attempt_recovery(
         self,
         error: Exception,
@@ -240,18 +242,18 @@ class IATPRecoveryEngine:
     ) -> bool:
         """
         Determine if recovery should be attempted for this error.
-        
+
         Args:
             error: The exception that occurred
             manifest: Agent capability manifest
-        
+
         Returns:
             True if recovery should be attempted
         """
         # Always attempt recovery if agent supports reversibility
         if manifest.capabilities.reversibility.value in ["full", "partial"]:
             return True
-        
+
         # Attempt recovery for certain error types
         error_name = type(error).__name__
         recoverable_errors = [
@@ -260,9 +262,9 @@ class IATPRecoveryEngine:
             "HTTPError",
             "ServiceUnavailable"
         ]
-        
+
         return any(err in error_name for err in recoverable_errors)
-    
+
     async def execute_compensation_transaction(
         self,
         trace_id: str,
@@ -272,23 +274,23 @@ class IATPRecoveryEngine:
     ) -> bool:
         """
         Execute a compensation transaction using the agent's compensation endpoint.
-        
+
         This is used when the agent provides a specific compensation/rollback
         endpoint as specified in the handshake.
-        
+
         Args:
             trace_id: Trace ID
             manifest: Agent manifest with undo_window info
             compensation_endpoint: URL for compensation
             compensation_payload: Payload for compensation request
-        
+
         Returns:
             True if compensation succeeded
         """
         import httpx
-        
+
         logger.info(f"[Recovery] Executing compensation transaction for {trace_id}")
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -300,7 +302,7 @@ class IATPRecoveryEngine:
                     },
                     timeout=30.0
                 )
-                
+
                 if 200 <= response.status_code < 300:
                     logger.info(f"[Recovery] Compensation successful for {trace_id}")
                     return True
@@ -310,7 +312,7 @@ class IATPRecoveryEngine:
                         f"status {response.status_code}"
                     )
                     return False
-        
+
         except Exception as e:
             logger.error(f"[Recovery] Compensation exception for {trace_id}: {e}")
             return False

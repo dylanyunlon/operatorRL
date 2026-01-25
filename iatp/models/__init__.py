@@ -45,7 +45,8 @@ Example:
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Dict, Any, Literal, List
+from typing import Any, Dict, List, Literal, Optional
+
 from pydantic import BaseModel, Field
 
 __all__ = [
@@ -93,7 +94,7 @@ class PrivacyContract(BaseModel):
         ...,
         description="How long the agent stores data"
     )
-    storage_location: Optional[str] = Field(
+    storage_location: str | None = Field(
         None,
         description="Geographic location of data storage (e.g., 'us-west')"
     )
@@ -121,15 +122,15 @@ class AgentCapabilities(BaseModel):
         ReversibilityLevel.NONE,
         description="Level of transaction reversibility support"
     )
-    undo_window: Optional[str] = Field(
+    undo_window: str | None = Field(
         None,
         description="Time window for undo operations (e.g., '24h', '7d')"
     )
-    sla_latency: Optional[str] = Field(
+    sla_latency: str | None = Field(
         None,
         description="Promised response latency (e.g., '2000ms', '5s')"
     )
-    rate_limit: Optional[int] = Field(
+    rate_limit: int | None = Field(
         None,
         description="Maximum requests per minute"
     )
@@ -144,7 +145,7 @@ class CapabilityManifest(BaseModel):
         ...,
         description="Unique identifier for the agent"
     )
-    agent_version: Optional[str] = Field(
+    agent_version: str | None = Field(
         None,
         description="Version of the agent"
     )
@@ -160,45 +161,45 @@ class CapabilityManifest(BaseModel):
         ...,
         description="Privacy policies of the agent"
     )
-    
+
     def calculate_trust_score(self) -> int:
         """
         Calculate a trust score (0-10) based on capabilities and privacy.
-        
+
         The trust score helps clients make informed decisions about agent reliability.
         Higher scores indicate more trustworthy agents with better security practices.
-        
+
         Scoring Criteria:
         ----------------
         Base Score: 5 (neutral)
-        
+
         Trust Level Adjustments:
         - VERIFIED_PARTNER: +3 (well-known, vetted partner)
         - TRUSTED: +2 (established trust relationship)
         - STANDARD: 0 (no prior relationship)
         - UNKNOWN: -2 (minimal information)
         - UNTRUSTED: -5 (known issues or red flags)
-        
+
         Capability Bonuses:
         - Idempotency support: +1 (safe retry behavior)
         - Reversibility (full or partial): +1 (can undo actions)
-        
+
         Privacy Adjustments:
         - Ephemeral retention: +2 (best privacy, data deleted after session)
         - Permanent/forever retention: -2 (worst privacy, data kept indefinitely)
         - No human review: +1 (automated processing only)
-        
+
         Score Ranges:
         - 8-10: Highly trustworthy (verified partners with strong privacy)
         - 5-7: Moderately trustworthy (standard agents with decent practices)
         - 3-4: Low trust (some concerns, user should be cautious)
         - 0-2: Very low trust (significant concerns, strong warnings needed)
-        
+
         Returns:
             int: Trust score clamped to range [0, 10]
         """
         score = 5  # Start with neutral score
-        
+
         # Trust level adjustments
         trust_scores = {
             TrustLevel.VERIFIED_PARTNER: 3,
@@ -208,22 +209,22 @@ class CapabilityManifest(BaseModel):
             TrustLevel.UNTRUSTED: -5
         }
         score += trust_scores.get(self.trust_level, 0)
-        
+
         # Capability bonuses
         if self.capabilities.idempotency:
             score += 1
         if self.capabilities.reversibility in [ReversibilityLevel.FULL, ReversibilityLevel.PARTIAL]:
             score += 1
-        
+
         # Privacy bonuses
         if self.privacy_contract.retention == RetentionPolicy.EPHEMERAL:
             score += 2
         elif self.privacy_contract.retention in [RetentionPolicy.PERMANENT, RetentionPolicy.FOREVER]:
             score -= 2
-        
+
         if not self.privacy_contract.human_review:
             score += 1
-        
+
         # Clamp to 0-10 range
         return max(0, min(10, score))
 
@@ -235,7 +236,7 @@ class QuarantineSession(BaseModel):
     warning_message: str
     user_override: bool = False
     timestamp: str
-    manifest: Optional[CapabilityManifest] = None
+    manifest: CapabilityManifest | None = None
 
 
 class TracingContext(BaseModel):
@@ -244,7 +245,7 @@ class TracingContext(BaseModel):
         ...,
         description="Unique trace ID for the request"
     )
-    parent_trace_id: Optional[str] = Field(
+    parent_trace_id: str | None = Field(
         None,
         description="Parent trace ID if this is part of a chain"
     )
@@ -261,7 +262,7 @@ class TracingContext(BaseModel):
 class AttestationRecord(BaseModel):
     """
     Attestation record for agent codebase verification.
-    
+
     This provides verifiable proof that an agent is running the expected
     codebase and configuration, signed by a trusted Control Plane.
     """
@@ -289,18 +290,18 @@ class AttestationRecord(BaseModel):
         ...,
         description="ISO 8601 timestamp when attestation was created"
     )
-    expires_at: Optional[str] = Field(
+    expires_at: str | None = Field(
         None,
         description="ISO 8601 timestamp when attestation expires"
     )
-    
+
     def is_expired(self, current_time: str) -> bool:
         """
         Check if the attestation has expired.
-        
+
         Args:
             current_time: Current time in ISO 8601 format
-            
+
         Returns:
             True if expired, False otherwise
         """
@@ -312,7 +313,7 @@ class AttestationRecord(BaseModel):
 class ReputationEvent(BaseModel):
     """
     Event that affects an agent's reputation score.
-    
+
     This tracks individual events that caused reputation changes,
     such as hallucinations detected by cmvk or successful transactions.
     """
@@ -340,15 +341,15 @@ class ReputationEvent(BaseModel):
         ...,
         description="ISO 8601 timestamp when event occurred"
     )
-    trace_id: Optional[str] = Field(
+    trace_id: str | None = Field(
         None,
         description="Associated trace ID if event was part of a request"
     )
-    details: Optional[Dict[str, Any]] = Field(
+    details: dict[str, Any] | None = Field(
         None,
         description="Additional context about the event"
     )
-    detected_by: Optional[str] = Field(
+    detected_by: str | None = Field(
         None,
         description="Component that detected the event (e.g., 'cmvk', 'iatp')"
     )
@@ -357,7 +358,7 @@ class ReputationEvent(BaseModel):
 class ReputationScore(BaseModel):
     """
     Network-wide reputation score for an agent.
-    
+
     This tracks an agent's reputation based on its behavior across
     the network. Reputation can be slashed when misbehavior is detected.
     """
@@ -391,40 +392,40 @@ class ReputationScore(BaseModel):
         ...,
         description="ISO 8601 timestamp of last update"
     )
-    recent_events: List[ReputationEvent] = Field(
+    recent_events: list[ReputationEvent] = Field(
         default_factory=list,
         description="Recent reputation events (up to 100)"
     )
-    
+
     def apply_event(self, event: ReputationEvent) -> None:
         """
         Apply a reputation event to update the score.
-        
+
         Args:
             event: The reputation event to apply
         """
         # Update score with clamping
         self.score = max(0.0, min(10.0, self.score + event.score_delta))
-        
+
         # Update counters
         self.total_events += 1
         if event.score_delta > 0:
             self.positive_events += 1
         elif event.score_delta < 0:
             self.negative_events += 1
-        
+
         # Add to recent events (keep last 100)
         self.recent_events.append(event)
         if len(self.recent_events) > 100:
             self.recent_events = self.recent_events[-100:]
-        
+
         # Update timestamp
         self.last_updated = event.timestamp
-    
+
     def get_trust_level(self) -> TrustLevel:
         """
         Convert reputation score to trust level.
-        
+
         Returns:
             Appropriate TrustLevel based on current score
         """
