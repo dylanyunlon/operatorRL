@@ -254,8 +254,10 @@ class MemoryCompressor:
                             continue
                     
                     rules.append(rule)
-                except Exception:
-                    # Skip invalid lines
+                except (ValueError, KeyError) as e:
+                    # Skip invalid lines but log the issue
+                    import logging
+                    logging.debug(f"Skipping invalid rule line: {e}")
                     continue
         
         # Return most recent rules first
@@ -265,7 +267,8 @@ class MemoryCompressor:
     def compress_old_episodes(
         self,
         summarizer: Optional[Callable[[List[Episode]], str]] = None,
-        dry_run: bool = False
+        dry_run: bool = False,
+        max_episodes: int = 10000
     ) -> Dict[str, Any]:
         """
         Execute a compression cycle: identify old episodes, summarize, and optionally archive.
@@ -273,12 +276,21 @@ class MemoryCompressor:
         Args:
             summarizer: Optional custom summarization function
             dry_run: If True, only report what would be compressed without making changes
+            max_episodes: Maximum number of episodes to process (default: 10000)
             
         Returns:
             Dictionary with compression statistics
         """
-        # Retrieve all episodes (note: this could be optimized with date filters)
-        all_episodes = self.store.retrieve(limit=10000)  # Large limit to get all
+        # Retrieve episodes up to max limit
+        all_episodes = self.store.retrieve(limit=max_episodes)
+        
+        if len(all_episodes) == max_episodes:
+            # Log warning that we may have hit the limit
+            import logging
+            logging.warning(
+                f"Retrieved {max_episodes} episodes (limit reached). "
+                "Some episodes may not be processed. Consider increasing max_episodes."
+            )
         
         # Identify old episodes
         old_episodes = self.identify_old_episodes(all_episodes)
@@ -293,6 +305,7 @@ class MemoryCompressor:
         # Batch compress
         rules_created = 0
         compressed_count = 0
+        errors = []
         
         for i in range(0, len(old_episodes), self.compression_batch_size):
             batch = old_episodes[i:i + self.compression_batch_size]
@@ -307,8 +320,10 @@ class MemoryCompressor:
                 rules_created += 1
                 compressed_count += len(batch)
             except Exception as e:
-                # Log error but continue with next batch
-                print(f"Error compressing batch: {e}")
+                # Collect errors but continue with next batch
+                import logging
+                logging.error(f"Error compressing batch starting at index {i}: {e}")
+                errors.append(str(e))
                 continue
         
         result = {
@@ -319,7 +334,10 @@ class MemoryCompressor:
             "dry_run": dry_run
         }
         
-        if dry_run:
+        if errors:
+            result["errors"] = errors
+            result["message"] = f"Completed with {len(errors)} error(s)"
+        elif dry_run:
             result["message"] = f"Dry run: Would compress {compressed_count} episodes into {rules_created} rules"
         else:
             result["message"] = f"Compressed {compressed_count} episodes into {rules_created} rules"

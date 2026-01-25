@@ -110,6 +110,8 @@ class VectorStoreAdapter(ABC):
         Retrieve episodes that are NOT marked as failures.
         
         This is a convenience method to get successful patterns only.
+        Note: This implementation filters in memory. For better performance,
+        consider using a store adapter that supports native filtering.
         
         Args:
             query_embedding: Optional embedding vector for similarity search
@@ -119,11 +121,14 @@ class VectorStoreAdapter(ABC):
         Returns:
             List of successful episodes
         """
-        # Get all episodes matching the criteria
+        # Get episodes matching the criteria (excluding is_failure)
+        # We retrieve more to account for filtering, but this is a limitation
+        # of stores that don't support negative filters natively
+        batch_size = min(limit * 3, 1000)  # Cap at 1000 to avoid excessive memory
         all_episodes = self.retrieve(
             query_embedding=query_embedding,
             filters=filters,
-            limit=limit * 2  # Get more to filter
+            limit=batch_size
         )
         
         # Filter out failures
