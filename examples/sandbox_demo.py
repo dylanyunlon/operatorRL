@@ -181,29 +181,33 @@ def main():
     print("\n4. Comparison of Execution Modes:")
     print("-" * 70)
     
-    comparison = """
-    | Feature              | Local Executor    | Docker Executor       |
-    |---------------------|-------------------|-----------------------|
-    | Speed               | Fast              | Slower (containerized)|
-    | Security            | No isolation      | Full isolation        |
-    | Network Access      | Full access       | Disabled              |
-    | Resource Limits     | None              | Configurable          |
-    | Cleanup             | N/A               | Automatic             |
-    | Use Case            | Trusted code only | Untrusted code        |
-    """
+    import textwrap
+    comparison = textwrap.dedent("""
+        | Feature              | Local Executor    | Docker Executor       |
+        |---------------------|-------------------|-----------------------|
+        | Speed               | Fast              | Slower (containerized)|
+        | Security            | No isolation      | Full isolation        |
+        | Network Access      | Full access       | Disabled              |
+        | Resource Limits     | None              | Configurable          |
+        | Cleanup             | N/A               | Automatic             |
+        | Use Case            | Trusted code only | Untrusted code        |
+    """)
     print(comparison)
     
     # Example 5: Best practices
     print("\n5. Best Practices:")
     print("-" * 70)
-    print("""
-    1. Always use DockerExecutor for untrusted or agent-generated code
-    2. Set appropriate timeouts to prevent hanging executions
-    3. Use LocalExecutor only for trusted, pre-vetted code
-    4. Monitor Docker resource usage in production
-    5. Consider using custom Docker images with minimal dependencies
-    6. Test your tools in Docker before deploying to production
+    
+    import textwrap
+    best_practices = textwrap.dedent("""
+        1. Always use DockerExecutor for untrusted or agent-generated code
+        2. Set appropriate timeouts to prevent hanging executions
+        3. Use LocalExecutor only for trusted, pre-vetted code
+        4. Monitor Docker resource usage in production
+        5. Consider using custom Docker images with minimal dependencies
+        6. Test your tools in Docker before deploying to production
     """)
+    print(best_practices)
     
     print("\n" + "=" * 70)
     print("Demo complete!")

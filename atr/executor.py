@@ -183,16 +183,10 @@ class DockerExecutor(Executor):
         # Import required modules
         import docker
         import inspect
-        import pickle
-        import base64
+        import textwrap
         
         container = None
         try:
-            # Import required modules
-            import docker
-            import inspect
-            import textwrap
-            
             # Get the function source
             try:
                 full_source = inspect.getsource(func)
