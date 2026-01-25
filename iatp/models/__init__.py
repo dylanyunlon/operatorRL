@@ -94,7 +94,7 @@ class PrivacyContract(BaseModel):
         ...,
         description="How long the agent stores data"
     )
-    storage_location: str | None = Field(
+    storage_location: Optional[str] = Field(
         None,
         description="Geographic location of data storage (e.g., 'us-west')"
     )
@@ -122,15 +122,15 @@ class AgentCapabilities(BaseModel):
         ReversibilityLevel.NONE,
         description="Level of transaction reversibility support"
     )
-    undo_window: str | None = Field(
+    undo_window: Optional[str] = Field(
         None,
         description="Time window for undo operations (e.g., '24h', '7d')"
     )
-    sla_latency: str | None = Field(
+    sla_latency: Optional[str] = Field(
         None,
         description="Promised response latency (e.g., '2000ms', '5s')"
     )
-    rate_limit: int | None = Field(
+    rate_limit: Optional[int] = Field(
         None,
         description="Maximum requests per minute"
     )
@@ -145,7 +145,7 @@ class CapabilityManifest(BaseModel):
         ...,
         description="Unique identifier for the agent"
     )
-    agent_version: str | None = Field(
+    agent_version: Optional[str] = Field(
         None,
         description="Version of the agent"
     )
@@ -240,7 +240,7 @@ class QuarantineSession(BaseModel):
     warning_message: str
     user_override: bool = False
     timestamp: str
-    manifest: CapabilityManifest | None = None
+    manifest: Optional[CapabilityManifest] = None
 
 
 class TracingContext(BaseModel):
@@ -249,7 +249,7 @@ class TracingContext(BaseModel):
         ...,
         description="Unique trace ID for the request"
     )
-    parent_trace_id: str | None = Field(
+    parent_trace_id: Optional[str] = Field(
         None,
         description="Parent trace ID if this is part of a chain"
     )
@@ -294,7 +294,7 @@ class AttestationRecord(BaseModel):
         ...,
         description="ISO 8601 timestamp when attestation was created"
     )
-    expires_at: str | None = Field(
+    expires_at: Optional[str] = Field(
         None,
         description="ISO 8601 timestamp when attestation expires"
     )
@@ -345,15 +345,15 @@ class ReputationEvent(BaseModel):
         ...,
         description="ISO 8601 timestamp when event occurred"
     )
-    trace_id: str | None = Field(
+    trace_id: Optional[str] = Field(
         None,
         description="Associated trace ID if event was part of a request"
     )
-    details: dict[str, Any] | None = Field(
+    details: Optional[Dict[str, Any]] = Field(
         None,
         description="Additional context about the event"
     )
-    detected_by: str | None = Field(
+    detected_by: Optional[str] = Field(
         None,
         description="Component that detected the event (e.g., 'cmvk', 'iatp')"
     )
@@ -396,7 +396,7 @@ class ReputationScore(BaseModel):
         ...,
         description="ISO 8601 timestamp of last update"
     )
-    recent_events: list[ReputationEvent] = Field(
+    recent_events: List[ReputationEvent] = Field(
         default_factory=list,
         description="Recent reputation events (up to 100)"
     )
