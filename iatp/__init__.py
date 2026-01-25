@@ -84,6 +84,9 @@ from iatp.models import (
     ReversibilityLevel,
     TracingContext,
     TrustLevel,
+    AttestationRecord,
+    ReputationScore,
+    ReputationEvent,
 )
 
 # Sidecar Components
@@ -91,6 +94,9 @@ from iatp.sidecar import SidecarProxy, create_sidecar
 
 # Security & Privacy
 from iatp.security import PrivacyScrubber, SecurityValidator
+
+# Attestation & Reputation
+from iatp.attestation import AttestationValidator, ReputationManager
 
 # Telemetry & Tracing
 from iatp.telemetry import FlightRecorder, TraceIDGenerator
@@ -114,12 +120,18 @@ __all__ = [
     "RetentionPolicy",
     "QuarantineSession",
     "TracingContext",
+    "AttestationRecord",
+    "ReputationScore",
+    "ReputationEvent",
     # Sidecar - The proxy that wraps agents
     "SidecarProxy",
     "create_sidecar",
     # Security - Validation and privacy enforcement
     "SecurityValidator",
     "PrivacyScrubber",
+    # Attestation & Reputation
+    "AttestationValidator",
+    "ReputationManager",
     # Telemetry - Distributed tracing and audit logging
     "FlightRecorder",
     "TraceIDGenerator",

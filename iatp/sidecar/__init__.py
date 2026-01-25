@@ -3,6 +3,8 @@ IATP Sidecar Proxy Server
 
 This is the main sidecar that sits in front of an agent and handles:
 - Capability manifest exchange
+- Agent attestation verification
+- Reputation tracking and slashing
 - Security validation
 - Privacy checks
 - Request routing
@@ -19,11 +21,13 @@ from iatp.models import (
     CapabilityManifest,
     QuarantineSession,
     TrustLevel,
+    AttestationRecord,
 )
 from iatp.security import SecurityValidator, PrivacyScrubber
 from iatp.telemetry import FlightRecorder, TraceIDGenerator, _get_utc_timestamp
 from iatp.policy_engine import IATPPolicyEngine
 from iatp.recovery import IATPRecoveryEngine
+from iatp.attestation import ReputationManager
 
 
 class SidecarProxy:
@@ -41,12 +45,14 @@ class SidecarProxy:
         agent_url: str,
         manifest: CapabilityManifest,
         sidecar_host: str = "0.0.0.0",
-        sidecar_port: int = 8001
+        sidecar_port: int = 8001,
+        attestation: Optional[AttestationRecord] = None
     ):
         self.agent_url = agent_url
         self.manifest = manifest
         self.sidecar_host = sidecar_host
         self.sidecar_port = sidecar_port
+        self.attestation = attestation
         
         self.app = FastAPI(title=f"IATP Sidecar for {manifest.agent_id}")
         self.validator = SecurityValidator()
@@ -57,6 +63,9 @@ class SidecarProxy:
         # Policy and Recovery engines
         self.policy_engine = IATPPolicyEngine()
         self.recovery_engine = IATPRecoveryEngine()
+        
+        # Reputation manager
+        self.reputation_manager = ReputationManager()
         
         self._setup_routes()
     
@@ -69,7 +78,26 @@ class SidecarProxy:
             Return the capability manifest.
             This is the "handshake" endpoint.
             """
-            return self.manifest.model_dump()
+            response = self.manifest.model_dump()
+            
+            # Include attestation if available
+            if self.attestation:
+                response["attestation"] = self.attestation.model_dump()
+            
+            return response
+        
+        @self.app.get("/.well-known/agent-attestation")
+        async def get_attestation():
+            """
+            Return the agent attestation record.
+            This provides cryptographic proof of running verified code.
+            """
+            if not self.attestation:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No attestation available for this agent"
+                )
+            return self.attestation.model_dump()
         
         @self.app.get("/health")
         async def health_check():
@@ -230,6 +258,13 @@ class SidecarProxy:
                         latency_ms=latency_ms
                     )
                     
+                    # Record successful transaction for reputation
+                    if 200 <= response.status_code < 300:
+                        self.reputation_manager.record_success(
+                            agent_id=self.manifest.agent_id,
+                            trace_id=trace_id
+                        )
+                    
                     # Add tracing headers to response
                     headers = {
                         "X-Agent-Trace-ID": trace_id,
@@ -252,6 +287,14 @@ class SidecarProxy:
                     trace_id=trace_id,
                     agent_id=self.manifest.agent_id,
                     error="Request timeout",
+                    details={"timeout_seconds": 30}
+                )
+                
+                # Record timeout failure for reputation
+                self.reputation_manager.record_failure(
+                    agent_id=self.manifest.agent_id,
+                    failure_type="timeout",
+                    trace_id=trace_id,
                     details={"timeout_seconds": 30}
                 )
                 
@@ -278,6 +321,14 @@ class SidecarProxy:
                     agent_id=self.manifest.agent_id,
                     error=str(e),
                     details={"exception_type": type(e).__name__}
+                )
+                
+                # Record general failure for reputation
+                self.reputation_manager.record_failure(
+                    agent_id=self.manifest.agent_id,
+                    failure_type="error",
+                    trace_id=trace_id,
+                    details={"error": str(e), "exception_type": type(e).__name__}
                 )
                 
                 # Attempt recovery using scak integration
@@ -313,6 +364,106 @@ class SidecarProxy:
             if not session:
                 raise HTTPException(status_code=404, detail="Quarantine session not found")
             return session.model_dump()
+        
+        @self.app.get("/reputation/{agent_id}")
+        async def get_reputation(agent_id: str):
+            """
+            Get reputation score for an agent.
+            
+            Returns the reputation score and recent events.
+            """
+            score = self.reputation_manager.get_score(agent_id)
+            if not score:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No reputation data for agent '{agent_id}'"
+                )
+            return score.model_dump()
+        
+        @self.app.post("/reputation/{agent_id}/slash")
+        async def slash_reputation(
+            agent_id: str,
+            request: Request
+        ):
+            """
+            Slash an agent's reputation due to misbehavior.
+            
+            Expected payload:
+            {
+                "reason": "hallucination|timeout|error",
+                "severity": "critical|high|medium|low",
+                "trace_id": "optional-trace-id",
+                "details": {"optional": "context"}
+            }
+            
+            This is typically called by cmvk when it detects hallucinations.
+            """
+            try:
+                payload = await request.json()
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid JSON payload")
+            
+            reason = payload.get("reason", "unknown")
+            severity = payload.get("severity", "medium")
+            trace_id = payload.get("trace_id")
+            details = payload.get("details")
+            
+            # Record the event based on reason
+            if reason == "hallucination":
+                score = self.reputation_manager.record_hallucination(
+                    agent_id=agent_id,
+                    severity=severity,
+                    trace_id=trace_id,
+                    details=details
+                )
+            else:
+                score = self.reputation_manager.record_failure(
+                    agent_id=agent_id,
+                    failure_type=reason,
+                    trace_id=trace_id,
+                    details=details
+                )
+            
+            return {
+                "status": "slashed",
+                "agent_id": agent_id,
+                "new_score": score.score,
+                "trust_level": score.get_trust_level().value,
+                "reason": reason,
+                "severity": severity
+            }
+        
+        @self.app.get("/reputation/export")
+        async def export_reputation():
+            """
+            Export all reputation data for network-wide propagation.
+            
+            This allows other nodes to learn about agent reputations.
+            """
+            return {
+                "reputation_data": self.reputation_manager.export_reputation_data(),
+                "timestamp": _get_utc_timestamp()
+            }
+        
+        @self.app.post("/reputation/import")
+        async def import_reputation(request: Request):
+            """
+            Import reputation data from other nodes.
+            
+            This enables network-wide reputation propagation.
+            """
+            try:
+                payload = await request.json()
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid JSON payload")
+            
+            reputation_data = payload.get("reputation_data", {})
+            self.reputation_manager.import_reputation_data(reputation_data)
+            
+            return {
+                "status": "imported",
+                "agents_updated": len(reputation_data)
+            }
     
     def run(self):
         """Run the sidecar server."""
@@ -328,7 +479,8 @@ def create_sidecar(
     agent_url: str,
     manifest: CapabilityManifest,
     host: str = "0.0.0.0",
-    port: int = 8001
+    port: int = 8001,
+    attestation: Optional[AttestationRecord] = None
 ) -> SidecarProxy:
     """
     Factory function to create a sidecar proxy.
@@ -338,6 +490,7 @@ def create_sidecar(
         manifest: Capability manifest for this agent
         host: Host to bind the sidecar to
         port: Port to bind the sidecar to
+        attestation: Optional attestation record for agent verification
     
     Returns:
         Configured SidecarProxy instance
@@ -346,5 +499,6 @@ def create_sidecar(
         agent_url=agent_url,
         manifest=manifest,
         sidecar_host=host,
-        sidecar_port=port
+        sidecar_port=port,
+        attestation=attestation
     )

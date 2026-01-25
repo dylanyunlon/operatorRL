@@ -7,8 +7,10 @@ from iatp.models import (
     CapabilityManifest,
     RetentionPolicy,
     ReversibilityLevel,
-    TrustLevel
+    TrustLevel,
+    AttestationRecord,
 )
+from iatp.attestation import AttestationValidator
 
 
 def _luhn_check(card_number: str) -> bool:
@@ -51,6 +53,28 @@ class SecurityValidator:
     def __init__(self):
         self.blocked_requests = []
         self.warnings = []
+        self.attestation_validator = AttestationValidator()
+    
+    def validate_attestation(
+        self,
+        attestation: AttestationRecord,
+        verify_signature: bool = True
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Validate an agent attestation record.
+        
+        This ensures the agent is running verified code and not a hacked version.
+        
+        Args:
+            attestation: The attestation record from the agent
+            verify_signature: Whether to verify cryptographic signature
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        return self.attestation_validator.validate_attestation(
+            attestation, verify_signature=verify_signature
+        )
     
     def detect_sensitive_data(self, payload: Dict[str, Any]) -> List[str]:
         """

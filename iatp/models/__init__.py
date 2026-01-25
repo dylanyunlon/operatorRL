@@ -45,7 +45,7 @@ Example:
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Dict, Any, Literal
+from typing import Optional, Dict, Any, Literal, List
 from pydantic import BaseModel, Field
 
 __all__ = [
@@ -57,6 +57,9 @@ __all__ = [
     "CapabilityManifest",
     "QuarantineSession",
     "TracingContext",
+    "AttestationRecord",
+    "ReputationScore",
+    "ReputationEvent",
 ]
 
 
@@ -253,3 +256,185 @@ class TracingContext(BaseModel):
         ...,
         description="ID of the agent processing this request"
     )
+
+
+class AttestationRecord(BaseModel):
+    """
+    Attestation record for agent codebase verification.
+    
+    This provides verifiable proof that an agent is running the expected
+    codebase and configuration, signed by a trusted Control Plane.
+    """
+    agent_id: str = Field(
+        ...,
+        description="Unique identifier for the agent"
+    )
+    codebase_hash: str = Field(
+        ...,
+        description="SHA-256 hash of the agent's codebase"
+    )
+    config_hash: str = Field(
+        ...,
+        description="SHA-256 hash of the agent's configuration"
+    )
+    signature: str = Field(
+        ...,
+        description="Digital signature from Control Plane (base64 encoded)"
+    )
+    signing_key_id: str = Field(
+        ...,
+        description="Identifier for the public key used to verify signature"
+    )
+    timestamp: str = Field(
+        ...,
+        description="ISO 8601 timestamp when attestation was created"
+    )
+    expires_at: Optional[str] = Field(
+        None,
+        description="ISO 8601 timestamp when attestation expires"
+    )
+    
+    def is_expired(self, current_time: str) -> bool:
+        """
+        Check if the attestation has expired.
+        
+        Args:
+            current_time: Current time in ISO 8601 format
+            
+        Returns:
+            True if expired, False otherwise
+        """
+        if not self.expires_at:
+            return False
+        return current_time > self.expires_at
+
+
+class ReputationEvent(BaseModel):
+    """
+    Event that affects an agent's reputation score.
+    
+    This tracks individual events that caused reputation changes,
+    such as hallucinations detected by cmvk or successful transactions.
+    """
+    event_id: str = Field(
+        ...,
+        description="Unique identifier for this event"
+    )
+    agent_id: str = Field(
+        ...,
+        description="Agent whose reputation is affected"
+    )
+    event_type: str = Field(
+        ...,
+        description="Type of event (e.g., 'hallucination', 'timeout', 'success')"
+    )
+    severity: str = Field(
+        ...,
+        description="Severity level: 'critical', 'high', 'medium', 'low'"
+    )
+    score_delta: float = Field(
+        ...,
+        description="Change in reputation score (negative for bad events)"
+    )
+    timestamp: str = Field(
+        ...,
+        description="ISO 8601 timestamp when event occurred"
+    )
+    trace_id: Optional[str] = Field(
+        None,
+        description="Associated trace ID if event was part of a request"
+    )
+    details: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Additional context about the event"
+    )
+    detected_by: Optional[str] = Field(
+        None,
+        description="Component that detected the event (e.g., 'cmvk', 'iatp')"
+    )
+
+
+class ReputationScore(BaseModel):
+    """
+    Network-wide reputation score for an agent.
+    
+    This tracks an agent's reputation based on its behavior across
+    the network. Reputation can be slashed when misbehavior is detected.
+    """
+    agent_id: str = Field(
+        ...,
+        description="Agent identifier"
+    )
+    score: float = Field(
+        5.0,
+        ge=0.0,
+        le=10.0,
+        description="Current reputation score (0.0 to 10.0)"
+    )
+    initial_score: float = Field(
+        5.0,
+        description="Starting reputation score"
+    )
+    total_events: int = Field(
+        0,
+        description="Total number of reputation events"
+    )
+    positive_events: int = Field(
+        0,
+        description="Number of positive reputation events"
+    )
+    negative_events: int = Field(
+        0,
+        description="Number of negative reputation events"
+    )
+    last_updated: str = Field(
+        ...,
+        description="ISO 8601 timestamp of last update"
+    )
+    recent_events: List[ReputationEvent] = Field(
+        default_factory=list,
+        description="Recent reputation events (up to 100)"
+    )
+    
+    def apply_event(self, event: ReputationEvent) -> None:
+        """
+        Apply a reputation event to update the score.
+        
+        Args:
+            event: The reputation event to apply
+        """
+        # Update score with clamping
+        self.score = max(0.0, min(10.0, self.score + event.score_delta))
+        
+        # Update counters
+        self.total_events += 1
+        if event.score_delta > 0:
+            self.positive_events += 1
+        elif event.score_delta < 0:
+            self.negative_events += 1
+        
+        # Add to recent events (keep last 100)
+        self.recent_events.append(event)
+        if len(self.recent_events) > 100:
+            self.recent_events = self.recent_events[-100:]
+        
+        # Update timestamp
+        self.last_updated = event.timestamp
+    
+    def get_trust_level(self) -> TrustLevel:
+        """
+        Convert reputation score to trust level.
+        
+        Returns:
+            Appropriate TrustLevel based on current score
+        """
+        if self.score >= 8.0:
+            return TrustLevel.VERIFIED_PARTNER
+        elif self.score >= 6.0:
+            return TrustLevel.TRUSTED
+        elif self.score >= 4.0:
+            return TrustLevel.STANDARD
+        elif self.score >= 2.0:
+            return TrustLevel.UNKNOWN
+        else:
+            return TrustLevel.UNTRUSTED
