@@ -124,10 +124,14 @@ class SidecarProxy:
             # Parse request body
             try:
                 payload = await request.json()
-            except Exception:
+            except ValueError as e:
+                # Log JSON parsing error
                 return JSONResponse(
                     status_code=400,
-                    content={"error": "Invalid JSON payload", "trace_id": trace_id}
+                    content={
+                        "error": f"Invalid JSON payload: {e!s}",
+                        "trace_id": trace_id,
+                    },
                 )
 
             # Validate using Policy Engine
@@ -401,8 +405,12 @@ class SidecarProxy:
             """
             try:
                 payload = await request.json()
-            except Exception:
-                raise HTTPException(status_code=400, detail="Invalid JSON payload")
+            except ValueError as e:
+                # Log JSON parsing error
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid JSON payload: {e!s}",
+                ) from e
 
             reason = payload.get("reason", "unknown")
             severity = payload.get("severity", "medium")
@@ -455,8 +463,12 @@ class SidecarProxy:
             """
             try:
                 payload = await request.json()
-            except Exception:
-                raise HTTPException(status_code=400, detail="Invalid JSON payload")
+            except ValueError as e:
+                # Log JSON parsing error
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid JSON payload: {e!s}",
+                ) from e
 
             reputation_data = payload.get("reputation_data", {})
             self.reputation_manager.import_reputation_data(reputation_data)

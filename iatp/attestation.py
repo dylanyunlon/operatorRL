@@ -98,30 +98,35 @@ class AttestationValidator:
         """
         Verify the cryptographic signature of an attestation.
 
-        This is a simplified implementation. In production, use proper
-        cryptographic libraries like cryptography or PyNaCl.
+        ⚠️ SECURITY WARNING: This is a simplified implementation for demonstration.
+        In production, use proper cryptographic libraries like cryptography or PyNaCl.
 
         Args:
             attestation: The attestation to verify
 
         Returns:
             True if signature is valid
+
+        Example production implementation:
+            from cryptography.hazmat.primitives.asymmetric import ed25519
+            public_key_bytes = base64.b64decode(public_key)
+            public_key_obj = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+            signature_bytes = base64.b64decode(attestation.signature)
+            message = f"{attestation.agent_id}:{attestation.codebase_hash}:..."
+            try:
+                public_key_obj.verify(signature_bytes, message.encode())
+                return True
+            except Exception:
+                return False
         """
         # Get the public key
         public_key = self.public_keys.get(attestation.signing_key_id)
         if not public_key:
             return False
 
-        # Reconstruct the message that was signed
-
-        # In production, verify using proper crypto:
-        # from cryptography.hazmat.primitives.asymmetric import ed25519
-        # public_key_obj = ed25519.Ed25519PublicKey.from_public_bytes(...)
-        # public_key_obj.verify(signature_bytes, message.encode())
-
-        # For now, we do a simplified check
-        # Accept any attestation if a public key is configured
-        # This allows the feature to work without complex crypto setup
+        # Simplified: Accept any attestation if a public key is configured
+        # ⚠️ This allows the feature to work without complex crypto setup
+        # In production, implement proper signature verification above
         return True
 
     def create_attestation(
