@@ -188,9 +188,36 @@ class DockerExecutor(Executor):
         
         container = None
         try:
-            # Serialize the function and arguments
-            func_source = inspect.getsource(func)
+            # Import required modules
+            import docker
+            import inspect
+            import textwrap
+            
+            # Get the function source
+            try:
+                full_source = inspect.getsource(func)
+            except (OSError, TypeError):
+                raise ExecutorError(
+                    "Cannot execute function in Docker: source code unavailable. "
+                    "This typically happens with built-in functions or lambdas."
+                )
+            
             func_name = func.__name__
+            
+            # Extract just the function definition (skip decorators)
+            # Split into lines and find where the def statement starts
+            lines = full_source.split('\n')
+            func_start_idx = 0
+            for i, line in enumerate(lines):
+                if line.strip().startswith('def '):
+                    func_start_idx = i
+                    break
+            
+            # Get the function definition without decorators
+            func_lines = lines[func_start_idx:]
+            
+            # Dedent to remove any leading indentation
+            func_source = textwrap.dedent('\n'.join(func_lines))
             
             # Create execution script
             script = self._create_execution_script(func_source, func_name, args)
@@ -209,7 +236,7 @@ class DockerExecutor(Executor):
                     network_mode="none",  # Disable network for security
                     mem_limit="512m",  # Limit memory
                     detach=True,
-                    remove=False,  # We'll remove manually after getting logs
+                    auto_remove=False,  # We'll remove manually after getting logs
                 )
                 
                 # Start container
@@ -235,12 +262,18 @@ class DockerExecutor(Executor):
                     result = self._parse_result(logs)
                     return result
                     
-                except docker.errors.APIError as e:
-                    if "timeout" in str(e).lower():
+                except Exception as e:
+                    # Check if it's a timeout
+                    error_str = str(e).lower()
+                    if "timeout" in error_str or "timed out" in error_str:
                         raise ExecutionTimeoutError(
                             f"Execution exceeded timeout of {timeout} seconds"
                         ) from e
-                    raise ExecutorError(f"Docker API error: {str(e)}") from e
+                    # Re-raise if it's already one of our exception types
+                    if isinstance(e, (ExecutorError, ExecutionTimeoutError)):
+                        raise
+                    # Wrap other exceptions
+                    raise ExecutorError(f"Docker execution failed: {str(e)}") from e
                 
         except ExecutorError:
             raise
@@ -276,33 +309,36 @@ class DockerExecutor(Executor):
         Returns:
             Complete Python script as string.
         """
-        # Serialize args to JSON
-        args_json = json.dumps(args)
+        # Serialize args to JSON and escape for embedding in script
+        args_json = json.dumps(args).replace('\\', '\\\\').replace("'", "\\'")
         
-        script = f'''
-import json
-import sys
-
-# Define the function
-{func_source}
-
-# Parse arguments
-args = json.loads('''{args_json}''')
-
-# Execute function
-try:
-    result = {func_name}(**args)
-    # Print result with marker for parsing
-    print("__RESULT_START__")
-    print(json.dumps({{"success": True, "result": result}}))
-    print("__RESULT_END__")
-except Exception as e:
-    print("__RESULT_START__")
-    print(json.dumps({{"success": False, "error": str(e)}}))
-    print("__RESULT_END__")
-    sys.exit(1)
-'''
-        return script
+        # Build the script with common imports
+        script_parts = [
+            "import json",
+            "import sys",
+            "from typing import List, Dict, Optional, Any, Tuple, Set",  # Common type hints
+            "",
+            "# Define the function",
+            func_source,
+            "",
+            "# Parse arguments",
+            f"args = json.loads('{args_json}')",
+            "",
+            "# Execute function",
+            "try:",
+            f"    result = {func_name}(**args)",
+            "    # Print result with marker for parsing",
+            '    print("__RESULT_START__")',
+            '    print(json.dumps({"success": True, "result": result}))',
+            '    print("__RESULT_END__")',
+            "except Exception as e:",
+            '    print("__RESULT_START__")',
+            '    print(json.dumps({"success": False, "error": str(e)}))',
+            '    print("__RESULT_END__")',
+            "    sys.exit(1)",
+        ]
+        
+        return "\n".join(script_parts)
     
     def _parse_result(self, logs: str) -> Any:
         """Parse execution result from container logs.
