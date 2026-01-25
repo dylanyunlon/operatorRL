@@ -36,14 +36,14 @@ from typing import Any, Dict, List, Optional, Union
 
 try:
     from huggingface_hub import (
-        HfApi,
-        create_repo,
-        upload_file,
-        hf_hub_download,
-        list_repo_files,
-        Repository,
         DatasetCard,
         DatasetCardData,
+        HfApi,
+        Repository,
+        create_repo,
+        hf_hub_download,
+        list_repo_files,
+        upload_file,
     )
     HF_AVAILABLE = True
 except ImportError:
@@ -107,13 +107,13 @@ def upload_experiment_logs(
         >>> print(f"Uploaded to: {url}")
     """
     _check_hf_available()
-    
+
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
-    
+
     api = HfApi(token=token)
-    
+
     # Create repo if it doesn't exist
     try:
         create_repo(
@@ -123,19 +123,19 @@ def upload_experiment_logs(
             exist_ok=True,
             token=token,
         )
-    except Exception as e:
+    except Exception:
         # Repo might already exist
         pass
-    
+
     # Generate path in repo with timestamp
     if path_in_repo is None:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         path_in_repo = f"runs/{timestamp}_{file_path.name}"
-    
+
     # Generate commit message
     if commit_message is None:
         commit_message = f"Upload experiment results: {file_path.name}"
-    
+
     # Upload file
     url = api.upload_file(
         path_or_fileobj=str(file_path),
@@ -144,7 +144,7 @@ def upload_experiment_logs(
         repo_type="dataset",
         commit_message=commit_message,
     )
-    
+
     return url
 
 
@@ -179,9 +179,9 @@ def download_dataset(
         ...     data = json.load(f)
     """
     _check_hf_available()
-    
+
     api = HfApi(token=token)
-    
+
     # If "latest", find most recent file
     if filename == "latest":
         files = list_repo_files(repo_id, repo_type="dataset", token=token)
@@ -190,7 +190,7 @@ def download_dataset(
         if not run_files:
             raise FileNotFoundError(f"No run files found in {repo_id}")
         filename = sorted(run_files)[-1]  # Most recent by timestamp
-    
+
     # Download file
     local_path = hf_hub_download(
         repo_id=repo_id,
@@ -199,7 +199,7 @@ def download_dataset(
         local_dir=local_dir,
         token=token,
     )
-    
+
     return Path(local_path)
 
 
@@ -234,9 +234,9 @@ def push_message_logs(
         >>> url = push_message_logs(messages, "imran-siddique/amb-message-logs")
     """
     _check_hf_available()
-    
+
     api = HfApi(token=token)
-    
+
     # Create repo
     create_repo(
         repo_id=repo_id,
@@ -245,18 +245,18 @@ def push_message_logs(
         exist_ok=True,
         token=token,
     )
-    
+
     # Convert to JSONL format
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"data/{split}_{timestamp}.jsonl"
-    
+
     # Create temporary file
     import tempfile
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
         for msg in messages:
             f.write(json.dumps(msg, default=str) + "\n")
         temp_path = f.name
-    
+
     try:
         # Upload
         url = api.upload_file(
@@ -268,7 +268,7 @@ def push_message_logs(
         )
     finally:
         os.unlink(temp_path)
-    
+
     return url
 
 
@@ -300,16 +300,16 @@ def create_dataset_card(
         ... )
     """
     _check_hf_available()
-    
+
     if tags is None:
         tags = ["agent-communication", "message-bus", "benchmarks", "async"]
-    
+
     card_data = DatasetCardData(
         license=license,
         language=language,
         tags=tags,
     )
-    
+
     card_content = f"""---
 {card_data.to_yaml()}
 ---
@@ -377,14 +377,14 @@ with open(path) as f:
 
 This dataset is released under the {license.upper()} License.
 """
-    
+
     api = HfApi(token=token)
-    
+
     import tempfile
     with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write(card_content)
         temp_path = f.name
-    
+
     try:
         api.upload_file(
             path_or_fileobj=temp_path,
@@ -433,11 +433,11 @@ class HFDatasetManager:
             private: Whether to create a private repository.
         """
         _check_hf_available()
-        
+
         self.repo_id = repo_id
         self.token = token or os.environ.get("HF_TOKEN")
         self._api = HfApi(token=self.token)
-        
+
         if auto_create:
             try:
                 create_repo(
@@ -492,7 +492,7 @@ class HFDatasetManager:
             local_dir=local_dir,
             token=self.token,
         )
-        
+
         with open(path) as f:
             return json.load(f)
 
