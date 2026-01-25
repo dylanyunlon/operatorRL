@@ -14,7 +14,7 @@ async def test_trace_id_in_message_model():
         id="test-123",
         topic="test.topic",
         payload={"key": "value"},
-        trace_id="0123456789abcdef0123456789abcdef"
+        trace_id="0123456789abcdef0123456789abcdef",
     )
 
     assert msg.trace_id == "0123456789abcdef0123456789abcdef"
@@ -23,11 +23,7 @@ async def test_trace_id_in_message_model():
 @pytest.mark.asyncio
 async def test_message_without_trace_id():
     """Test that Message works without trace_id (backward compatibility)."""
-    msg = Message(
-        id="test-123",
-        topic="test.topic",
-        payload={"key": "value"}
-    )
+    msg = Message(id="test-123", topic="test.topic", payload={"key": "value"})
 
     assert msg.trace_id is None
 
@@ -101,10 +97,7 @@ async def test_request_injects_trace_id():
 
         # Send request with trace_id
         response = await bus.request(
-            "ping.topic",
-            {"request": "ping"},
-            timeout=5.0,
-            trace_id=custom_trace_id
+            "ping.topic", {"request": "ping"}, timeout=5.0, trace_id=custom_trace_id
         )
 
         # Check that request had trace_id
@@ -135,7 +128,7 @@ async def test_reply_propagates_trace_id():
             payload={"request": "data"},
             correlation_id="corr-123",
             reply_to="reply.topic",
-            trace_id=original_trace_id
+            trace_id=original_trace_id,
         )
 
         # Reply to the original message
@@ -152,12 +145,7 @@ async def test_reply_propagates_trace_id():
 async def test_trace_id_serialization():
     """Test that trace_id is properly serialized and deserialized."""
     trace_id = "0123456789abcdef0123456789abcdef"
-    msg = Message(
-        id="test-123",
-        topic="test.topic",
-        payload={"key": "value"},
-        trace_id=trace_id
-    )
+    msg = Message(id="test-123", topic="test.topic", payload={"key": "value"}, trace_id=trace_id)
 
     # Serialize
     json_str = msg.model_dump_json()
@@ -226,4 +214,6 @@ async def test_publish_without_trace_id():
         # Should work fine, trace_id might be None
         assert len(received_messages) == 1
         # trace_id is None or a valid string
-        assert received_messages[0].trace_id is None or isinstance(received_messages[0].trace_id, str)
+        assert received_messages[0].trace_id is None or isinstance(
+            received_messages[0].trace_id, str
+        )
