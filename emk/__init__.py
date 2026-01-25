@@ -34,9 +34,10 @@ __author__ = "Imran Siddique"
 __license__ = "MIT"
 
 # Core exports - always available
-from emk.schema import Episode
+from emk.schema import Episode, SemanticRule
 from emk.store import VectorStoreAdapter, FileAdapter
 from emk.indexer import Indexer
+from emk.sleep_cycle import MemoryCompressor
 
 # Define explicit public API
 __all__: List[str] = [
@@ -46,9 +47,11 @@ __all__: List[str] = [
     "__license__",
     # Core classes
     "Episode",
+    "SemanticRule",
     "VectorStoreAdapter", 
     "FileAdapter",
     "Indexer",
+    "MemoryCompressor",
 ]
 
 # Optional ChromaDB adapter - only import if chromadb is installed
