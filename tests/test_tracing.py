@@ -64,7 +64,7 @@ async def test_publish_injects_trace_id_from_active_span():
 @pytest.mark.asyncio
 async def test_publish_with_explicit_trace_id():
     """Test that explicit trace_id is used when provided."""
-    custom_trace_id = "custom1234567890abcdef1234567890ab"
+    custom_trace_id = "1234567890abcdef1234567890abcdef"
 
     async with MessageBus() as bus:
         received_messages = []
@@ -87,7 +87,7 @@ async def test_publish_with_explicit_trace_id():
 @pytest.mark.asyncio
 async def test_request_injects_trace_id():
     """Test that request-response pattern includes trace_id."""
-    custom_trace_id = "request1234567890abcdef1234567890"
+    custom_trace_id = "abcdef1234567890abcdef1234567890"
 
     async with MessageBus() as bus:
         received_requests = []
@@ -118,7 +118,7 @@ async def test_request_injects_trace_id():
 @pytest.mark.asyncio
 async def test_reply_propagates_trace_id():
     """Test that reply propagates trace_id from original message."""
-    original_trace_id = "reply1234567890abcdef1234567890ab"
+    original_trace_id = "fedcba9876543210fedcba9876543210"
 
     async with MessageBus() as bus:
         responses = []
@@ -151,7 +151,7 @@ async def test_reply_propagates_trace_id():
 @pytest.mark.asyncio
 async def test_trace_id_serialization():
     """Test that trace_id is properly serialized and deserialized."""
-    trace_id = "serialize123456789abcdef123456789"
+    trace_id = "0123456789abcdef0123456789abcdef"
     msg = Message(
         id="test-123",
         topic="test.topic",

@@ -17,7 +17,9 @@ async def agent_a(bus: MessageBus, tracer):
     print("Agent A: Starting thought process...")
     
     with tracer.start_as_current_span("agent-a-thinking") as span:
-        trace_id = format(span.get_span_context().trace_id, '032x')
+        # Use the get_trace_id utility function
+        from amb_core import get_trace_id
+        trace_id = get_trace_id()
         print(f"Agent A: Trace ID = {trace_id}")
         
         # Publish a thought - trace_id automatically injected
