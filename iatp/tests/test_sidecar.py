@@ -3,15 +3,16 @@ Integration tests for the IATP Sidecar.
 """
 import pytest
 from fastapi.testclient import TestClient
-from iatp.sidecar import create_sidecar
+
 from iatp.models import (
-    CapabilityManifest,
     AgentCapabilities,
+    CapabilityManifest,
     PrivacyContract,
-    TrustLevel,
-    ReversibilityLevel,
     RetentionPolicy,
+    ReversibilityLevel,
+    TrustLevel,
 )
+from iatp.sidecar import create_sidecar
 
 
 @pytest.fixture
@@ -61,7 +62,7 @@ def test_health_check(trusted_manifest):
         manifest=trusted_manifest
     )
     client = TestClient(sidecar.app)
-    
+
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
@@ -76,7 +77,7 @@ def test_get_manifest(trusted_manifest):
         manifest=trusted_manifest
     )
     client = TestClient(sidecar.app)
-    
+
     response = client.get("/.well-known/agent-manifest")
     assert response.status_code == 200
     data = response.json()
@@ -92,7 +93,7 @@ def test_invalid_json_payload(trusted_manifest):
         manifest=trusted_manifest
     )
     client = TestClient(sidecar.app)
-    
+
     response = client.post(
         "/proxy",
         content="invalid json",
@@ -110,7 +111,7 @@ def test_blocked_credit_card_permanent_storage(untrusted_manifest):
         manifest=untrusted_manifest
     )
     client = TestClient(sidecar.app)
-    
+
     response = client.post(
         "/proxy",
         json={
@@ -131,7 +132,7 @@ def test_warning_without_override(untrusted_manifest):
         manifest=untrusted_manifest
     )
     client = TestClient(sidecar.app)
-    
+
     response = client.post(
         "/proxy",
         json={"task": "test", "data": {}}
@@ -150,7 +151,7 @@ def test_trace_id_injection(trusted_manifest):
         manifest=trusted_manifest
     )
     client = TestClient(sidecar.app)
-    
+
     # Provide a custom trace ID
     custom_trace_id = "custom-trace-123"
     response = client.post(
@@ -158,7 +159,7 @@ def test_trace_id_injection(trusted_manifest):
         json={"task": "test"},
         headers={"X-Agent-Trace-ID": custom_trace_id}
     )
-    
+
     # Even if backend fails, trace ID should be in error response
     data = response.json()
     assert "trace_id" in data

@@ -1,14 +1,13 @@
 """
 Unit tests for IATP models.
 """
-import pytest
 from iatp.models import (
-    CapabilityManifest,
     AgentCapabilities,
+    CapabilityManifest,
     PrivacyContract,
-    TrustLevel,
-    ReversibilityLevel,
     RetentionPolicy,
+    ReversibilityLevel,
+    TrustLevel,
 )
 
 
@@ -30,7 +29,7 @@ def test_capability_manifest_creation():
             human_review=False
         )
     )
-    
+
     assert manifest.agent_id == "test-agent"
     assert manifest.trust_level == TrustLevel.TRUSTED
     assert manifest.capabilities.idempotency is True
@@ -51,7 +50,7 @@ def test_trust_score_verified_partner():
             human_review=False
         )
     )
-    
+
     score = manifest.calculate_trust_score()
     assert score >= 8  # Verified partner with good privacy should score high
 
@@ -70,7 +69,7 @@ def test_trust_score_untrusted():
             human_review=True
         )
     )
-    
+
     score = manifest.calculate_trust_score()
     assert score <= 3  # Untrusted agent with bad privacy should score low
 
@@ -80,7 +79,7 @@ def test_privacy_contract_defaults():
     contract = PrivacyContract(
         retention=RetentionPolicy.TEMPORARY
     )
-    
+
     assert contract.human_review is False
     assert contract.encryption_at_rest is True
     assert contract.encryption_in_transit is True
@@ -89,7 +88,7 @@ def test_privacy_contract_defaults():
 def test_agent_capabilities_defaults():
     """Test agent capabilities default values."""
     capabilities = AgentCapabilities()
-    
+
     assert capabilities.idempotency is False
     assert capabilities.reversibility == ReversibilityLevel.NONE
     assert capabilities.undo_window is None

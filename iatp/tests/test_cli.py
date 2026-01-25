@@ -2,8 +2,10 @@
 Tests for IATP CLI commands
 """
 import json
+
 import pytest
 from click.testing import CliRunner
+
 from iatp.cli import cli
 
 

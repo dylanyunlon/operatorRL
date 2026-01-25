@@ -11,28 +11,28 @@ The sidecar acts as a gateway that:
 4. Enforces privacy and security policies
 5. Records all events in the Flight Recorder for distributed tracing
 """
-import os
 import logging
-from typing import Optional, Dict, Any
+import os
 from contextlib import asynccontextmanager
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request, Header
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 import httpx
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from iatp.models import (
-    CapabilityManifest,
-    TrustLevel,
     AgentCapabilities,
-    ReversibilityLevel,
+    CapabilityManifest,
     PrivacyContract,
     RetentionPolicy,
+    ReversibilityLevel,
+    TrustLevel,
 )
-from iatp.security import SecurityValidator, PrivacyScrubber
-from iatp.telemetry import FlightRecorder, TraceIDGenerator
 from iatp.policy_engine import IATPPolicyEngine
 from iatp.recovery import IATPRecoveryEngine
+from iatp.security import PrivacyScrubber, SecurityValidator
+from iatp.telemetry import FlightRecorder, TraceIDGenerator
 
 # Configure logging
 logging.basicConfig(
@@ -137,7 +137,7 @@ async def health_check():
 async def get_capabilities():
     """
     IATP Handshake Endpoint.
-    
+
     Returns this agent's capability manifest for trust negotiation.
     External agents call this to understand what this agent can do
     and what its security/privacy posture is.
@@ -154,7 +154,7 @@ async def proxy_task(
 ):
     """
     The Main Gateway - Intercepts and validates all requests.
-    
+
     Flow:
     1. Generate/validate trace ID
     2. Parse and validate the payload
@@ -163,14 +163,14 @@ async def proxy_task(
     5. Forward to upstream agent
     6. Handle failures with Recovery Engine (scak)
     7. Log everything to Flight Recorder
-    
+
     Headers:
     - X-User-Override: Set to "true" to bypass security warnings
     - X-Agent-Trace-ID: Optional trace ID for distributed tracing
     """
     # 1. GENERATE TRACE ID
     trace_id = x_agent_trace_id or TraceIDGenerator.generate()
-    
+
     # 2. PARSE PAYLOAD
     try:
         payload = await request.json()
@@ -183,10 +183,10 @@ async def proxy_task(
                 "trace_id": trace_id
             }
         )
-    
+
     # 3. POLICY ENGINE CHECK
     policy_allowed, policy_error, policy_warning = policy_engine.validate_manifest(manifest)
-    
+
     if not policy_allowed:
         logger.warning(f"[{trace_id}] Policy Engine BLOCKED: {policy_error}")
         flight_recorder.log_blocked_request(
@@ -205,10 +205,10 @@ async def proxy_task(
                 "blocked_by": "policy_engine"
             }
         )
-    
+
     # 4. SECURITY VALIDATOR CHECK
     is_valid, error_message = security_validator.validate_privacy_policy(manifest, payload)
-    
+
     if not is_valid:
         logger.warning(f"[{trace_id}] Security Validator BLOCKED: {error_message}")
         flight_recorder.log_blocked_request(
@@ -227,12 +227,12 @@ async def proxy_task(
                 "blocked_by": "security_validator"
             }
         )
-    
+
     # 5. CHECK IF WARNING/OVERRIDE NEEDED
     warning = security_validator.generate_warning_message(manifest, payload)
     if policy_warning:
         warning = f"{warning}\n{policy_warning}" if warning else policy_warning
-    
+
     if warning and not x_user_override:
         trust_score = manifest.calculate_trust_score()
         logger.info(f"[{trace_id}] Requires user override. Trust score: {trust_score}")
@@ -249,7 +249,7 @@ async def proxy_task(
                 )
             }
         )
-    
+
     # Log the request
     flight_recorder.log_request(
         trace_id=trace_id,
@@ -258,11 +258,11 @@ async def proxy_task(
         manifest=manifest,
         quarantined=security_validator.should_quarantine(manifest)
     )
-    
+
     # 6. FORWARD TO UPSTREAM AGENT
     import time
     start_time = time.time()
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -274,15 +274,15 @@ async def proxy_task(
                 },
                 timeout=30.0
             )
-            
+
             latency_ms = (time.time() - start_time) * 1000
-            
+
             # Parse response
             try:
                 response_data = response.json()
             except Exception:
                 response_data = {"raw": response.text}
-            
+
             # Log response
             flight_recorder.log_response(
                 trace_id=trace_id,
@@ -291,9 +291,9 @@ async def proxy_task(
                 status_code=response.status_code,
                 latency_ms=latency_ms
             )
-            
+
             logger.info(f"[{trace_id}] Proxied request. Status: {response.status_code}, Latency: {latency_ms:.2f}ms")
-            
+
             # Return with tracing headers
             return JSONResponse(
                 content=response_data,
@@ -304,7 +304,7 @@ async def proxy_task(
                     "X-Agent-Trust-Score": str(manifest.calculate_trust_score())
                 }
             )
-            
+
     except httpx.TimeoutException as e:
         # 7. TIMEOUT - TRIGGER RECOVERY
         logger.error(f"[{trace_id}] Upstream timeout: {e}")
@@ -314,14 +314,14 @@ async def proxy_task(
             error="Request timeout",
             details={"timeout_seconds": 30, "upstream": UPSTREAM_AGENT_URL}
         )
-        
+
         recovery_result = await recovery_engine.handle_failure(
             trace_id=trace_id,
             error=e,
             manifest=manifest,
             payload=payload
         )
-        
+
         return JSONResponse(
             status_code=504,
             content={
@@ -330,7 +330,7 @@ async def proxy_task(
                 "recovery": recovery_result
             }
         )
-        
+
     except Exception as e:
         # GENERAL ERROR - TRIGGER RECOVERY
         logger.error(f"[{trace_id}] Upstream error: {e}")
@@ -340,14 +340,14 @@ async def proxy_task(
             error=str(e),
             details={"exception_type": type(e).__name__, "upstream": UPSTREAM_AGENT_URL}
         )
-        
+
         recovery_result = await recovery_engine.handle_failure(
             trace_id=trace_id,
             error=e,
             manifest=manifest,
             payload=payload
         )
-        
+
         if recovery_result.get("success"):
             return JSONResponse(
                 status_code=200,
@@ -357,7 +357,7 @@ async def proxy_task(
                     "recovery": recovery_result
                 }
             )
-        
+
         return JSONResponse(
             status_code=502,
             content={
@@ -372,7 +372,7 @@ async def proxy_task(
 async def get_trace(trace_id: str):
     """
     Retrieve flight recorder logs for a specific trace ID.
-    
+
     Useful for debugging and distributed tracing across agent calls.
     """
     logs = flight_recorder.get_trace_logs(trace_id)

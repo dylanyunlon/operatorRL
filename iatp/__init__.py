@@ -75,29 +75,34 @@ __author__ = "Imran Siddique"
 __license__ = "MIT"
 
 # Core Models
+# Attestation & Reputation
+from iatp.attestation import AttestationValidator, ReputationManager
 from iatp.models import (
     AgentCapabilities,
+    AttestationRecord,
     CapabilityManifest,
     PrivacyContract,
     QuarantineSession,
+    ReputationEvent,
+    ReputationScore,
     RetentionPolicy,
     ReversibilityLevel,
     TracingContext,
     TrustLevel,
 )
 
-# Sidecar Components
-from iatp.sidecar import SidecarProxy, create_sidecar
+# Engines
+from iatp.policy_engine import IATPPolicyEngine
+from iatp.recovery import IATPRecoveryEngine
 
 # Security & Privacy
 from iatp.security import PrivacyScrubber, SecurityValidator
 
+# Sidecar Components
+from iatp.sidecar import SidecarProxy, create_sidecar
+
 # Telemetry & Tracing
 from iatp.telemetry import FlightRecorder, TraceIDGenerator
-
-# Engines
-from iatp.policy_engine import IATPPolicyEngine
-from iatp.recovery import IATPRecoveryEngine
 
 # Public API exports - controls what is visible via `from iatp import *`
 __all__ = [
@@ -114,12 +119,18 @@ __all__ = [
     "RetentionPolicy",
     "QuarantineSession",
     "TracingContext",
+    "AttestationRecord",
+    "ReputationScore",
+    "ReputationEvent",
     # Sidecar - The proxy that wraps agents
     "SidecarProxy",
     "create_sidecar",
     # Security - Validation and privacy enforcement
     "SecurityValidator",
     "PrivacyScrubber",
+    # Attestation & Reputation
+    "AttestationValidator",
+    "ReputationManager",
     # Telemetry - Distributed tracing and audit logging
     "FlightRecorder",
     "TraceIDGenerator",
