@@ -6,7 +6,7 @@ multiple agents to share and see each other's file edits.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path as PathLib
 from typing import Dict, List, Optional, Set
 
@@ -79,7 +79,7 @@ class VirtualFileSystem:
         normalized = self._normalize_path(path)
         
         if normalized not in self.files:
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             self.files[normalized] = FileNode(
                 path=normalized,
                 file_type=FileType.DIRECTORY,
@@ -95,8 +95,12 @@ class VirtualFileSystem:
         normalized = self._normalize_path(path)
         parts = normalized.strip("/").split("/")
         
+        # Create each parent directory
         for i in range(len(parts)):
-            parent_path = "/" + "/".join(parts[:i]) if i > 0 else "/"
+            if i == 0:
+                parent_path = "/"
+            else:
+                parent_path = "/" + "/".join(parts[:i])
             self._ensure_directory(parent_path)
     
     def create_file(
@@ -129,7 +133,7 @@ class VirtualFileSystem:
         # Ensure parent directories exist
         self._ensure_parent_directories(normalized)
         
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         
         # Create initial edit record
         initial_edit = FileEdit(
@@ -218,7 +222,7 @@ class VirtualFileSystem:
         if file_node.file_type == FileType.DIRECTORY:
             raise ValueError(f"Cannot update directory: {normalized}")
         
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         
         # Create edit record
         edit = FileEdit(
