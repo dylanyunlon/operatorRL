@@ -264,12 +264,22 @@ class InMemoryBroker(BrokerAdapter):
         queue = self._message_queues[topic]
         background_priority = PRIORITY_ORDER[MessagePriority.BACKGROUND]
 
-        # Find and remove oldest BACKGROUND message
-        for i, (priority, _counter, _msg) in enumerate(queue):
-            if priority == background_priority:
-                queue.pop(i)
+        # Find index of oldest BACKGROUND message (largest counter value for background priority)
+        background_idx = None
+        max_counter = -1
+        
+        for i, (priority, counter, _msg) in enumerate(queue):
+            if priority == background_priority and counter > max_counter:
+                background_idx = i
+                max_counter = counter
+        
+        if background_idx is not None:
+            # Remove the item and re-heapify
+            queue[background_idx] = queue[-1]
+            queue.pop()
+            if background_idx < len(queue):
                 heapq.heapify(queue)
-                return True
+            return True
 
         return False
 
