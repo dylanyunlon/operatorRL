@@ -241,14 +241,50 @@ If local policy strictly forbids an operation:
 - Sidecars MAY cache manifests (recommended: 1 hour TTL)
 - Manifest changes SHOULD trigger re-validation
 
-### 5.2 Sensitive Data Detection
+### 5.2 Agent Attestation (Verifiable Credentials)
+
+**NEW:** IATP supports cryptographic attestation to verify agents run unmodified code.
+
+**Attestation Endpoint:**
+```
+GET /.well-known/agent-attestation
+```
+
+**Response Format:**
+```json
+{
+  "agent_id": "booking-agent-v2.1.0",
+  "codebase_hash": "sha256:a3f5b9c...",
+  "config_hash": "sha256:d8e2a1b...",
+  "signature": "base64_signature",
+  "signing_key_id": "control-plane-prod-2026",
+  "timestamp": "2026-01-25T10:00:00Z",
+  "expires_at": "2026-01-26T10:00:00Z"
+}
+```
+
+**Attestation Handshake Flow:**
+1. Agent requests remote agent's manifest
+2. Agent requests remote agent's attestation
+3. Agent validates attestation signature using Control Plane's public key
+4. Agent verifies codebase_hash matches expected value
+5. Agent checks attestation hasn't expired
+6. If valid, proceed with request; if invalid, reject
+
+**Benefits:**
+- Prevents running hacked/modified agent code
+- No need for complex firewall rules between agents
+- Security is in the protocol, not the infrastructure
+- Control Plane acts as trusted signing authority
+
+### 5.3 Sensitive Data Detection
 
 Sidecars MUST detect:
 - Credit card numbers (Luhn algorithm validation)
 - SSNs (pattern: `\d{3}-\d{2}-\d{4}`)
 - API keys, tokens (entropy-based detection)
 
-### 5.3 Privacy Scrubbing
+### 5.4 Privacy Scrubbing
 
 All logged data MUST be scrubbed:
 - Credit cards → `[CREDIT_CARD_REDACTED]`
@@ -270,13 +306,77 @@ A minimal IATP sidecar must:
 - User override mechanism (449 status + X-User-Override header)
 - Flight recorder (append-only audit log)
 - Quarantine tracking for risky transactions
+- Agent attestation verification
+- Reputation tracking and slashing
+
+### 6.3 Reputation Slashing
+
+**NEW:** IATP supports network-wide reputation tracking to penalize misbehavior.
+
+**Reputation Endpoints:**
+
+Get reputation for an agent:
+```
+GET /reputation/{agent_id}
+```
+
+Slash reputation (called by cmvk or other verification systems):
+```
+POST /reputation/{agent_id}/slash
+{
+  "reason": "hallucination",
+  "severity": "high",
+  "trace_id": "trace-123",
+  "details": {"context": "additional info"}
+}
+```
+
+Export reputation data:
+```
+GET /reputation/export
+```
+
+Import reputation data from other nodes:
+```
+POST /reputation/import
+{
+  "reputation_data": {...}
+}
+```
+
+**Reputation Scoring:**
+- Agents start at 5.0/10
+- Hallucinations: -0.25 to -2.0 depending on severity
+- Failures/timeouts: -0.5
+- Successful operations: +0.1
+- Score range: 0.0 to 10.0
+
+**Trust Level Mapping:**
+- 8.0-10.0 → VERIFIED_PARTNER
+- 6.0-7.9 → TRUSTED
+- 4.0-5.9 → STANDARD
+- 2.0-3.9 → UNKNOWN
+- 0.0-1.9 → UNTRUSTED
+
+**Network Propagation:**
+- Nodes export reputation data periodically
+- Importing nodes use conservative merge (take lower score)
+- Prevents reputation gaming across network
+
+**Integration with cmvk:**
+When cmvk (Context Memory Verification Kit) detects a hallucination, it calls:
+```bash
+POST http://sidecar:8001/reputation/{agent_id}/slash
+```
+This automatically reduces the agent's reputation across the network.
 
 ## 7. Future Extensions
 
-- **IATP-003:** Cryptographic verification of manifests
+- **IATP-003:** ✅ **Implemented:** Cryptographic attestation of agent code
 - **IATP-004:** Rate limiting and quota management
 - **IATP-005:** Multi-agent transaction coordination
-- **IATP-006:** Federated trust networks
+- **IATP-006:** ✅ **Implemented:** Network-wide reputation tracking
+- **IATP-007:** Federated trust networks with cross-organization verification
 
 ## 8. References
 

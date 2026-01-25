@@ -18,6 +18,34 @@ Multi-agent systems fail because agents are forced to embed trust logic, securit
 
 ---
 
+## 🔒 Removing Implicit Trust
+
+IATP eliminates implicit trust through two key features:
+
+### 1. **Agent Attestation (Verifiable Credentials)**
+
+**The Problem:** How do we know an agent running on a different server is running the verified code and not a hacked version?
+
+**The Fix:** Attestation Handshake. Agents exchange a hash of their codebase/configuration signed by the Control Plane before talking.
+
+- Cryptographic proof that agents run verified code
+- Signed by trusted Control Plane
+- Prevents running modified/hacked agent versions
+- No need for complex firewalls—security is in the protocol
+
+### 2. **Reputation Slashing**
+
+**The Problem:** Agents that hallucinate or misbehave continue to be trusted by the network.
+
+**The Fix:** If cmvk (Context Memory Verification Kit) catches an agent hallucinating, IATP automatically lowers that agent's trust score across the network. Other agents stop listening to it.
+
+- Network-wide reputation tracking
+- Automatic slashing when misbehavior detected
+- cmvk integration for hallucination detection
+- Conservative reputation propagation across nodes
+
+---
+
 ## Installation
 
 ```bash
@@ -37,6 +65,54 @@ sidecar.run()
 ```
 
 Your agent is now protected by IATP. Requests are validated, policies enforced, and all actions logged.
+
+### Using Attestation and Reputation
+
+```python
+from iatp import create_sidecar, CapabilityManifest, AgentCapabilities, PrivacyContract, RetentionPolicy
+from iatp.attestation import AttestationValidator, ReputationManager
+
+# Create attestation for your agent (done by Control Plane)
+validator = AttestationValidator()
+validator.add_trusted_key("control-plane-key", "-----BEGIN PUBLIC KEY-----...")
+
+attestation = validator.create_attestation(
+    agent_id="my-agent",
+    codebase_hash="sha256_of_codebase",
+    config_hash="sha256_of_config",
+    signing_key_id="control-plane-key",
+    expires_in_hours=24
+)
+
+# Create sidecar with attestation
+manifest = CapabilityManifest(...)
+sidecar = create_sidecar(
+    agent_url="http://localhost:8000",
+    manifest=manifest,
+    port=8001,
+    attestation=attestation  # Proves you're running verified code
+)
+
+# Track reputation
+reputation = ReputationManager()
+
+# Record hallucination (called by cmvk)
+reputation.record_hallucination(
+    agent_id="misbehaving-agent",
+    severity="high",
+    details={"reason": "fabricated data"}
+)
+
+# Get reputation score
+score = reputation.get_score("misbehaving-agent")
+print(f"Trust score: {score.score}/10")
+print(f"Trust level: {score.get_trust_level()}")
+```
+
+Run the demo:
+```bash
+python examples/demo_attestation_reputation.py
+```
 
 ---
 
