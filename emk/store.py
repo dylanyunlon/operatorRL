@@ -70,6 +70,110 @@ class VectorStoreAdapter(ABC):
             The episode if found, None otherwise
         """
         pass
+    
+    def retrieve_failures(
+        self,
+        query_embedding: Optional[np.ndarray] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 10
+    ) -> List[Episode]:
+        """
+        Retrieve episodes marked as failures (anti-patterns).
+        
+        This is a convenience method that adds the is_failure filter.
+        
+        Args:
+            query_embedding: Optional embedding vector for similarity search
+            filters: Optional additional metadata filters
+            limit: Maximum number of episodes to return
+            
+        Returns:
+            List of failure episodes
+        """
+        # Merge failure filter with any existing filters
+        failure_filters = filters.copy() if filters else {}
+        failure_filters["is_failure"] = True
+        
+        return self.retrieve(
+            query_embedding=query_embedding,
+            filters=failure_filters,
+            limit=limit
+        )
+    
+    def retrieve_successes(
+        self,
+        query_embedding: Optional[np.ndarray] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 10
+    ) -> List[Episode]:
+        """
+        Retrieve episodes that are NOT marked as failures.
+        
+        This is a convenience method to get successful patterns only.
+        
+        Args:
+            query_embedding: Optional embedding vector for similarity search
+            filters: Optional additional metadata filters
+            limit: Maximum number of episodes to return
+            
+        Returns:
+            List of successful episodes
+        """
+        # Get all episodes matching the criteria
+        all_episodes = self.retrieve(
+            query_embedding=query_embedding,
+            filters=filters,
+            limit=limit * 2  # Get more to filter
+        )
+        
+        # Filter out failures
+        successes = [ep for ep in all_episodes if not ep.is_failure()]
+        
+        return successes[:limit]
+    
+    def retrieve_with_anti_patterns(
+        self,
+        query_embedding: Optional[np.ndarray] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 10,
+        include_failures: bool = True
+    ) -> Dict[str, List[Episode]]:
+        """
+        Retrieve both successful and failure episodes for comprehensive pattern analysis.
+        
+        This enables the agent to learn from both what works AND what doesn't work,
+        pruning the search space by avoiding known failures.
+        
+        Args:
+            query_embedding: Optional embedding vector for similarity search
+            filters: Optional metadata filters
+            limit: Maximum number of episodes per category
+            include_failures: Whether to include failures (default: True)
+            
+        Returns:
+            Dictionary with 'successes' and 'failures' keys containing episode lists
+        """
+        result = {
+            "successes": [],
+            "failures": []
+        }
+        
+        # Get successes
+        result["successes"] = self.retrieve_successes(
+            query_embedding=query_embedding,
+            filters=filters,
+            limit=limit
+        )
+        
+        # Get failures if requested
+        if include_failures:
+            result["failures"] = self.retrieve_failures(
+                query_embedding=query_embedding,
+                filters=filters,
+                limit=limit
+            )
+        
+        return result
 
 
 class FileAdapter(VectorStoreAdapter):
