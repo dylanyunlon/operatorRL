@@ -1,7 +1,5 @@
 """Tests for core message models."""
 
-import pytest
-from datetime import datetime
 from amb_core.models import Message, MessagePriority
 
 
@@ -12,7 +10,7 @@ def test_message_creation():
         topic="test.topic",
         payload={"key": "value"}
     )
-    
+
     assert msg.id == "test-123"
     assert msg.topic == "test.topic"
     assert msg.payload == {"key": "value"}
@@ -27,7 +25,7 @@ def test_message_with_priority():
         payload={},
         priority=MessagePriority.HIGH
     )
-    
+
     assert msg.priority == MessagePriority.HIGH
 
 
@@ -42,7 +40,7 @@ def test_message_with_metadata():
         reply_to="reply.topic",
         metadata={"custom": "data"}
     )
-    
+
     assert msg.sender == "agent-1"
     assert msg.correlation_id == "corr-123"
     assert msg.reply_to == "reply.topic"
@@ -56,12 +54,12 @@ def test_message_serialization():
         topic="test.topic",
         payload={"key": "value"}
     )
-    
+
     # Serialize
     json_str = msg.model_dump_json()
     assert "test-123" in json_str
     assert "test.topic" in json_str
-    
+
     # Deserialize
     msg2 = Message.model_validate_json(json_str)
     assert msg2.id == msg.id

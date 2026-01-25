@@ -1,7 +1,8 @@
 """Broker adapter interface for AMB."""
 
 from abc import ABC, abstractmethod
-from typing import Callable, Awaitable, Optional, List
+from typing import Awaitable, Callable, List, Optional
+
 from amb_core.models import Message
 
 # Type alias for message handler functions
@@ -15,7 +16,7 @@ class BrokerAdapter(ABC):
     This provides a broker-agnostic interface that can be implemented
     for different message brokers (Redis, RabbitMQ, Kafka, etc.).
     """
-    
+
     @abstractmethod
     async def connect(self) -> None:
         """
@@ -25,14 +26,14 @@ class BrokerAdapter(ABC):
             ConnectionError: If connection fails
         """
         pass
-    
+
     @abstractmethod
     async def disconnect(self) -> None:
         """
         Close connection to the broker.
         """
         pass
-    
+
     @abstractmethod
     async def publish(self, message: Message, wait_for_confirmation: bool = False) -> Optional[str]:
         """
@@ -50,7 +51,7 @@ class BrokerAdapter(ABC):
             PublishError: If publishing fails
         """
         pass
-    
+
     @abstractmethod
     async def subscribe(self, topic: str, handler: MessageHandler) -> str:
         """
@@ -67,7 +68,7 @@ class BrokerAdapter(ABC):
             SubscriptionError: If subscription fails
         """
         pass
-    
+
     @abstractmethod
     async def unsubscribe(self, subscription_id: str) -> None:
         """
@@ -80,7 +81,7 @@ class BrokerAdapter(ABC):
             SubscriptionError: If unsubscription fails
         """
         pass
-    
+
     @abstractmethod
     async def request(self, message: Message, timeout: float = 30.0) -> Message:
         """
@@ -98,7 +99,7 @@ class BrokerAdapter(ABC):
             RequestError: If request fails
         """
         pass
-    
+
     @abstractmethod
     async def get_pending_messages(self, topic: str, limit: int = 10) -> List[Message]:
         """
@@ -112,7 +113,7 @@ class BrokerAdapter(ABC):
             List of pending messages
         """
         pass
-    
+
     def get_backpressure_stats(self, topic: Optional[str] = None):
         """
         Get backpressure statistics (if supported by broker).
@@ -126,7 +127,7 @@ class BrokerAdapter(ABC):
             Statistics about backpressure events
         """
         return {}
-    
+
     def get_queue_size(self, topic: str) -> int:
         """
         Get current queue size for a topic (if supported by broker).

@@ -1,10 +1,11 @@
 """Main MessageBus implementation."""
 
 import uuid
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from amb_core.broker import BrokerAdapter, MessageHandler
-from amb_core.models import Message, MessagePriority
 from amb_core.memory_broker import InMemoryBroker
+from amb_core.models import Message, MessagePriority
 
 
 class MessageBus:
@@ -14,7 +15,7 @@ class MessageBus:
     This class provides a simple API for publishing and subscribing to messages
     with support for both "fire and forget" and "wait for verification" patterns.
     """
-    
+
     def __init__(self, adapter: Optional[BrokerAdapter] = None):
         """
         Initialize the message bus.
@@ -24,26 +25,26 @@ class MessageBus:
         """
         self._adapter = adapter or InMemoryBroker()
         self._connected = False
-    
+
     async def connect(self) -> None:
         """Connect to the broker."""
         await self._adapter.connect()
         self._connected = True
-    
+
     async def disconnect(self) -> None:
         """Disconnect from the broker."""
         await self._adapter.disconnect()
         self._connected = False
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         await self.connect()
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.disconnect()
-    
+
     async def publish(
         self,
         topic: str,
@@ -84,7 +85,7 @@ class MessageBus:
         """
         if not self._connected:
             raise ConnectionError("Message bus not connected")
-        
+
         message = Message(
             id=str(uuid.uuid4()),
             topic=topic,
@@ -93,10 +94,10 @@ class MessageBus:
             sender=sender,
             **kwargs
         )
-        
+
         await self._adapter.publish(message, wait_for_confirmation=wait_for_confirmation)
         return message.id
-    
+
     async def subscribe(self, topic: str, handler: MessageHandler) -> str:
         """
         Subscribe to a topic with a message handler.
@@ -116,9 +117,9 @@ class MessageBus:
         """
         if not self._connected:
             raise ConnectionError("Message bus not connected")
-        
+
         return await self._adapter.subscribe(topic, handler)
-    
+
     async def unsubscribe(self, subscription_id: str) -> None:
         """
         Unsubscribe from a topic.
@@ -128,9 +129,9 @@ class MessageBus:
         """
         if not self._connected:
             raise ConnectionError("Message bus not connected")
-        
+
         await self._adapter.unsubscribe(subscription_id)
-    
+
     async def request(
         self,
         topic: str,
@@ -169,7 +170,7 @@ class MessageBus:
         """
         if not self._connected:
             raise ConnectionError("Message bus not connected")
-        
+
         message = Message(
             id=str(uuid.uuid4()),
             topic=topic,
@@ -178,9 +179,9 @@ class MessageBus:
             correlation_id=str(uuid.uuid4()),
             **kwargs
         )
-        
+
         return await self._adapter.request(message, timeout=timeout)
-    
+
     async def reply(self, original_message: Message, payload: Dict[str, Any]) -> str:
         """
         Reply to a request message.
@@ -199,12 +200,12 @@ class MessageBus:
         """
         if not self._connected:
             raise ConnectionError("Message bus not connected")
-        
+
         if not original_message.correlation_id:
             raise ValueError("Original message has no correlation_id")
-        
+
         reply_topic = original_message.reply_to or original_message.topic
-        
+
         reply_message = Message(
             id=str(uuid.uuid4()),
             topic=reply_topic,
@@ -212,6 +213,6 @@ class MessageBus:
             correlation_id=original_message.correlation_id,
             sender=None,
         )
-        
+
         await self._adapter.publish(reply_message, wait_for_confirmation=False)
         return reply_message.id
