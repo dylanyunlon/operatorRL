@@ -161,6 +161,10 @@ class CapabilityManifest(BaseModel):
         ...,
         description="Privacy policies of the agent"
     )
+    scopes: List[str] = Field(
+        default_factory=list,
+        description="RBAC scopes defining agent permissions (e.g., 'repo:read', 'repo:write')"
+    )
 
     def calculate_trust_score(self) -> int:
         """

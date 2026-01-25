@@ -206,6 +206,7 @@ class IATPPolicyEngine:
             "human_review": manifest.privacy_contract.human_review,
             "encryption_at_rest": manifest.privacy_contract.encryption_at_rest,
             "encryption_in_transit": manifest.privacy_contract.encryption_in_transit,
+            "scopes": manifest.scopes,
         }
 
     def _generate_deny_message(
@@ -281,7 +282,8 @@ class IATPPolicyEngine:
     def validate_handshake(
         self,
         manifest: CapabilityManifest,
-        required_capabilities: Optional[List[str]] = None
+        required_capabilities: Optional[List[str]] = None,
+        required_scopes: Optional[List[str]] = None
     ) -> Tuple[bool, Optional[str]]:
         """
         Validate handshake compatibility between agents.
@@ -292,12 +294,15 @@ class IATPPolicyEngine:
         Args:
             manifest: Remote agent's capability manifest
             required_capabilities: List of required capability keys
+            required_scopes: List of required RBAC scopes (e.g., ['repo:write'])
 
         Returns:
             Tuple of (is_compatible, error_message)
         """
         if not required_capabilities:
             required_capabilities = []
+        if not required_scopes:
+            required_scopes = []
 
         # Always validate against base policies first
         is_allowed, error_msg, _ = self.validate_manifest(manifest)
@@ -316,5 +321,15 @@ class IATPPolicyEngine:
 
         if missing:
             return False, f"Agent missing required capabilities: {', '.join(missing)}"
+
+        # Check RBAC scope requirements
+        missing_scopes = []
+        agent_scopes = set(manifest.scopes)
+        for scope in required_scopes:
+            if scope not in agent_scopes:
+                missing_scopes.append(scope)
+
+        if missing_scopes:
+            return False, f"Agent missing required scopes: {', '.join(missing_scopes)}"
 
         return True, None
