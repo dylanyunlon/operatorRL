@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 from amb_core.broker import BrokerAdapter, MessageHandler
 from amb_core.memory_broker import InMemoryBroker
 from amb_core.models import Message, MessagePriority
+from amb_core.tracing import get_trace_id
 
 
 class MessageBus:
@@ -86,12 +87,16 @@ class MessageBus:
         if not self._connected:
             raise ConnectionError("Message bus not connected")
 
+        # Inject trace_id from current span context if available
+        trace_id = kwargs.pop('trace_id', None) or get_trace_id()
+
         message = Message(
             id=str(uuid.uuid4()),
             topic=topic,
             payload=payload,
             priority=priority,
             sender=sender,
+            trace_id=trace_id,
             **kwargs
         )
 
@@ -171,12 +176,16 @@ class MessageBus:
         if not self._connected:
             raise ConnectionError("Message bus not connected")
 
+        # Inject trace_id from current span context if available
+        trace_id = kwargs.pop('trace_id', None) or get_trace_id()
+
         message = Message(
             id=str(uuid.uuid4()),
             topic=topic,
             payload=payload,
             sender=sender,
             correlation_id=str(uuid.uuid4()),
+            trace_id=trace_id,
             **kwargs
         )
 
@@ -212,6 +221,7 @@ class MessageBus:
             payload=payload,
             correlation_id=original_message.correlation_id,
             sender=None,
+            trace_id=original_message.trace_id,  # Propagate trace_id from original message
         )
 
         await self._adapter.publish(reply_message, wait_for_confirmation=False)

@@ -35,6 +35,7 @@ class Message(BaseModel):
     correlation_id: Optional[str] = Field(None, description="Correlation ID for request-response patterns")
     reply_to: Optional[str] = Field(None, description="Topic to reply to")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Message timestamp")
+    trace_id: Optional[str] = Field(None, description="OpenTelemetry trace ID for distributed tracing")
 
     # TTL and expiration
     ttl: Optional[int] = Field(None, description="Time to live in seconds")
