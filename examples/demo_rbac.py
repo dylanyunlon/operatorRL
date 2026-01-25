@@ -9,6 +9,8 @@ This demo showcases how different agent types can have different permissions:
 The handshake validation ensures agents have required scopes before proceeding.
 """
 
+from typing import List
+
 from iatp.models import (
     AgentCapabilities,
     CapabilityManifest,
@@ -65,7 +67,7 @@ def create_reviewer_agent_manifest() -> CapabilityManifest:
     )
 
 
-def validate_agent(manifest: CapabilityManifest, operation: str, required_scopes: list[str]):
+def validate_agent(manifest: CapabilityManifest, operation: str, required_scopes: List[str]):
     """Validate an agent's permissions for a specific operation."""
     engine = IATPPolicyEngine()
     
