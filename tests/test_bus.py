@@ -33,11 +33,7 @@ async def test_publish_fire_and_forget():
     """Test fire and forget publishing pattern."""
     async with MessageBus() as bus:
         # Publish without waiting
-        msg_id = await bus.publish(
-            "test.topic",
-            {"message": "hello"},
-            wait_for_confirmation=False
-        )
+        msg_id = await bus.publish("test.topic", {"message": "hello"}, wait_for_confirmation=False)
 
         assert msg_id is not None
 
@@ -47,11 +43,7 @@ async def test_publish_with_confirmation():
     """Test publishing with confirmation."""
     async with MessageBus() as bus:
         # Publish with confirmation
-        msg_id = await bus.publish(
-            "test.topic",
-            {"message": "hello"},
-            wait_for_confirmation=True
-        )
+        msg_id = await bus.publish("test.topic", {"message": "hello"}, wait_for_confirmation=True)
 
         assert msg_id is not None
 
@@ -96,8 +88,8 @@ async def test_multiple_subscribers():
             received_2.append(msg)
 
         # Subscribe both handlers
-        sub1 = await bus.subscribe("test.topic", handler1)
-        sub2 = await bus.subscribe("test.topic", handler2)
+        await bus.subscribe("test.topic", handler1)
+        await bus.subscribe("test.topic", handler2)
 
         # Publish message
         await bus.publish("test.topic", {"data": "broadcast"})
@@ -123,11 +115,7 @@ async def test_request_response_pattern():
         await asyncio.sleep(0.1)
 
         # Send request
-        response = await bus.request(
-            "ping.topic",
-            {"request": "ping"},
-            timeout=5.0
-        )
+        response = await bus.request("ping.topic", {"request": "ping"}, timeout=5.0)
 
         assert response.payload == {"response": "pong"}
 
@@ -139,11 +127,7 @@ async def test_request_timeout():
         # No responder set up
 
         with pytest.raises(TimeoutError):
-            await bus.request(
-                "no.response.topic",
-                {"request": "ping"},
-                timeout=1.0
-            )
+            await bus.request("no.response.topic", {"request": "ping"}, timeout=1.0)
 
 
 @pytest.mark.asyncio
@@ -158,11 +142,7 @@ async def test_message_with_priority():
         await bus.subscribe("test.topic", handler)
 
         # Publish with high priority
-        await bus.publish(
-            "test.topic",
-            {"urgent": "data"},
-            priority=MessagePriority.HIGH
-        )
+        await bus.publish("test.topic", {"urgent": "data"}, priority=MessagePriority.HIGH)
 
         await asyncio.sleep(0.1)
 
@@ -182,11 +162,7 @@ async def test_message_with_sender():
         await bus.subscribe("test.topic", handler)
 
         # Publish with sender
-        await bus.publish(
-            "test.topic",
-            {"data": "test"},
-            sender="agent-123"
-        )
+        await bus.publish("test.topic", {"data": "test"}, sender="agent-123")
 
         await asyncio.sleep(0.1)
 

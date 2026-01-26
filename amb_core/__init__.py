@@ -34,6 +34,7 @@ from amb_core.broker import BrokerAdapter, MessageHandler
 from amb_core.bus import MessageBus
 from amb_core.memory_broker import InMemoryBroker
 from amb_core.models import Message, MessagePriority
+from amb_core.tracing import get_trace_id, get_tracer, initialize_tracing
 
 __all__ = [
     # Version info
@@ -48,4 +49,8 @@ __all__ = [
     "BrokerAdapter",
     "MessageHandler",
     "InMemoryBroker",
+    # Tracing utilities
+    "get_trace_id",
+    "get_tracer",
+    "initialize_tracing",
 ]
