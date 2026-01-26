@@ -16,6 +16,8 @@ from mcp_kernel_server.tools import (
     CMVKVerifyTool,
     KernelExecuteTool,
     IATPSignTool,
+    IATPVerifyTool,
+    IATPReputationTool,
     ToolResult,
 )
 from mcp_kernel_server.resources import VFSResource, VFSResourceTemplate
@@ -47,9 +49,12 @@ class KernelMCPServer:
     - cmvk_verify: Cross-model verification
     - kernel_execute: Governed action execution
     - iatp_sign: Trust attestation signing
+    - iatp_verify: Trust relationship verification
+    - iatp_reputation: Reputation query/slashing
     
     Resources:
     - vfs://: Agent Virtual File System
+    - iatp://: Trust manifests and attestations
     """
     
     def __init__(self, config: Optional[ServerConfig] = None):
@@ -60,6 +65,8 @@ class KernelMCPServer:
             "cmvk_verify": CMVKVerifyTool({"threshold": self.config.cmvk_threshold}),
             "kernel_execute": KernelExecuteTool({"policy_mode": self.config.policy_mode}),
             "iatp_sign": IATPSignTool(),
+            "iatp_verify": IATPVerifyTool(),
+            "iatp_reputation": IATPReputationTool(),
         }
         
         # Initialize resources (stateless with external backend)

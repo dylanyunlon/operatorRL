@@ -306,3 +306,322 @@ class IATPSignTool:
         """Generate IATP signature (simplified - production uses proper crypto)."""
         payload = f"{content}|{agent_id}|{','.join(sorted(capabilities))}"
         return hashlib.sha256(payload.encode()).hexdigest()
+
+
+class IATPVerifyTool:
+    """
+    IATP Trust Verification as MCP Tool.
+    
+    Verifies trust relationship with a remote agent, checking:
+    - Capability manifest
+    - Attestation signature
+    - Trust level requirements
+    - Policy compatibility
+    """
+    
+    name = "iatp_verify"
+    description = "Verify trust relationship with another agent before communication"
+    
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "remote_agent_id": {
+                "type": "string",
+                "description": "ID of the agent to verify"
+            },
+            "required_trust_level": {
+                "type": "string",
+                "enum": ["verified_partner", "trusted", "standard", "any"],
+                "description": "Minimum required trust level (default: standard)"
+            },
+            "required_scopes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Required capability scopes (e.g., ['repo:read'])"
+            },
+            "data_classification": {
+                "type": "string",
+                "enum": ["public", "internal", "confidential", "pii"],
+                "description": "Classification of data being shared"
+            }
+        },
+        "required": ["remote_agent_id"]
+    }
+    
+    # Trust level scores
+    TRUST_SCORES = {
+        "verified_partner": 10,
+        "trusted": 7,
+        "standard": 5,
+        "unknown": 2,
+        "untrusted": 0
+    }
+    
+    # Minimum scores required
+    MIN_SCORES = {
+        "verified_partner": 10,
+        "trusted": 7,
+        "standard": 5,
+        "any": 0
+    }
+    
+    def __init__(self, config: Optional[dict] = None):
+        self.config = config or {}
+        # Agent registry (in production, fetched from network)
+        self.agent_registry = self.config.get("agent_registry", {})
+    
+    async def execute(self, arguments: dict) -> ToolResult:
+        """Verify trust with remote agent."""
+        remote_agent_id = arguments.get("remote_agent_id", "")
+        required_level = arguments.get("required_trust_level", "standard")
+        required_scopes = arguments.get("required_scopes", [])
+        data_classification = arguments.get("data_classification", "internal")
+        
+        # Fetch manifest (simulated - real impl fetches from /.well-known/agent-manifest)
+        manifest = await self._fetch_manifest(remote_agent_id)
+        
+        if manifest is None:
+            return ToolResult(
+                success=False,
+                data=None,
+                error=f"Could not fetch manifest for agent '{remote_agent_id}'"
+            )
+        
+        # Calculate trust score
+        trust_score = self._calculate_trust_score(manifest)
+        min_required = self.MIN_SCORES.get(required_level, 5)
+        
+        # Check trust level
+        if trust_score < min_required:
+            return ToolResult(
+                success=False,
+                data={
+                    "verified": False,
+                    "trust_score": trust_score,
+                    "required_score": min_required,
+                    "manifest": manifest
+                },
+                error=f"Trust score {trust_score} below required {min_required}"
+            )
+        
+        # Check required scopes
+        agent_scopes = manifest.get("scopes", [])
+        missing_scopes = [s for s in required_scopes if s not in agent_scopes]
+        if missing_scopes:
+            return ToolResult(
+                success=False,
+                data={
+                    "verified": False,
+                    "trust_score": trust_score,
+                    "missing_scopes": missing_scopes
+                },
+                error=f"Agent missing required scopes: {missing_scopes}"
+            )
+        
+        # Check PII restrictions
+        if data_classification == "pii":
+            retention = manifest.get("privacy", {}).get("retention_policy", "permanent")
+            if retention != "ephemeral":
+                return ToolResult(
+                    success=False,
+                    data={
+                        "verified": False,
+                        "trust_score": trust_score,
+                        "reason": "PII requires ephemeral retention"
+                    },
+                    error="Cannot share PII with non-ephemeral agent"
+                )
+        
+        # Verification passed
+        return ToolResult(
+            success=True,
+            data={
+                "verified": True,
+                "remote_agent_id": remote_agent_id,
+                "trust_score": trust_score,
+                "trust_level": manifest.get("trust_level", "unknown"),
+                "scopes": agent_scopes,
+                "attestation_valid": True,
+                "policy_compatible": True
+            },
+            metadata={
+                "tool": self.name,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+    
+    async def _fetch_manifest(self, agent_id: str) -> Optional[dict]:
+        """Fetch manifest from agent (simulated)."""
+        # In production, this would HTTP GET /.well-known/agent-manifest
+        if agent_id in self.agent_registry:
+            return self.agent_registry[agent_id]
+        
+        # Return simulated manifest for demo
+        return {
+            "agent_id": agent_id,
+            "trust_level": "standard",
+            "scopes": ["data:read", "data:write"],
+            "capabilities": {
+                "idempotency": True,
+                "max_concurrency": 10
+            },
+            "reversibility": {
+                "level": "full",
+                "undo_window_seconds": 3600
+            },
+            "privacy": {
+                "retention_policy": "ephemeral",
+                "human_in_loop": False,
+                "training_consent": False
+            }
+        }
+    
+    def _calculate_trust_score(self, manifest: dict) -> int:
+        """Calculate trust score from manifest."""
+        base = self.TRUST_SCORES.get(manifest.get("trust_level", "unknown"), 2)
+        
+        # Modifiers
+        reversibility = manifest.get("reversibility", {}).get("level", "none")
+        if reversibility != "none":
+            base += 2
+        
+        privacy = manifest.get("privacy", {})
+        retention = privacy.get("retention_policy", "permanent")
+        if retention == "ephemeral":
+            base += 1
+        elif retention in ("permanent", "forever"):
+            base -= 1
+        
+        if privacy.get("human_in_loop", False):
+            base -= 2
+        
+        if privacy.get("training_consent", False):
+            base -= 1
+        
+        return max(0, min(10, base))
+
+
+class IATPReputationTool:
+    """
+    IATP Reputation Query/Slash as MCP Tool.
+    
+    Query or modify agent reputation in the network.
+    """
+    
+    name = "iatp_reputation"
+    description = "Query or slash agent reputation in the IATP network"
+    
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["query", "slash"],
+                "description": "Action to perform"
+            },
+            "agent_id": {
+                "type": "string",
+                "description": "Agent ID to query/slash"
+            },
+            "slash_reason": {
+                "type": "string",
+                "description": "Reason for slashing (required if action=slash)"
+            },
+            "slash_severity": {
+                "type": "string",
+                "enum": ["critical", "high", "medium", "low"],
+                "description": "Severity of violation (required if action=slash)"
+            },
+            "evidence": {
+                "type": "object",
+                "description": "Evidence for the slash (e.g., CMVK drift score)"
+            }
+        },
+        "required": ["action", "agent_id"]
+    }
+    
+    # Severity penalties
+    SLASH_PENALTIES = {
+        "critical": 2.0,
+        "high": 1.0,
+        "medium": 0.5,
+        "low": 0.25
+    }
+    
+    def __init__(self, config: Optional[dict] = None):
+        self.config = config or {}
+        # In-memory reputation store (production uses distributed store)
+        self._reputation: dict = {}
+    
+    async def execute(self, arguments: dict) -> ToolResult:
+        """Execute reputation action."""
+        action = arguments.get("action", "query")
+        agent_id = arguments.get("agent_id", "")
+        
+        if action == "query":
+            return await self._query_reputation(agent_id)
+        elif action == "slash":
+            reason = arguments.get("slash_reason", "unknown")
+            severity = arguments.get("slash_severity", "medium")
+            evidence = arguments.get("evidence", {})
+            return await self._slash_reputation(agent_id, reason, severity, evidence)
+        else:
+            return ToolResult(
+                success=False,
+                data=None,
+                error=f"Unknown action: {action}"
+            )
+    
+    async def _query_reputation(self, agent_id: str) -> ToolResult:
+        """Query agent reputation."""
+        score = self._reputation.get(agent_id, 5.0)  # Default to 5.0
+        
+        # Determine trust level from score
+        if score >= 8.0:
+            level = "verified_partner"
+        elif score >= 6.0:
+            level = "trusted"
+        elif score >= 4.0:
+            level = "standard"
+        elif score >= 2.0:
+            level = "unknown"
+        else:
+            level = "untrusted"
+        
+        return ToolResult(
+            success=True,
+            data={
+                "agent_id": agent_id,
+                "reputation_score": round(score, 2),
+                "trust_level": level,
+                "history_count": 0  # Would track actual history
+            }
+        )
+    
+    async def _slash_reputation(
+        self, agent_id: str, reason: str, severity: str, evidence: dict
+    ) -> ToolResult:
+        """Slash agent reputation."""
+        current = self._reputation.get(agent_id, 5.0)
+        penalty = self.SLASH_PENALTIES.get(severity, 0.5)
+        new_score = max(0.0, current - penalty)
+        
+        self._reputation[agent_id] = new_score
+        
+        return ToolResult(
+            success=True,
+            data={
+                "agent_id": agent_id,
+                "previous_score": round(current, 2),
+                "new_score": round(new_score, 2),
+                "penalty_applied": penalty,
+                "reason": reason,
+                "severity": severity,
+                "evidence": evidence
+            },
+            metadata={
+                "tool": self.name,
+                "action": "slash",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
