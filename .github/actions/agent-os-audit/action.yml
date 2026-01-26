@@ -1,0 +1,81 @@
+name: 'Agent OS Security Audit'
+description: 'Audit AI agent security with Agent OS kernel'
+author: 'Imran Siddique'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to audit (default: repository root)'
+    required: false
+    default: '.'
+  policy:
+    description: 'Policy template to use (strict, permissive, audit)'
+    required: false
+    default: 'strict'
+  fail-on-violation:
+    description: 'Fail the action if violations are found'
+    required: false
+    default: 'true'
+  init-if-missing:
+    description: 'Initialize .agents/ if not present'
+    required: false
+    default: 'false'
+
+outputs:
+  passed:
+    description: 'Whether the audit passed'
+    value: ${{ steps.audit.outputs.passed }}
+  findings:
+    description: 'JSON array of audit findings'
+    value: ${{ steps.audit.outputs.findings }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Agent OS
+      shell: bash
+      run: |
+        pip install agent-os-kernel
+
+    - name: Initialize (if requested)
+      if: inputs.init-if-missing == 'true'
+      shell: bash
+      run: |
+        if [ ! -d "${{ inputs.path }}/.agents" ]; then
+          python -m agent_os.cli init --path "${{ inputs.path }}" --template "${{ inputs.policy }}"
+        fi
+
+    - name: Run Security Audit
+      id: audit
+      shell: bash
+      run: |
+        set +e
+        result=$(python -m agent_os.cli audit --path "${{ inputs.path }}" --format json 2>&1)
+        exit_code=$?
+        
+        # Extract passed status
+        passed=$(echo "$result" | python -c "import sys, json; d=json.load(sys.stdin); print(str(d.get('passed', False)).lower())" 2>/dev/null || echo "false")
+        findings=$(echo "$result" | python -c "import sys, json; d=json.load(sys.stdin); print(json.dumps(d.get('findings', [])))" 2>/dev/null || echo "[]")
+        
+        echo "passed=$passed" >> $GITHUB_OUTPUT
+        echo "findings=$findings" >> $GITHUB_OUTPUT
+        
+        # Show results
+        echo "=== Agent OS Security Audit ==="
+        echo "$result"
+        echo "==============================="
+        
+        if [ "$passed" = "false" ] && [ "${{ inputs.fail-on-violation }}" = "true" ]; then
+          echo "::error::Security audit failed"
+          exit 1
+        fi
+        
+        exit 0

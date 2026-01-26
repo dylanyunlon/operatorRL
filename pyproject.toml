@@ -145,6 +145,7 @@ all = [
 [project.scripts]
 agent-os = "agent_os.cli:main"
 agentctl = "agent_os.cli:main"
+agentos = "agent_os.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_os"]
