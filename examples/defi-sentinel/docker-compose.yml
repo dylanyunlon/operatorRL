@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # DeFi Sentinel Demo - Attack detection simulation
+  defi-sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: defi-sentinel-demo
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ATTACK_TYPE=all
+    volumes:
+      - ./data:/app/data:ro
+      - ./output:/app/output
+    command: python demo.py --attack all
+    
+  # Single attack mode
+  reentrancy-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: defi-reentrancy-demo
+    command: python demo.py --attack reentrancy
+    profiles:
+      - single
+
+  flash-loan-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: defi-flash-loan-demo
+    command: python demo.py --attack flash_loan
+    profiles:
+      - single
+
+  # With Redis for production mempool simulation
+  redis:
+    image: redis:7-alpine
+    container_name: defi-sentinel-redis
+    ports:
+      - "6379:6379"
+    profiles:
+      - full

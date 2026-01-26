@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # Grid Balancing Demo - 100 DER simulation
+  grid-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: grid-balancing-demo
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NUM_AGENTS=100
+      - SCENARIO=price_spike
+    volumes:
+      - ./data:/app/data:ro
+      - ./output:/app/output
+    command: python demo.py --agents 100 --scenario price_spike
+    
+  # Redis-backed AMB for production scenarios
+  redis:
+    image: redis:7-alpine
+    container_name: grid-redis
+    ports:
+      - "6379:6379"
+    profiles:
+      - full
+      - prod
+
+  # Multiple grid regions (parallel simulation)
+  region-west:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: grid-region-west
+    environment:
+      - REGION=west
+      - NUM_AGENTS=50
+    command: python demo.py --agents 50 --required-kw 200
+    profiles:
+      - multi-region
+
+  region-east:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: grid-region-east
+    environment:
+      - REGION=east
+      - NUM_AGENTS=50
+    command: python demo.py --agents 50 --required-kw 300
+    profiles:
+      - multi-region

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Pharma Compliance Demo - Document analysis
+  pharma-compliance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pharma-compliance-demo
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NUM_REPORTS=50
+    volumes:
+      - ./data:/app/data:ro
+      - ./output:/app/output
+    command: python demo.py --reports 50
+    
+  # Quick demo with fewer documents
+  quick-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pharma-quick-demo
+    command: python demo.py --reports 10
+    profiles:
+      - quick
+
+  # Full enterprise demo
+  enterprise-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pharma-enterprise-demo
+    command: python demo.py --reports 100
+    profiles:
+      - enterprise

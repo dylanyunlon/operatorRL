@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Carbon Auditor Demo - Complete verification swarm
+  carbon-auditor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: carbon-auditor-demo
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEMO_MODE=fraud  # Options: fraud, verified, both
+    volumes:
+      - ./data:/app/data:ro
+      - ./output:/app/output
+    command: python demo_audit.py --both
+    
+  # Optional: Run with Redis-backed AMB for persistence
+  redis:
+    image: redis:7-alpine
+    container_name: carbon-auditor-redis
+    ports:
+      - "6379:6379"
+    profiles:
+      - full
+
+  # Optional: Run interactive demo
+  interactive:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: carbon-auditor-interactive
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/app/data:ro
+      - ./output:/app/output
+    command: /bin/bash
+    profiles:
+      - dev
