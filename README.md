@@ -21,9 +21,10 @@
 | **Build an Agent** | [`packages/control-plane`](packages/control-plane/) - The Kernel |
 | **Secure my Swarm** | [`packages/iatp`](packages/iatp/) - The Trust Protocol |
 | **Verify Hallucinations** | [`packages/cmvk`](packages/cmvk/) - Cross-Model Verification |
+| **Use with MCP** | [`packages/mcp-kernel-server`](packages/mcp-kernel-server/) - MCP Server |
+| **Add Observability** | [`packages/observability`](packages/observability/) - Prometheus + Grafana |
 | **See Real Examples** | [`examples/carbon-auditor`](examples/carbon-auditor/) - Working Demo |
 | **Read the Research** | [`papers/`](papers/) - Academic Papers |
-| **Integrate with LangChain/CrewAI** | [`src/agent_os/integrations`](src/agent_os/integrations/) - Adapters |
 
 ---
 
@@ -128,6 +129,97 @@ result = await pipeline.execute("Find AI papers")
 
 ---
 
+## MCP Integration (Model Context Protocol)
+
+Agent OS is MCP-native. Run any MCP-compatible agent with kernel safety:
+
+```bash
+pip install mcp-kernel-server
+mcp-kernel-server --stdio  # For Claude Desktop
+```
+
+```python
+# Any MCP client gets kernel governance
+from mcp import ClientSession
+
+async with ClientSession() as session:
+    await session.connect("http://localhost:8080")
+    
+    # Verify claims across models
+    result = await session.call_tool("cmvk_verify", {
+        "claim": "This code is safe to execute"
+    })
+    
+    # Execute with policy enforcement
+    result = await session.call_tool("kernel_execute", {
+        "action": "database_query",
+        "params": {"query": "SELECT * FROM users"},
+        "policies": ["read_only", "no_pii"]
+    })
+```
+
+---
+
+## Stateless API (MCP June 2026)
+
+For horizontal scaling and serverless deployment:
+
+```python
+from agent_os import stateless_execute
+
+# Every request is self-contained
+result = await stateless_execute(
+    action="database_query",
+    params={"query": "SELECT * FROM users"},
+    agent_id="analyst-001",
+    policies=["read_only"]
+)
+
+# No session state - runs on any instance
+```
+
+---
+
+## AGENTS.md Compatibility
+
+Drop Agent OS into any repo with `.agents/agents.md`:
+
+```python
+from agent_os import discover_agents, AgentsParser
+
+# Auto-discover and parse
+configs = discover_agents("./my-project")
+
+# Convert to kernel policies
+parser = AgentsParser()
+policies = parser.to_kernel_policies(configs[0])
+```
+
+---
+
+## Observability
+
+Production-ready monitoring for SOC teams:
+
+```python
+from agent_os_observability import KernelMetrics, KernelTracer
+
+metrics = KernelMetrics()
+tracer = KernelTracer(service_name="my-agent")
+
+# Expose /metrics endpoint
+@app.get("/metrics")
+def get_metrics():
+    return Response(metrics.export(), media_type="text/plain")
+```
+
+Key metrics:
+- `agent_os_violation_rate` (target: 0%)
+- `agent_os_policy_check_duration_seconds` (<5ms)
+- `agent_os_mttr_seconds` (recovery time)
+
+---
+
 ## Examples
 
 | Demo | Industry | What it Shows |
@@ -149,17 +241,19 @@ python examples/carbon-auditor/demo.py
 ```
 agent-os/
 ├── packages/
-│   ├── primitives/      # Base types
-│   ├── cmvk/            # Cross-model verification  
-│   ├── caas/            # Context management
-│   ├── iatp/            # Inter-agent trust
-│   ├── amb/             # Message bus
-│   ├── control-plane/   # THE KERNEL
-│   ├── scak/            # Self-correction
-│   └── mute-agent/      # Reasoning/execution split
-├── examples/            # Working demos
-├── papers/              # Research papers
-└── src/agent_os/        # Main package
+│   ├── primitives/          # Base types
+│   ├── cmvk/                 # Cross-model verification  
+│   ├── caas/                 # Context management
+│   ├── iatp/                 # Inter-agent trust
+│   ├── amb/                  # Message bus
+│   ├── control-plane/        # THE KERNEL
+│   ├── scak/                 # Self-correction
+│   ├── mute-agent/           # Reasoning/execution split
+│   ├── mcp-kernel-server/    # MCP integration
+│   └── observability/        # Prometheus + OTel
+├── examples/                 # Working demos
+├── papers/                   # Research papers
+└── src/agent_os/             # Main package
 ```
 
 ---
