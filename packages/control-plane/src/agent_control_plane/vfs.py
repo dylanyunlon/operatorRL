@@ -181,10 +181,11 @@ class MemoryBackend(VFSBackend):
         return self._files[path]
     
     def write(self, path: str, data: bytes, mode: FileMode = FileMode.WRITE) -> int:
-        # Ensure parent directory exists
+        # Ensure parent directory exists - auto-create if needed
         parent = str(PurePosixPath(path).parent)
         if parent not in self._dirs and parent != path:
-            raise FileNotFoundError(f"Parent directory does not exist: {parent}")
+            # Auto-create parent directories (like mkdir -p)
+            self._mkdir_p(parent)
         
         if mode & FileMode.APPEND and path in self._files:
             self._files[path] += data
@@ -253,6 +254,15 @@ class MemoryBackend(VFSBackend):
             return False
         self._dirs.add(path)
         return True
+    
+    def _mkdir_p(self, path: str) -> None:
+        """Create directory and all parent directories (like mkdir -p)."""
+        parts = path.strip("/").split("/")
+        current = ""
+        for part in parts:
+            current = current + "/" + part
+            if current not in self._dirs:
+                self._dirs.add(current)
 
 
 @dataclass

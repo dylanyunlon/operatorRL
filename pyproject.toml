@@ -1,0 +1,223 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-os"
+version = "1.0.0"
+description = "A Safety-First Kernel for Autonomous AI Agents - POSIX-inspired primitives with 0% policy violation guarantee"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    {name = "Imran Siddique", email = "imran.siddique@microsoft.com"},
+]
+maintainers = [
+    {name = "Imran Siddique", email = "imran.siddique@microsoft.com"},
+]
+keywords = [
+    "ai",
+    "agents",
+    "llm",
+    "kernel",
+    "safety",
+    "governance",
+    "control-plane",
+    "multi-agent",
+    "signals",
+    "vfs",
+    "posix",
+    "autonomous",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Operating System Kernels",
+    "Topic :: Security",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+
+# Core dependencies (minimal)
+dependencies = [
+    "pydantic>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/imran-siddique/agent-os"
+Documentation = "https://github.com/imran-siddique/agent-os/tree/master/docs"
+Repository = "https://github.com/imran-siddique/agent-os"
+"Bug Tracker" = "https://github.com/imran-siddique/agent-os/issues"
+Changelog = "https://github.com/imran-siddique/agent-os/blob/master/CHANGELOG.md"
+
+[project.optional-dependencies]
+# Layer 1: Primitives
+primitives = []  # No extra deps, just pydantic
+
+cmvk = [
+    "numpy>=1.20.0",
+]
+
+caas = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "PyPDF2>=3.0.0",
+    "numpy>=1.20.0",
+    "scikit-learn>=1.0.0",
+]
+
+emk = [
+    "numpy>=1.20.0",
+    "chromadb>=0.4.0",
+]
+
+# Layer 2: Infrastructure
+iatp = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "httpx>=0.24.0",
+]
+
+amb = [
+    "anyio>=3.0.0",
+    "aiofiles>=23.0.0",
+]
+
+atr = [
+    "docker>=6.0.0",
+]
+
+# Layer 3: Framework
+control-plane = []  # Zero external deps by design
+
+# Layer 4: Intelligence
+scak = [
+    "pyyaml>=6.0",
+]
+
+mute-agent = []  # Minimal deps
+
+# Bundles
+core = [
+    "agent-os[primitives,cmvk,control-plane]",
+]
+
+infrastructure = [
+    "agent-os[iatp,amb,atr]",
+]
+
+intelligence = [
+    "agent-os[scak,mute-agent]",
+]
+
+full = [
+    "agent-os[primitives,cmvk,caas,emk,iatp,amb,atr,control-plane,scak,mute-agent]",
+]
+
+# Development
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+]
+
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.24.0",
+]
+
+all = [
+    "agent-os[full,dev,docs]",
+]
+
+[project.scripts]
+agent-os = "agent_os.cli:main"
+agentctl = "agent_os.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_os"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/packages",
+    "/docs",
+    "/README.md",
+    "/LICENSE",
+]
+
+# ============================================================================
+# Ruff - Fast Python Linter & Formatter
+# ============================================================================
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+src = ["src", "packages"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_os"]
+
+# ============================================================================
+# Pytest
+# ============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests", "packages/*/tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+
+# ============================================================================
+# MyPy
+# ============================================================================
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+# ============================================================================
+# Coverage
+# ============================================================================
+[tool.coverage.run]
+source = ["src/agent_os", "packages"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
