@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" font-family="Arial, sans-serif">
+  <defs>
+    <linearGradient id="barGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3498DB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2980B9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="fullGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#27AE60;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E8449;stop-opacity:1" />
+    </linearGradient>
+    <filter id="barShadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Title -->
+  <text x="400" y="35" text-anchor="middle" font-size="22" font-weight="bold" fill="#2C3E50">Ablation Study: Component Contributions to Precision@5</text>
+  <text x="400" y="58" text-anchor="middle" font-size="13" fill="#6C757D">Each component's individual contribution measured by disabling others</text>
+  
+  <!-- Chart area -->
+  <rect x="180" y="80" width="580" height="340" fill="#FAFAFA" stroke="#E0E0E0" stroke-width="1"/>
+  
+  <!-- Y-axis -->
+  <line x1="180" y1="80" x2="180" y2="420" stroke="#495057" stroke-width="2"/>
+  <text x="30" y="260" text-anchor="middle" font-size="14" font-weight="bold" fill="#2C3E50" transform="rotate(-90, 30, 260)">Precision@5</text>
+  
+  <!-- Y-axis labels -->
+  <text x="170" y="420" text-anchor="end" font-size="11" fill="#6C757D">0.50</text>
+  <line x1="175" y1="416" x2="760" y2="416" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="170" y="360" text-anchor="end" font-size="11" fill="#6C757D">0.60</text>
+  <line x1="175" y1="356" x2="760" y2="356" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="170" y="300" text-anchor="end" font-size="11" fill="#6C757D">0.70</text>
+  <line x1="175" y1="296" x2="760" y2="296" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="170" y="240" text-anchor="end" font-size="11" fill="#6C757D">0.80</text>
+  <line x1="175" y1="236" x2="760" y2="236" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <text x="170" y="180" text-anchor="end" font-size="11" fill="#6C757D">0.90</text>
+  <line x1="175" y1="176" x2="760" y2="176" stroke="#E0E0E0" stroke-width="1" stroke-dasharray="4,4"/>
+  
+  <!-- X-axis -->
+  <line x1="180" y1="420" x2="760" y2="420" stroke="#495057" stroke-width="2"/>
+  
+  <!-- Baseline reference line at 0.64 -->
+  <line x1="180" y1="332" x2="760" y2="332" stroke="#E74C3C" stroke-width="2" stroke-dasharray="8,4"/>
+  <text x="765" y="336" font-size="10" fill="#E74C3C" font-weight="bold">Baseline (0.64)</text>
+  
+  <!-- Bars - scaled: 0.50 = 420, 0.90 = 176, so each 0.01 = 6.1px -->
+  <!-- Height formula: 420 - ((value - 0.50) * 600) -->
+  
+  <!-- Bar 1: Baseline 0.640 -->
+  <rect x="205" y="332" width="70" height="88" fill="#95A5A6" filter="url(#barShadow)" rx="3"/>
+  <text x="240" y="322" text-anchor="middle" font-size="12" font-weight="bold" fill="#2C3E50">0.640</text>
+  <text x="240" y="445" text-anchor="middle" font-size="10" fill="#495057">Baseline</text>
+  <text x="240" y="458" text-anchor="middle" font-size="9" fill="#6C757D">(Naive)</text>
+  
+  <!-- Bar 2: +Structure 0.740 (+15.6%) -->
+  <rect x="295" y="272" width="70" height="148" fill="url(#barGrad)" filter="url(#barShadow)" rx="3"/>
+  <text x="330" y="262" text-anchor="middle" font-size="12" font-weight="bold" fill="#2C3E50">0.740</text>
+  <text x="330" y="248" text-anchor="middle" font-size="10" fill="#27AE60" font-weight="bold">+15.6%</text>
+  <text x="330" y="445" text-anchor="middle" font-size="10" fill="#495057">+Structure</text>
+  <text x="330" y="458" text-anchor="middle" font-size="9" fill="#6C757D">Aware</text>
+  
+  <!-- Bar 3: +Metadata 0.720 (+12.5%) -->
+  <rect x="385" y="284" width="70" height="136" fill="url(#barGrad)" filter="url(#barShadow)" rx="3"/>
+  <text x="420" y="274" text-anchor="middle" font-size="12" font-weight="bold" fill="#2C3E50">0.720</text>
+  <text x="420" y="260" text-anchor="middle" font-size="10" fill="#27AE60" font-weight="bold">+12.5%</text>
+  <text x="420" y="445" text-anchor="middle" font-size="10" fill="#495057">+Metadata</text>
+  <text x="420" y="458" text-anchor="middle" font-size="9" fill="#6C757D">Injection</text>
+  
+  <!-- Bar 4: +Time Decay 0.700 (+9.4%) -->
+  <rect x="475" y="296" width="70" height="124" fill="url(#barGrad)" filter="url(#barShadow)" rx="3"/>
+  <text x="510" y="286" text-anchor="middle" font-size="12" font-weight="bold" fill="#2C3E50">0.700</text>
+  <text x="510" y="272" text-anchor="middle" font-size="10" fill="#27AE60" font-weight="bold">+9.4%</text>
+  <text x="510" y="445" text-anchor="middle" font-size="10" fill="#495057">+Time</text>
+  <text x="510" y="458" text-anchor="middle" font-size="9" fill="#6C757D">Decay</text>
+  
+  <!-- Bar 5: +Pragmatic 0.680 (+6.3%) -->
+  <rect x="565" y="308" width="70" height="112" fill="url(#barGrad)" filter="url(#barShadow)" rx="3"/>
+  <text x="600" y="298" text-anchor="middle" font-size="12" font-weight="bold" fill="#2C3E50">0.680</text>
+  <text x="600" y="284" text-anchor="middle" font-size="10" fill="#27AE60" font-weight="bold">+6.3%</text>
+  <text x="600" y="445" text-anchor="middle" font-size="10" fill="#495057">+Pragmatic</text>
+  <text x="600" y="458" text-anchor="middle" font-size="9" fill="#6C757D">Truth</text>
+  
+  <!-- Bar 6: Full CaaS 0.820 (+28.1%) -->
+  <rect x="655" y="224" width="80" height="196" fill="url(#fullGrad)" filter="url(#barShadow)" rx="3"/>
+  <text x="695" y="214" text-anchor="middle" font-size="14" font-weight="bold" fill="#1E8449">0.820</text>
+  <text x="695" y="198" text-anchor="middle" font-size="12" fill="#27AE60" font-weight="bold">+28.1%</text>
+  <text x="695" y="445" text-anchor="middle" font-size="11" fill="#1E8449" font-weight="bold">Full</text>
+  <text x="695" y="458" text-anchor="middle" font-size="11" fill="#1E8449" font-weight="bold">CaaS</text>
+  
+  <!-- Star indicator for full -->
+  <text x="695" y="183" text-anchor="middle" font-size="16">⭐</text>
+  
+  <!-- Legend / Key findings box -->
+  <rect x="50" y="80" width="120" height="120" rx="6" fill="white" stroke="#DEE2E6" stroke-width="1"/>
+  <text x="110" y="100" text-anchor="middle" font-size="11" font-weight="bold" fill="#2C3E50">Key Findings</text>
+  <line x1="60" y1="108" x2="160" y2="108" stroke="#E0E0E0" stroke-width="1"/>
+  <rect x="60" y="118" width="12" height="12" fill="#3498DB" rx="2"/>
+  <text x="78" y="128" font-size="9" fill="#495057">Individual</text>
+  <rect x="60" y="138" width="12" height="12" fill="#27AE60" rx="2"/>
+  <text x="78" y="148" font-size="9" fill="#495057">Combined</text>
+  <line x1="60" y1="162" x2="160" y2="162" stroke="#E74C3C" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="78" y="172" font-size="9" fill="#495057">Baseline</text>
+  <text x="110" y="192" text-anchor="middle" font-size="8" fill="#6C757D" font-style="italic">p &lt; 0.001</text>
+  
+  <!-- Statistical note -->
+  <rect x="200" y="470" width="400" height="25" rx="4" fill="#E8F8F5" stroke="#1ABC9C" stroke-width="1"/>
+  <text x="400" y="487" text-anchor="middle" font-size="11" fill="#1ABC9C" font-weight="bold">Statistical significance: p &lt; 0.001 | Cohen's d = 3.36 (large effect)</text>
+</svg>
