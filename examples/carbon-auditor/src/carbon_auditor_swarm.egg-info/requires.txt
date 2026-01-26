@@ -1,6 +1,8 @@
+agent-control-plane>=1.2.0
+amb-core>=0.2.0
+cmvk>=0.2.0
+agent-tool-registry>=0.2.0
 numpy>=1.24.0
-rasterio>=1.3.0
-pypdf>=3.0.0
 pydantic>=2.0.0
 
 [dev]
