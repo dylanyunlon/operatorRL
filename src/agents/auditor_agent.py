@@ -1,30 +1,76 @@
 """
 Auditor Agent (Agent C) - "The Judge"
 
-The decision maker that uses cmvk (Verification Kernel) to detect fraud.
+The decision maker that uses cmvk (Cross-Model Verification Kernel) to detect fraud.
 Compares claims against observations using mathematical verification.
 """
 
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from datetime import datetime
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import numpy as np
+from cmvk import verify_embeddings, DriftType
 
-from amb import Message, MessageType
-from amb.topics import Topics
-from cmvk import VerificationKernel, DriftMetric, ClaimVector, ObservationVector
-from cmvk.kernel import VerificationStatus
-from .base import Agent, MessageBus
+from .base import BaseAgent
 
 
-class AuditorAgent(Agent):
+@dataclass
+class ClaimVector:
+    """Vector representation of a carbon credit claim."""
+    project_id: str
+    ndvi: float
+    carbon_stock: float
+    year: int
+    
+    def to_array(self) -> np.ndarray:
+        """Convert to numpy array for verification."""
+        return np.array([self.ndvi, self.carbon_stock / 1000.0])
+
+
+@dataclass
+class ObservationVector:
+    """Vector representation of satellite observations."""
+    project_id: str
+    ndvi_mean: float
+    ndvi_std: float
+    cloud_cover: float
+    vegetation_coverage: float
+    deforestation_indicator: float
+    
+    @property
+    def estimated_carbon_stock(self) -> float:
+        """Estimate carbon stock from NDVI (simplified model)."""
+        return 250 * (self.ndvi_mean ** 2)
+    
+    def to_array(self) -> np.ndarray:
+        """Convert to numpy array for verification."""
+        return np.array([self.ndvi_mean, self.estimated_carbon_stock / 1000.0])
+    
+    @property
+    def confidence(self) -> float:
+        """Calculate observation confidence score."""
+        cloud_penalty = 1.0 - self.cloud_cover
+        variance_penalty = 1.0 - min(self.ndvi_std / 0.3, 1.0)
+        return cloud_penalty * variance_penalty
+
+
+def calculate_euclidean_drift(claim_arr: np.ndarray, obs_arr: np.ndarray) -> float:
+    """
+    Calculate Euclidean distance drift score between claim and observation vectors.
+    
+    This is our primary verification metric - pure mathematical distance.
+    """
+    return float(np.linalg.norm(claim_arr - obs_arr))
+
+
+class AuditorAgent(BaseAgent):
     """
     The Auditor Agent - "The Judge"
     
     Role: Decision maker that:
         - Subscribes to both Claim and Observation messages
-        - Uses cmvk (Verification Kernel) to calculate drift scores
+        - Uses cmvk (Cross-Model Verification Kernel) to calculate drift scores
         - Issues verification results: VERIFIED, FLAGGED, or FRAUD
     
     KEY PRINCIPLE: "The AI didn't decide; the Math decided."
@@ -32,16 +78,19 @@ class AuditorAgent(Agent):
     The agent doesn't use LLM inference for the verification decision.
     It uses deterministic mathematical calculations via cmvk.
     
-    Dependencies: cmvk (Carbon Market Verification Kernel)
+    Dependencies: cmvk (Cross-Model Verification Kernel)
     
     Subscribes to: CLAIMS, OBSERVATIONS
     Publishes: Verification results and ALERTS
     """
 
+    # Thresholds for verification
+    FRAUD_THRESHOLD = 0.15
+    FLAG_THRESHOLD = 0.10
+
     def __init__(
         self,
         agent_id: str,
-        bus: MessageBus,
         threshold: float = 0.15
     ):
         """
@@ -49,70 +98,41 @@ class AuditorAgent(Agent):
         
         Args:
             agent_id: Unique identifier
-            bus: Message bus reference
             threshold: Drift score threshold for fraud detection
         """
-        super().__init__(agent_id, bus, name="auditor-agent")
+        super().__init__(agent_id, name="auditor-agent")
         
-        # Initialize the Verification Kernel
-        self._kernel = VerificationKernel(threshold=threshold)
-        
-        # Store pending claims and observations for matching
-        self._pending_claims: Dict[str, Dict[str, Any]] = {}
-        self._pending_observations: Dict[str, Dict[str, Any]] = {}
-        
-        # Verification results
+        self._threshold = threshold
+        self._verification_count = 0
         self._results: List[Dict[str, Any]] = []
 
     @property
     def subscribed_topics(self) -> List[str]:
         """Subscribe to both claims and observations."""
-        return [Topics.CLAIMS, Topics.OBSERVATIONS]
+        return ["vcm.claims", "vcm.observations"]
 
-    def handle_message(self, message: Message) -> None:
-        """
-        Handle incoming claim or observation messages.
-        
-        When both a claim and observation are received for the same project,
-        perform verification.
-        """
-        project_id = message.payload.get("project_id")
-        
-        if message.type == MessageType.CLAIM:
-            self._log(f"Received claim for project: {project_id}")
-            self._pending_claims[project_id] = message.payload
-            
-        elif message.type == MessageType.OBSERVATION:
-            self._log(f"Received observation for project: {project_id}")
-            self._pending_observations[project_id] = message.payload
-        
-        # Check if we can perform verification
-        if project_id in self._pending_claims and project_id in self._pending_observations:
-            self._perform_verification(
-                project_id,
-                self._pending_claims[project_id],
-                self._pending_observations[project_id],
-                message.correlation_id,
-            )
-            
-            # Clean up
-            del self._pending_claims[project_id]
-            del self._pending_observations[project_id]
-
-    def _perform_verification(
+    def verify_project(
         self,
-        project_id: str,
         claim_data: Dict[str, Any],
         observation_data: Dict[str, Any],
-        correlation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Perform mathematical verification using cmvk.
         
         This is where "the Math decides, not the AI."
+        
+        Args:
+            claim_data: The claim from the claims agent
+            observation_data: The observation from the geo agent
+            
+        Returns:
+            Verification result dictionary
         """
+        project_id = claim_data.get("project_id", "UNKNOWN")
+        
         self._log(f"Performing verification for project: {project_id}")
         self._log("="*60)
+        self._metrics.last_activity = datetime.utcnow()
         
         # Build vectors
         claim_vector = ClaimVector(
@@ -120,7 +140,6 @@ class AuditorAgent(Agent):
             ndvi=claim_data.get("claimed_ndvi", 0.0),
             carbon_stock=claim_data.get("claimed_carbon_stock", 0.0),
             year=claim_data.get("year", 2024),
-            polygon=claim_data.get("polygon"),
         )
         
         observation_vector = ObservationVector(
@@ -132,98 +151,122 @@ class AuditorAgent(Agent):
             deforestation_indicator=observation_data.get("deforestation_indicator", 0.0),
         )
         
-        self._log(f"Claim Vector: {claim_vector}")
-        self._log(f"Observation Vector: {observation_vector}")
+        self._log(f"Claim Vector: ndvi={claim_vector.ndvi}, carbon={claim_vector.carbon_stock}")
+        self._log(f"Observation Vector: ndvi={observation_vector.ndvi_mean:.3f}, "
+                  f"est_carbon={observation_vector.estimated_carbon_stock:.1f}")
         
-        # Run verification through cmvk
-        # This is MATHEMATICAL, not LLM-based
-        result = self._kernel.verify(
-            target=claim_vector,
-            actual=observation_vector,
-            metric=DriftMetric.EUCLIDEAN,
-        )
+        # Convert to arrays for verification
+        claim_arr = claim_vector.to_array()
+        obs_arr = observation_vector.to_array()
         
-        self._log(f"Verification Result: {result}")
+        # Use cmvk for semantic drift analysis (for metadata)
+        cmvk_score = verify_embeddings(claim_arr, obs_arr)
         
-        # Store result
-        result_dict = result.to_dict()
-        self._results.append(result_dict)
+        # Calculate Euclidean drift score (our primary metric)
+        # This is the MATHEMATICAL verification
+        drift_score = calculate_euclidean_drift(claim_arr, obs_arr)
         
-        # Publish verification result
-        self.publish(
-            topic=Topics.VERIFICATION_RESULTS,
-            payload=result_dict,
-            message_type=MessageType.VERIFICATION_RESULT,
-            correlation_id=correlation_id,
-        )
+        self._verification_count += 1
         
-        # If fraud detected, publish alert
-        if result.status == VerificationStatus.FRAUD:
-            self._issue_alert(result, correlation_id)
+        # Determine status based on drift
+        if drift_score > self._threshold:
+            status = "FRAUD"
+        elif drift_score > self.FLAG_THRESHOLD:
+            status = "FLAGGED"
+        else:
+            status = "VERIFIED"
         
-        return result_dict
-
-    def _issue_alert(
-        self,
-        result: Any,
-        correlation_id: Optional[str] = None,
-    ) -> None:
-        """
-        Issue a CRITICAL alert for detected fraud.
-        """
-        alert = {
-            "level": "CRITICAL",
-            "type": "FRAUD_DETECTED",
-            "project_id": result.project_id,
-            "drift_score": result.drift_score,
-            "threshold": result.threshold,
-            "message": (
-                f"FRAUD ALERT: Project {result.project_id} shows significant "
-                f"discrepancy between claimed and observed values. "
-                f"Drift score ({result.drift_score:.4f}) exceeds "
-                f"threshold ({result.threshold})."
-            ),
-            "details": result.details,
-            "recommendation": "Immediate investigation required. Suspend credit issuance pending review.",
+        # Build detailed result
+        details = self._calculate_details(claim_vector, observation_vector, drift_score)
+        
+        result = {
+            "project_id": project_id,
+            "status": status,
+            "drift_score": float(drift_score),
+            "threshold": self._threshold,
+            "confidence": float(observation_vector.confidence),
+            "claim_vector": claim_arr.tolist(),
+            "observation_vector": obs_arr.tolist(),
+            "metric": "euclidean",
+            "timestamp": datetime.utcnow().isoformat(),
+            "details": details,
+            "cmvk_drift_type": cmvk_score.drift_type.value,
+            "cmvk_semantic_score": float(cmvk_score.drift_score),
         }
         
-        self._log("!"*60, level="ALERT")
-        self._log(f"FRAUD DETECTED: {result.project_id}", level="ALERT")
-        self._log(f"Drift Score: {result.drift_score:.4f} (threshold: {result.threshold})", level="ALERT")
-        self._log("!"*60, level="ALERT")
+        self._log(f"Verification Result: status={status}, drift_score={drift_score:.4f}")
+        self._results.append(result)
         
-        self.publish(
-            topic=Topics.ALERTS,
-            payload=alert,
-            message_type=MessageType.ALERT,
-            correlation_id=correlation_id,
-        )
+        # Issue alert if fraud detected
+        if status == "FRAUD":
+            self._issue_alert(result)
+        
+        return result
 
-    def verify_project(
+    def _calculate_details(
         self,
-        claim_vector: ClaimVector,
-        observation_vector: ObservationVector,
+        claim: ClaimVector,
+        observation: ObservationVector,
+        drift_score: float,
     ) -> Dict[str, Any]:
-        """
-        Direct verification API (for programmatic use).
+        """Calculate detailed breakdown for audit trail."""
+        ndvi_diff = claim.ndvi - observation.ndvi_mean
+        ndvi_pct_diff = abs(ndvi_diff) / claim.ndvi * 100 if claim.ndvi else 0
         
-        Args:
-            claim_vector: The claimed values
-            observation_vector: The observed values
-            
-        Returns:
-            Verification result dictionary
-        """
-        result = self._kernel.verify(
-            target=claim_vector,
-            actual=observation_vector,
-            metric=DriftMetric.EUCLIDEAN,
-        )
+        carbon_diff = claim.carbon_stock - observation.estimated_carbon_stock
+        carbon_pct_diff = abs(carbon_diff) / claim.carbon_stock * 100 if claim.carbon_stock else 0
         
-        result_dict = result.to_dict()
-        self._results.append(result_dict)
-        
-        return result_dict
+        return {
+            "ndvi_claimed": claim.ndvi,
+            "ndvi_observed": observation.ndvi_mean,
+            "ndvi_difference": round(ndvi_diff, 4),
+            "ndvi_percent_difference": round(ndvi_pct_diff, 2),
+            "carbon_claimed": claim.carbon_stock,
+            "carbon_observed": round(observation.estimated_carbon_stock, 2),
+            "carbon_difference": round(carbon_diff, 2),
+            "carbon_percent_difference": round(carbon_pct_diff, 2),
+            "observation_confidence": round(observation.confidence, 4),
+            "deforestation_indicator": observation.deforestation_indicator,
+            "vegetation_coverage": observation.vegetation_coverage,
+            "audit_note": self._generate_audit_note(drift_score, ndvi_pct_diff, carbon_pct_diff),
+        }
+
+    def _generate_audit_note(
+        self,
+        drift_score: float,
+        ndvi_pct_diff: float,
+        carbon_pct_diff: float,
+    ) -> str:
+        """Generate human-readable audit note."""
+        if drift_score > self._threshold:
+            return (
+                f"CRITICAL: Mathematical verification failed. "
+                f"NDVI discrepancy: {ndvi_pct_diff:.1f}%, "
+                f"Carbon stock discrepancy: {carbon_pct_diff:.1f}%. "
+                f"Drift score ({drift_score:.4f}) exceeds threshold ({self._threshold}). "
+                f"Recommend investigation for potential fraud."
+            )
+        elif drift_score > self.FLAG_THRESHOLD:
+            return (
+                f"WARNING: Minor discrepancies detected. "
+                f"NDVI discrepancy: {ndvi_pct_diff:.1f}%, "
+                f"Carbon stock discrepancy: {carbon_pct_diff:.1f}%. "
+                f"Recommend manual review."
+            )
+        else:
+            return (
+                f"VERIFIED: Claim aligns with satellite observations. "
+                f"NDVI discrepancy: {ndvi_pct_diff:.1f}%, "
+                f"Carbon stock discrepancy: {carbon_pct_diff:.1f}%. "
+                f"Within acceptable tolerance."
+            )
+
+    def _issue_alert(self, result: Dict[str, Any]) -> None:
+        """Issue a CRITICAL alert for detected fraud."""
+        self._log("!"*60, level="ALERT")
+        self._log(f"FRAUD DETECTED: {result['project_id']}", level="ALERT")
+        self._log(f"Drift Score: {result['drift_score']:.4f} (threshold: {result['threshold']})", level="ALERT")
+        self._log("!"*60, level="ALERT")
 
     def get_results(self) -> List[Dict[str, Any]]:
         """Get all verification results."""
@@ -231,4 +274,8 @@ class AuditorAgent(Agent):
 
     def get_kernel_stats(self) -> Dict[str, Any]:
         """Get verification kernel statistics."""
-        return self._kernel.stats
+        return {
+            "verification_count": self._verification_count,
+            "threshold": self._threshold,
+            "flag_threshold": self.FLAG_THRESHOLD,
+        }

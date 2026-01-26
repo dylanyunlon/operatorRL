@@ -6,18 +6,14 @@ Listens for Claims and publishes Observations.
 """
 
 from typing import Any, Dict, List, Optional
+from datetime import datetime
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import atr
 
-from amb import Message, MessageType
-from amb.topics import Topics
-from atr import SentinelAPITool, NDVICalculatorTool, ToolRegistry
-from .base import Agent, MessageBus
+from .base import BaseAgent
 
 
-class GeoAgent(Agent):
+class GeoAgent(BaseAgent):
     """
     The Geo Agent - "The Eye"
     
@@ -27,7 +23,7 @@ class GeoAgent(Agent):
         - Calculates NDVI (vegetation index)
         - Publishes Observation objects with actual values
     
-    Tooling: sentinel_api, ndvi_calculator
+    Tooling (atr): sentinel_api, ndvi_calculator
     
     Subscribes to: CLAIMS topic
     Publishes: Observation objects to the OBSERVATIONS topic
@@ -36,7 +32,6 @@ class GeoAgent(Agent):
     def __init__(
         self,
         agent_id: str,
-        bus: MessageBus,
         simulate_deforestation: bool = False
     ):
         """
@@ -44,36 +39,20 @@ class GeoAgent(Agent):
         
         Args:
             agent_id: Unique identifier
-            bus: Message bus reference
             simulate_deforestation: If True, generate data showing deforestation
         """
-        super().__init__(agent_id, bus, name="geo-agent")
+        super().__init__(agent_id, name="geo-agent")
         
         self._simulate_deforestation = simulate_deforestation
         
-        # Initialize tools
-        self._sentinel_api = SentinelAPITool()
-        self._ndvi_calculator = NDVICalculatorTool()
-        
-        # Register tools
-        self._registry = ToolRegistry()
-        self._registry.register(self._sentinel_api)
-        self._registry.register(self._ndvi_calculator)
+        # Get tools from the Agent Tool Registry
+        self._sentinel_api = atr._global_registry.get_callable("sentinel_api")
+        self._ndvi_calculator = atr._global_registry.get_callable("ndvi_calculator")
 
     @property
     def subscribed_topics(self) -> List[str]:
         """Subscribe to claims to trigger satellite lookups."""
-        return [Topics.CLAIMS]
-
-    def handle_message(self, message: Message) -> None:
-        """
-        Handle incoming claim messages.
-        
-        When a claim arrives, fetch satellite data and calculate actual values.
-        """
-        if message.type == MessageType.CLAIM:
-            self._log(f"Received claim for project: {message.payload.get('project_id')}")
-            self.process_claim(message.payload, message.correlation_id)
+        return ["vcm.claims"]
 
     def process_claim(
         self,
@@ -95,53 +74,48 @@ class GeoAgent(Agent):
         year = claim.get("year", 2024)
         
         self._log(f"Fetching satellite data for {project_id}, year {year}")
+        self._metrics.last_activity = datetime.utcnow()
         
-        # Step 1: Fetch satellite imagery
-        satellite_result = self._sentinel_api.execute(
+        # Step 1: Fetch satellite imagery using atr tool
+        satellite_result = self._sentinel_api(
             polygon=polygon,
             start_date=f"{year}-01-01",
             end_date=f"{year}-12-31",
         )
         
-        if not satellite_result.success:
-            self._log(f"Failed to fetch satellite data: {satellite_result.error}", level="ERROR")
-            return {"error": satellite_result.error}
+        if "error" in satellite_result:
+            self._log(f"Failed to fetch satellite data: {satellite_result['error']}", level="ERROR")
+            return {"error": satellite_result["error"]}
         
-        cloud_cover = satellite_result.data.get("cloud_cover_percentage", 0) / 100.0
+        cloud_cover = satellite_result.get("cloud_cover_percentage", 0) / 100.0
         
-        self._log(f"Retrieved {satellite_result.data['product_type']} imagery, "
+        self._log(f"Retrieved {satellite_result['product_type']} imagery, "
                   f"cloud cover: {cloud_cover:.1%}")
         
-        # Step 2: Calculate NDVI
-        ndvi_result = self._ndvi_calculator.execute(
-            red_band=satellite_result.data["bands"]["B04_RED"],
-            nir_band=satellite_result.data["bands"]["B08_NIR"],
+        # Step 2: Calculate NDVI using atr tool
+        ndvi_result = self._ndvi_calculator(
+            red_band=satellite_result["bands"]["B04_RED"],
+            nir_band=satellite_result["bands"]["B08_NIR"],
             simulate_deforestation=self._simulate_deforestation,
         )
         
-        if not ndvi_result.success:
-            self._log(f"Failed to calculate NDVI: {ndvi_result.error}", level="ERROR")
-            return {"error": ndvi_result.error}
+        if "error" in ndvi_result:
+            self._log(f"Failed to calculate NDVI: {ndvi_result['error']}", level="ERROR")
+            return {"error": ndvi_result["error"]}
         
-        self._log(f"Calculated NDVI: mean={ndvi_result.data['ndvi_mean']:.3f}, "
-                  f"vegetation coverage: {ndvi_result.data['vegetation_coverage']:.1%}")
+        self._log(f"Calculated NDVI: mean={ndvi_result['ndvi_mean']:.3f}, "
+                  f"vegetation coverage: {ndvi_result['vegetation_coverage']:.1%}")
         
         # Step 3: Build observation object
         observation = self._build_observation(
             project_id=project_id,
-            ndvi_data=ndvi_result.data,
+            ndvi_data=ndvi_result,
             cloud_cover=cloud_cover,
-            satellite_provenance=satellite_result.provenance,
-            ndvi_provenance=ndvi_result.provenance,
+            satellite_provenance=satellite_result.get("_provenance"),
+            ndvi_provenance=ndvi_result.get("_provenance"),
         )
         
-        # Step 4: Publish to bus
-        self.publish(
-            topic=Topics.OBSERVATIONS,
-            payload=observation,
-            message_type=MessageType.OBSERVATION,
-            correlation_id=correlation_id,
-        )
+        self._metrics.messages_sent += 1
         
         return observation
 
@@ -153,9 +127,7 @@ class GeoAgent(Agent):
         satellite_provenance: Any,
         ndvi_provenance: Any,
     ) -> Dict[str, Any]:
-        """
-        Build a standardized observation object.
-        """
+        """Build a standardized observation object."""
         observation = {
             "project_id": project_id,
             "observed_ndvi_mean": ndvi_data["ndvi_mean"],
@@ -170,24 +142,16 @@ class GeoAgent(Agent):
         
         # Add provenance metadata (the "Cryptographic Oracle" feature)
         if satellite_provenance:
-            observation["_satellite_provenance"] = {
-                "signature": satellite_provenance.signature,
-                "source": satellite_provenance.source,
-                "timestamp": satellite_provenance.timestamp.isoformat(),
-            }
+            observation["_satellite_provenance"] = satellite_provenance
         
         if ndvi_provenance:
-            observation["_ndvi_provenance"] = {
-                "signature": ndvi_provenance.signature,
-                "source": ndvi_provenance.source,
-                "timestamp": ndvi_provenance.timestamp.isoformat(),
-            }
+            observation["_ndvi_provenance"] = ndvi_provenance
         
         return observation
 
     def get_tools(self) -> List[str]:
         """List available tools."""
-        return self._registry.list_tools()
+        return ["sentinel_api", "ndvi_calculator"]
 
     def set_simulation_mode(self, simulate_deforestation: bool) -> None:
         """
