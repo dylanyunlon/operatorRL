@@ -36,6 +36,40 @@ def test_capability_manifest_creation():
     assert manifest.privacy_contract.retention == RetentionPolicy.EPHEMERAL
 
 
+def test_capability_manifest_with_scopes():
+    """Test creating a capability manifest with RBAC scopes."""
+    manifest = CapabilityManifest(
+        agent_id="coder-agent",
+        agent_version="1.0.0",
+        trust_level=TrustLevel.TRUSTED,
+        capabilities=AgentCapabilities(
+            idempotency=True,
+            reversibility=ReversibilityLevel.FULL,
+        ),
+        privacy_contract=PrivacyContract(
+            retention=RetentionPolicy.EPHEMERAL,
+        ),
+        scopes=["repo:read", "repo:write"]
+    )
+
+    assert manifest.agent_id == "coder-agent"
+    assert manifest.scopes == ["repo:read", "repo:write"]
+
+
+def test_capability_manifest_default_scopes():
+    """Test that scopes defaults to empty list."""
+    manifest = CapabilityManifest(
+        agent_id="agent-without-scopes",
+        trust_level=TrustLevel.STANDARD,
+        capabilities=AgentCapabilities(),
+        privacy_contract=PrivacyContract(
+            retention=RetentionPolicy.TEMPORARY,
+        )
+    )
+
+    assert manifest.scopes == []
+
+
 def test_trust_score_verified_partner():
     """Test trust score for verified partner."""
     manifest = CapabilityManifest(

@@ -66,6 +66,23 @@ Run:
 python examples/integration_demo.py
 ```
 
+### RBAC Demo (`demo_rbac.py`)
+- Demonstrates Role-Based Access Control (RBAC) with scopes
+- Shows Coder Agent with write permissions (`repo:read`, `repo:write`)
+- Shows Reviewer Agent with read-only permissions (`repo:read`)
+- Validates scope enforcement during handshake
+
+Run:
+```bash
+python examples/demo_rbac.py
+```
+
+Key scenarios demonstrated:
+- ✅ Coder Agent can read and write code
+- ✅ Reviewer Agent can only read code
+- ❌ Reviewer Agent denied when attempting to write code
+- Multiple scope validation for admin operations
+
 ## Test Scripts
 
 ### Test Untrusted (`test_untrusted.py`)
@@ -78,15 +95,19 @@ python examples/integration_demo.py
 
 Example capability manifests in `manifests/`:
 
-| File | Trust Level | Reversibility | Retention |
-|------|-------------|---------------|-----------|
-| `secure_bank.json` | verified_partner | full | ephemeral |
-| `standard_agent.json` | standard | partial | temporary |
-| `untrusted_honeypot.json` | untrusted | none | permanent |
+| File | Trust Level | Reversibility | Retention | Scopes |
+|------|-------------|---------------|-----------|--------|
+| `secure_bank.json` | verified_partner | full | ephemeral | - |
+| `standard_agent.json` | standard | partial | temporary | - |
+| `coder_agent.json` | trusted | full | ephemeral | repo:read, repo:write |
+| `reviewer_agent.json` | standard | none | temporary | repo:read |
+| `untrusted_honeypot.json` | untrusted | none | permanent | - |
 
 Use with the IATP CLI:
 ```bash
 iatp verify examples/manifests/secure_bank.json
+iatp verify examples/manifests/coder_agent.json
+iatp verify examples/manifests/reviewer_agent.json
 ```
 
 ## Quick Test Commands

@@ -211,3 +211,135 @@ def test_manifest_to_context():
     assert context["human_review"] is True
     assert context["encryption_at_rest"] is True
     assert context["encryption_in_transit"] is True
+
+
+def test_validate_handshake_with_required_scopes():
+    """Test handshake validation with required scopes."""
+    engine = IATPPolicyEngine()
+
+    manifest = CapabilityManifest(
+        agent_id="coder-agent",
+        trust_level=TrustLevel.TRUSTED,
+        capabilities=AgentCapabilities(
+            idempotency=True,
+            reversibility=ReversibilityLevel.FULL,
+        ),
+        privacy_contract=PrivacyContract(
+            retention=RetentionPolicy.EPHEMERAL,
+            human_review=False,
+        ),
+        scopes=["repo:read", "repo:write"]
+    )
+
+    is_compatible, error_msg = engine.validate_handshake(
+        manifest,
+        required_scopes=["repo:write"]
+    )
+
+    assert is_compatible is True
+    assert error_msg is None
+
+
+def test_validate_handshake_missing_scopes():
+    """Test handshake validation with missing required scopes."""
+    engine = IATPPolicyEngine()
+
+    manifest = CapabilityManifest(
+        agent_id="reviewer-agent",
+        trust_level=TrustLevel.STANDARD,
+        capabilities=AgentCapabilities(
+            idempotency=True,
+            reversibility=ReversibilityLevel.FULL,
+        ),
+        privacy_contract=PrivacyContract(
+            retention=RetentionPolicy.TEMPORARY,
+            human_review=False,
+        ),
+        scopes=["repo:read"]  # Only has read access
+    )
+
+    is_compatible, error_msg = engine.validate_handshake(
+        manifest,
+        required_scopes=["repo:write"]  # But needs write access
+    )
+
+    assert is_compatible is False
+    assert error_msg is not None
+    assert "repo:write" in error_msg
+
+
+def test_validate_handshake_multiple_scopes():
+    """Test handshake validation with multiple required scopes."""
+    engine = IATPPolicyEngine()
+
+    manifest = CapabilityManifest(
+        agent_id="admin-agent",
+        trust_level=TrustLevel.VERIFIED_PARTNER,
+        capabilities=AgentCapabilities(
+            idempotency=True,
+            reversibility=ReversibilityLevel.FULL,
+        ),
+        privacy_contract=PrivacyContract(
+            retention=RetentionPolicy.EPHEMERAL,
+            human_review=False,
+        ),
+        scopes=["repo:read", "repo:write", "admin:manage"]
+    )
+
+    is_compatible, error_msg = engine.validate_handshake(
+        manifest,
+        required_scopes=["repo:read", "repo:write"]
+    )
+
+    assert is_compatible is True
+    assert error_msg is None
+
+
+def test_validate_handshake_no_scopes_required():
+    """Test handshake validation when no scopes are required."""
+    engine = IATPPolicyEngine()
+
+    manifest = CapabilityManifest(
+        agent_id="basic-agent",
+        trust_level=TrustLevel.STANDARD,
+        capabilities=AgentCapabilities(
+            idempotency=True,
+            reversibility=ReversibilityLevel.FULL,
+        ),
+        privacy_contract=PrivacyContract(
+            retention=RetentionPolicy.TEMPORARY,
+            human_review=False,
+        ),
+        scopes=[]  # No scopes
+    )
+
+    is_compatible, error_msg = engine.validate_handshake(
+        manifest,
+        required_scopes=None  # No scopes required
+    )
+
+    assert is_compatible is True
+    assert error_msg is None
+
+
+def test_manifest_to_context_with_scopes():
+    """Test conversion of manifest with scopes to policy context."""
+    engine = IATPPolicyEngine()
+
+    manifest = CapabilityManifest(
+        agent_id="scoped-agent",
+        trust_level=TrustLevel.TRUSTED,
+        capabilities=AgentCapabilities(
+            idempotency=True,
+            reversibility=ReversibilityLevel.FULL,
+        ),
+        privacy_contract=PrivacyContract(
+            retention=RetentionPolicy.EPHEMERAL,
+            human_review=False,
+        ),
+        scopes=["repo:read", "repo:write"]
+    )
+
+    context = engine._manifest_to_context(manifest)
+
+    assert context["scopes"] == ["repo:read", "repo:write"]

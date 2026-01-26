@@ -77,6 +77,7 @@ GET /.well-known/agent-manifest
     "contact": "security@expedia.com"
   },
   "trust_level": "verified_partner",
+  "scopes": ["repo:read", "repo:write"],
   "capabilities": {
     "idempotency": true,
     "concurrency_limit": 10,
@@ -195,7 +196,32 @@ X-Agent-Trace-ID: e4b5c6d7-8a9b-0c1d-2e3f-4a5b6c7d8e9f
 | `unknown` | No prior interaction |
 | `untrusted` | Known bad actor or policy violator |
 
-### 3.3 Reversibility
+### 3.3 RBAC Scopes (Role-Based Access Control)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `scopes` | array[string] | No | List of permission scopes granted to the agent |
+
+**Common Scope Values:**
+
+| Scope | Meaning |
+|-------|---------|
+| `repo:read` | Read-only access to repositories (Reviewer Agent) |
+| `repo:write` | Write access to repositories (Coder Agent) |
+| `admin:manage` | Administrative management capabilities |
+| `data:read` | Read access to data resources |
+| `data:write` | Write access to data resources |
+
+**Examples:**
+
+- **Coder Agent**: `["repo:read", "repo:write"]` - Can read and modify code
+- **Reviewer Agent**: `["repo:read"]` - Can only review code, no modifications
+- **Admin Agent**: `["repo:read", "repo:write", "admin:manage"]` - Full access
+
+**Usage in Handshake:**
+When validating a handshake, the requesting agent can specify `required_scopes` to ensure the remote agent has the necessary permissions. If the remote agent lacks required scopes, the handshake will fail with an error message indicating the missing scopes.
+
+### 3.4 Reversibility
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -204,7 +230,7 @@ X-Agent-Trace-ID: e4b5c6d7-8a9b-0c1d-2e3f-4a5b6c7d8e9f
 | `compensation_method` | string | How undo works (e.g., "rollback", "refund") |
 | `compensation_sla_ms` | integer | Max time to complete undo |
 
-### 3.4 Privacy
+### 3.5 Privacy
 
 | Field | Type | Description |
 |-------|------|-------------|
