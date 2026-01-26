@@ -68,8 +68,7 @@ def test_message_serialization():
 
 
 def test_message_priority_enum():
-    """Test priority enum values."""
-    assert MessagePriority.LOW == "low"
-    assert MessagePriority.NORMAL == "normal"
-    assert MessagePriority.HIGH == "high"
-    assert MessagePriority.URGENT == "urgent"
+    """Test priority enum values are ordered correctly."""
+    assert MessagePriority.LOW < MessagePriority.NORMAL
+    assert MessagePriority.NORMAL < MessagePriority.HIGH
+    assert MessagePriority.HIGH < MessagePriority.URGENT
