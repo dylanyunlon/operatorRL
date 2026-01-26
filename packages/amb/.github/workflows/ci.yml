@@ -1,0 +1,102 @@
+# Continuous Integration workflow
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+      
+      - name: Run Ruff linter
+        run: ruff check amb_core/ tests/
+      
+      - name: Run Ruff formatter check
+        run: ruff format --check amb_core/ tests/
+      
+      - name: Run MyPy type checking
+        run: mypy amb_core/ --ignore-missing-imports
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        exclude:
+          # Reduce matrix size for faster CI
+          - os: windows-latest
+            python-version: "3.8"
+          - os: windows-latest
+            python-version: "3.9"
+          - os: macos-latest
+            python-version: "3.8"
+          - os: macos-latest
+            python-version: "3.9"
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      
+      - name: Run tests with coverage
+        run: pytest tests/ -v --cov=amb_core --cov-report=xml --cov-report=term-missing
+      
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install mkdocs mkdocs-material mkdocstrings[python]
+      
+      - name: Build docs
+        run: |
+          # Check if mkdocs.yml exists, if not skip
+          if [ -f mkdocs.yml ]; then
+            mkdocs build --strict
+          else
+            echo "No mkdocs.yml found, skipping documentation build"
+          fi

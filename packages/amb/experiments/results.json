@@ -1,0 +1,324 @@
+{
+  "metadata": {
+    "experiment_name": "AMB Performance Benchmark",
+    "version": "1.0.0",
+    "timestamp": "2026-01-23T21:55:01.203615+00:00",
+    "seed": 42,
+    "iterations": 500,
+    "python_version": "3.13.9 (tags/v3.13.9:8183fa5, Oct 14 2025, 14:09:13) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "win32"
+  },
+  "config": {
+    "seed": 42,
+    "iterations": 500,
+    "warmup_iterations": 100,
+    "message_sizes": [
+      100,
+      1000,
+      10000
+    ],
+    "concurrent_subscribers": [
+      1,
+      5,
+      10,
+      25,
+      50
+    ]
+  },
+  "results": [
+    {
+      "name": "publish_fire_and_forget_100B",
+      "iterations": 500,
+      "mean_latency_ms": 0.032269202871248126,
+      "median_latency_ms": 0.020999927073717117,
+      "p95_latency_ms": 0.07910002022981644,
+      "p99_latency_ms": 0.38139999378472567,
+      "min_latency_ms": 0.01100008375942707,
+      "max_latency_ms": 0.6114999996498227,
+      "std_dev_ms": 0.05398582674953781,
+      "throughput_msg_per_sec": 30989.2997354143,
+      "total_time_sec": 0.016134601435624063,
+      "config": {
+        "payload_size": 100,
+        "pattern": "fire_and_forget"
+      }
+    },
+    {
+      "name": "publish_fire_and_forget_1000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.0882089997176081,
+      "median_latency_ms": 0.054349948186427355,
+      "p95_latency_ms": 0.21510000806301832,
+      "p99_latency_ms": 0.7473999867215753,
+      "min_latency_ms": 0.015300000086426735,
+      "max_latency_ms": 1.67559995315969,
+      "std_dev_ms": 0.11849108575039392,
+      "throughput_msg_per_sec": 11336.711709705309,
+      "total_time_sec": 0.04410449985880405,
+      "config": {
+        "payload_size": 1000,
+        "pattern": "fire_and_forget"
+      }
+    },
+    {
+      "name": "publish_fire_and_forget_10000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.14071139902807772,
+      "median_latency_ms": 0.12929999502375722,
+      "p95_latency_ms": 0.24120009038597345,
+      "p99_latency_ms": 0.7333999965339899,
+      "min_latency_ms": 0.011600088328123093,
+      "max_latency_ms": 3.3322999952360988,
+      "std_dev_ms": 0.20804957284839098,
+      "throughput_msg_per_sec": 7106.744776238483,
+      "total_time_sec": 0.07035569951403886,
+      "config": {
+        "payload_size": 10000,
+        "pattern": "fire_and_forget"
+      }
+    },
+    {
+      "name": "publish_confirmed_100B",
+      "iterations": 500,
+      "mean_latency_ms": 0.014101601205766201,
+      "median_latency_ms": 0.009900075383484364,
+      "p95_latency_ms": 0.0252000754699111,
+      "p99_latency_ms": 0.09410001803189516,
+      "min_latency_ms": 0.005899928510189056,
+      "max_latency_ms": 0.11999998241662979,
+      "std_dev_ms": 0.012221586805368667,
+      "throughput_msg_per_sec": 70913.9327802786,
+      "total_time_sec": 0.0070508006028831005,
+      "config": {
+        "payload_size": 100,
+        "pattern": "confirmed"
+      }
+    },
+    {
+      "name": "publish_confirmed_1000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.02958859666250646,
+      "median_latency_ms": 0.012650038115680218,
+      "p95_latency_ms": 0.10339997243136168,
+      "p99_latency_ms": 0.19280007109045982,
+      "min_latency_ms": 0.005800044164061546,
+      "max_latency_ms": 1.1869000736624002,
+      "std_dev_ms": 0.06605124286223833,
+      "throughput_msg_per_sec": 33796.803931129376,
+      "total_time_sec": 0.01479429833125323,
+      "config": {
+        "payload_size": 1000,
+        "pattern": "confirmed"
+      }
+    },
+    {
+      "name": "publish_confirmed_10000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.08920360147021711,
+      "median_latency_ms": 0.036750047001987696,
+      "p95_latency_ms": 0.1591000473126769,
+      "p99_latency_ms": 0.5600000731647015,
+      "min_latency_ms": 0.008500064723193645,
+      "max_latency_ms": 6.115800002589822,
+      "std_dev_ms": 0.3325502562085034,
+      "throughput_msg_per_sec": 11210.309713043092,
+      "total_time_sec": 0.044601800735108554,
+      "config": {
+        "payload_size": 10000,
+        "pattern": "confirmed"
+      }
+    },
+    {
+      "name": "pubsub_e2e_100B",
+      "iterations": 500,
+      "mean_latency_ms": 0.09135739994235337,
+      "median_latency_ms": 0.03869994543492794,
+      "p95_latency_ms": 0.1949999714270234,
+      "p99_latency_ms": 1.1536000529304147,
+      "min_latency_ms": 0.018300022929906845,
+      "max_latency_ms": 4.908100003376603,
+      "std_dev_ms": 0.3263010343955471,
+      "throughput_msg_per_sec": 10946.020799968052,
+      "total_time_sec": 0.045678699971176684,
+      "config": {
+        "payload_size": 100,
+        "pattern": "pubsub_e2e"
+      }
+    },
+    {
+      "name": "pubsub_e2e_1000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.2175171992275864,
+      "median_latency_ms": 0.14480005484074354,
+      "p95_latency_ms": 0.5750999553129077,
+      "p99_latency_ms": 1.8503000028431416,
+      "min_latency_ms": 0.019499915651977062,
+      "max_latency_ms": 6.456799921579659,
+      "std_dev_ms": 0.39913084286767314,
+      "throughput_msg_per_sec": 4597.337606180321,
+      "total_time_sec": 0.1087585996137932,
+      "config": {
+        "payload_size": 1000,
+        "pattern": "pubsub_e2e"
+      }
+    },
+    {
+      "name": "pubsub_e2e_10000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.46346860309131444,
+      "median_latency_ms": 0.28820004081353545,
+      "p95_latency_ms": 0.9558999445289373,
+      "p99_latency_ms": 6.916500045917928,
+      "min_latency_ms": 0.04229997284710407,
+      "max_latency_ms": 23.792000021785498,
+      "std_dev_ms": 1.4190045113964278,
+      "throughput_msg_per_sec": 2157.643459190214,
+      "total_time_sec": 0.23173430154565722,
+      "config": {
+        "payload_size": 10000,
+        "pattern": "pubsub_e2e"
+      }
+    },
+    {
+      "name": "request_response_100B",
+      "iterations": 500,
+      "mean_latency_ms": 0.09641460166312754,
+      "median_latency_ms": 0.047200010158121586,
+      "p95_latency_ms": 0.2188999205827713,
+      "p99_latency_ms": 0.5313999718055129,
+      "min_latency_ms": 0.037899939343333244,
+      "max_latency_ms": 4.573400015942752,
+      "std_dev_ms": 0.26410501948335474,
+      "throughput_msg_per_sec": 10371.872960633062,
+      "total_time_sec": 0.04820730083156377,
+      "config": {
+        "payload_size": 100,
+        "pattern": "request_response"
+      }
+    },
+    {
+      "name": "request_response_1000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.11994599807076156,
+      "median_latency_ms": 0.06025005131959915,
+      "p95_latency_ms": 0.37990009877830744,
+      "p99_latency_ms": 0.5811000009998679,
+      "min_latency_ms": 0.04009995609521866,
+      "max_latency_ms": 1.7231000820174813,
+      "std_dev_ms": 0.14623566995583373,
+      "throughput_msg_per_sec": 8337.085155688603,
+      "total_time_sec": 0.05997299903538078,
+      "config": {
+        "payload_size": 1000,
+        "pattern": "request_response"
+      }
+    },
+    {
+      "name": "request_response_10000B",
+      "iterations": 500,
+      "mean_latency_ms": 0.5601639989763498,
+      "median_latency_ms": 0.39184995694085956,
+      "p95_latency_ms": 1.506200060248375,
+      "p99_latency_ms": 3.86420008726418,
+      "min_latency_ms": 0.07159996312111616,
+      "max_latency_ms": 18.819999997504056,
+      "std_dev_ms": 1.1348873006183504,
+      "throughput_msg_per_sec": 1785.1914829003856,
+      "total_time_sec": 0.2800819994881749,
+      "config": {
+        "payload_size": 10000,
+        "pattern": "request_response"
+      }
+    },
+    {
+      "name": "fanout_1_subscribers",
+      "iterations": 100,
+      "mean_latency_ms": 0.5602710042148829,
+      "median_latency_ms": 0.08710002293810248,
+      "p95_latency_ms": 0.8789999410510063,
+      "p99_latency_ms": 39.782700012438,
+      "min_latency_ms": 0.06320001557469368,
+      "max_latency_ms": 39.782700012438,
+      "std_dev_ms": 3.9701753180442956,
+      "throughput_msg_per_sec": 1784.850532112253,
+      "total_time_sec": 0.056027100421488285,
+      "config": {
+        "num_subscribers": 1,
+        "pattern": "fanout"
+      }
+    },
+    {
+      "name": "fanout_5_subscribers",
+      "iterations": 100,
+      "mean_latency_ms": 0.2596330002415925,
+      "median_latency_ms": 0.11214998085051775,
+      "p95_latency_ms": 0.2837999491021037,
+      "p99_latency_ms": 14.51390003785491,
+      "min_latency_ms": 0.06269989535212517,
+      "max_latency_ms": 14.51390003785491,
+      "std_dev_ms": 1.4405253701688379,
+      "throughput_msg_per_sec": 3851.590510718917,
+      "total_time_sec": 0.025963300024159253,
+      "config": {
+        "num_subscribers": 5,
+        "pattern": "fanout"
+      }
+    },
+    {
+      "name": "fanout_10_subscribers",
+      "iterations": 100,
+      "mean_latency_ms": 0.3076070046517998,
+      "median_latency_ms": 0.172849977388978,
+      "p95_latency_ms": 0.8471000473946333,
+      "p99_latency_ms": 4.713700036518276,
+      "min_latency_ms": 0.0942000187933445,
+      "max_latency_ms": 4.713700036518276,
+      "std_dev_ms": 0.5242468628170748,
+      "throughput_msg_per_sec": 3250.9012632269687,
+      "total_time_sec": 0.03076070046517998,
+      "config": {
+        "num_subscribers": 10,
+        "pattern": "fanout"
+      }
+    },
+    {
+      "name": "fanout_25_subscribers",
+      "iterations": 100,
+      "mean_latency_ms": 0.46666200272738934,
+      "median_latency_ms": 0.31394994584843516,
+      "p95_latency_ms": 1.2601999333128333,
+      "p99_latency_ms": 2.112500020302832,
+      "min_latency_ms": 0.2389000728726387,
+      "max_latency_ms": 2.112500020302832,
+      "std_dev_ms": 0.3480931650218404,
+      "throughput_msg_per_sec": 2142.8785591188825,
+      "total_time_sec": 0.046666200272738934,
+      "config": {
+        "num_subscribers": 25,
+        "pattern": "fanout"
+      }
+    },
+    {
+      "name": "fanout_50_subscribers",
+      "iterations": 100,
+      "mean_latency_ms": 0.5748150043655187,
+      "median_latency_ms": 0.4970500594936311,
+      "p95_latency_ms": 1.156899961642921,
+      "p99_latency_ms": 2.6579999830573797,
+      "min_latency_ms": 0.20680006127804518,
+      "max_latency_ms": 2.6579999830573797,
+      "std_dev_ms": 0.36561353176780076,
+      "throughput_msg_per_sec": 1739.690147969956,
+      "total_time_sec": 0.05748150043655187,
+      "config": {
+        "num_subscribers": 50,
+        "pattern": "fanout"
+      }
+    }
+  ],
+  "summary": {
+    "total_benchmarks": 17,
+    "avg_latency_ms": 0.24187877753694706,
+    "avg_throughput": 12724.639124912752
+  }
+}
