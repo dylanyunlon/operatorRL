@@ -3,6 +3,10 @@ Geo Agent (Agent B) - "The Eye"
 
 Satellite interface that fetches imagery and calculates vegetation indices.
 Listens for Claims and publishes Observations.
+
+Updated for atr 0.2.0:
+- Public API: atr.get_tool() instead of atr._global_registry
+- Tool versioning support
 """
 
 from typing import Any, Dict, List, Optional
@@ -23,7 +27,7 @@ class GeoAgent(BaseAgent):
         - Calculates NDVI (vegetation index)
         - Publishes Observation objects with actual values
     
-    Tooling (atr): sentinel_api, ndvi_calculator
+    Tooling (atr 0.2.0): sentinel_api, ndvi_calculator
     
     Subscribes to: CLAIMS topic
     Publishes: Observation objects to the OBSERVATIONS topic
@@ -45,9 +49,13 @@ class GeoAgent(BaseAgent):
         
         self._simulate_deforestation = simulate_deforestation
         
-        # Get tools from the Agent Tool Registry
-        self._sentinel_api = atr._global_registry.get_callable("sentinel_api")
-        self._ndvi_calculator = atr._global_registry.get_callable("ndvi_calculator")
+        # NEW: Use public atr.get_tool() API (ATR-001)
+        # This replaces the fragile atr._global_registry access
+        sentinel_tool = atr.get_tool("sentinel_api", version=">=1.0.0")
+        ndvi_tool = atr.get_tool("ndvi_calculator", version=">=1.0.0")
+        
+        self._sentinel_api = atr.get_callable("sentinel_api")
+        self._ndvi_calculator = atr.get_callable("ndvi_calculator")
 
     @property
     def subscribed_topics(self) -> List[str]:

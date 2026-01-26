@@ -3,9 +3,18 @@ Carbon Auditor Tools
 
 Tools registered with the Agent Tool Registry (atr) for the Carbon Auditor Swarm.
 These tools provide capabilities for PDF parsing, satellite data fetching, and NDVI calculation.
+
+Updated for atr 0.2.0:
+- Public API: atr.get_tool() instead of atr._global_registry
+- Tool versioning with semantic versions
+- Retry policies with exponential backoff
+- Rate limiting for external APIs
+- Health checks for external dependencies
+- Access control with permissions
 """
 
 import atr
+from atr import RetryPolicy, BackoffStrategy, HttpHealthCheck, CallableHealthCheck
 import hashlib
 import json
 import re
@@ -53,14 +62,22 @@ class ProvenanceMetadata:
 
 
 # =============================================================================
-# PDF Parser Tool
+# PDF Parser Tool (atr 0.2.0 - with versioning and retry)
 # =============================================================================
 
 @atr.register(
     name="pdf_parser",
+    version="1.0.0",  # NEW: Tool versioning (ATR-002)
+    description="Parse PDF or text documents and extract content",
     cost="low",
     tags=["pdf", "parsing", "document", "text_extraction"],
     side_effects=["read", "filesystem"],
+    permissions=["claims-agent"],  # NEW: Access control (ATR-005)
+    retry_policy=RetryPolicy(  # NEW: Retry with backoff (ATR-010)
+        max_attempts=3,
+        backoff=BackoffStrategy.EXPONENTIAL,
+        initial_delay=0.5,
+    ),
 )
 def parse_pdf(file_path: str) -> Dict[str, Any]:
     """
@@ -153,13 +170,16 @@ Reference Period: 2020-2024
 
 
 # =============================================================================
-# Table Extractor Tool
+# Table Extractor Tool (atr 0.2.0 - with versioning)
 # =============================================================================
 
 @atr.register(
     name="table_extractor",
+    version="1.0.0",  # NEW: Tool versioning (ATR-002)
+    description="Extract structured data from document text",
     cost="low",
     tags=["extraction", "structured_data", "parsing"],
+    permissions=["claims-agent"],  # NEW: Access control (ATR-005)
 )
 def extract_tables(text: str) -> Dict[str, Any]:
     """
@@ -215,14 +235,28 @@ def extract_tables(text: str) -> Dict[str, Any]:
 
 
 # =============================================================================
-# Sentinel API Tool
+# Sentinel API Tool (atr 0.2.0 - with rate limiting and retry)
 # =============================================================================
 
 @atr.register(
     name="sentinel_api",
+    version="1.0.0",  # NEW: Tool versioning (ATR-002)
+    description="Fetch Sentinel-2 satellite imagery for a polygon",
     cost="medium",
     tags=["satellite", "imagery", "sentinel", "remote_sensing"],
     side_effects=["network"],
+    permissions=["geo-agent"],  # NEW: Access control (ATR-005)
+    rate_limit="10/minute",  # NEW: Rate limiting (ATR-006)
+    retry_policy=RetryPolicy(  # NEW: Retry with backoff (ATR-010)
+        max_attempts=3,
+        backoff=BackoffStrategy.EXPONENTIAL,
+        initial_delay=1.0,
+    ),
+    # Health check for Copernicus API (ATR-008)
+    health_check=CallableHealthCheck(
+        func=lambda: True,  # Mock - in production: ping copernicus.eu
+        name="copernicus_api",
+    ),
 )
 def fetch_sentinel_data(
     polygon: str,
@@ -262,13 +296,16 @@ def fetch_sentinel_data(
 
 
 # =============================================================================
-# NDVI Calculator Tool
+# NDVI Calculator Tool (atr 0.2.0 - with versioning)
 # =============================================================================
 
 @atr.register(
     name="ndvi_calculator",
+    version="1.0.0",  # NEW: Tool versioning (ATR-002)
+    description="Calculate NDVI vegetation index from satellite bands",
     cost="low",
     tags=["vegetation", "ndvi", "remote_sensing", "analysis"],
+    permissions=["geo-agent"],  # NEW: Access control (ATR-005)
 )
 def calculate_ndvi(
     red_band: str,

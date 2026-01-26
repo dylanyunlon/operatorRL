@@ -3,6 +3,10 @@ Claims Agent (Agent A) - "The Reader"
 
 Ingests Project Design Documents (PDFs) and extracts carbon credit claims.
 Publishes structured Claim objects to the message bus.
+
+Updated for atr 0.2.0:
+- Public API: atr.get_tool() instead of atr._global_registry
+- Tool versioning support
 """
 
 from typing import Any, Dict, List, Optional
@@ -23,7 +27,7 @@ class ClaimsAgent(BaseAgent):
         - Claimed carbon stock values
         - Claimed NDVI/vegetation values
     
-    Tooling (atr): pdf_parser, table_extractor
+    Tooling (atr 0.2.0): pdf_parser, table_extractor
     
     Publishes: Claim objects to the CLAIMS topic
     """
@@ -31,9 +35,13 @@ class ClaimsAgent(BaseAgent):
     def __init__(self, agent_id: str):
         super().__init__(agent_id, name="claims-agent")
         
-        # Get tools from the Agent Tool Registry
-        self._pdf_parser = atr._global_registry.get_callable("pdf_parser")
-        self._table_extractor = atr._global_registry.get_callable("table_extractor")
+        # NEW: Use public atr.get_tool() API (ATR-001)
+        # This replaces the fragile atr._global_registry access
+        pdf_tool = atr.get_tool("pdf_parser", version=">=1.0.0")
+        table_tool = atr.get_tool("table_extractor", version=">=1.0.0")
+        
+        self._pdf_parser = atr.get_callable("pdf_parser")
+        self._table_extractor = atr.get_callable("table_extractor")
 
     @property
     def subscribed_topics(self) -> List[str]:

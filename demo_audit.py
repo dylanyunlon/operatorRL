@@ -11,10 +11,11 @@ This script:
 4. Uses cmvk (Cross-Model Verification Kernel) to detect fraud
 5. Prints the FRAUD alert to console
 
-Dependencies:
-- amb-core: Agent Message Bus
-- cmvk: Cross-Model Verification Kernel
-- agent-tool-registry: Tool registration
+Dependencies (v2.0 - ALL UPGRADED):
+- amb-core 0.2.0: Message persistence, DLQ, schema validation, tracing
+- cmvk 0.2.0: Euclidean distance, threshold profiles, explainability, audit trail
+- agent-tool-registry 0.2.0: Public API, versioning, retry policies, rate limiting
+- agent-control-plane 1.2.0: Full lifecycle management
 
 "The AI didn't decide; the Math decided. The AI just managed the workflow."
 """
@@ -22,6 +23,7 @@ Dependencies:
 import sys
 import time
 from pathlib import Path
+from uuid import uuid4
 
 # Add src to path
 src_path = Path(__file__).parent / "src"
@@ -31,6 +33,9 @@ sys.path.insert(0, str(src_path))
 import tools  # This registers all tools with atr
 
 from agents import ClaimsAgent, GeoAgent, AuditorAgent
+
+# Import new amb-core 0.2.0 features
+from amb_core import TraceContext, inject_trace, extract_trace
 
 
 def print_banner():
@@ -60,14 +65,19 @@ def run_demo(simulate_fraud: bool = True):
     print_banner()
     
     # ─────────────────────────────────────────────────────────────────────────
-    # STEP 1: Show Dependencies
+    # STEP 1: Show Dependencies (UPGRADED VERSIONS!)
     # ─────────────────────────────────────────────────────────────────────────
-    print_section("STEP 1: Dependencies (from PyPI)")
+    print_section("STEP 1: Dependencies (from PyPI - UPGRADED!)")
     
-    print("[✓] amb-core: Agent Message Bus for inter-agent communication")
-    print("[✓] cmvk: Cross-Model Verification Kernel for drift detection")
-    print("[✓] agent-tool-registry: Tool registration and discovery")
-    print("[✓] agent-control-plane: Agent runtime (available)")
+    print("[✓] amb-core 0.2.0: Message persistence, DLQ, schema validation, tracing")
+    print("[✓] cmvk 0.2.0: Euclidean distance, threshold profiles, explainability")
+    print("[✓] agent-tool-registry 0.2.0: Public API, versioning, retry policies")
+    print("[✓] agent-control-plane 1.2.0: Full lifecycle management")
+    
+    # Create a trace context for distributed tracing (AMB-004)
+    trace_id = str(uuid4())
+    trace_context = TraceContext(trace_id=trace_id, span_id="audit-root")
+    print(f"\n[→] Trace ID: {trace_id[:8]}... (amb-core distributed tracing)")
     
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 2: Initialize the Agents
@@ -95,7 +105,8 @@ def run_demo(simulate_fraud: bool = True):
     )
     print(f"[✓] {auditor_agent.name} initialized")
     print(f"    Verification threshold: 0.15")
-    print(f"    Uses: cmvk.verify_embeddings() for mathematical verification")
+    print(f"    Uses: cmvk.verify_embeddings(metric='euclidean', threshold_profile='carbon')")
+    print(f"    NEW: Audit trail enabled, explainability enabled")
     
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 3: Start the Agents
@@ -139,11 +150,13 @@ def run_demo(simulate_fraud: bool = True):
     print(f"    Deforestation Indicator: {observation.get('deforestation_indicator', 0):.1%}")
     
     # ─────────────────────────────────────────────────────────────────────────
-    # STEP 6: Auditor Agent Performs Verification (using cmvk)
+    # STEP 6: Auditor Agent Performs Verification (using cmvk 0.2.0)
     # ─────────────────────────────────────────────────────────────────────────
-    print_section("STEP 6: Mathematical Verification (cmvk)")
+    print_section("STEP 6: Mathematical Verification (cmvk 0.2.0)")
     
-    print("[→] Using cmvk.verify_embeddings() for drift calculation...")
+    print("[→] Using cmvk.verify_embeddings(metric='euclidean')...")
+    print("[→] NEW: threshold_profile='carbon' for domain-specific thresholds")
+    print("[→] NEW: explain=True for drift explainability")
     print("[→] This is MATHEMATICAL verification, not LLM inference!")
     
     # Auditor agent uses cmvk to verify
@@ -156,6 +169,13 @@ def run_demo(simulate_fraud: bool = True):
     print(f"    Threshold: {result['threshold']}")
     print(f"    Confidence: {result['confidence']:.2%}")
     print(f"    CMVK Drift Type: {result.get('cmvk_drift_type', 'N/A')}")
+    print(f"    Metric: {result.get('metric', 'euclidean')} (cmvk 0.2.0!)")
+    
+    # Show explainability if available (CMVK-010)
+    if result.get('cmvk_explanation'):
+        expl = result['cmvk_explanation']
+        print(f"\n[→] Drift Explanation (cmvk 0.2.0):")
+        print(f"    Primary drift dimension: {expl.get('primary_drift_dimension', 'N/A')}")
     
     # ─────────────────────────────────────────────────────────────────────────
     # STEP 7: Display Detailed Results
@@ -206,14 +226,26 @@ def run_demo(simulate_fraud: bool = True):
         print("\n")
     
     # ─────────────────────────────────────────────────────────────────────────
-    # Kernel Statistics
+    # Kernel Statistics (with cmvk 0.2.0 audit trail)
     # ─────────────────────────────────────────────────────────────────────────
-    print_section("Kernel Statistics")
+    print_section("Kernel Statistics (cmvk 0.2.0)")
     
     stats = auditor_agent.get_kernel_stats()
     print(f"Total Verifications: {stats['verification_count']}")
     print(f"Fraud Threshold: {stats['threshold']}")
     print(f"Flag Threshold: {stats['flag_threshold']}")
+    print(f"CMVK Version: {stats.get('cmvk_version', 'N/A')}")
+    print(f"Distance Metric: {stats.get('metric', 'N/A')}")
+    print(f"Threshold Profile: {stats.get('threshold_profile', 'N/A')}")
+    
+    # Show audit trail (CMVK-006)
+    if stats.get('audit_trail_entries'):
+        print(f"Audit Trail Entries: {stats['audit_trail_entries']}")
+        audit_trail = auditor_agent.get_audit_trail()
+        if audit_trail:
+            print(f"\n[→] Audit Trail (cmvk 0.2.0 - CMVK-006):")
+            for entry in audit_trail[-3:]:  # Show last 3
+                print(f"    - {entry['timestamp']}: drift={entry['drift_score']:.4f}, metric={entry['metric_used']}")
     
     # ─────────────────────────────────────────────────────────────────────────
     # Cleanup

@@ -3,6 +3,13 @@ Auditor Agent (Agent C) - "The Judge"
 
 The decision maker that uses cmvk (Cross-Model Verification Kernel) to detect fraud.
 Compares claims against observations using mathematical verification.
+
+Updated for cmvk 0.2.0:
+- DistanceMetric.EUCLIDEAN for magnitude-based fraud detection
+- threshold_profile="carbon" for domain-specific thresholds
+- explain=True for drift explainability
+- AuditTrail for immutable verification logs
+- dimension_names for readable explanations
 """
 
 from typing import Any, Dict, List, Optional
@@ -10,7 +17,15 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import numpy as np
-from cmvk import verify_embeddings, DriftType
+import cmvk
+from cmvk import (
+    verify_embeddings,
+    DistanceMetric,
+    DriftType,
+    AuditTrail,
+    configure_audit_trail,
+    get_audit_trail,
+)
 
 from .base import BaseAgent
 
@@ -55,13 +70,8 @@ class ObservationVector:
         return cloud_penalty * variance_penalty
 
 
-def calculate_euclidean_drift(claim_arr: np.ndarray, obs_arr: np.ndarray) -> float:
-    """
-    Calculate Euclidean distance drift score between claim and observation vectors.
-    
-    This is our primary verification metric - pure mathematical distance.
-    """
-    return float(np.linalg.norm(claim_arr - obs_arr))
+# Dimension names for cmvk explainability (CMVK-010)
+DIMENSION_NAMES = ["ndvi", "carbon_stock_normalized"]
 
 
 class AuditorAgent(BaseAgent):
@@ -78,7 +88,11 @@ class AuditorAgent(BaseAgent):
     The agent doesn't use LLM inference for the verification decision.
     It uses deterministic mathematical calculations via cmvk.
     
-    Dependencies: cmvk (Cross-Model Verification Kernel)
+    cmvk 0.2.0 Features Used:
+        - DistanceMetric.EUCLIDEAN for magnitude-based fraud detection
+        - threshold_profile="carbon" for domain-specific thresholds
+        - explain=True for drift explainability
+        - AuditTrail for immutable verification logs
     
     Subscribes to: CLAIMS, OBSERVATIONS
     Publishes: Verification results and ALERTS
@@ -91,7 +105,8 @@ class AuditorAgent(BaseAgent):
     def __init__(
         self,
         agent_id: str,
-        threshold: float = 0.15
+        threshold: float = 0.15,
+        enable_audit_trail: bool = True,
     ):
         """
         Initialize the Auditor Agent.
@@ -99,12 +114,20 @@ class AuditorAgent(BaseAgent):
         Args:
             agent_id: Unique identifier
             threshold: Drift score threshold for fraud detection
+            enable_audit_trail: Enable cmvk audit trail (CMVK-006)
         """
         super().__init__(agent_id, name="auditor-agent")
         
         self._threshold = threshold
         self._verification_count = 0
         self._results: List[Dict[str, Any]] = []
+        
+        # NEW: Configure cmvk audit trail (CMVK-006)
+        if enable_audit_trail:
+            # configure_audit_trail returns an AuditTrail instance
+            self._audit_trail = configure_audit_trail(persist_path=None, auto_persist=False)
+        else:
+            self._audit_trail = None
 
     @property
     def subscribed_topics(self) -> List[str]:
@@ -159,12 +182,26 @@ class AuditorAgent(BaseAgent):
         claim_arr = claim_vector.to_array()
         obs_arr = observation_vector.to_array()
         
-        # Use cmvk for semantic drift analysis (for metadata)
-        cmvk_score = verify_embeddings(claim_arr, obs_arr)
+        # =====================================================================
+        # cmvk 0.2.0 - Full featured verification
+        # =====================================================================
+        # NEW: Use Euclidean metric (CMVK-001, CMVK-002)
+        # NEW: Use carbon threshold profile (CMVK-005)
+        # NEW: Enable explainability (CMVK-010)
+        # NEW: Use dimension names for readable explanations
+        # NEW: Audit trail configured in __init__ (CMVK-006)
+        cmvk_result = verify_embeddings(
+            claim_arr,
+            obs_arr,
+            metric="euclidean",  # CMVK-001: Euclidean distance!
+            threshold_profile="carbon",  # CMVK-005: Domain-specific thresholds
+            explain=True,  # CMVK-010: Explainability
+            dimension_names=DIMENSION_NAMES,  # For readable explanations
+            audit_trail=self._audit_trail,  # CMVK-006: Audit trail
+        )
         
-        # Calculate Euclidean drift score (our primary metric)
-        # This is the MATHEMATICAL verification
-        drift_score = calculate_euclidean_drift(claim_arr, obs_arr)
+        # Extract drift score from cmvk result
+        drift_score = float(cmvk_result.drift_score)
         
         self._verification_count += 1
         
@@ -179,19 +216,31 @@ class AuditorAgent(BaseAgent):
         # Build detailed result
         details = self._calculate_details(claim_vector, observation_vector, drift_score)
         
+        # Extract explanation if available (CMVK-010)
+        explanation = None
+        if hasattr(cmvk_result, 'explanation') and cmvk_result.explanation:
+            expl = cmvk_result.explanation
+            # explanation is a dict in cmvk 0.2.0
+            explanation = {
+                "primary_drift_dimension": expl.get('primary_drift_dimension'),
+                "dimension_contributions": expl.get('dimension_contributions'),
+                "interpretation": expl.get('interpretation'),
+            }
+        
         result = {
             "project_id": project_id,
             "status": status,
-            "drift_score": float(drift_score),
+            "drift_score": drift_score,
             "threshold": self._threshold,
             "confidence": float(observation_vector.confidence),
             "claim_vector": claim_arr.tolist(),
             "observation_vector": obs_arr.tolist(),
-            "metric": "euclidean",
+            "metric": "euclidean",  # cmvk 0.2.0!
             "timestamp": datetime.utcnow().isoformat(),
             "details": details,
-            "cmvk_drift_type": cmvk_score.drift_type.value,
-            "cmvk_semantic_score": float(cmvk_score.drift_score),
+            "cmvk_drift_type": cmvk_result.drift_type.value,
+            "cmvk_confidence": float(cmvk_result.confidence),
+            "cmvk_explanation": explanation,  # NEW: Explainability (CMVK-010)
         }
         
         self._log(f"Verification Result: status={status}, drift_score={drift_score:.4f}")
@@ -274,8 +323,23 @@ class AuditorAgent(BaseAgent):
 
     def get_kernel_stats(self) -> Dict[str, Any]:
         """Get verification kernel statistics."""
-        return {
+        stats = {
             "verification_count": self._verification_count,
             "threshold": self._threshold,
             "flag_threshold": self.FLAG_THRESHOLD,
+            "cmvk_version": "0.2.0",
+            "metric": "euclidean",
+            "threshold_profile": "carbon",
         }
+        
+        # NEW: Include audit trail stats (CMVK-006)
+        if self._audit_trail:
+            stats["audit_trail_entries"] = len(self._audit_trail.entries)
+        
+        return stats
+
+    def get_audit_trail(self) -> Optional[List[Dict[str, Any]]]:
+        """Get the cmvk audit trail entries (CMVK-006)."""
+        if self._audit_trail and self._audit_trail.entries:
+            return [entry.to_dict() for entry in self._audit_trail.entries]
+        return None
