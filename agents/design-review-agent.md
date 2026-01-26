@@ -28,6 +28,8 @@ last-validated: 2026-01-21
 
 > *"Why not just use Researcher?"*
 
+Researcher is very powerful and broad, and it can help with many kinds of analysis and exploration. However, it is not particularly specialized for design reviews. What we are proposing is different in that we can encode our own design-review–specific requirements (for example, explicit rules and heuristics derived from past design discussions), and inject very targeted context that Researcher would not naturally have. This allows our own agent to perform design reviews with stronger domain knowledge and more consistent judgment, rather than being a general-purpose reviewer.
+
 | Capability | Researcher | Design Review Agent |
 |------------|------------|--------------------|
 | General Q&A on design topics | ✅ | ✅ |
