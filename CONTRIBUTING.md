@@ -1,124 +1,157 @@
 # Contributing to Agent OS
 
-Thank you for your interest in contributing to Agent OS!
+Thank you for your interest in contributing! Agent OS is designed to be extended by the community.
 
-## Development Setup
+## 🚀 Quick Start (5 minutes)
 
 ```bash
-# Clone the repository
+# Clone and install
 git clone https://github.com/imran-siddique/agent-os.git
 cd agent-os
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install in development mode
 pip install -e ".[dev]"
 
-# Run tests
+# Run tests to make sure everything works
 pytest tests/ -v
+
+# Run a demo
+python examples/carbon-auditor/demo.py
 ```
 
-## Project Structure
+## 🏷️ Good First Issues
+
+New to the project? Start here:
+
+| Label | Description |
+|-------|-------------|
+| [`good-first-issue`](https://github.com/imran-siddique/agent-os/labels/good-first-issue) | Small, well-defined tasks |
+| [`documentation`](https://github.com/imran-siddique/agent-os/labels/documentation) | Improve docs and examples |
+| [`needs-tests`](https://github.com/imran-siddique/agent-os/labels/needs-tests) | Add test coverage |
+
+## 🎁 Integration Bounties
+
+We're actively looking for integration contributions:
+
+| Integration | Description | Status |
+|-------------|-------------|--------|
+| **LangChain** | Wrap LangChain agents | 🟡 Starter code in `integrations/` |
+| **CrewAI** | Wrap CrewAI crews | 🟡 Starter code in `integrations/` |
+| **AutoGen** | Wrap Microsoft AutoGen | 🟡 Starter code in `integrations/` |
+| **OpenAI Swarm** | Wrap OpenAI's Swarm | 🔴 Open |
+| **LlamaIndex** | Wrap LlamaIndex agents | 🔴 Open |
+
+See `src/agent_os/integrations/` for the adapter pattern.
+
+## 📁 Project Structure
 
 ```
 agent-os/
-├── src/agent_os/     # Unified package (re-exports)
-├── packages/         # Individual packages
-│   ├── primitives/   # Layer 1
-│   ├── cmvk/         # Layer 1
-│   ├── caas/         # Layer 1
-│   ├── emk/          # Layer 1
-│   ├── iatp/         # Layer 2
-│   ├── amb/          # Layer 2
-│   ├── atr/          # Layer 2
-│   ├── control-plane/# Layer 3
-│   ├── scak/         # Layer 4
-│   └── mute-agent/   # Layer 4
-├── examples/         # Example implementations
-├── docs/             # Documentation
-└── tests/            # Integration tests
+├── src/agent_os/        # Main package (re-exports everything)
+│   ├── __init__.py      # Unified imports
+│   ├── cli.py           # agentctl CLI
+│   └── integrations/    # Framework adapters
+├── packages/            # Individual kernel modules
+│   ├── primitives/      # L1: Base types
+│   ├── cmvk/            # L1: Verification
+│   ├── iatp/            # L2: Trust protocol
+│   ├── control-plane/   # L3: Kernel
+│   └── scak/            # L4: Self-correction
+├── examples/            # Working demos
+│   ├── carbon-auditor/
+│   ├── grid-balancing/
+│   ├── defi-sentinel/
+│   └── pharma-compliance/
+├── docs/                # Documentation
+├── tests/               # Integration tests
+└── gh-extension/        # GitHub CLI extension
 ```
 
-## Code Style
-
-We use:
-- **ruff** for linting
-- **black** for formatting
-- **mypy** for type checking
-
-```bash
-# Format code
-black src/ packages/ tests/
-
-# Lint
-ruff check src/ packages/ tests/
-
-# Type check
-mypy src/ packages/
-```
-
-## Testing
+## 🧪 Testing
 
 ```bash
 # Run all tests
 pytest tests/ -v
 
-# Run specific layer tests
+# Run specific layer
 pytest tests/test_layer1_primitives.py -v
-pytest tests/test_layer3_framework.py -v
 
-# With coverage
-pytest tests/ --cov=packages --cov-report=html
+# Run with coverage
+pytest tests/ --cov=src --cov-report=html
+
+# Run demos (integration test)
+python examples/carbon-auditor/demo.py --scenario both
+python examples/grid-balancing/demo.py --agents 10
+python examples/defi-sentinel/demo.py --attack all
+python examples/pharma-compliance/demo.py --reports 10
 ```
 
-## Pull Request Process
+## 📝 Code Style
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`pytest tests/ -v`)
-5. Commit (`git commit -m 'Add amazing feature'`)
-6. Push (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+```bash
+# Format (we use ruff)
+ruff format .
 
-## Design Philosophy
+# Lint
+ruff check .
 
-**Scale by Subtraction** - We value:
-- ✅ POSIX-inspired primitives (signals, VFS, pipes)
-- ✅ CLI-first interfaces (`agentctl`)
-- ✅ Safety over efficiency (0% violation guarantee)
-- ✅ Kernel/user space separation
+# Type check
+mypy src/
+```
 
-We avoid:
-- ❌ Visual workflow editors
-- ❌ CRM connectors
-- ❌ Low-code builders
-- ❌ Feature bloat
+## 🔀 Pull Request Process
 
-## Layer Guidelines
+1. **Fork** the repository
+2. **Create branch**: `git checkout -b feature/my-feature`
+3. **Make changes** (follow the design philosophy below)
+4. **Test**: `pytest tests/ -v`
+5. **Commit**: `git commit -m "feat: add my feature"`
+6. **Push**: `git push origin feature/my-feature`
+7. **Open PR** with description of changes
 
-### Layer 1 (Primitives)
-- Zero or minimal dependencies
-- Pure functions preferred
-- No agent-specific logic
+### Commit Message Convention
 
-### Layer 2 (Infrastructure)
-- Can depend on Layer 1
-- Protocol definitions
-- Transport mechanisms
+```
+feat: add new feature
+fix: fix a bug
+docs: documentation only
+test: add tests
+refactor: code change that neither fixes a bug nor adds a feature
+```
 
-### Layer 3 (Framework)
-- Can depend on Layers 1-2
-- Governance and control
-- Zero external deps where possible
+## 🎯 Design Philosophy
 
-### Layer 4 (Intelligence)
-- Can depend on Layers 1-3
-- Agent-specific logic
-- Self-correction, learning
+**"Scale by Subtraction"** - We value simplicity over features.
 
-## Questions?
+### We ✅ Want
 
-Open an issue or reach out to the maintainers.
+- POSIX-inspired primitives (signals, VFS, pipes)
+- CLI-first interfaces
+- Safety guarantees (0% violation)
+- Kernel/user space separation
+- Minimal dependencies
+
+### We ❌ Avoid
+
+- Visual workflow editors
+- CRM/ERP connectors  
+- Low-code builders
+- Feature bloat
+- Vendor lock-in
+
+## 📚 Layer Guidelines
+
+| Layer | May Depend On | Focus |
+|-------|---------------|-------|
+| **L1: Primitives** | Nothing | Pure types, zero deps |
+| **L2: Infrastructure** | L1 | Protocols, transport |
+| **L3: Framework** | L1, L2 | Governance, kernel |
+| **L4: Intelligence** | L1, L2, L3 | Self-correction |
+
+## 💬 Getting Help
+
+- **Questions?** Open a [Discussion](https://github.com/imran-siddique/agent-os/discussions)
+- **Found a bug?** Open an [Issue](https://github.com/imran-siddique/agent-os/issues)
+- **Want to chat?** See the README for community links
+
+## 📜 License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
