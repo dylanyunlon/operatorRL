@@ -91,7 +91,7 @@ Changelog = "https://github.com/imran-siddique/inter-agent-trust-protocol/blob/m
 iatp = "iatp.cli:cli"
 
 [tool.setuptools]
-packages = ["iatp", "iatp.models", "iatp.security", "iatp.sidecar", "iatp.telemetry", "iatp.tests"]
+packages = ["iatp", "iatp.models", "iatp.security", "iatp.sidecar", "iatp.telemetry"]
 include-package-data = true
 
 [tool.setuptools.package-data]
