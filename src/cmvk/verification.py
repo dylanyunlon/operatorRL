@@ -6,21 +6,35 @@ between two outputs. These functions have no side effects and use only
 numpy/scipy for mathematical operations.
 
 Layer 1: The Primitive - Mathematical and adversarial verification.
+
+Enhanced Features (v0.2.0):
+    - Configurable distance metrics (cosine, euclidean, manhattan, etc.)
+    - Dimensional weighting for importance-based drift calculation
+    - Threshold profiles for domain-specific verification
+    - Explainable drift with per-dimension contributions
+    - Batch verification for efficiency
+    - Audit trail integration
 """
+
+from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import ArrayLike
 
 try:
-    from scipy import spatial, stats
+    from scipy import stats
 
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
+
+if TYPE_CHECKING:
+    from .audit import AuditTrail
 
 
 class DriftType(Enum):
@@ -42,12 +56,58 @@ class VerificationScore:
         confidence: Confidence in the score (0.0 to 1.0)
         drift_type: Primary type of drift detected
         details: Dictionary with component scores
+        explanation: Optional drift explanation with dimension contributions (CMVK-010)
     """
 
     drift_score: float
     confidence: float
     drift_type: DriftType
     details: dict
+    explanation: dict | None = None
+
+    def passed(self, threshold: float = 0.3) -> bool:
+        """Check if drift is within acceptable threshold."""
+        return self.drift_score <= threshold
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "drift_score": self.drift_score,
+            "confidence": self.confidence,
+            "drift_type": self.drift_type.value,
+            "details": self.details,
+            "explanation": self.explanation,
+        }
+
+
+@dataclass(frozen=True)
+class DriftExplanation:
+    """
+    Detailed explanation of drift between two vectors (CMVK-010).
+
+    Attributes:
+        primary_drift_dimension: Index or name of dimension with highest contribution
+        dimension_contributions: Mapping of dimension to its contribution percentage
+        top_contributors: List of top N contributing dimensions
+        metric_used: The distance metric used
+        interpretation: Human-readable interpretation of the drift
+    """
+
+    primary_drift_dimension: str | int
+    dimension_contributions: dict[str | int, float]
+    top_contributors: list[tuple[str | int, float]]
+    metric_used: str
+    interpretation: str
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        return {
+            "primary_drift_dimension": self.primary_drift_dimension,
+            "dimension_contributions": self.dimension_contributions,
+            "top_contributors": self.top_contributors,
+            "metric_used": self.metric_used,
+            "interpretation": self.interpretation,
+        }
 
 
 def verify(output_a: str, output_b: str) -> VerificationScore:
@@ -124,56 +184,413 @@ def verify(output_a: str, output_b: str) -> VerificationScore:
     )
 
 
-def verify_embeddings(embedding_a: ArrayLike, embedding_b: ArrayLike) -> VerificationScore:
+def verify_embeddings(
+    embedding_a: ArrayLike,
+    embedding_b: ArrayLike,
+    metric: str = "cosine",
+    weights: ArrayLike | None = None,
+    threshold_profile: str | None = None,
+    explain: bool = False,
+    dimension_names: list[str] | None = None,
+    audit_trail: AuditTrail | None = None,
+) -> VerificationScore:
     """
     Calculate drift score between two embedding vectors.
 
-    Pure function for comparing pre-computed embeddings.
+    Enhanced verification function with configurable metrics, weighting,
+    threshold profiles, and explainability (CMVK-001 through CMVK-010).
 
     Args:
-        embedding_a: Embedding vector for output A
-        embedding_b: Embedding vector for output B
+        embedding_a: Embedding vector for output A (e.g., claimed values)
+        embedding_b: Embedding vector for output B (e.g., observed values)
+        metric: Distance metric to use. Options:
+            - "cosine": Cosine distance (default, normalizes vectors)
+            - "euclidean": Euclidean distance (preserves magnitude - CMVK-001)
+            - "manhattan": Manhattan/L1 distance
+            - "chebyshev": Maximum absolute difference
+            - "mahalanobis": Mahalanobis distance
+        weights: Optional weights for each dimension (CMVK-008).
+                Higher weights increase that dimension's contribution to drift.
+        threshold_profile: Name of threshold profile to use (CMVK-005).
+                         Options: "carbon", "financial", "medical", "general", "strict"
+        explain: If True, include detailed drift explanation (CMVK-010)
+        dimension_names: Optional names for dimensions (for explainability)
+        audit_trail: Optional AuditTrail instance for logging (CMVK-006)
 
     Returns:
-        VerificationScore with cosine-distance based drift score
+        VerificationScore with drift score, confidence, and optional explanation
+
+    Example:
+        >>> # Basic usage
+        >>> score = verify_embeddings(claim_vec, obs_vec)
+
+        >>> # With Euclidean distance for magnitude-sensitive comparison
+        >>> score = verify_embeddings(
+        ...     claim_vec, obs_vec,
+        ...     metric="euclidean",
+        ...     threshold_profile="carbon",
+        ...     explain=True
+        ... )
+
+        >>> # With dimensional weighting
+        >>> score = verify_embeddings(
+        ...     claim_vec, obs_vec,
+        ...     metric="euclidean",
+        ...     weights=[0.6, 0.4],  # NDVI more important than carbon
+        ...     explain=True,
+        ...     dimension_names=["ndvi", "carbon_stock"]
+        ... )
     """
+    from .metrics import calculate_distance, calculate_weighted_distance
+
     vec_a = np.asarray(embedding_a, dtype=np.float64)
     vec_b = np.asarray(embedding_b, dtype=np.float64)
 
+    # Load threshold profile if specified
+    profile = None
+    if threshold_profile:
+        from .profiles import get_profile
+
+        profile = get_profile(threshold_profile)
+        # Use profile's default metric if none specified
+        if metric == "cosine" and profile.default_metric != "cosine":
+            metric = profile.default_metric
+
+    # Shape validation
     if vec_a.shape != vec_b.shape:
-        return VerificationScore(
+        result = VerificationScore(
             drift_score=1.0,
             confidence=0.5,
             drift_type=DriftType.STRUCTURAL,
             details={"reason": "shape_mismatch", "shape_a": vec_a.shape, "shape_b": vec_b.shape},
         )
+        if audit_trail:
+            _log_to_audit(audit_trail, vec_a, vec_b, result, metric, threshold_profile)
+        return result
 
-    # Cosine distance (0 = identical, 1 = orthogonal, 2 = opposite)
-    if HAS_SCIPY:
-        cosine_dist = spatial.distance.cosine(vec_a, vec_b)
+    # Calculate distance with appropriate function
+    if weights is not None:
+        metric_result = calculate_weighted_distance(vec_a, vec_b, weights=weights, metric=metric)
     else:
-        # Fallback implementation
-        dot = np.dot(vec_a, vec_b)
-        norm_a = np.linalg.norm(vec_a)
-        norm_b = np.linalg.norm(vec_b)
-        cosine_dist = 1.0 if norm_a == 0 or norm_b == 0 else 1.0 - (dot / (norm_a * norm_b))
+        metric_result = calculate_distance(vec_a, vec_b, metric=metric)
 
-    # Euclidean distance (normalized)
-    euclidean_dist = np.linalg.norm(vec_a - vec_b)
-    max_dist = np.sqrt(len(vec_a) * 4)  # Assuming normalized embeddings in [-1, 1]
-    normalized_euclidean = min(euclidean_dist / max_dist, 1.0)
+    # Build drift score from normalized distance
+    drift_score = float(np.clip(metric_result.normalized, 0.0, 1.0))
 
-    # Combine metrics
-    drift_score = 0.6 * cosine_dist + 0.4 * normalized_euclidean
+    # Calculate confidence based on vector properties
+    confidence = _calculate_embedding_confidence(vec_a, vec_b)
 
-    return VerificationScore(
-        drift_score=float(np.clip(drift_score, 0.0, 1.0)),
-        confidence=0.95,
+    # Build explanation if requested
+    explanation_dict = None
+    if explain:
+        explanation = _build_drift_explanation(
+            vec_a, vec_b, metric_result, weights, dimension_names
+        )
+        explanation_dict = explanation.to_dict()
+
+    # Build details
+    details = {
+        "metric": metric,
+        "raw_distance": metric_result.distance,
+        "normalized_distance": metric_result.normalized,
+        **metric_result.details,
+    }
+
+    # Add profile info if used
+    if profile:
+        passed = profile.is_within_threshold(drift_score, confidence)
+        severity = profile.get_severity(drift_score)
+        details["profile"] = {
+            "name": profile.name,
+            "drift_threshold": profile.drift_threshold,
+            "passed": passed,
+            "severity": severity,
+        }
+
+    result = VerificationScore(
+        drift_score=drift_score,
+        confidence=confidence,
         drift_type=DriftType.SEMANTIC,
-        details={
-            "cosine_distance": float(cosine_dist),
-            "euclidean_distance": float(euclidean_dist),
-            "normalized_euclidean": float(normalized_euclidean),
+        details=details,
+        explanation=explanation_dict,
+    )
+
+    # Log to audit trail if provided
+    if audit_trail:
+        _log_to_audit(audit_trail, vec_a, vec_b, result, metric, threshold_profile)
+
+    return result
+
+
+def verify_embeddings_batch(
+    embeddings_a: Sequence[ArrayLike],
+    embeddings_b: Sequence[ArrayLike],
+    metric: str = "cosine",
+    weights: ArrayLike | None = None,
+    threshold_profile: str | None = None,
+    explain: bool = False,
+    dimension_names: list[str] | None = None,
+    audit_trail: AuditTrail | None = None,
+) -> list[VerificationScore]:
+    """
+    Verify multiple embedding pairs efficiently (CMVK-004).
+
+    Processes all pairs with consistent settings and optional audit logging.
+
+    Args:
+        embeddings_a: Sequence of embedding vectors from source A
+        embeddings_b: Sequence of embedding vectors from source B
+        metric: Distance metric (applied to all pairs)
+        weights: Dimensional weights (applied to all pairs)
+        threshold_profile: Threshold profile name
+        explain: Whether to include explanations
+        dimension_names: Optional dimension names for explainability
+        audit_trail: Optional AuditTrail for logging
+
+    Returns:
+        List of VerificationScore for each pair
+
+    Raises:
+        ValueError: If sequence lengths don't match
+    """
+    if len(embeddings_a) != len(embeddings_b):
+        raise ValueError(
+            f"Length mismatch: embeddings_a has {len(embeddings_a)} items, "
+            f"embeddings_b has {len(embeddings_b)} items"
+        )
+
+    results = []
+    for vec_a, vec_b in zip(embeddings_a, embeddings_b, strict=True):
+        score = verify_embeddings(
+            vec_a,
+            vec_b,
+            metric=metric,
+            weights=weights,
+            threshold_profile=threshold_profile,
+            explain=explain,
+            dimension_names=dimension_names,
+            audit_trail=audit_trail,
+        )
+        results.append(score)
+
+    return results
+
+
+def aggregate_embedding_scores(
+    scores: Sequence[VerificationScore],
+    threshold_profile: str | None = None,
+) -> dict[str, Any]:
+    """
+    Aggregate multiple embedding verification scores with profile context.
+
+    Args:
+        scores: Sequence of VerificationScore objects
+        threshold_profile: Optional profile for pass/fail classification
+
+    Returns:
+        Dictionary with aggregate statistics and pass rates
+    """
+    if not scores:
+        return {"count": 0}
+
+    profile = None
+    if threshold_profile:
+        from .profiles import get_profile
+
+        profile = get_profile(threshold_profile)
+
+    drift_values = [s.drift_score for s in scores]
+    confidence_values = [s.confidence for s in scores]
+
+    # Calculate pass/fail if profile available
+    if profile:
+        passed_count = sum(
+            1 for s in scores if profile.is_within_threshold(s.drift_score, s.confidence)
+        )
+        severity_counts: dict[str, int] = {
+            "pass": 0,
+            "warning": 0,
+            "critical": 0,
+            "severe": 0,
+        }
+        for s in scores:
+            severity = profile.get_severity(s.drift_score)
+            severity_counts[severity] += 1
+    else:
+        passed_count = sum(1 for s in scores if s.drift_score <= 0.3)
+        severity_counts = {}
+
+    result: dict[str, Any] = {
+        "count": len(scores),
+        "passed_count": passed_count,
+        "failed_count": len(scores) - passed_count,
+        "pass_rate": passed_count / len(scores),
+        "mean_drift": float(np.mean(drift_values)),
+        "std_drift": float(np.std(drift_values)),
+        "min_drift": float(np.min(drift_values)),
+        "max_drift": float(np.max(drift_values)),
+        "median_drift": float(np.median(drift_values)),
+        "mean_confidence": float(np.mean(confidence_values)),
+        "p95_drift": float(np.percentile(drift_values, 95)),
+    }
+
+    if severity_counts and profile:
+        result["severity_distribution"] = severity_counts
+        result["profile_used"] = profile.name
+
+    return result
+
+
+# ============================================================================
+# Explainability Functions (CMVK-010)
+# ============================================================================
+
+
+def _build_drift_explanation(
+    vec_a: np.ndarray,
+    vec_b: np.ndarray,
+    metric_result: Any,
+    weights: ArrayLike | None,
+    dimension_names: list[str] | None,
+) -> DriftExplanation:
+    """Build detailed drift explanation."""
+    diff = np.abs(vec_a - vec_b)
+
+    # Apply weights if provided
+    if weights is not None:
+        weights_arr = np.asarray(weights, dtype=np.float64)
+        weighted_diff = diff * weights_arr
+    else:
+        weighted_diff = diff
+
+    # Calculate per-dimension contributions
+    total_diff = np.sum(weighted_diff)
+    contributions = weighted_diff / total_diff if total_diff > 0 else np.zeros_like(diff)
+
+    # Map contributions to names or indices
+    contrib_dict: dict[str | int, float]
+    sorted_contribs: list[tuple[str | int, float]]
+    primary_dim: str | int
+
+    if dimension_names and len(dimension_names) == len(contributions):
+        contrib_dict = {
+            name: float(c) for name, c in zip(dimension_names, contributions, strict=False)
+        }
+        sorted_contribs = sorted(contrib_dict.items(), key=lambda x: x[1], reverse=True)
+        primary_dim = sorted_contribs[0][0]
+    else:
+        contrib_dict = {i: float(c) for i, c in enumerate(contributions)}
+        sorted_contribs = sorted(contrib_dict.items(), key=lambda x: x[1], reverse=True)
+        primary_dim = sorted_contribs[0][0]
+
+    # Top contributors (up to 5)
+    top_contributors: list[tuple[str | int, float]] = sorted_contribs[:5]
+
+    # Generate interpretation
+    interpretation = _generate_interpretation(
+        vec_a, vec_b, primary_dim, top_contributors, dimension_names
+    )
+
+    return DriftExplanation(
+        primary_drift_dimension=primary_dim,
+        dimension_contributions=contrib_dict,
+        top_contributors=top_contributors,
+        metric_used=metric_result.metric.value,
+        interpretation=interpretation,
+    )
+
+
+def _generate_interpretation(
+    vec_a: np.ndarray,
+    vec_b: np.ndarray,
+    primary_dim: str | int,
+    top_contributors: list[tuple[str | int, float]],
+    dimension_names: list[str] | None,
+) -> str:
+    """Generate human-readable interpretation of drift."""
+    # Get primary dimension index
+    if isinstance(primary_dim, str) and dimension_names:
+        idx = dimension_names.index(primary_dim)
+    else:
+        idx = primary_dim if isinstance(primary_dim, int) else 0
+
+    diff_value = abs(vec_a[idx] - vec_b[idx])
+    pct_diff = (diff_value / abs(vec_a[idx])) * 100 if vec_a[idx] != 0 else float("inf")
+
+    dim_name = primary_dim if isinstance(primary_dim, str) else f"dimension {primary_dim}"
+
+    if len(top_contributors) > 1 and top_contributors[0][1] > 0.5:
+        return (
+            f"Drift primarily driven by {dim_name} "
+            f"({top_contributors[0][1]*100:.1f}% of total drift). "
+            f"Value changed from {vec_a[idx]:.4f} to {vec_b[idx]:.4f} "
+            f"({pct_diff:.1f}% difference)."
+        )
+    elif len(top_contributors) > 1:
+        top_names = [str(c[0]) for c, _ in zip(top_contributors[:3], range(3), strict=False)]
+        return (
+            f"Drift distributed across multiple dimensions. "
+            f"Top contributors: {', '.join(top_names)}. "
+            f"Largest single change in {dim_name}."
+        )
+    else:
+        return f"Single dimension drift in {dim_name}."
+
+
+def _calculate_embedding_confidence(
+    vec_a: np.ndarray,
+    vec_b: np.ndarray,
+) -> float:
+    """Calculate confidence score for embedding verification."""
+    # Base confidence
+    confidence = 0.9
+
+    # Reduce confidence for very small vectors (less reliable)
+    if len(vec_a) < 10:
+        confidence *= 0.9
+
+    # Reduce confidence if vectors have very different magnitudes
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
+    if norm_a > 0 and norm_b > 0:
+        magnitude_ratio = min(norm_a, norm_b) / max(norm_a, norm_b)
+        if magnitude_ratio < 0.5:
+            confidence *= 0.85
+
+    # Reduce confidence for near-zero vectors
+    if norm_a < 1e-6 or norm_b < 1e-6:
+        confidence *= 0.7
+
+    return float(np.clip(confidence, 0.0, 1.0))
+
+
+def _log_to_audit(
+    audit_trail: AuditTrail,
+    vec_a: np.ndarray,
+    vec_b: np.ndarray,
+    result: VerificationScore,
+    metric: str,
+    profile_name: str | None,
+) -> None:
+    """Log verification to audit trail."""
+    passed = result.details.get("profile", {}).get("passed", result.drift_score <= 0.3)
+
+    audit_trail.log(
+        operation="verify_embeddings",
+        inputs={
+            "embedding_a_shape": vec_a.shape,
+            "embedding_b_shape": vec_b.shape,
+            "embedding_a_norm": float(np.linalg.norm(vec_a)),
+            "embedding_b_norm": float(np.linalg.norm(vec_b)),
+        },
+        drift_score=result.drift_score,
+        confidence=result.confidence,
+        metric_used=metric,
+        profile_used=profile_name,
+        passed=passed,
+        result_details={
+            "drift_type": result.drift_type.value,
+            "raw_distance": result.details.get("raw_distance"),
         },
     )
 

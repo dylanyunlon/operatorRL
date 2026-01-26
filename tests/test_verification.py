@@ -109,7 +109,7 @@ class TestVerifyEmbeddings:
         emb_a = np.array([1.0, 0.0, 0.0, 0.0])
         emb_b = np.array([0.0, 1.0, 0.0, 0.0])
         score = verify_embeddings(emb_a, emb_b)
-        assert score.drift_score > 0.5
+        assert score.drift_score >= 0.5  # Orthogonal = cosine distance 1.0, normalized to 0.5
 
     def test_opposite_embeddings_have_maximum_drift(self):
         """Opposite embeddings should have maximum drift."""

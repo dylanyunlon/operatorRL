@@ -11,11 +11,23 @@ Publication Target: PyPI (pip install cmvk)
 This library provides pure functions for verification:
 
 - :func:`verify` - Compare two text outputs for semantic drift
-- :func:`verify_embeddings` - Compare embedding vectors
+- :func:`verify_embeddings` - Compare embedding vectors with configurable metrics
 - :func:`verify_distributions` - Compare probability distributions (KL divergence)
 - :func:`verify_sequences` - Compare sequences with alignment
 
 All functions are pure (no side effects) and use only numpy/scipy.
+
+Version 0.2.0 Features
+----------------------
+
+- **Configurable Distance Metrics** (CMVK-001/002): Support for cosine, euclidean,
+  manhattan, chebyshev, and mahalanobis distances
+- **Metric Selection API** (CMVK-003): `verify_embeddings(metric="euclidean")`
+- **Batch Verification** (CMVK-004): `verify_embeddings_batch()` for efficiency
+- **Threshold Profiles** (CMVK-005): Pre-configured thresholds for carbon, financial, medical
+- **Audit Trail** (CMVK-006): Immutable logging with timestamps
+- **Dimensional Weighting** (CMVK-008): Weight certain dimensions higher
+- **Explainable Drift** (CMVK-010): Per-dimension contribution analysis
 
 Example Usage
 -------------
@@ -30,25 +42,36 @@ Basic text verification::
     )
     print(f"Drift: {score.drift_score:.2f}")  # ~0.15 (low = similar)
 
-Embedding comparison::
+Enhanced embedding comparison with Euclidean distance::
 
     import cmvk
     import numpy as np
 
-    emb_a = np.random.randn(768)
-    emb_b = emb_a + np.random.randn(768) * 0.1  # Small perturbation
+    # Euclidean distance preserves magnitude - critical for fraud detection
+    claim_vec = np.array([0.82, 150.0])   # Claimed NDVI, carbon
+    obs_vec = np.array([0.316, 95.0])     # Observed values
 
-    score = cmvk.verify_embeddings(emb_a, emb_b)
-    print(f"Semantic drift: {score.drift_score:.2f}")
+    score = cmvk.verify_embeddings(
+        claim_vec, obs_vec,
+        metric="euclidean",           # Preserves magnitude (CMVK-001)
+        weights=[0.6, 0.4],           # NDVI weighted higher (CMVK-008)
+        threshold_profile="carbon",   # Domain-specific thresholds (CMVK-005)
+        explain=True                  # Show dimension contributions (CMVK-010)
+    )
+
+    print(f"Drift: {score.drift_score:.2f}")
+    print(f"Explanation: {score.explanation}")
 
 Batch verification::
 
-    outputs_a = ["Solution 1", "Solution 2", "Solution 3"]
-    outputs_b = ["Answer 1", "Answer 2", "Answer 3"]
-
-    scores = cmvk.verify_batch(outputs_a, outputs_b)
-    summary = cmvk.aggregate_scores(scores)
-    print(f"Mean drift: {summary.drift_score:.2f}")
+    scores = cmvk.verify_embeddings_batch(
+        claims_vectors,
+        observations_vectors,
+        metric="euclidean",
+        threshold_profile="carbon"
+    )
+    summary = cmvk.aggregate_embedding_scores(scores, threshold_profile="carbon")
+    print(f"Pass rate: {summary['pass_rate']:.1%}")
 
 For Hugging Face Hub integration, see :mod:`cmvk.hf_utils`.
 """
@@ -57,18 +80,42 @@ from __future__ import annotations
 
 from typing import Any
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Imran Siddique"
 __email__ = "imran.siddique@example.com"
 __license__ = "MIT"
 
+# Audit trail
+from .audit import AuditEntry, AuditTrail, configure_audit_trail, get_audit_trail
+
+# Distance metrics module
+from .metrics import (
+    DistanceMetric,
+    MetricResult,
+    calculate_distance,
+    calculate_weighted_distance,
+    get_available_metrics,
+)
+
+# Threshold profiles
+from .profiles import (
+    ProfileName,
+    ThresholdProfile,
+    create_profile,
+    get_profile,
+    list_profiles,
+    register_profile,
+)
 from .types import DriftType, VerificationScore
 from .verification import (
+    DriftExplanation,
+    aggregate_embedding_scores,
     aggregate_scores,
     verify,
     verify_batch,
     verify_distributions,
     verify_embeddings,
+    verify_embeddings_batch,
     verify_sequences,
 )
 
@@ -81,14 +128,35 @@ __all__ = [
     # Types (exported for type annotations)
     "DriftType",
     "VerificationScore",
+    "DriftExplanation",
     # Core verification functions
     "verify",
     "verify_embeddings",
     "verify_distributions",
     "verify_sequences",
-    # Batch operations
+    # Batch operations (CMVK-004)
     "verify_batch",
+    "verify_embeddings_batch",
     "aggregate_scores",
+    "aggregate_embedding_scores",
+    # Distance metrics (CMVK-001/002/003)
+    "DistanceMetric",
+    "MetricResult",
+    "calculate_distance",
+    "calculate_weighted_distance",
+    "get_available_metrics",
+    # Threshold profiles (CMVK-005)
+    "ProfileName",
+    "ThresholdProfile",
+    "get_profile",
+    "list_profiles",
+    "create_profile",
+    "register_profile",
+    # Audit trail (CMVK-006)
+    "AuditEntry",
+    "AuditTrail",
+    "get_audit_trail",
+    "configure_audit_trail",
 ]
 
 
@@ -98,4 +166,16 @@ def __getattr__(name: str) -> Any:
         from . import hf_utils
 
         return hf_utils
+    if name == "metrics":
+        from . import metrics
+
+        return metrics
+    if name == "profiles":
+        from . import profiles
+
+        return profiles
+    if name == "audit":
+        from . import audit
+
+        return audit
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
