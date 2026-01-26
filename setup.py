@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="inter-agent-trust-protocol",
-    version="0.3.1",
+    version="0.4.0",
     author="Imran Siddique",
     author_email="",
-    description="Inter-Agent Trust Protocol - Envoy for Agents",
+    description="Inter-Agent Trust Protocol - Envoy for Agents with Typed IPC Pipes",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/imran-siddique/inter-agent-trust-protocol",

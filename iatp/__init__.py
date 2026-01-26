@@ -70,7 +70,7 @@ Example:
 
 from __future__ import annotations
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"  # Bump for IPC Pipes feature
 __author__ = "Imran Siddique"
 __license__ = "MIT"
 
@@ -103,6 +103,19 @@ from iatp.sidecar import SidecarProxy, create_sidecar
 
 # Telemetry & Tracing
 from iatp.telemetry import FlightRecorder, TraceIDGenerator
+
+# IPC Pipes - Typed inter-agent communication (v0.4.0)
+from iatp.ipc_pipes import (
+    TypedPipe,
+    PipeMessage,
+    PipeConfig,
+    PipeState,
+    PolicyCheckPipe,
+    Pipeline,
+    AgentPipelineStage,
+    create_pipeline,
+    pipe_agents,
+)
 
 # Public API exports - controls what is visible via `from iatp import *`
 __all__ = [
@@ -138,4 +151,14 @@ __all__ = [
     "IATPPolicyEngine",
     # Recovery Engine - Compensating transaction support (scak integration)
     "IATPRecoveryEngine",
+    # IPC Pipes - Typed inter-agent communication (v0.4.0)
+    "TypedPipe",
+    "PipeMessage",
+    "PipeConfig",
+    "PipeState",
+    "PolicyCheckPipe",
+    "Pipeline",
+    "AgentPipelineStage",
+    "create_pipeline",
+    "pipe_agents",
 ]
