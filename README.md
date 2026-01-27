@@ -2,153 +2,51 @@
 
 # Agent OS
 
-## AI Agents Can't Be Trusted. We Fixed That.
+**A kernel architecture for governing autonomous AI agents**
 
-[![PyPI](https://img.shields.io/pypi/v/agent-os-kernel)](https://pypi.org/project/agent-os-kernel/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-76%20passed-brightgreen)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-27%25-yellow)](https://codecov.io/gh/imran-siddique/agent-os)
-[![Security](https://img.shields.io/badge/security-bandit%20%7C%20pip--audit-green)](docs/dependencies.md)
-[![Star History](https://img.shields.io/github/stars/imran-siddique/agent-os?style=social)](https://github.com/imran-siddique/agent-os)
 
 </div>
 
 ---
 
-## The Problem
+## What is Agent OS?
 
-**In 2024**, a hedge fund lost $47M when their trading agent hallucinated a stock price.
-
-**In 2025**, a hospital's diagnosis agent recommended a drug interaction that was contraindicated.
-
-**In 2026**, a carbon market collapsed due to AI-verified phantom credits that didn't exist.
-
-**The root cause?** Agents have no kernel. They run with root permissions. The LLM *decides* whether to follow safety rules.
-
-## The Solution
-
-**Agent OS is the Linux kernel for AI agents.** We provide POSIX-style signals, process isolation, and deterministic enforcement.
+Agent OS applies operating system concepts to AI agent governance. Instead of relying on prompts to enforce safety ("please don't do dangerous things"), it provides kernel-level enforcement where policy violations are blocked before execution.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              USER SPACE (Untrusted LLM)                 │
-│   Your agent code runs here. It can crash, hallucinate, │
-│   or misbehave - the kernel survives.                   │
+│              USER SPACE (Agent Code)                    │
+│   Your agent code runs here. The kernel intercepts      │
+│   actions before they execute.                          │
 ├─────────────────────────────────────────────────────────┤
-│              KERNEL SPACE (Trusted)                     │
+│              KERNEL SPACE                               │
 │   Policy Engine │ Flight Recorder │ Signal Dispatch     │
-│   If agent violates policy → SIGKILL (non-catchable)   │
+│   Actions are checked against policies before execution │
 └─────────────────────────────────────────────────────────┘
 ```
 
-| Metric | Prompt-based | **Agent OS** |
-|--------|-------------|--------------|
-| Safety Violations | 26.67% | **0.00%** |
-| Policy Enforcement | Probabilistic | **Deterministic** |
-| Audit Trail | Partial | **Complete** |
+## The Idea
 
-<div align="center">
+**Prompt-based safety** asks the LLM to follow rules. The LLM decides whether to comply.
 
-[**See It Work ↓**](#examples) · [**Read the Paper →**](papers/) · [**Deploy Now →**](#install)
+**Kernel-based safety** intercepts actions before execution. The policy engine decides, not the LLM.
 
-</div>
+This is the same principle operating systems use: applications request resources, the kernel grants or denies access based on permissions.
 
 ---
 
-## In Production
+## Core Components
 
-🏢 **Climate Tech** — 50 agents auditing carbon credits, caught $5M fraud in 90 seconds
-
-⚡ **Energy Utility** — 100 DERs negotiating power trades in <100ms
-
-🔐 **DeFi Protocol** — Stopped 3 flash loan attacks in first month (142ms response)
-
-💊 **Pharma** — Found 12 FDA filing contradictions in 8 minutes (humans found 3 in 2 weeks)
-
-<div align="center">
-
-[Want to be featured? →](https://github.com/imran-siddique/agent-os/issues/new?title=Production%20Use%20Case)
-
-</div>
-
----
-
-## Why POSIX?
-
-In 1988, **POSIX standardized how processes interact with operating systems.**
-Result: Any program can run on any OS (Linux, BSD, macOS).
-
-**In 2026, we need the same for AI agents.**
-
-| POSIX Primitive | Agent OS Equivalent | What It Does |
-|-----------------|---------------------|--------------|
-| `SIGKILL` | `AgentSignal.SIGKILL` | Terminate agent (non-catchable) |
-| `SIGSTOP` | `AgentSignal.SIGSTOP` | Pause agent to inspect state |
-| `SIGINT` | `AgentSignal.SIGINT` | Graceful interrupt |
-| `/proc` filesystem | Agent VFS | Structured memory (`/mem/working`, `/mem/episodic`) |
-| Pipes (`|`) | IPC Pipes | Type-safe agent-to-agent communication |
-| `syscall()` | `kernel.execute()` | Agent-to-kernel interface |
-
-**Result:** Any agent can run on any infrastructure, with guaranteed safety.
-
-```
-Think: "Kubernetes standardized containers. Agent OS standardizes agents."
-```
-
----
-
-## Agent OS vs LangChain/CrewAI
-
-**LangChain and CrewAI are applications. Agent OS is the operating system underneath.**
-
-```
-Chrome (application) runs on Linux (OS)
-LangChain (framework) runs on Agent OS (kernel)
-
-You don't compare Chrome to Linux.
-You don't compare LangChain to Agent OS.
-But you DO need both.
-```
-
-| Dimension | LangChain | CrewAI | **Agent OS** |
-|-----------|-----------|--------|--------------|
-| **Layer** | Application | Application | **Kernel** |
-| **Purpose** | Build agents | Coordinate agents | **Govern agents** |
-| **Safety** | Prompt-based | Prompt-based | **Kernel-enforced** |
-| **Violations** | ~27% bypass rate | ~27% bypass rate | **0% guaranteed** |
-| **Analogy** | Chrome | Firefox | **Linux** |
-
-### Use Them Together
-
-```python
-# LangChain agent + Agent OS governance
-from langchain.agents import AgentExecutor
-from agent_os import KernelSpace
-
-kernel = KernelSpace(policy="strict")
-
-@kernel.govern  # Wrap any LangChain agent
-async def my_langchain_agent(task: str):
-    return agent_executor.invoke({"input": task})
-
-# Now your LangChain agent has kernel-level safety
-result = await kernel.execute(my_langchain_agent, "analyze data")
-```
-
----
-
-## Quick Jump
-
-| I want to... | Go here |
-|-------------|---------|
-| **Build an Agent** | [`packages/control-plane`](packages/control-plane/) — The Kernel |
-| **Secure my Swarm** | [`packages/iatp`](packages/iatp/) — The Trust Protocol |
-| **Verify Hallucinations** | [`packages/cmvk`](packages/cmvk/) — Cross-Model Verification |
-| **Use with MCP** | [`packages/mcp-kernel-server`](packages/mcp-kernel-server/) — MCP Server |
-| **Add Observability** | [`packages/observability`](packages/observability/) — Prometheus + Grafana |
-| **See Real Examples** | [`examples/carbon-auditor`](examples/carbon-auditor/) — Working Demo |
-| **Read the Research** | [`papers/`](papers/) — Academic Papers |
+| Package | Description |
+|---------|-------------|
+| [`control-plane`](packages/control-plane/) | Kernel with policy engine, signals, VFS |
+| [`iatp`](packages/iatp/) | Inter-Agent Trust Protocol for multi-agent |
+| [`cmvk`](packages/cmvk/) | Cross-Model Verification (consensus across LLMs) |
+| [`amb`](packages/amb/) | Agent Message Bus |
+| [`observability`](packages/observability/) | Prometheus metrics + OpenTelemetry |
+| [`mcp-kernel-server`](packages/mcp-kernel-server/) | MCP server integration |
 
 ---
 
@@ -161,20 +59,19 @@ pip install agent-os-kernel
 Or install specific components:
 
 ```bash
-pip install agent-control-plane  # Kernel + Signals + VFS
-pip install inter-agent-trust-protocol  # Secure multi-agent
-pip install cmvk  # Cross-model verification
-pip install scak  # Self-correcting agents
+pip install agent-control-plane
+pip install inter-agent-trust-protocol
+pip install cmvk
 ```
 
 ---
 
-## 60-Second Example
+## Quick Example
 
 ```python
-from agent_os import KernelSpace, AgentSignal
+from agent_os import KernelSpace
 
-# Create a governed agent
+# Create kernel with policy
 kernel = KernelSpace(policy="strict")
 
 @kernel.register
@@ -182,149 +79,80 @@ async def my_agent(task: str):
     # Your LLM code here
     return llm.generate(task)
 
-# If agent violates policy → automatic SIGKILL
+# Actions are checked against policies
 result = await kernel.execute(my_agent, "analyze this data")
 ```
 
 ---
 
-## Core Concepts
+## POSIX-Inspired Primitives
 
-### Signals - Control Agents Like Processes
+Agent OS borrows concepts from POSIX operating systems:
+
+| Concept | POSIX | Agent OS |
+|---------|-------|----------|
+| Process control | `SIGKILL`, `SIGSTOP` | `AgentSignal.SIGKILL`, `AgentSignal.SIGSTOP` |
+| Filesystem | `/proc`, `/tmp` | VFS with `/mem/working`, `/mem/episodic` |
+| IPC | Pipes (`\|`) | Typed IPC pipes between agents |
+| Syscalls | `open()`, `read()` | `kernel.execute()` |
+
+### Signals
 
 ```python
 from agent_os import SignalDispatcher, AgentSignal
 
 dispatcher.signal(agent_id, AgentSignal.SIGSTOP)  # Pause
 dispatcher.signal(agent_id, AgentSignal.SIGCONT)  # Resume
-dispatcher.signal(agent_id, AgentSignal.SIGKILL)  # Terminate (non-catchable)
+dispatcher.signal(agent_id, AgentSignal.SIGKILL)  # Terminate
 ```
 
-### VFS - Structured Memory
+### VFS (Virtual File System)
 
 ```python
 from agent_os import AgentVFS
 
 vfs = AgentVFS(agent_id="agent-001")
 vfs.write("/mem/working/task.txt", "Current task")
-vfs.write("/mem/episodic/history.log", "What happened")
-vfs.read("/policy/rules.yaml")  # Read-only
-```
-
-### IPC Pipes - Type-Safe Agent Communication
-
-```python
-from agent_os.iatp import Pipeline, PolicyCheck
-
-pipeline = Pipeline([
-    research_agent,
-    PolicyCheck(allowed=["ResearchResult"]),
-    summary_agent
-])
-result = await pipeline.execute("Find AI papers")
+vfs.read("/policy/rules.yaml")  # Read-only from user space
 ```
 
 ---
 
-## MCP Integration (Model Context Protocol)
+## How It Differs from LangChain/CrewAI
 
-Agent OS is MCP-native. Run any MCP-compatible agent with kernel safety:
+LangChain and CrewAI are frameworks for building agents. Agent OS is infrastructure for governing them.
 
-```bash
-pip install mcp-kernel-server
-mcp-kernel-server --stdio  # For Claude Desktop
-```
+| | LangChain/CrewAI | Agent OS |
+|---|------------------|----------|
+| **Purpose** | Build agents | Govern agents |
+| **Layer** | Application | Infrastructure |
+| **Safety** | Prompt-based | Kernel-enforced |
 
-```python
-# Any MCP client gets kernel governance
-from mcp import ClientSession
-
-async with ClientSession() as session:
-    await session.connect("http://localhost:8080")
-    
-    # Verify claims across models
-    result = await session.call_tool("cmvk_verify", {
-        "claim": "This code is safe to execute"
-    })
-    
-    # Execute with policy enforcement
-    result = await session.call_tool("kernel_execute", {
-        "action": "database_query",
-        "params": {"query": "SELECT * FROM users"},
-        "policies": ["read_only", "no_pii"]
-    })
-```
-
----
-
-## Stateless API (MCP June 2026)
-
-For horizontal scaling and serverless deployment:
+You can use them together:
 
 ```python
-from agent_os import stateless_execute
+from langchain.agents import AgentExecutor
+from agent_os import KernelSpace
 
-# Every request is self-contained
-result = await stateless_execute(
-    action="database_query",
-    params={"query": "SELECT * FROM users"},
-    agent_id="analyst-001",
-    policies=["read_only"]
-)
+kernel = KernelSpace(policy="strict")
 
-# No session state - runs on any instance
+@kernel.govern
+async def my_langchain_agent(task: str):
+    return agent_executor.invoke({"input": task})
 ```
-
----
-
-## AGENTS.md Compatibility
-
-Drop Agent OS into any repo with `.agents/agents.md`:
-
-```python
-from agent_os import discover_agents, AgentsParser
-
-# Auto-discover and parse
-configs = discover_agents("./my-project")
-
-# Convert to kernel policies
-parser = AgentsParser()
-policies = parser.to_kernel_policies(configs[0])
-```
-
----
-
-## Observability
-
-Production-ready monitoring for SOC teams:
-
-```python
-from agent_os_observability import KernelMetrics, KernelTracer
-
-metrics = KernelMetrics()
-tracer = KernelTracer(service_name="my-agent")
-
-# Expose /metrics endpoint
-@app.get("/metrics")
-def get_metrics():
-    return Response(metrics.export(), media_type="text/plain")
-```
-
-Key metrics:
-- `agent_os_violation_rate` (target: 0%)
-- `agent_os_policy_check_duration_seconds` (<5ms)
-- `agent_os_mttr_seconds` (recovery time)
 
 ---
 
 ## Examples
 
-| Demo | Industry | What it Shows |
-|------|----------|---------------|
-| [Carbon Auditor](examples/carbon-auditor/) | Climate | Multi-model verification catches fraud |
-| [Grid Balancing](examples/grid-balancing/) | Energy | 100 agents negotiate in <100ms |
-| [DeFi Sentinel](examples/defi-sentinel/) | Crypto | Block attacks in 142ms |
-| [Pharma Compliance](examples/pharma-compliance/) | Healthcare | Find contradictions in 100K pages |
+The `examples/` directory contains working demos:
+
+| Demo | Description |
+|------|-------------|
+| [carbon-auditor](examples/carbon-auditor/) | Multi-model verification example |
+| [grid-balancing](examples/grid-balancing/) | Multi-agent coordination |
+| [defi-sentinel](examples/defi-sentinel/) | Real-time monitoring |
+| [pharma-compliance](examples/pharma-compliance/) | Document analysis |
 
 ```bash
 # Run a demo
@@ -340,51 +168,45 @@ agent-os/
 ├── packages/
 │   ├── primitives/          # Base types
 │   ├── cmvk/                 # Cross-model verification  
-│   ├── caas/                 # Context management
 │   ├── iatp/                 # Inter-agent trust
 │   ├── amb/                  # Message bus
 │   ├── control-plane/        # THE KERNEL
 │   ├── scak/                 # Self-correction
-│   ├── mute-agent/           # Reasoning/execution split
 │   ├── mcp-kernel-server/    # MCP integration
 │   └── observability/        # Prometheus + OTel
 ├── examples/                 # Working demos
 ├── papers/                   # Research papers
-└── src/agent_os/             # Main package
+└── docs/                     # Documentation
 ```
 
 ---
 
-## Integrations
+## Documentation
 
-```python
-# LangChain
-from agent_os.integrations import LangChainKernel
-kernel = LangChainKernel(policy="strict")
-chain = kernel.wrap(your_langchain_chain)
-
-# CrewAI
-from agent_os.integrations import CrewAIKernel
-kernel = CrewAIKernel(policy="strict")
-crew = kernel.wrap(your_crew)
-
-# AutoGen
-from agent_os.integrations import AutoGenKernel
-kernel = AutoGenKernel(policy="strict")
-kernel.govern(your_agents)
-```
+- [Quickstart Guide](docs/quickstart.md)
+- [Kernel Internals](docs/kernel-internals.md)
+- [Architecture Overview](docs/architecture.md)
+- [RFC-001: IATP](docs/rfcs/RFC-001-IATP.md)
+- [RFC-002: Agent VFS](docs/rfcs/RFC-002-Agent-VFS.md)
 
 ---
 
-## Comparison
+## Status
 
-| Feature | LangChain | AutoGen | CrewAI | **Agent OS** |
-|---------|-----------|---------|--------|--------------|
-| Multi-agent | ✓ | ✓ | ✓ | ✓ |
-| Safety guarantees | - | - | - | **Kernel-level** |
-| Deterministic | - | - | - | **Yes** |
-| Process isolation | - | - | - | **Kernel/User** |
-| Audit trail | Partial | Partial | Partial | **Flight Recorder** |
+This is a research project exploring kernel concepts for AI agent governance. The code is functional but not production-hardened.
+
+**What works:**
+- Policy engine with signal-based enforcement
+- VFS for structured agent memory
+- Cross-model verification (CMVK)
+- Inter-agent trust protocol (IATP)
+- MCP server integration
+- Prometheus/OpenTelemetry observability
+
+**What's experimental:**
+- The "0% violation" claim needs formal verification
+- Benchmark numbers need independent reproduction
+- Integration with LangChain/CrewAI is basic
 
 ---
 
@@ -397,8 +219,6 @@ pip install -e ".[dev]"
 pytest
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
 ---
 
 ## License
@@ -407,19 +227,10 @@ MIT - See [LICENSE](LICENSE)
 
 ---
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=imran-siddique/agent-os&type=Date)](https://star-history.com/#imran-siddique/agent-os&Date)
-
----
-
 <div align="center">
 
-**Built for engineers who don't trust their agents.**
+**Exploring kernel concepts for AI agent safety.**
 
-[GitHub](https://github.com/imran-siddique/agent-os) ·
-[PyPI](https://pypi.org/project/agent-os-kernel/) ·
-[Papers](papers/) ·
-[Docs](docs/)
+[GitHub](https://github.com/imran-siddique/agent-os) · [Docs](docs/)
 
 </div>
