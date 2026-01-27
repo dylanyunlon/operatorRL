@@ -1,29 +1,59 @@
 # MCP Kernel Server
 
-**Expose Agent OS kernel primitives through the Model Context Protocol (MCP)**
+**Agent OS kernel primitives via Model Context Protocol (MCP)**
 
-MCP is becoming the "USB-C for AI" - a standard interface for AI tools and resources. This server exposes Agent OS capabilities through MCP, enabling any MCP-compatible client to use kernel-level safety.
+This server exposes Agent OS capabilities through MCP, enabling any MCP-compatible client (Claude Desktop, etc.) to use kernel-level AI agent governance.
 
 ## Quick Start
 
-```bash
-pip install mcp-kernel-server
+### Claude Desktop Integration (Recommended)
 
-# Run the server
-mcp-kernel-server --port 8080
+1. Install the server:
+```bash
+pip install agent-os[mcp]
 ```
 
-## MCP Tools Exposed
+2. Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+```json
+{
+  "mcpServers": {
+    "agent-os": {
+      "command": "mcp-kernel-server",
+      "args": ["--stdio"]
+    }
+  }
+}
+```
 
-### 1. `cmvk_verify` - Cross-Model Verification
-Verify claims across multiple models to detect hallucinations.
+3. Restart Claude Desktop. You now have access to:
+- **Tools**: cmvk_verify, kernel_execute, iatp_sign, iatp_verify, iatp_reputation
+- **Resources**: Agent VFS (memory, policies, audit)
+- **Prompts**: governed_agent, verify_claim, safe_execution
+
+### Development Mode
+
+```bash
+# HTTP transport for testing
+mcp-kernel-server --http --port 8080
+
+# List available tools
+mcp-kernel-server --list-tools
+
+# List available prompts
+mcp-kernel-server --list-prompts
+```
+
+## Available Tools
+
+### `cmvk_verify` - Cross-Model Verification
+Verify claims across multiple AI models to detect hallucinations.
 
 ```json
 {
   "name": "cmvk_verify",
   "arguments": {
-    "claim": "Python's GIL prevents true multithreading",
-    "models": ["gpt-4", "claude-3", "gemini-pro"]
+    "claim": "The capital of France is Paris",
+    "threshold": 0.85
   }
 }
 ```
@@ -33,13 +63,14 @@ Returns:
 {
   "verified": true,
   "confidence": 0.95,
-  "agreement_score": 0.92,
-  "divergences": []
+  "drift_score": 0.05,
+  "models_checked": ["gpt-4", "claude-sonnet-4", "gemini-pro"],
+  "interpretation": "Strong consensus across all models."
 }
 ```
 
-### 2. `kernel_execute` - Governed Execution
-Execute any action through the kernel with policy enforcement.
+### `kernel_execute` - Governed Execution
+Execute actions through the kernel with policy enforcement.
 
 ```json
 {
@@ -47,103 +78,90 @@ Execute any action through the kernel with policy enforcement.
   "arguments": {
     "action": "database_query",
     "params": {"query": "SELECT * FROM users"},
-    "policy": "read_only"
+    "agent_id": "analyst-001",
+    "policies": ["read_only", "no_pii"]
   }
 }
 ```
 
-### 3. `iatp_sign` - Trust Attestation
-Sign agent outputs with cryptographic trust.
+### `iatp_sign` - Trust Attestation
+Sign agent outputs for inter-agent trust.
 
 ```json
 {
   "name": "iatp_sign",
   "arguments": {
-    "content": "Analysis complete: 12 vulnerabilities found",
-    "agent_id": "security-scanner-001"
+    "attester_id": "security-scanner-001",
+    "subject_id": "analyst-001",
+    "trust_level": "verified_partner"
   }
 }
 ```
 
-## MCP Resources Exposed
+### `iatp_verify` - Trust Verification
+Verify trust before agent-to-agent communication.
 
-### `/vfs/{agent_id}/mem/working/*` - Working Memory
-Read/write ephemeral working memory for agents.
-
-### `/vfs/{agent_id}/mem/episodic/*` - Episodic Memory
-Read/write agent experience logs.
-
-### `/vfs/{agent_id}/policy/*` - Policies (Read-Only)
-Read agent policies and constraints.
-
-## Configuration
-
-```yaml
-# mcp-kernel.yaml
-server:
-  port: 8080
-  host: 0.0.0.0
-
-kernel:
-  policy_mode: strict  # strict | permissive | audit
-  max_agents: 100
-  
-cmvk:
-  models:
-    - provider: openai
-      model: gpt-4-turbo
-    - provider: anthropic
-      model: claude-3-sonnet
-  threshold: 0.85
-
-vfs:
-  backend: memory  # memory | redis | s3
-  redis_url: redis://localhost:6379
-```
-
-## Integration with MCP Clients
-
-### Claude Desktop
 ```json
 {
-  "mcpServers": {
-    "agent-os": {
-      "command": "mcp-kernel-server",
-      "args": ["--config", "mcp-kernel.yaml"]
-    }
+  "name": "iatp_verify",
+  "arguments": {
+    "source_agent": "agent-a",
+    "target_agent": "agent-b",
+    "action": "share_data"
   }
 }
 ```
 
-### Any MCP Client
-```python
-from mcp import ClientSession
+### `iatp_reputation` - Reputation Network
+Query or modify agent reputation.
 
-async with ClientSession() as session:
-    # Connect to kernel server
-    await session.connect("http://localhost:8080")
-    
-    # Use CMVK verification
-    result = await session.call_tool(
-        "cmvk_verify",
-        {"claim": "The earth is round"}
-    )
-    
-    # Execute with governance
-    result = await session.call_tool(
-        "kernel_execute",
-        {"action": "send_email", "params": {...}}
-    )
+```json
+{
+  "name": "iatp_reputation",
+  "arguments": {
+    "agent_id": "agent-001",
+    "action": "query"
+  }
+}
 ```
 
-## Stateless Design
+## Available Resources
 
-This server is **stateless by design** (MCP June 2026 standard):
+| URI Template | Description |
+|-------------|-------------|
+| `vfs://{agent_id}/mem/working/{key}` | Ephemeral working memory |
+| `vfs://{agent_id}/mem/episodic/{session}` | Experience logs |
+| `vfs://{agent_id}/policy/{name}` | Policies (read-only) |
+| `audit://{agent_id}/log` | Audit trail (read-only) |
 
-- No session state maintained
-- All context passed in each request
-- State externalized to Redis/S3/DynamoDB
-- Horizontally scalable (run N instances)
+## Available Prompts
+
+### `governed_agent`
+Instructions for operating as a governed agent.
+```
+Arguments: agent_id (required), policies
+```
+
+### `verify_claim`
+Template for CMVK verification.
+```
+Arguments: claim (required)
+```
+
+### `safe_execution`
+Template for safe action execution.
+```
+Arguments: action (required), params (required)
+```
+
+## Stateless Design (MCP June 2026)
+
+This server is **stateless by design**:
+
+- ✅ No session state maintained
+- ✅ All context passed in each request
+- ✅ State externalized to backend storage
+- ✅ Horizontally scalable
 
 ```python
 # Every request is self-contained
@@ -151,10 +169,41 @@ result = await kernel.execute(
     action="database_query",
     context={
         "agent_id": "analyst-001",
-        "policies": ["read_only", "no_pii"],
+        "policies": ["read_only"],
         "history": [...]  # Passed, not stored
     }
 )
+```
+
+## Configuration Options
+
+```bash
+mcp-kernel-server --stdio                    # Claude Desktop (default)
+mcp-kernel-server --http --port 8080         # Development
+mcp-kernel-server --policy-mode strict       # Policy mode: strict|permissive|audit
+mcp-kernel-server --cmvk-threshold 0.90      # CMVK confidence threshold
+```
+
+## Python Integration
+
+```python
+from mcp import ClientSession
+
+async with ClientSession() as session:
+    await session.connect("http://localhost:8080")
+    
+    # Verify a claim
+    result = await session.call_tool("cmvk_verify", {
+        "claim": "The earth is approximately 4.5 billion years old"
+    })
+    
+    # Execute with governance
+    result = await session.call_tool("kernel_execute", {
+        "action": "send_email",
+        "params": {"to": "user@example.com", "body": "..."},
+        "agent_id": "email-agent",
+        "policies": ["no_pii"]
+    })
 ```
 
 ## License
