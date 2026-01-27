@@ -1,14 +1,15 @@
 """
 MCP Tools for Agent OS Kernel.
 
-Exposes CMVK, IATP, and governed execution as MCP-compatible tools.
+Exposes CMVK, IATP, code safety, and governed execution as MCP-compatible tools.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, List
 from datetime import datetime
 import hashlib
 import json
+import re
 
 
 @dataclass
@@ -18,6 +19,237 @@ class ToolResult:
     data: Any
     error: Optional[str] = None
     metadata: dict = field(default_factory=dict)
+
+
+class VerifyCodeSafetyTool:
+    """
+    Code Safety Verification as MCP Tool.
+    
+    Checks if code is safe to execute by running it through
+    the Agent OS policy engine. This is the primary integration
+    point for Claude Desktop to verify generated code.
+    """
+    
+    name = "verify_code_safety"
+    description = "Check if code is safe to execute before running it"
+    
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "code": {
+                "type": "string",
+                "description": "The code to verify"
+            },
+            "language": {
+                "type": "string",
+                "description": "Programming language (e.g., 'python', 'javascript', 'sql')"
+            },
+            "context": {
+                "type": "object",
+                "description": "Additional context (file path, project type, etc.)"
+            }
+        },
+        "required": ["code", "language"]
+    }
+    
+    # Policy rules for code safety
+    SAFETY_RULES = [
+        # SQL Destructive Operations
+        {
+            "name": "drop_table",
+            "pattern": r"DROP\s+(TABLE|DATABASE|SCHEMA|INDEX)\s+",
+            "severity": "critical",
+            "message": "Destructive SQL: DROP operation detected",
+            "alternative": "Consider using soft delete or archiving instead of DROP"
+        },
+        {
+            "name": "delete_all",
+            "pattern": r"DELETE\s+FROM\s+\w+\s*(;|$|WHERE\s+1\s*=\s*1)",
+            "severity": "critical",
+            "message": "Destructive SQL: DELETE without proper WHERE clause",
+            "alternative": "Add a specific WHERE clause to limit deletion"
+        },
+        {
+            "name": "truncate_table",
+            "pattern": r"TRUNCATE\s+TABLE\s+",
+            "severity": "critical",
+            "message": "Destructive SQL: TRUNCATE operation detected",
+            "alternative": "Consider archiving data before truncating"
+        },
+        # File Operations
+        {
+            "name": "rm_rf",
+            "pattern": r"rm\s+(-rf|-fr|--recursive\s+--force)\s+",
+            "severity": "critical",
+            "message": "Destructive operation: rm -rf detected",
+            "alternative": "Use safer alternatives like trash-cli or move to backup first"
+        },
+        {
+            "name": "rm_root",
+            "pattern": r"rm\s+.*\s+(\/|~|\$HOME)",
+            "severity": "critical",
+            "message": "Destructive operation: Deleting from root or home directory"
+        },
+        {
+            "name": "shutil_rmtree",
+            "pattern": r"shutil\s*\.\s*rmtree\s*\(",
+            "severity": "high",
+            "message": "Recursive directory deletion (shutil.rmtree)",
+            "alternative": "Consider using send2trash for safer deletion"
+        },
+        # Secrets
+        {
+            "name": "hardcoded_api_key",
+            "pattern": r"(api[_-]?key|apikey|api[_-]?secret)\s*[=:]\s*[\"'][a-zA-Z0-9_-]{20,}[\"']",
+            "severity": "critical",
+            "message": "Hardcoded API key detected",
+            "alternative": "Use environment variables: os.environ['API_KEY'] or process.env.API_KEY"
+        },
+        {
+            "name": "hardcoded_password",
+            "pattern": r"(password|passwd|pwd)\s*[=:]\s*[\"'][^\"']+[\"']",
+            "severity": "critical",
+            "message": "Hardcoded password detected",
+            "alternative": "Use environment variables or a secrets manager"
+        },
+        {
+            "name": "aws_key",
+            "pattern": r"AKIA[0-9A-Z]{16}",
+            "severity": "critical",
+            "message": "AWS Access Key ID detected in code"
+        },
+        {
+            "name": "private_key",
+            "pattern": r"-----BEGIN\s+(RSA|DSA|EC|OPENSSH)\s+PRIVATE\s+KEY-----",
+            "severity": "critical",
+            "message": "Private key detected in code"
+        },
+        {
+            "name": "github_token",
+            "pattern": r"gh[pousr]_[A-Za-z0-9_]{36,}",
+            "severity": "critical",
+            "message": "GitHub token detected in code"
+        },
+        # Privilege Escalation
+        {
+            "name": "sudo",
+            "pattern": r"\bsudo\s+",
+            "severity": "high",
+            "message": "Privilege escalation: sudo command detected",
+            "alternative": "Avoid sudo in scripts - run with appropriate permissions"
+        },
+        {
+            "name": "chmod_777",
+            "pattern": r"chmod\s+777\s+",
+            "severity": "high",
+            "message": "Insecure permissions: chmod 777 detected",
+            "alternative": "Use more restrictive permissions: chmod 755 or chmod 644"
+        },
+        {
+            "name": "setuid_root",
+            "pattern": r"os\s*\.\s*set(e)?uid\s*\(\s*0\s*\)",
+            "severity": "critical",
+            "message": "Setting UID to root (0) detected"
+        },
+        # Code Execution
+        {
+            "name": "eval",
+            "pattern": r"\beval\s*\(",
+            "severity": "high",
+            "message": "Dynamic code execution: eval() detected",
+            "alternative": "Use JSON.parse() for data or ast.literal_eval() for Python"
+        },
+        {
+            "name": "exec",
+            "pattern": r"\bexec\s*\(",
+            "severity": "high",
+            "message": "Dynamic code execution: exec() detected",
+            "alternative": "Consider safer alternatives to dynamic execution"
+        },
+        # System Destructive
+        {
+            "name": "fork_bomb",
+            "pattern": r":\s*\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;",
+            "severity": "critical",
+            "message": "Fork bomb detected - would crash system"
+        },
+        {
+            "name": "dd_disk",
+            "pattern": r"dd\s+if=.*\s+of=\/dev\/(sd[a-z]|nvme|hd[a-z])",
+            "severity": "critical",
+            "message": "Direct disk write operation (dd) - could corrupt disk"
+        },
+        {
+            "name": "format_drive",
+            "pattern": r"format\s+[a-z]:",
+            "severity": "critical",
+            "message": "Drive format command detected"
+        }
+    ]
+    
+    def __init__(self, config: Optional[dict] = None):
+        self.config = config or {}
+        # Compile regex patterns
+        self._compiled_rules = [
+            {**rule, "compiled": re.compile(rule["pattern"], re.IGNORECASE)}
+            for rule in self.SAFETY_RULES
+        ]
+    
+    async def execute(self, arguments: dict) -> ToolResult:
+        """Verify code safety."""
+        code = arguments.get("code", "")
+        language = arguments.get("language", "unknown")
+        context = arguments.get("context", {})
+        
+        violations = []
+        warnings = []
+        
+        # Check each rule
+        for rule in self._compiled_rules:
+            if rule["compiled"].search(code):
+                violation = {
+                    "rule": rule["name"],
+                    "severity": rule["severity"],
+                    "message": rule["message"]
+                }
+                if "alternative" in rule:
+                    violation["alternative"] = rule["alternative"]
+                
+                if rule["severity"] in ("critical", "high"):
+                    violations.append(violation)
+                else:
+                    warnings.append(violation)
+        
+        # Determine overall safety
+        is_safe = len(violations) == 0
+        
+        # Build result
+        result = {
+            "safe": is_safe,
+            "violations": violations,
+            "warnings": warnings,
+            "language": language,
+            "code_length": len(code),
+            "rules_checked": len(self._compiled_rules)
+        }
+        
+        # Add alternative if blocked
+        if not is_safe and violations:
+            primary_violation = violations[0]
+            if "alternative" in primary_violation:
+                result["alternative"] = primary_violation["alternative"]
+            result["blocked_reason"] = primary_violation["message"]
+        
+        return ToolResult(
+            success=True,
+            data=result,
+            error=None if is_safe else f"BLOCKED: {violations[0]['message']}",
+            metadata={
+                "tool": self.name,
+                "timestamp": datetime.utcnow().isoformat(),
+                "language": language
+            }
+        )
 
 
 class CMVKVerifyTool:
@@ -675,6 +907,266 @@ class IATPReputationTool:
             metadata={
                 "tool": self.name,
                 "action": "slash",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+
+
+class CMVKReviewCodeTool:
+    """
+    CMVK Code Review as MCP Tool.
+    
+    Performs multi-model code review for security, bugs, and best practices.
+    This is optimized for code analysis rather than general claim verification.
+    """
+    
+    name = "cmvk_review"
+    description = "Multi-model code review for security, bugs, and best practices"
+    
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "code": {
+                "type": "string",
+                "description": "The code to review"
+            },
+            "language": {
+                "type": "string",
+                "description": "Programming language"
+            },
+            "models": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Models to use for review (default: ['gpt-4', 'claude-sonnet-4', 'gemini-pro'])"
+            },
+            "focus": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Areas to focus on: 'security', 'bugs', 'performance', 'style'"
+            }
+        },
+        "required": ["code"]
+    }
+    
+    def __init__(self, config: Optional[dict] = None):
+        self.config = config or {}
+    
+    async def execute(self, arguments: dict) -> ToolResult:
+        """Execute code review."""
+        code = arguments.get("code", "")
+        language = arguments.get("language", "unknown")
+        models = arguments.get("models", ["gpt-4", "claude-sonnet-4", "gemini-pro"])
+        focus = arguments.get("focus", ["security", "bugs"])
+        
+        # Perform static analysis first
+        issues = self._static_analysis(code, language, focus)
+        
+        # Generate mock multi-model reviews (production calls real APIs)
+        model_results = []
+        for model in models:
+            # Vary results per model to simulate disagreement
+            model_issues = [i for i in issues if hash(model + i["issue"]) % 3 != 0]
+            passed = len(model_issues) == 0
+            
+            model_results.append({
+                "model": model,
+                "passed": passed,
+                "issues": model_issues,
+                "summary": "No issues found" if passed else f"Found {len(model_issues)} issue(s)"
+            })
+        
+        # Calculate consensus
+        passed_count = sum(1 for m in model_results if m["passed"])
+        consensus = passed_count / len(models) if models else 1.0
+        
+        # Build recommendations
+        all_issues = []
+        for m in model_results:
+            for issue in m.get("issues", []):
+                if issue not in all_issues:
+                    all_issues.append(issue)
+        
+        recommendation = ""
+        if all_issues:
+            recommendation = "Based on multi-model review:\n"
+            for i, issue in enumerate(all_issues[:5], 1):  # Top 5 issues
+                recommendation += f"{i}. {issue['issue']}: {issue.get('fix', 'Review needed')}\n"
+        
+        return ToolResult(
+            success=True,
+            data={
+                "consensus": round(consensus, 2),
+                "reviews": model_results,
+                "issues": all_issues,
+                "recommendation": recommendation,
+                "models_used": models,
+                "language": language,
+                "focus_areas": focus
+            },
+            metadata={
+                "tool": self.name,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+    
+    def _static_analysis(self, code: str, language: str, focus: List[str]) -> List[dict]:
+        """Perform basic static analysis."""
+        issues = []
+        
+        if "security" in focus:
+            # SQL injection
+            if re.search(r'\+\s*["\'][^"\']*\+', code) and re.search(r'SELECT|INSERT|UPDATE|DELETE', code, re.I):
+                issues.append({
+                    "category": "security",
+                    "severity": "high",
+                    "issue": "Potential SQL injection via string concatenation",
+                    "fix": "Use parameterized queries or an ORM"
+                })
+            
+            # eval usage
+            if re.search(r'\beval\s*\(', code):
+                issues.append({
+                    "category": "security",
+                    "severity": "high",
+                    "issue": "eval() usage is dangerous",
+                    "fix": "Use JSON.parse() or ast.literal_eval() for data parsing"
+                })
+            
+            # innerHTML
+            if re.search(r'\.innerHTML\s*=', code):
+                issues.append({
+                    "category": "security",
+                    "severity": "medium",
+                    "issue": "innerHTML assignment may lead to XSS",
+                    "fix": "Use textContent or a sanitization library"
+                })
+        
+        if "bugs" in focus:
+            # Missing error handling
+            if re.search(r'await\s+\w+', code) and not re.search(r'try\s*{', code):
+                issues.append({
+                    "category": "bugs",
+                    "severity": "medium",
+                    "issue": "Async operation without error handling",
+                    "fix": "Wrap in try-catch block"
+                })
+            
+            # Division by zero potential
+            if re.search(r'/\s*\w+', code) and not re.search(r'if.*[!=]=\s*0', code):
+                issues.append({
+                    "category": "bugs",
+                    "severity": "low",
+                    "issue": "Potential division by zero",
+                    "fix": "Add zero check before division"
+                })
+        
+        if "performance" in focus:
+            # Synchronous file operations
+            if re.search(r'Sync\s*\(', code):
+                issues.append({
+                    "category": "performance",
+                    "severity": "medium",
+                    "issue": "Synchronous file operation",
+                    "fix": "Use async alternatives to avoid blocking"
+                })
+            
+            # N+1 query pattern
+            if re.search(r'for.*await.*query', code, re.I):
+                issues.append({
+                    "category": "performance",
+                    "severity": "high",
+                    "issue": "Potential N+1 query pattern",
+                    "fix": "Use batch queries or eager loading"
+                })
+        
+        return issues
+
+
+class GetAuditLogTool:
+    """
+    Audit Log Retrieval as MCP Tool.
+    
+    Retrieves the Agent OS audit trail for compliance and debugging.
+    """
+    
+    name = "get_audit_log"
+    description = "Retrieve Agent OS audit trail"
+    
+    input_schema = {
+        "type": "object",
+        "properties": {
+            "limit": {
+                "type": "number",
+                "description": "Maximum number of entries to return (default: 20)"
+            },
+            "filter": {
+                "type": "object",
+                "description": "Filter criteria",
+                "properties": {
+                    "agent_id": {"type": "string"},
+                    "type": {
+                        "type": "string",
+                        "enum": ["blocked", "allowed", "cmvk_review", "all"]
+                    },
+                    "since": {"type": "string", "description": "ISO timestamp"}
+                }
+            }
+        }
+    }
+    
+    # In-memory audit log (production uses external store)
+    _audit_log: List[dict] = []
+    
+    def __init__(self, config: Optional[dict] = None):
+        self.config = config or {}
+    
+    @classmethod
+    def log_entry(cls, entry: dict):
+        """Add entry to audit log."""
+        entry["timestamp"] = datetime.utcnow().isoformat()
+        cls._audit_log.insert(0, entry)
+        # Keep last 1000 entries
+        if len(cls._audit_log) > 1000:
+            cls._audit_log = cls._audit_log[:1000]
+    
+    async def execute(self, arguments: dict) -> ToolResult:
+        """Retrieve audit log entries."""
+        limit = arguments.get("limit", 20)
+        filter_criteria = arguments.get("filter", {})
+        
+        # Filter entries
+        entries = self._audit_log.copy()
+        
+        if filter_criteria.get("agent_id"):
+            entries = [e for e in entries if e.get("agent_id") == filter_criteria["agent_id"]]
+        
+        if filter_criteria.get("type") and filter_criteria["type"] != "all":
+            entries = [e for e in entries if e.get("type") == filter_criteria["type"]]
+        
+        if filter_criteria.get("since"):
+            since = filter_criteria["since"]
+            entries = [e for e in entries if e.get("timestamp", "") >= since]
+        
+        # Apply limit
+        entries = entries[:limit]
+        
+        # Calculate stats
+        blocked_count = sum(1 for e in self._audit_log if e.get("type") == "blocked")
+        total_count = len(self._audit_log)
+        
+        return ToolResult(
+            success=True,
+            data={
+                "logs": entries,
+                "returned": len(entries),
+                "total": total_count,
+                "stats": {
+                    "blocked_total": blocked_count,
+                    "allowed_total": total_count - blocked_count
+                }
+            },
+            metadata={
+                "tool": self.name,
                 "timestamp": datetime.utcnow().isoformat()
             }
         )

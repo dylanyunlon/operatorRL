@@ -32,6 +32,9 @@ from mcp_kernel_server.tools import (
     IATPSignTool,
     IATPVerifyTool,
     IATPReputationTool,
+    VerifyCodeSafetyTool,
+    CMVKReviewCodeTool,
+    GetAuditLogTool,
     ToolResult,
 )
 from mcp_kernel_server.resources import VFSResource, VFSResourceTemplate
@@ -164,12 +167,15 @@ class KernelMCPServer:
     - State externalized to backend storage
     - Horizontally scalable
     
-    Tools (5 total):
-    - cmvk_verify: Cross-model verification
+    Tools (8 total):
+    - verify_code_safety: Check code safety before execution
+    - cmvk_verify: Cross-model claim verification
+    - cmvk_review: Multi-model code review
     - kernel_execute: Governed action execution
     - iatp_sign: Trust attestation signing
     - iatp_verify: Trust relationship verification
     - iatp_reputation: Reputation query/slashing
+    - get_audit_log: Retrieve audit trail
     
     Resources:
     - vfs://{agent_id}/mem/* - Agent memory
@@ -183,7 +189,7 @@ class KernelMCPServer:
     """
     
     SERVER_NAME = "agent-os-kernel"
-    SERVER_VERSION = "1.1.0"
+    SERVER_VERSION = "1.2.0"
     PROTOCOL_VERSION = "2024-11-05"
     
     def __init__(self, config: Optional[ServerConfig] = None):
@@ -191,11 +197,14 @@ class KernelMCPServer:
         
         # Initialize tools (stateless)
         self.tools = {
+            "verify_code_safety": VerifyCodeSafetyTool(),
             "cmvk_verify": CMVKVerifyTool({"threshold": self.config.cmvk_threshold}),
+            "cmvk_review": CMVKReviewCodeTool(),
             "kernel_execute": KernelExecuteTool({"policy_mode": self.config.policy_mode}),
             "iatp_sign": IATPSignTool(),
             "iatp_verify": IATPVerifyTool(),
             "iatp_reputation": IATPReputationTool(),
+            "get_audit_log": GetAuditLogTool(),
         }
         
         # Initialize resources (stateless with external backend)
