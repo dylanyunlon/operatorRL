@@ -218,9 +218,19 @@ from agent_os.stateless import (
 # AGENTS.md Compatibility
 from agent_os.agents_compat import (
     AgentsParser,
-    AgentConfig,
+    AgentConfig as AgentsConfig,  # Renamed to avoid conflict
     AgentSkill,
     discover_agents,
+)
+
+# Base Agent Classes
+from agent_os.base_agent import (
+    BaseAgent,
+    ToolUsingAgent,
+    AgentConfig,
+    AuditEntry,
+    PolicyDecision,
+    TypedResult,
 )
 
 # ============================================================================
@@ -339,9 +349,17 @@ __all__ = [
     "StatelessMemoryBackend",
     "stateless_execute",
     
+    # Base Agent Classes
+    "BaseAgent",
+    "ToolUsingAgent",
+    "AgentConfig",
+    "AuditEntry",
+    "PolicyDecision",
+    "TypedResult",
+    
     # AGENTS.md Compatibility
     "AgentsParser",
-    "AgentConfig",
+    "AgentsConfig",
     "AgentSkill",
     "discover_agents",
 ]
