@@ -6,9 +6,14 @@ Key metrics for CISOs:
 - Policy enforcement latency (<5ms target)
 - Agent uptime
 - MTTR after SIGKILL
+
+Key metrics for ML Ops:
+- CMVK consensus rate
+- Model disagreement tracking
+- Verification latency
 """
 
-from prometheus_client import Counter, Histogram, Gauge, Info, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, Info, Summary, generate_latest, CONTENT_TYPE_LATEST
 from typing import Optional
 import time
 
@@ -151,6 +156,76 @@ class KernelMetrics:
         )
         
         # =====================================================================
+        # CMVK Metrics (ML Ops)
+        # =====================================================================
+        
+        self.cmvk_verifications_total = Counter(
+            f"{namespace}_cmvk_verifications_total",
+            "Total CMVK verifications performed",
+            ["result"]  # verified, flagged, rejected
+        )
+        
+        self.cmvk_consensus_ratio = Gauge(
+            f"{namespace}_cmvk_consensus_ratio",
+            "Current model consensus ratio (0.0-1.0)"
+        )
+        
+        self.cmvk_model_disagreements = Counter(
+            f"{namespace}_cmvk_model_disagreements_total",
+            "Model disagreements detected",
+            ["model_pair"]  # e.g., "gpt4_claude", "claude_gemini"
+        )
+        
+        self.cmvk_drift_score = Histogram(
+            f"{namespace}_cmvk_drift_score",
+            "Distribution of drift scores",
+            buckets=[0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 1.0]
+        )
+        
+        self.cmvk_verification_duration = Histogram(
+            f"{namespace}_cmvk_verification_duration_seconds",
+            "Time to complete CMVK verification",
+            ["model_count"],
+            buckets=[0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0]
+        )
+        
+        self.cmvk_model_latency = Histogram(
+            f"{namespace}_cmvk_model_latency_seconds",
+            "Per-model response latency",
+            ["model"],
+            buckets=[0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
+        )
+        
+        self.cmvk_claims_by_confidence = Counter(
+            f"{namespace}_cmvk_claims_by_confidence",
+            "Claims grouped by confidence level",
+            ["confidence_bucket"]  # high (>0.9), medium (0.7-0.9), low (<0.7)
+        )
+        
+        # =====================================================================
+        # Agent-Level Metrics
+        # =====================================================================
+        
+        self.agent_llm_calls = Counter(
+            f"{namespace}_agent_llm_calls_total",
+            "Total LLM API calls by agent",
+            ["agent_id", "model"]
+        )
+        
+        self.agent_errors = Counter(
+            f"{namespace}_agent_errors_total",
+            "Agent errors by type",
+            ["agent_id", "error_type"]
+        )
+        
+        self.agent_execution_duration = Histogram(
+            f"{namespace}_agent_execution_duration_seconds",
+            "Agent task execution time",
+            ["agent_id"],
+            buckets=[0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]
+        )
+        
+        # =====================================================================
         # Info Metrics
         # =====================================================================
         
@@ -159,7 +234,7 @@ class KernelMetrics:
             "Kernel version and configuration"
         )
         self.kernel_info.info({
-            "version": "0.4.0",
+            "version": "1.1.0",
             "policy_mode": "strict"
         })
         
@@ -210,6 +285,58 @@ class KernelMetrics:
             self.kernel_crashes.inc()
         else:
             self.agent_crashes.labels(agent_id=agent_id, reason=reason).inc()
+    
+    # =========================================================================
+    # CMVK Recording Methods
+    # =========================================================================
+    
+    def record_cmvk_verification(
+        self,
+        result: str,
+        confidence: float,
+        drift_score: float,
+        duration_seconds: float,
+        model_count: int = 3
+    ):
+        """Record a CMVK verification."""
+        self.cmvk_verifications_total.labels(result=result).inc()
+        self.cmvk_drift_score.observe(drift_score)
+        self.cmvk_consensus_ratio.set(1.0 - drift_score)
+        self.cmvk_verification_duration.labels(model_count=str(model_count)).observe(duration_seconds)
+        
+        # Bucket by confidence
+        if confidence >= 0.9:
+            bucket = "high"
+        elif confidence >= 0.7:
+            bucket = "medium"
+        else:
+            bucket = "low"
+        self.cmvk_claims_by_confidence.labels(confidence_bucket=bucket).inc()
+    
+    def record_cmvk_model_response(self, model: str, latency_seconds: float):
+        """Record individual model response in CMVK."""
+        self.cmvk_model_latency.labels(model=model).observe(latency_seconds)
+    
+    def record_cmvk_disagreement(self, model_a: str, model_b: str):
+        """Record a disagreement between two models."""
+        pair = f"{model_a}_{model_b}" if model_a < model_b else f"{model_b}_{model_a}"
+        self.cmvk_model_disagreements.labels(model_pair=pair).inc()
+    
+    # =========================================================================
+    # Agent Recording Methods
+    # =========================================================================
+    
+    def record_agent_llm_call(self, agent_id: str, model: str):
+        """Record an LLM API call by an agent."""
+        self.agent_llm_calls.labels(agent_id=agent_id, model=model).inc()
+    
+    def record_agent_error(self, agent_id: str, error_type: str):
+        """Record an agent error."""
+        self.agent_errors.labels(agent_id=agent_id, error_type=error_type).inc()
+    
+    def record_agent_execution(self, agent_id: str, duration_seconds: float):
+        """Record agent task execution time."""
+        self.agent_execution_duration.labels(agent_id=agent_id).observe(duration_seconds)
     
     def _update_violation_rate(self):
         """Update violation rate gauge."""

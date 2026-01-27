@@ -16,6 +16,7 @@ def get_grafana_dashboard(name: str = "agent-os-overview") -> dict:
     - agent-os-safety: Safety metrics detail
     - agent-os-performance: Performance metrics
     - agent-os-amb: AMB health and throughput
+    - agent-os-cmvk: CMVK verification metrics
     
     Usage:
         dashboard = get_grafana_dashboard("agent-os-overview")
@@ -26,6 +27,7 @@ def get_grafana_dashboard(name: str = "agent-os-overview") -> dict:
         "agent-os-safety": _safety_dashboard(),
         "agent-os-performance": _performance_dashboard(),
         "agent-os-amb": _amb_dashboard(),
+        "agent-os-cmvk": _cmvk_dashboard(),
     }
     return dashboards.get(name, dashboards["agent-os-overview"])
 
@@ -586,6 +588,303 @@ def _amb_dashboard() -> dict:
                     "targets": [
                         {
                             "expr": "amb_wal_messages_pending",
+                            "refId": "A"
+                        }
+                    ]
+                }
+            ]
+        },
+        "folderId": 0,
+        "overwrite": True
+    }
+
+
+def _cmvk_dashboard() -> dict:
+    """CMVK (Cross-Model Verification Kernel) dashboard for ML Ops."""
+    return {
+        "dashboard": {
+            "id": None,
+            "uid": "agent-os-cmvk",
+            "title": "Agent OS - CMVK Verification",
+            "tags": ["agent-os", "cmvk", "ml-ops", "verification"],
+            "timezone": "browser",
+            "schemaVersion": 38,
+            "version": 1,
+            "refresh": "10s",
+            "panels": [
+                # Row 1: Key CMVK Metrics
+                {
+                    "id": 1,
+                    "type": "stat",
+                    "title": "Model Consensus Rate",
+                    "description": "Current agreement ratio across verification models (target: >90%)",
+                    "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+                    "targets": [
+                        {
+                            "expr": "agent_os_cmvk_consensus_ratio",
+                            "refId": "A"
+                        }
+                    ],
+                    "fieldConfig": {
+                        "defaults": {
+                            "unit": "percentunit",
+                            "thresholds": {
+                                "steps": [
+                                    {"color": "red", "value": None},
+                                    {"color": "yellow", "value": 0.7},
+                                    {"color": "green", "value": 0.9}
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": 2,
+                    "type": "stat",
+                    "title": "Verifications (24h)",
+                    "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+                    "targets": [
+                        {
+                            "expr": "increase(agent_os_cmvk_verifications_total[24h])",
+                            "refId": "A"
+                        }
+                    ]
+                },
+                {
+                    "id": 3,
+                    "type": "stat",
+                    "title": "Flagged Claims (24h)",
+                    "description": "Claims flagged due to model disagreement",
+                    "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+                    "targets": [
+                        {
+                            "expr": "increase(agent_os_cmvk_verifications_total{result='flagged'}[24h])",
+                            "refId": "A"
+                        }
+                    ],
+                    "fieldConfig": {
+                        "defaults": {
+                            "thresholds": {
+                                "steps": [
+                                    {"color": "green", "value": None},
+                                    {"color": "yellow", "value": 10},
+                                    {"color": "red", "value": 50}
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": 4,
+                    "type": "stat",
+                    "title": "Avg Verification Time",
+                    "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+                    "targets": [
+                        {
+                            "expr": "histogram_quantile(0.50, rate(agent_os_cmvk_verification_duration_seconds_bucket[5m]))",
+                            "refId": "A"
+                        }
+                    ],
+                    "fieldConfig": {
+                        "defaults": {
+                            "unit": "s",
+                            "thresholds": {
+                                "steps": [
+                                    {"color": "green", "value": None},
+                                    {"color": "yellow", "value": 3},
+                                    {"color": "red", "value": 10}
+                                ]
+                            }
+                        }
+                    }
+                },
+                
+                # Row 2: Verification Results
+                {
+                    "id": 5,
+                    "type": "piechart",
+                    "title": "Verification Results (24h)",
+                    "gridPos": {"h": 8, "w": 8, "x": 0, "y": 4},
+                    "targets": [
+                        {
+                            "expr": "increase(agent_os_cmvk_verifications_total[24h])",
+                            "legendFormat": "{{result}}",
+                            "refId": "A"
+                        }
+                    ],
+                    "options": {
+                        "legend": {"displayMode": "table", "placement": "right"}
+                    }
+                },
+                {
+                    "id": 6,
+                    "type": "timeseries",
+                    "title": "Verification Rate Over Time",
+                    "gridPos": {"h": 8, "w": 16, "x": 8, "y": 4},
+                    "targets": [
+                        {
+                            "expr": "rate(agent_os_cmvk_verifications_total[5m])",
+                            "legendFormat": "{{result}}",
+                            "refId": "A"
+                        }
+                    ],
+                    "fieldConfig": {
+                        "defaults": {
+                            "unit": "req/s",
+                            "custom": {
+                                "fillOpacity": 30
+                            }
+                        }
+                    }
+                },
+                
+                # Row 3: Drift and Consensus
+                {
+                    "id": 7,
+                    "type": "timeseries",
+                    "title": "Drift Score Distribution",
+                    "description": "Lower is better. High drift = model disagreement.",
+                    "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+                    "targets": [
+                        {
+                            "expr": "histogram_quantile(0.99, rate(agent_os_cmvk_drift_score_bucket[5m]))",
+                            "legendFormat": "p99",
+                            "refId": "A"
+                        },
+                        {
+                            "expr": "histogram_quantile(0.95, rate(agent_os_cmvk_drift_score_bucket[5m]))",
+                            "legendFormat": "p95",
+                            "refId": "B"
+                        },
+                        {
+                            "expr": "histogram_quantile(0.50, rate(agent_os_cmvk_drift_score_bucket[5m]))",
+                            "legendFormat": "p50",
+                            "refId": "C"
+                        }
+                    ],
+                    "fieldConfig": {
+                        "defaults": {
+                            "thresholds": {
+                                "steps": [
+                                    {"color": "green", "value": None},
+                                    {"color": "yellow", "value": 0.15},
+                                    {"color": "red", "value": 0.30}
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": 8,
+                    "type": "timeseries",
+                    "title": "Model Disagreements Rate",
+                    "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+                    "targets": [
+                        {
+                            "expr": "rate(agent_os_cmvk_model_disagreements_total[5m])",
+                            "legendFormat": "{{model_pair}}",
+                            "refId": "A"
+                        }
+                    ]
+                },
+                
+                # Row 4: Per-Model Performance
+                {
+                    "id": 9,
+                    "type": "timeseries",
+                    "title": "Model Response Latency",
+                    "description": "Individual model response times",
+                    "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+                    "targets": [
+                        {
+                            "expr": "histogram_quantile(0.95, rate(agent_os_cmvk_model_latency_seconds_bucket[5m]))",
+                            "legendFormat": "{{model}} p95",
+                            "refId": "A"
+                        }
+                    ],
+                    "fieldConfig": {
+                        "defaults": {
+                            "unit": "s",
+                            "thresholds": {
+                                "steps": [
+                                    {"color": "green", "value": None},
+                                    {"color": "yellow", "value": 2},
+                                    {"color": "red", "value": 5}
+                                ]
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": 10,
+                    "type": "bargauge",
+                    "title": "Claims by Confidence Level",
+                    "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+                    "targets": [
+                        {
+                            "expr": "increase(agent_os_cmvk_claims_by_confidence[24h])",
+                            "legendFormat": "{{confidence_bucket}}",
+                            "refId": "A"
+                        }
+                    ],
+                    "options": {
+                        "displayMode": "gradient",
+                        "orientation": "horizontal"
+                    },
+                    "fieldConfig": {
+                        "defaults": {
+                            "thresholds": {
+                                "steps": [
+                                    {"color": "red", "value": None},
+                                    {"color": "yellow", "value": 0},
+                                    {"color": "green", "value": 0}
+                                ]
+                            }
+                        },
+                        "overrides": [
+                            {
+                                "matcher": {"id": "byName", "options": "high"},
+                                "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]
+                            },
+                            {
+                                "matcher": {"id": "byName", "options": "medium"},
+                                "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]
+                            },
+                            {
+                                "matcher": {"id": "byName", "options": "low"},
+                                "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]
+                            }
+                        ]
+                    }
+                },
+                
+                # Row 5: Verification Duration
+                {
+                    "id": 11,
+                    "type": "heatmap",
+                    "title": "Verification Duration Heatmap",
+                    "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+                    "targets": [
+                        {
+                            "expr": "sum(rate(agent_os_cmvk_verification_duration_seconds_bucket[1m])) by (le)",
+                            "format": "heatmap",
+                            "refId": "A"
+                        }
+                    ],
+                    "options": {
+                        "yAxis": {"unit": "s"}
+                    }
+                },
+                {
+                    "id": 12,
+                    "type": "table",
+                    "title": "Recent High-Drift Claims",
+                    "description": "Claims with drift >0.20 that may need review",
+                    "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+                    "targets": [
+                        {
+                            "expr": "topk(10, agent_os_cmvk_drift_score > 0.20)",
+                            "format": "table",
                             "refId": "A"
                         }
                     ]
