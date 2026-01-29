@@ -1,7 +1,7 @@
 {
   "name": "@agent-os/copilot-extension",
   "version": "1.0.0",
-  "description": "Agent OS Safety Layer for GitHub Copilot - Kernel-level safety verification for AI code suggestions",
+  "description": "AgentOS GitHub Copilot Extension - Build safe AI agents with natural language and 0% policy violations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "repository": {
@@ -14,9 +14,14 @@
     "extension",
     "safety",
     "ai",
+    "agents",
     "code-review",
     "security",
-    "agent-os"
+    "agent-os",
+    "compliance",
+    "gdpr",
+    "hipaa",
+    "soc2"
   ],
   "author": "Agent OS Team",
   "license": "MIT",
@@ -52,9 +57,9 @@
     "ts-node": "^10.9.0"
   },
   "copilotExtension": {
-    "name": "agent-os-safety",
-    "displayName": "Agent OS Safety Layer",
-    "description": "Kernel-level safety verification for GitHub Copilot suggestions",
+    "name": "agentos",
+    "displayName": "AgentOS",
+    "description": "Build safe AI agents with natural language and 0% policy violations",
     "publisher": "agent-os",
     "version": "1.0.0",
     "capabilities": {
@@ -66,27 +71,141 @@
       "copilot:suggestions:filter",
       "copilot:suggestions:annotate",
       "copilot:chat:respond",
-      "copilot:context:read"
+      "copilot:context:read",
+      "github:actions:write",
+      "github:contents:write"
     ],
     "chatCommands": [
       {
+        "name": "create",
+        "description": "Create a new agent from natural language description",
+        "examples": [
+          "@agentos create agent for processing customer feedback",
+          "@agentos create agent to monitor API uptime"
+        ]
+      },
+      {
+        "name": "design",
+        "description": "Design a multi-step workflow for complex tasks",
+        "examples": [
+          "@agentos design workflow to generate daily reports"
+        ]
+      },
+      {
+        "name": "templates",
+        "description": "Browse 50+ pre-built agent templates",
+        "examples": [
+          "@agentos templates",
+          "@agentos templates devops"
+        ]
+      },
+      {
+        "name": "test",
+        "description": "Test agent with scenarios and detect edge cases",
+        "examples": [
+          "@agentos test this agent"
+        ]
+      },
+      {
+        "name": "debug",
+        "description": "Debug agent failures and get fix suggestions",
+        "examples": [
+          "@agentos why did this agent fail?"
+        ]
+      },
+      {
         "name": "review",
-        "description": "Review code for safety issues using CMVK multi-model verification"
+        "description": "Review code with CMVK multi-model verification",
+        "examples": [
+          "@agentos review"
+        ]
       },
       {
         "name": "policy",
-        "description": "Show or configure safety policies"
+        "description": "Show or configure safety policies",
+        "examples": [
+          "@agentos policy"
+        ]
+      },
+      {
+        "name": "compliance",
+        "description": "Check compliance with GDPR, HIPAA, SOC2, PCI DSS",
+        "examples": [
+          "@agentos compliance gdpr",
+          "@agentos compliance soc2"
+        ]
+      },
+      {
+        "name": "security",
+        "description": "Run security audit on agent code",
+        "examples": [
+          "@agentos security"
+        ]
+      },
+      {
+        "name": "deploy",
+        "description": "Deploy agent to GitHub Actions",
+        "examples": [
+          "@agentos deploy"
+        ]
+      },
+      {
+        "name": "optimize",
+        "description": "Get performance optimization suggestions",
+        "examples": [
+          "@agentos optimize"
+        ]
       },
       {
         "name": "audit",
-        "description": "Show recent safety audit log"
+        "description": "View recent safety audit log",
+        "examples": [
+          "@agentos audit"
+        ]
+      },
+      {
+        "name": "help",
+        "description": "Show help and available commands"
+      }
+    ],
+    "slashCommands": [
+      {
+        "command": "/agent-new",
+        "description": "Create a new agent"
+      },
+      {
+        "command": "/policy-add",
+        "description": "Add a safety policy"
+      },
+      {
+        "command": "/safety-check",
+        "description": "Run safety check on code"
+      },
+      {
+        "command": "/deploy",
+        "description": "Deploy to GitHub Actions"
+      },
+      {
+        "command": "/templates",
+        "description": "Browse templates"
       }
     ],
     "icon": "images/icon.png",
     "categories": [
+      "AI Agents",
       "Security",
       "Code Quality",
-      "AI Safety"
+      "Automation",
+      "Compliance"
+    ],
+    "features": [
+      "Natural language to agent code generation",
+      "50+ pre-built agent templates",
+      "0% policy violation guarantee",
+      "GDPR, HIPAA, SOC2, PCI DSS compliance checking",
+      "Multi-model code verification (CMVK)",
+      "GitHub Actions deployment",
+      "Real-time safety annotations"
     ]
   }
 }

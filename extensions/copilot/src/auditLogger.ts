@@ -3,7 +3,7 @@
  */
 
 export interface AuditEntry {
-    type: 'blocked' | 'warning' | 'allowed' | 'cmvk_review';
+    type: 'blocked' | 'warning' | 'allowed' | 'cmvk_review' | 'agent_created' | 'agent_deployed' | 'compliance_check';
     timestamp: Date;
     file?: string;
     language?: string;
@@ -12,6 +12,8 @@ export interface AuditEntry {
     reason?: string;
     result?: any;
     repository?: string;
+    agent?: string;
+    description?: string;
 }
 
 export class AuditLogger {
