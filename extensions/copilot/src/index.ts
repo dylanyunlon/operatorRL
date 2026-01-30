@@ -367,16 +367,20 @@ app.get('/api/status', (req: Request, res: Response) => {
     });
 });
 
-// Start server
+// Start server only if not in serverless environment
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    logger.info(`Agent OS Copilot Extension running on port ${PORT}`);
-    logger.info('Endpoints:');
-    logger.info('  POST /api/filter   - Filter Copilot suggestions');
-    logger.info('  POST /api/chat     - Handle @agent-os chat commands');
-    logger.info('  POST /api/annotate - Get safety annotations');
-    logger.info('  GET  /api/audit    - Get audit log');
-    logger.info('  GET  /api/policy   - Get active policies');
-});
 
+if (process.env.VERCEL !== '1') {
+    app.listen(PORT, () => {
+        logger.info(`Agent OS Copilot Extension running on port ${PORT}`);
+        logger.info('Endpoints:');
+        logger.info('  POST /api/copilot  - Copilot extension endpoint');
+        logger.info('  POST /api/webhook  - GitHub webhook endpoint');
+        logger.info('  GET  /api/audit    - Get audit log');
+        logger.info('  GET  /api/policy   - Get active policies');
+    });
+}
+
+// Export for Vercel serverless
+export default app;
 export { app };
