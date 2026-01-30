@@ -86,28 +86,40 @@ This is the same principle operating systems use: applications request resources
 
 ```
 agent-os/
-├── modules/                  # OS Modules (like Linux kernel modules)
+├── src/agent_os/             # Core Python package
+│   ├── __init__.py           # Public API
+│   ├── cli.py                # Command-line interface
+│   └── integrations/         # Framework adapters
+├── modules/                  # Kernel Modules (4-layer architecture)
 │   ├── primitives/           # Layer 1: Base types and failures
-│   ├── cmvk/                 # Layer 2: Cross-model verification
+│   ├── cmvk/                 # Layer 1: Cross-model verification
+│   ├── emk/                  # Layer 1: Episodic memory kernel
+│   ├── caas/                 # Layer 1: Context-as-a-Service
 │   ├── amb/                  # Layer 2: Agent message bus
 │   ├── iatp/                 # Layer 2: Inter-agent trust protocol
-│   ├── emk/                  # Layer 2: Episodic memory kernel
-│   ├── control-plane/        # Layer 3: THE KERNEL
-│   ├── observability/        # Layer 3: Prometheus + OpenTelemetry
+│   ├── atr/                  # Layer 2: Agent tool registry
+│   ├── observability/        # Layer 2: Prometheus + OpenTelemetry
+│   ├── control-plane/        # Layer 3: THE KERNEL (policies, signals)
 │   ├── scak/                 # Layer 4: Self-correcting agent kernel
-│   ├── mute-agent/           # Layer 4: Face/Hands agent architecture
-│   ├── atr/                  # Layer 4: Agent tool registry
-│   ├── caas/                 # Layer 4: Context-as-a-Service
-│   └── mcp-kernel-server/    # Integration: MCP for Claude Desktop
-├── extensions/               # IDE & CLI Extensions
+│   ├── mute-agent/           # Layer 4: Face/Hands architecture
+│   └── mcp-kernel-server/    # Integration: MCP protocol support
+├── extensions/               # IDE & AI Assistant Extensions
 │   ├── vscode/               # VS Code extension
-│   ├── cursor/               # Cursor IDE extension
+│   ├── mcp-server/           # Claude Desktop MCP Server
 │   ├── copilot/              # GitHub Copilot integration
+│   ├── jetbrains/            # IntelliJ/PyCharm plugin
+│   ├── cursor/               # Cursor IDE extension
+│   ├── chrome/               # Chrome extension
 │   └── github-cli/           # gh CLI extension
-├── src/                      # Core Python package (agent_os)
-├── examples/                 # Working demos with observability
+├── examples/                 # Working examples
+│   ├── quickstart/           # Start here: my_first_agent.py
+│   ├── demo-app/             # Full demo application
+│   ├── hello-world/          # Minimal example
+│   └── [domain examples]/    # Real-world use cases
 ├── docs/                     # Documentation
-└── papers/                   # Research papers
+├── tests/                    # Test suite (organized by layer)
+├── notebooks/                # Jupyter tutorials
+└── templates/                # Policy templates
 ```
 
 ---
@@ -139,7 +151,9 @@ agent-os/
 | [`jetbrains`](extensions/jetbrains/) | IntelliJ, PyCharm, WebStorm plugin |
 | [`cursor`](extensions/cursor/) | Cursor IDE extension (Composer integration) |
 | [`copilot`](extensions/copilot/) | GitHub Copilot safety layer |
+| [`mcp-server`](extensions/mcp-server/) | **NEW** MCP Server for Claude Desktop |
 | [`github-cli`](extensions/github-cli/) | `gh agent-os` CLI extension |
+| [`chrome`](extensions/chrome/) | Chrome extension for web agents |
 
 ---
 

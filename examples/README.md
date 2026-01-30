@@ -5,6 +5,22 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://www.docker.com/)
 
+## 🚀 Start Here
+
+| Example | Description | Complexity |
+|---------|-------------|------------|
+| [**quickstart**](./quickstart/) | ⭐ **START HERE** - Single-file example | ⭐ Beginner |
+| [**demo-app**](./demo-app/) | Full demo application with UI | ⭐⭐ Intermediate |
+| [**hello-world**](./hello-world/) | Minimal example - 15 lines | ⭐ Beginner |
+
+```bash
+# Quickstart (instant)
+python examples/quickstart/my_first_agent.py
+
+# Full demo
+cd examples/demo-app && python agent.py
+```
+
 ## 🌟 Getting Started Examples
 
 Start here if you're new to Agent OS:
