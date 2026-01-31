@@ -469,25 +469,32 @@ Learn by doing with Jupyter notebooks:
 
 This is a research project exploring kernel concepts for AI agent governance. The code is functional but evolving.
 
-**What works:**
-- Policy engine with signal-based enforcement (SIGKILL, SIGSTOP, SIGCONT)
-- VFS for structured agent memory
-- Cross-model verification (CMVK) with drift detection
-- Inter-agent trust protocol (IATP) with cryptographic signing
-- MCP server integration (Claude Desktop compatible)
-- Prometheus/OpenTelemetry observability with pre-built dashboards
-- Framework integrations: LangChain, CrewAI, AutoGen, OpenAI Assistants, Semantic Kernel
-- IDE extensions: VS Code, Cursor, GitHub Copilot
-- CLI tool with pre-commit hooks
-- Stateless architecture (MCP June 2026 compliant)
-- AGENTS.md compatibility (OpenAI/Anthropic standard)
-- **Message bus adapters: Redis, Kafka, RabbitMQ, NATS, Azure Service Bus, AWS SQS**
-- **Safe tool plugins: HTTP client, file reader, calculator, JSON parser, datetime, text**
+### Core (Production-Ready)
+The minimal trust boundary that's small enough to audit:
+- **Policy Engine**: Deterministic rule enforcement for defined patterns
+- **Flight Recorder**: SQLite-based audit logging (see known limitations below)
+- **SDK Adapters**: Intercept tool calls at SDK boundary (OpenAI, LangChain, CrewAI)
 
-**What's experimental:**
-- Policy enforcement is deterministic for defined rules, but novel attack vectors may bypass blocklist-style policies
-- Benchmark (N=60 prompts) needs independent reproduction with adversarial datasets (AdvBench, HarmBench)
-- "Kernel" is application-level middleware, not OS-level isolation
+### Extensions (Experimental)
+Additional capabilities built on the core:
+- Cross-model verification (CMVK), Inter-agent trust (IATP)
+- Supervisor agents, Constraint graphs, Shadow mode
+- IDE extensions (VS Code, JetBrains, Copilot)
+- Observability (Prometheus, OpenTelemetry)
+- Message bus adapters (Redis, Kafka, NATS)
+
+### Known Architectural Limitations
+Be aware of these design constraints:
+
+| Limitation | Impact | Mitigation |
+|------------|--------|------------|
+| **Application-level only** | Direct stdlib calls (subprocess, open) bypass kernel | Pair with container isolation for production |
+| **Blocklist-based policies** | Novel attack patterns not in rules will pass | Add AST-level parsing (#32), use defense in depth |
+| **Shadow Mode single-step** | Multi-step agent simulations diverge from reality | Use for single-turn validation only |
+| **No tamper-proof audit** | Flight Recorder SQLite can be modified by compromised agent | Write to external sink for critical audits |
+| **Provider-coupled adapters** | Each SDK needs separate adapter | Abstract interface planned (#47) |
+
+See [GitHub Issues](https://github.com/imran-siddique/agent-os/issues) for the full roadmap.
 - Some integrations are basic wrappers
 
 ---
