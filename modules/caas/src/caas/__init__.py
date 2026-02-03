@@ -128,6 +128,21 @@ from caas.enrichment import MetadataEnricher
 # Virtual File System - Project state management for SDLC agents
 from caas.vfs import VirtualFileSystem
 
+# Context Caching - Cost optimization for LLM APIs (CAAS-008)
+from caas.caching import (
+    ContextCache,
+    CacheConfig,
+    CacheStrategy,
+    AnthropicCacheStrategy,
+    OpenAICacheStrategy,
+    LocalCacheStrategy,
+    CacheProvider,
+    CacheType,
+    CacheResult,
+    CacheStats,
+    create_cache,
+)
+
 # Public API - explicit exports for `from caas import *`
 __all__ = [
     # Version info
@@ -193,6 +208,18 @@ __all__ = [
     "MetadataEnricher",
     # Virtual File System
     "VirtualFileSystem",
+    # Context Caching
+    "ContextCache",
+    "CacheConfig",
+    "CacheStrategy",
+    "AnthropicCacheStrategy",
+    "OpenAICacheStrategy",
+    "LocalCacheStrategy",
+    "CacheProvider",
+    "CacheType",
+    "CacheResult",
+    "CacheStats",
+    "create_cache",
 ]
 
 

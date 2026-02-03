@@ -119,6 +119,25 @@ from .verification import (
     verify_sequences,
 )
 
+# Constitutional Validator (CMVK-011)
+from .constitutional import (
+    ConstitutionalValidator,
+    Principle,
+    PrincipleSet,
+    Severity,
+    Violation,
+    ValidationResult,
+    PrincipleEvaluator,
+    RuleBasedEvaluator,
+    LLMEvaluator,
+    SAFETY_PRINCIPLES,
+    MEDICAL_PRINCIPLES,
+    FINANCIAL_PRINCIPLES,
+    validate_safety,
+    validate_medical,
+    validate_financial,
+)
+
 __all__ = [
     # Metadata
     "__version__",
@@ -157,6 +176,22 @@ __all__ = [
     "AuditTrail",
     "get_audit_trail",
     "configure_audit_trail",
+    # Constitutional Validator (CMVK-011)
+    "ConstitutionalValidator",
+    "Principle",
+    "PrincipleSet",
+    "Severity",
+    "Violation",
+    "ValidationResult",
+    "PrincipleEvaluator",
+    "RuleBasedEvaluator",
+    "LLMEvaluator",
+    "SAFETY_PRINCIPLES",
+    "MEDICAL_PRINCIPLES",
+    "FINANCIAL_PRINCIPLES",
+    "validate_safety",
+    "validate_medical",
+    "validate_financial",
 ]
 
 

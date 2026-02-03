@@ -109,6 +109,20 @@ from amb_core.tracing import (
     extract_trace,
 )
 
+# CloudEvents support (AMB-008)
+from amb_core.cloudevents import (
+    CloudEvent,
+    CloudEventBatch,
+    to_cloudevent,
+    from_cloudevent,
+    to_http_headers,
+    from_http_headers,
+    topic_to_type,
+    type_to_topic,
+    CLOUDEVENTS_SPEC_VERSION,
+    CLOUDEVENTS_CONTENT_TYPE,
+)
+
 __all__ = [
     # Version info
     "__version__",
@@ -147,4 +161,15 @@ __all__ = [
     "get_current_trace",
     "inject_trace",
     "extract_trace",
+    # CloudEvents
+    "CloudEvent",
+    "CloudEventBatch",
+    "to_cloudevent",
+    "from_cloudevent",
+    "to_http_headers",
+    "from_http_headers",
+    "topic_to_type",
+    "type_to_topic",
+    "CLOUDEVENTS_SPEC_VERSION",
+    "CLOUDEVENTS_CONTENT_TYPE",
 ]
