@@ -4,14 +4,16 @@
 
 **A kernel architecture for governing autonomous AI agents**
 
+[![GitHub Stars](https://img.shields.io/github/stars/imran-siddique/agent-os?style=social)](https://github.com/imran-siddique/agent-os/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
 [![CI](https://github.com/imran-siddique/agent-os/actions/workflows/ci.yml/badge.svg)](https://github.com/imran-siddique/agent-os/actions/workflows/ci.yml)
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=agent-os.agent-os-vscode)
 [![Documentation](https://img.shields.io/badge/docs-imran--siddique.github.io-blue)](https://imran-siddique.github.io/agent-os-docs/)
 
-[Quick Start](#quick-example) • [Documentation](https://imran-siddique.github.io/agent-os-docs/) • [FAQ](docs/faq.md) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=agent-os.agent-os-vscode) • [Examples](examples/)
+> ⭐ **If this project helps you, please star it!** It helps others discover Agent OS.
 
+[Quick Start](#quick-example) • [Documentation](https://imran-siddique.github.io/agent-os-docs/) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=agent-os.agent-os-vscode) • [Examples](examples/)
 
 <br/>
 
@@ -86,6 +88,46 @@ This is the same principle operating systems use: applications request resources
 ---
 
 ## Architecture
+
+```mermaid
+graph TB
+    subgraph "Layer 4: Execution"
+        SCAK[Self-Correcting Agent Kernel]
+        MUTE[Mute Agent]
+        ATR[Agent Tool Registry]
+    end
+    
+    subgraph "Layer 3: Control Plane"
+        KERNEL[🎯 THE KERNEL<br/>Policy Engine + Signals]
+        OBS[Observability<br/>Prometheus + OTEL]
+    end
+    
+    subgraph "Layer 2: Communication"
+        AMB[Agent Message Bus]
+        IATP[Inter-Agent Trust Protocol]
+        CMVK[Cross-Model Verification]
+        EMK[Episodic Memory Kernel]
+    end
+    
+    subgraph "Layer 1: Primitives"
+        PRIM[Base Types + Failures]
+        CAAS[Context-as-a-Service]
+    end
+    
+    SCAK --> KERNEL
+    MUTE --> KERNEL
+    ATR --> KERNEL
+    KERNEL --> AMB
+    KERNEL --> IATP
+    KERNEL --> OBS
+    AMB --> PRIM
+    IATP --> CMVK
+    CMVK --> EMK
+    EMK --> PRIM
+    CAAS --> PRIM
+```
+
+### Directory Structure
 
 ```
 agent-os/
