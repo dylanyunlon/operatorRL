@@ -33,7 +33,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Generic, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Generic, Union
 import asyncio
 import logging
 import traceback
@@ -318,9 +318,12 @@ class KernelSpace:
         if self._policy_engine:
             self._metrics.policy_checks += 1
             try:
-                allowed = await self._check_policy(request, ctx)
+                allowed, policy_error = await self._check_policy(request, ctx)
                 if not allowed:
                     self._metrics.policy_violations += 1
+                    
+                    # Build actionable error message
+                    error_msg = f"Policy '{request.syscall.name}' blocked: {policy_error or 'Access denied'}"
                     
                     # This is a policy violation - trigger signal
                     if dispatcher:
@@ -334,7 +337,7 @@ class KernelSpace:
                     return SyscallResult(
                         success=False,
                         error_code=-2,
-                        error_message="Policy violation",
+                        error_message=error_msg,
                     )
             except AgentKernelPanic as e:
                 # Re-raise kernel panics
@@ -370,11 +373,17 @@ class KernelSpace:
         self,
         request: SyscallRequest,
         ctx: "AgentContext",
-    ) -> bool:
-        """Check if syscall is allowed by policy."""
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Check if syscall is allowed by policy.
+        
+        Returns:
+            Tuple of (allowed, error_message). If allowed is True, error_message is None.
+            If allowed is False, error_message contains actionable details.
+        """
         # Integration with PolicyEngine would go here
         # For now, allow all
-        return True
+        return (True, None)
     
     # ========== Syscall Implementations ==========
     

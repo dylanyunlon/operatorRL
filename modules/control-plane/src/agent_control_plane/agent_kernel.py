@@ -192,10 +192,12 @@ class AgentKernel:
                 )
 
                 # THE MUTE AGENT:
-                # We return a system error, NOT a polite chat response.
+                # We return a system error with actionable details.
                 return {
                     "status": "blocked",
-                    "error": "RuntimeError: PolicyViolation - Action Blocked by Kernel.",
+                    "error": f"RuntimeError: PolicyViolation - {violation}",
+                    "policy": tool_name,
+                    "agent": agent_id,
                     "mute": True,
                 }
 
@@ -265,7 +267,9 @@ class AgentKernel:
 
                 return {
                     "allowed": False,
-                    "error": "RuntimeError: PolicyViolation - Action Blocked by Kernel.",
+                    "error": f"RuntimeError: PolicyViolation - {violation}",
+                    "policy": tool_name,
+                    "agent": agent_id,
                     "mute": True,
                 }
 
