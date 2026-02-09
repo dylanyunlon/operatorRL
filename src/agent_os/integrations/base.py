@@ -6,7 +6,7 @@ All framework adapters inherit from this base class.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, List, Optional, Protocol
 from datetime import datetime
 
 
@@ -27,6 +27,10 @@ class GovernancePolicy:
     # Audit settings
     log_all_calls: bool = True
     checkpoint_frequency: int = 5  # Every N calls
+    
+    # Concurrency limits
+    max_concurrent: int = 10
+    backpressure_threshold: int = 8  # Start slowing down at this level
 
 
 @dataclass
@@ -39,6 +43,165 @@ class ExecutionContext:
     call_count: int = 0
     tool_calls: list[dict] = field(default_factory=list)
     checkpoints: list[str] = field(default_factory=list)
+
+
+# ── Abstract Tool Call Interceptor ────────────────────────────
+
+@dataclass
+class ToolCallRequest:
+    """Vendor-neutral representation of a tool/function call."""
+    tool_name: str
+    arguments: Dict[str, Any]
+    call_id: str = ""
+    agent_id: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ToolCallResult:
+    """Result of intercepting a tool call."""
+    allowed: bool
+    reason: Optional[str] = None
+    modified_arguments: Optional[Dict[str, Any]] = None  # For argument sanitization
+    audit_entry: Optional[Dict[str, Any]] = None
+
+
+class ToolCallInterceptor(Protocol):
+    """
+    Abstract protocol for intercepting tool/function calls.
+
+    Implement this to add custom governance logic across any framework.
+    The same interceptor works with OpenAI, LangChain, CrewAI, etc.
+
+    Example:
+        class PIIInterceptor:
+            def intercept(self, request: ToolCallRequest) -> ToolCallResult:
+                if any(p in str(request.arguments) for p in ["ssn", "password"]):
+                    return ToolCallResult(allowed=False, reason="PII detected")
+                return ToolCallResult(allowed=True)
+    """
+
+    def intercept(self, request: ToolCallRequest) -> ToolCallResult:
+        """Intercept a tool call and return allow/deny decision."""
+        ...
+
+
+class PolicyInterceptor:
+    """
+    Default interceptor that enforces GovernancePolicy rules.
+
+    Checks:
+    - Tool is in allowed_tools (if specified)
+    - Arguments don't contain blocked patterns
+    - Call count within limits
+    """
+
+    def __init__(self, policy: GovernancePolicy, context: Optional[ExecutionContext] = None):
+        self.policy = policy
+        self.context = context
+
+    def intercept(self, request: ToolCallRequest) -> ToolCallResult:
+        # Check allowed tools
+        if self.policy.allowed_tools and request.tool_name not in self.policy.allowed_tools:
+            return ToolCallResult(
+                allowed=False,
+                reason=f"Tool '{request.tool_name}' not in allowed list: {self.policy.allowed_tools}",
+            )
+
+        # Check blocked patterns
+        args_str = str(request.arguments).lower()
+        for pattern in self.policy.blocked_patterns:
+            if pattern.lower() in args_str:
+                return ToolCallResult(
+                    allowed=False,
+                    reason=f"Blocked pattern '{pattern}' detected in tool arguments",
+                )
+
+        # Check call count
+        if self.context and self.context.call_count >= self.policy.max_tool_calls:
+            return ToolCallResult(
+                allowed=False,
+                reason=f"Max tool calls exceeded ({self.policy.max_tool_calls})",
+            )
+
+        return ToolCallResult(allowed=True)
+
+
+class CompositeInterceptor:
+    """Chain multiple interceptors. All must allow for the call to proceed."""
+
+    def __init__(self, interceptors: Optional[List[Any]] = None):
+        self.interceptors: List[Any] = interceptors or []
+
+    def add(self, interceptor: Any) -> "CompositeInterceptor":
+        self.interceptors.append(interceptor)
+        return self
+
+    def intercept(self, request: ToolCallRequest) -> ToolCallResult:
+        for interceptor in self.interceptors:
+            result = interceptor.intercept(request)
+            if not result.allowed:
+                return result
+        return ToolCallResult(allowed=True)
+
+
+# ── Bounded Concurrency ──────────────────────────────────────
+
+class BoundedSemaphore:
+    """
+    Async-compatible bounded semaphore with backpressure.
+
+    When concurrency exceeds backpressure_threshold, callers must wait.
+    When it exceeds max_concurrent, requests are rejected.
+    """
+
+    def __init__(self, max_concurrent: int = 10, backpressure_threshold: int = 8):
+        self.max_concurrent = max_concurrent
+        self.backpressure_threshold = backpressure_threshold
+        self._active = 0
+        self._total_acquired = 0
+        self._total_rejected = 0
+
+    def try_acquire(self) -> tuple[bool, Optional[str]]:
+        """
+        Try to acquire a slot.
+
+        Returns (acquired, reason).
+        """
+        if self._active >= self.max_concurrent:
+            self._total_rejected += 1
+            return False, f"Max concurrency reached ({self.max_concurrent})"
+        self._active += 1
+        self._total_acquired += 1
+        return True, None
+
+    def release(self) -> None:
+        """Release a slot."""
+        if self._active > 0:
+            self._active -= 1
+
+    @property
+    def is_under_pressure(self) -> bool:
+        """Check if backpressure threshold is reached."""
+        return self._active >= self.backpressure_threshold
+
+    @property
+    def active(self) -> int:
+        return self._active
+
+    @property
+    def available(self) -> int:
+        return max(0, self.max_concurrent - self._active)
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "active": self._active,
+            "max_concurrent": self.max_concurrent,
+            "available": self.available,
+            "under_pressure": self.is_under_pressure,
+            "total_acquired": self._total_acquired,
+            "total_rejected": self._total_rejected,
+        }
 
 
 class BaseIntegration(ABC):

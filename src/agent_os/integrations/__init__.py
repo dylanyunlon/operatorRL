@@ -31,12 +31,29 @@ from .crewai_adapter import CrewAIKernel
 from .autogen_adapter import AutoGenKernel
 from .openai_adapter import OpenAIKernel, GovernedAssistant
 from .semantic_kernel_adapter import SemanticKernelWrapper, GovernedSemanticKernel
-from .base import BaseIntegration, GovernancePolicy
+from .base import (
+    BaseIntegration,
+    GovernancePolicy,
+    ToolCallInterceptor,
+    ToolCallRequest,
+    ToolCallResult,
+    PolicyInterceptor,
+    CompositeInterceptor,
+    BoundedSemaphore,
+)
 
 __all__ = [
     # Base
     "BaseIntegration",
     "GovernancePolicy",
+    # Tool Call Interceptor (vendor-neutral)
+    "ToolCallInterceptor",
+    "ToolCallRequest",
+    "ToolCallResult",
+    "PolicyInterceptor",
+    "CompositeInterceptor",
+    # Backpressure / Concurrency
+    "BoundedSemaphore",
     # LangChain
     "LangChainKernel",
     # CrewAI
