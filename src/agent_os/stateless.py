@@ -189,15 +189,33 @@ class StatelessKernel:
         context: ExecutionContext
     ) -> ExecutionResult:
         """
-        Execute action statelessly.
+        Execute an action statelessly with full policy governance.
+        
+        This is the main entry point. Every request is self-contained:
+        policies are checked, the action is executed, state is updated
+        externally, and an updated context is returned.
         
         Args:
-            action: Action to execute
-            params: Action parameters
-            context: Complete execution context
+            action: Action to execute (e.g., "database_query", "file_write", "chat")
+            params: Action parameters (passed to handler and checked against policies)
+            context: Complete execution context including agent_id, policies, and history
         
         Returns:
-            ExecutionResult with outcome and updated context
+            ExecutionResult with:
+            - success=True, data=result, updated_context (on success)
+            - success=False, error=reason, signal="SIGKILL" (on policy violation)
+            - success=False, error=str(e), signal="SIGTERM" (on execution error)
+        
+        Example:
+            >>> result = await kernel.execute(
+            ...     action="database_query",
+            ...     params={"query": "SELECT * FROM users"},
+            ...     context=ExecutionContext(agent_id="a1", policies=["read_only"])
+            ... )
+            >>> if result.success:
+            ...     print(result.data)
+            ... else:
+            ...     print(f"Blocked: {result.error}")
         """
         request = ExecutionRequest(action=action, params=params, context=context)
         
@@ -269,7 +287,17 @@ class StatelessKernel:
         params: Dict[str, Any],
         policy_names: List[str]
     ) -> Dict[str, Any]:
-        """Check if action is allowed under policies."""
+        """Check if action is allowed under policies.
+        
+        Args:
+            action: The action being attempted (e.g., "database_query", "file_write")
+            params: Parameters for the action
+            policy_names: List of policy names to check against
+            
+        Returns:
+            Dict with 'allowed' (bool) and 'reason' (str) keys.
+            When blocked, includes 'suggestion' with actionable fix.
+        """
         for policy_name in policy_names:
             policy = self.policies.get(policy_name)
             if not policy:
@@ -277,9 +305,13 @@ class StatelessKernel:
             
             # Check blocked actions
             if action in policy.get("blocked_actions", []):
+                allowed_actions = [a for a in ["read", "query", "list"] 
+                                   if a not in policy.get("blocked_actions", [])]
+                suggestion = (f"Try a read-only action instead (e.g., {', '.join(allowed_actions[:3])})" 
+                              if allowed_actions else "Request policy exception from administrator")
                 return {
                     "allowed": False,
-                    "reason": f"Action '{action}' blocked by {policy_name} policy"
+                    "reason": f"Action '{action}' blocked by '{policy_name}' policy. {suggestion}."
                 }
             
             # Check blocked patterns in params
@@ -288,7 +320,11 @@ class StatelessKernel:
                 if pattern.lower() in params_str:
                     return {
                         "allowed": False,
-                        "reason": f"Pattern '{pattern}' blocked by {policy_name} policy"
+                        "reason": (
+                            f"Content blocked: '{pattern}' detected in request parameters. "
+                            f"Policy '{policy_name}' prohibits this pattern. "
+                            f"Remove the sensitive content and retry."
+                        )
                     }
             
             # Check requires approval
@@ -296,7 +332,11 @@ class StatelessKernel:
                 if not params.get("approved"):
                     return {
                         "allowed": False,
-                        "reason": f"Action '{action}' requires approval"
+                        "reason": (
+                            f"Action '{action}' requires approval. "
+                            f"Add approved=True to params after getting authorization, "
+                            f"or use a non-restricted action instead."
+                        )
                     }
         
         return {"allowed": True, "reason": None}
