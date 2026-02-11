@@ -24,7 +24,8 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
-
+import logging
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Terminal Colors & Formatting
@@ -319,8 +320,8 @@ def cmd_init(args):
     agents_dir = root / ".agents"
     
     if agents_dir.exists() and not args.force:
-        print(f"Error: {agents_dir} already exists. Use --force to overwrite.")
-        print(f"  {Colors.DIM}Hint: agentos init --force{Colors.RESET}")
+        logger.error(f"Error: {agents_dir} already exists. Use --force to overwrite.")
+        logger.info(f"  {Colors.DIM}Hint: agentos init --force{Colors.RESET}")
         return 1
     
     agents_dir.mkdir(parents=True, exist_ok=True)
@@ -419,15 +420,15 @@ observability:
     
     security_md.write_text(security_content)
     
-    print(f"Initialized Agent OS in {agents_dir}")
-    print(f"  - agents.md: Agent instructions (OpenAI/Anthropic standard)")
-    print(f"  - security.md: Kernel policies (Agent OS extension)")
-    print(f"  - Template: {policy_template}")
-    print()
-    print("Next steps:")
-    print("  1. Edit .agents/agents.md with your agent's capabilities")
-    print("  2. Customize .agents/security.md policies")
-    print("  3. Run: agentos secure --verify")
+    logger.info(f"Initialized Agent OS in {agents_dir}")
+    logger.info(f"  - agents.md: Agent instructions (OpenAI/Anthropic standard)")
+    logger.info(f"  - security.md: Kernel policies (Agent OS extension)")
+    logger.info(f"  - Template: {policy_template}")
+    logger.info()
+    logger.info("Next steps:")
+    logger.info("  1. Edit .agents/agents.md with your agent's capabilities")
+    logger.info("  2. Customize .agents/security.md policies")
+    logger.info("  3. Run: agentos secure --verify")
     
     return 0
 
@@ -438,18 +439,18 @@ def cmd_secure(args):
     agents_dir = root / ".agents"
     
     if not agents_dir.exists():
-        print(f"Error: No .agents/ directory found. Run 'agentos init' first.")
-        print(f"  {Colors.DIM}Hint: agentos init --template strict{Colors.RESET}")
+        logger.error(f"Error: No .agents/ directory found. Run 'agentos init' first.")
+        logger.info(f"  {Colors.DIM}Hint: agentos init --template strict{Colors.RESET}")
         return 1
     
     security_md = agents_dir / "security.md"
     if not security_md.exists():
-        print(f"Error: No security.md found. Run 'agentos init' first.")
-        print(f"  {Colors.DIM}Hint: agentos init && agentos secure{Colors.RESET}")
+        logger.error(f"Error: No security.md found. Run 'agentos init' first.")
+        logger.info(f"  {Colors.DIM}Hint: agentos init && agentos secure{Colors.RESET}")
         return 1
     
-    print(f"Securing agents in {root}...")
-    print()
+    logger.info(f"Securing agents in {root}...")
+    logger.info("")
     
     content = security_md.read_text()
     
@@ -462,22 +463,22 @@ def cmd_secure(args):
     all_passed = True
     for check_name, passed in checks:
         status = "[PASS]" if passed else "[FAIL]"
-        print(f"  {status} {check_name}")
+        logger.info(f"  {status} {check_name}")
         if not passed:
             all_passed = False
     
-    print()
+    logger.info()
     
     if all_passed:
-        print("Security configuration valid.")
-        print()
-        print("Kernel governance enabled. Your agents will now:")
-        print("  - Enforce policies on every action")
-        print("  - Respond to POSIX-style signals")
-        print("  - Log all operations to flight recorder")
+        logger.info("Security configuration valid.")
+        logger.info("")
+        logger.info("Kernel governance enabled. Your agents will now:")
+        logger.info("  - Enforce policies on every action")
+        logger.info("  - Respond to POSIX-style signals")
+        logger.info("  - Log all operations to flight recorder")
         return 0
     else:
-        print("Security configuration invalid. Please fix the issues above.")
+        logger.error("Security configuration invalid. Please fix the issues above.")
         return 1
 
 
@@ -487,11 +488,11 @@ def cmd_audit(args):
     agents_dir = root / ".agents"
     
     if not agents_dir.exists():
-        print(f"No .agents/ directory found in {root}")
+        logger.error(f"No .agents/ directory found in {root}")
         return 1
     
-    print(f"Auditing {root}...")
-    print()
+    logger.info(f"Auditing {root}...")
+    logger.info("")
     
     files = {
         "agents.md": agents_dir / "agents.md",
@@ -502,12 +503,12 @@ def cmd_audit(args):
     
     for name, path in files.items():
         if path.exists():
-            print(f"  [OK] {name}")
+            logger.info(f"  [OK] {name}")
         else:
-            print(f"  [MISSING] {name}")
+            logger.warning(f"  [MISSING] {name}")
             findings.append(f"Missing {name}")
     
-    print()
+    logger.info("")
     
     security_md = files["security.md"]
     if security_md.exists():
@@ -527,13 +528,13 @@ def cmd_audit(args):
                 findings.append(f"Missing required section: {section}")
     
     if findings:
-        print("Findings:")
+        logger.info("Findings:")
         for f in findings:
-            print(f"  - {f}")
+            logger.info(f"  - {f}")
     else:
-        print("No issues found.")
+        logger.info("No issues found.")
     
-    print()
+    logger.info()
     
     if args.format == "json":
         result = {
@@ -542,7 +543,7 @@ def cmd_audit(args):
             "findings": findings,
             "passed": len(findings) == 0
         }
-        print(json.dumps(result, indent=2))
+        logger.info(json.dumps(result, indent=2))
     
     return 0 if len(findings) == 0 else 1
 
@@ -559,23 +560,23 @@ def cmd_check(args):
     if args.staged:
         all_violations = checker.check_staged_files()
         if not all_violations:
-            print(f"{Colors.GREEN}✓{Colors.RESET} No violations in staged files")
+            logger.info(f"{Colors.GREEN}✓{Colors.RESET} No violations in staged files")
             return 0
         
         total = sum(len(v) for v in all_violations.values())
-        print(f"{Colors.RED}⚠️  {total} violation(s) found in staged files:{Colors.RESET}")
-        print()
+        logger.warning(f"{Colors.RED}⚠️  {total} violation(s) found in staged files:{Colors.RESET}")
+        logger.info("")
         
         for filepath, violations in all_violations.items():
-            print(f"{Colors.BOLD}{filepath}{Colors.RESET}")
+            logger.info(f"{Colors.BOLD}{filepath}{Colors.RESET}")
             _print_violations(violations, args)
         
         return 1
     
     # Check specified files
     if not args.files:
-        print("Usage: agentos check <file> [file2 ...]")
-        print("       agentos check --staged")
+        logger.error("Usage: agentos check <file> [file2 ...]")
+        logger.error("       agentos check --staged")
         return 1
     
     exit_code = 0
@@ -584,16 +585,16 @@ def cmd_check(args):
             violations = checker.check_file(filepath)
             
             if not violations:
-                print(f"{Colors.GREEN}✓{Colors.RESET} {filepath}: No violations")
+                logger.info(f"{Colors.GREEN}✓{Colors.RESET} {filepath}: No violations")
                 continue
             
-            print(f"{Colors.RED}⚠️  {len(violations)} violation(s) found in {filepath}:{Colors.RESET}")
-            print()
+            logger.warning(f"{Colors.RED}⚠️  {len(violations)} violation(s) found in {filepath}:{Colors.RESET}")
+            logger.info("")
             _print_violations(violations, args)
             exit_code = 1
             
         except FileNotFoundError as e:
-            print(f"{Colors.RED}Error:{Colors.RESET} {e}")
+            logger.error(f"{Colors.RED}Error:{Colors.RESET} {e}")
             exit_code = 1
     
     # JSON output for CI
@@ -613,12 +614,12 @@ def _print_violations(violations: List[PolicyViolation], args):
             'low': Colors.CYAN,
         }.get(v.severity, Colors.WHITE)
         
-        print(f"  {Colors.DIM}Line {v.line}:{Colors.RESET} {v.code[:60]}{'...' if len(v.code) > 60 else ''}")
-        print(f"    {severity_color}Violation:{Colors.RESET} {v.violation}")
-        print(f"    {Colors.DIM}Policy:{Colors.RESET} {v.policy}")
+        logger.info(f"  {Colors.DIM}Line {v.line}:{Colors.RESET} {v.code[:60]}{'...' if len(v.code) > 60 else ''}")
+        logger.info(f"    {severity_color}Violation:{Colors.RESET} {v.violation}")
+        logger.info(f"    {Colors.DIM}Policy:{Colors.RESET} {v.policy}")
         if v.suggestion and not args.ci:
-            print(f"    {Colors.GREEN}Suggestion:{Colors.RESET} {v.suggestion}")
-        print()
+            logger.info(f"    {Colors.GREEN}Suggestion:{Colors.RESET} {v.suggestion}")
+        logger.info("")
 
 
 def _output_json(files: List[str], checker: PolicyChecker):
@@ -651,7 +652,7 @@ def _output_json(files: List[str], checker: PolicyChecker):
         except FileNotFoundError:
             pass
     
-    print(json.dumps(results, indent=2))
+    logger.info(json.dumps(results, indent=2))
 
 
 def cmd_review(args):
@@ -659,31 +660,31 @@ def cmd_review(args):
     filepath = args.file
     
     if not Path(filepath).exists():
-        print(f"{Colors.RED}Error:{Colors.RESET} File not found: {filepath}")
+        logger.error(f"{Colors.RED}Error:{Colors.RESET} File not found: {filepath}")
         return 1
     
-    print(f"{Colors.BLUE}🔍 Reviewing {filepath} with CMVK...{Colors.RESET}")
-    print()
+    logger.info(f"{Colors.BLUE}🔍 Reviewing {filepath} with CMVK...{Colors.RESET}")
+    logger.info("")
     
     # First, run local policy check
     checker = PolicyChecker()
     violations = checker.check_file(filepath)
     
     if violations:
-        print(f"{Colors.YELLOW}Local Policy Check:{Colors.RESET}")
-        print(f"  {Colors.RED}⚠️  {len(violations)} violation(s) found{Colors.RESET}")
+        logger.info(f"{Colors.YELLOW}Local Policy Check:{Colors.RESET}")
+        logger.info(f"  {Colors.RED}⚠️  {len(violations)} violation(s) found{Colors.RESET}")
         for v in violations[:3]:  # Show first 3
-            print(f"    Line {v.line}: {v.violation}")
+            logger.info(f"    Line {v.line}: {v.violation}")
         if len(violations) > 3:
-            print(f"    ... and {len(violations) - 3} more")
-        print()
+            logger.info(f"    ... and {len(violations) - 3} more")
+        logger.info("")
     
     # CMVK multi-model review (simulated for now)
     if args.cmvk:
         models = args.models.split(',') if args.models else ['gpt-4', 'claude-sonnet-4', 'gemini-pro']
         
-        print(f"{Colors.BLUE}Multi-Model Review ({len(models)} models):{Colors.RESET}")
-        print()
+        logger.info(f"{Colors.BLUE}Multi-Model Review ({len(models)} models):{Colors.RESET}")
+        logger.info("")
         
         # Read file content for analysis
         content = Path(filepath).read_text(encoding='utf-8', errors='ignore')
@@ -694,15 +695,15 @@ def cmd_review(args):
         passed = 0
         for model, result in model_results.items():
             if result['passed']:
-                print(f"  {Colors.GREEN}✅{Colors.RESET} {model}: {result['summary']}")
+                logger.info(f"  {Colors.GREEN}✅{Colors.RESET} {model}: {result['summary']}")
                 passed += 1
             else:
-                print(f"  {Colors.YELLOW}⚠️{Colors.RESET}  {model}: {result['summary']}")
+                logger.info(f"  {Colors.YELLOW}⚠️{Colors.RESET}  {model}: {result['summary']}")
         
-        print()
+        logger.info("")
         consensus = (passed / len(models)) * 100
         consensus_color = Colors.GREEN if consensus >= 80 else Colors.YELLOW if consensus >= 50 else Colors.RED
-        print(f"Consensus: {consensus_color}{consensus:.0f}%{Colors.RESET}")
+        logger.info(f"Consensus: {consensus_color}{consensus:.0f}%{Colors.RESET}")
         
         if model_results:
             issues = []
@@ -710,15 +711,15 @@ def cmd_review(args):
                 issues.extend(r.get('issues', []))
             
             if issues:
-                print()
-                print(f"{Colors.YELLOW}Issues Found:{Colors.RESET}")
+                logger.info()
+                logger.warning(f"{Colors.YELLOW}Issues Found:{Colors.RESET}")
                 for issue in set(issues):
-                    print(f"  - {issue}")
+                    logger.warning(f"  - {issue}")
         
-        print()
+        logger.info("")
         
         if args.format == 'json':
-            print(json.dumps({
+            logger.info(json.dumps({
                 'file': filepath,
                 'consensus': consensus / 100,
                 'model_results': model_results,
@@ -771,8 +772,8 @@ def cmd_install_hooks(args):
     git_dir = Path('.git')
     
     if not git_dir.exists():
-        print(f"{Colors.RED}Error:{Colors.RESET} Not a git repository. Run 'git init' first.")
-        print(f"  {Colors.DIM}Hint: git init && agentos install-hooks{Colors.RESET}")
+        logger.error(f"{Colors.RED}Error:{Colors.RESET} Not a git repository. Run 'git init' first.")
+        logger.info(f"  {Colors.DIM}Hint: git init && agentos install-hooks{Colors.RESET}")
         return 1
     
     hooks_dir = git_dir / 'hooks'
@@ -782,19 +783,19 @@ def cmd_install_hooks(args):
     
     # Check if hook already exists
     if pre_commit.exists() and not args.force:
-        print(f"{Colors.YELLOW}Warning:{Colors.RESET} pre-commit hook already exists.")
-        print("Use --force to overwrite, or --append to add Agent OS check.")
+        logger.warning(f"{Colors.YELLOW}Warning:{Colors.RESET} pre-commit hook already exists.")
+        logger.warning("Use --force to overwrite, or --append to add Agent OS check.")
         
         if args.append:
             # Append to existing hook
             existing = pre_commit.read_text()
             if 'agentos check' in existing:
-                print(f"{Colors.GREEN}✓{Colors.RESET} Agent OS check already in pre-commit hook")
+                logger.info(f"{Colors.GREEN}✓{Colors.RESET} Agent OS check already in pre-commit hook")
                 return 0
             
             new_content = existing.rstrip() + '\n\n' + _get_hook_content()
             pre_commit.write_text(new_content)
-            print(f"{Colors.GREEN}✓{Colors.RESET} Appended Agent OS check to pre-commit hook")
+            logger.info(f"{Colors.GREEN}✓{Colors.RESET} Appended Agent OS check to pre-commit hook")
             return 0
         
         return 1
@@ -813,12 +814,12 @@ def cmd_install_hooks(args):
     if os.name != 'nt':
         os.chmod(pre_commit, 0o755)
     
-    print(f"{Colors.GREEN}✓{Colors.RESET} Installed pre-commit hook: {pre_commit}")
-    print()
-    print("Agent OS will now check staged files before each commit.")
-    print("Commits with safety violations will be blocked.")
-    print()
-    print(f"{Colors.DIM}To bypass (not recommended): git commit --no-verify{Colors.RESET}")
+    logger.info(f"{Colors.GREEN}✓{Colors.RESET} Installed pre-commit hook: {pre_commit}")
+    logger.info("")
+    logger.info("Agent OS will now check staged files before each commit.")
+    logger.info("Commits with safety violations will be blocked.")
+    logger.info("")
+    logger.info(f"{Colors.DIM}To bypass (not recommended): git commit --no-verify{Colors.RESET}")
     
     return 0
 
@@ -848,44 +849,44 @@ echo "✓ Agent OS: All checks passed"
 
 def cmd_status(args):
     """Show kernel status."""
-    print("Agent OS Kernel Status")
-    print("=" * 40)
-    print()
+    logger.info("Agent OS Kernel Status")
+    logger.info("=" * 40)
+    logger.info("")
     
     try:
         import agent_os
-        print(f"  Version: {agent_os.__version__}")
-        print(f"  Status: Installed")
+        logger.info(f"  Version: {agent_os.__version__}")
+        logger.info(f"  Status: Installed")
     except ImportError:
-        print(f"  Status: Not installed")
-        print()
-        print("Install with: pip install agent-os-kernel")
+        logger.warning(f"  Status: Not installed")
+        logger.info("")
+        logger.info("Install with: pip install agent-os-kernel")
         return 1
     
-    print()
+    logger.info("")
     
     root = Path(".")
     agents_dir = root / ".agents"
     
     if agents_dir.exists():
-        print(f"  Project: {root.absolute()}")
-        print(f"  Agents: Configured (.agents/ found)")
+        logger.info(f"  Project: {root.absolute()}")
+        logger.info(f"  Agents: Configured (.agents/ found)")
     else:
-        print(f"  Project: {root.absolute()}")
-        print(f"  Agents: Not configured")
-        print()
-        print("Initialize with: agentos init")
+        logger.info(f"  Project: {root.absolute()}")
+        logger.info(f"  Agents: Not configured")
+        logger.info("")
+        logger.info("Initialize with: agentos init")
     
-    print()
+    logger.info("")
     
-    print("Packages:")
+    logger.info("Packages:")
     try:
         from agent_os import AVAILABLE_PACKAGES
         for pkg, available in AVAILABLE_PACKAGES.items():
             status = "installed" if available else "not installed"
-            print(f"  - {pkg}: {status}")
+            logger.info(f"  - {pkg}: {status}")
     except:
-        print("  Unable to check packages")
+        logger.warning("  Unable to check packages")
     
     return 0
 
@@ -894,7 +895,7 @@ def cmd_validate(args):
     """Validate policy YAML files."""
     import yaml
     
-    print(f"\n{Colors.BOLD}🔍 Validating Policy Files{Colors.RESET}\n")
+    logger.info(f"\n{Colors.BOLD}🔍 Validating Policy Files{Colors.RESET}\n")
     
     # Find files to validate
     files_to_check = []
@@ -906,8 +907,8 @@ def cmd_validate(args):
         if agents_dir.exists():
             files_to_check = list(agents_dir.glob("*.yaml")) + list(agents_dir.glob("*.yml"))
         if not files_to_check:
-            print(f"{Colors.YELLOW}No policy files found.{Colors.RESET}")
-            print(f"Run 'agentos init' to create default policies, or specify files to validate.")
+            logger.warning(f"{Colors.YELLOW}No policy files found.{Colors.RESET}")
+            logger.warning(f"Run 'agentos init' to create default policies, or specify files to validate.")
             return 0
     
     # Required fields for policy files
@@ -924,7 +925,7 @@ def cmd_validate(args):
             errors.append(f"{filepath}: File not found")
             continue
             
-        print(f"  Checking {filepath}...", end=" ")
+        logger.info(f"  Checking {filepath}...", end=" ")
         
         try:
             with open(filepath) as f:
@@ -932,7 +933,7 @@ def cmd_validate(args):
             
             if content is None:
                 errors.append(f"{filepath}: Empty file")
-                print(f"{Colors.RED}EMPTY{Colors.RESET}")
+                logger.error(f"{Colors.RED}EMPTY{Colors.RESET}")
                 continue
             
             file_errors = []
@@ -970,40 +971,40 @@ def cmd_validate(args):
             
             if file_errors:
                 errors.extend([f"{filepath}: {e}" for e in file_errors])
-                print(f"{Colors.RED}INVALID{Colors.RESET}")
+                logger.error(f"{Colors.RED}INVALID{Colors.RESET}")
             elif file_warnings:
                 warnings.extend([f"{filepath}: {w}" for w in file_warnings])
-                print(f"{Colors.YELLOW}OK (warnings){Colors.RESET}")
+                logger.warning(f"{Colors.YELLOW}OK (warnings){Colors.RESET}")
                 valid_count += 1
             else:
-                print(f"{Colors.GREEN}OK{Colors.RESET}")
+                logger.info(f"{Colors.GREEN}OK{Colors.RESET}")
                 valid_count += 1
                 
         except yaml.YAMLError as e:
             errors.append(f"{filepath}: Invalid YAML - {e}")
-            print(f"{Colors.RED}PARSE ERROR{Colors.RESET}")
+            logger.error(f"{Colors.RED}PARSE ERROR{Colors.RESET}")
         except Exception as e:
             errors.append(f"{filepath}: {e}")
-            print(f"{Colors.RED}ERROR{Colors.RESET}")
+            logger.error(f"{Colors.RED}ERROR{Colors.RESET}")
     
-    print()
+    logger.info("")
     
     # Print summary
     if warnings:
-        print(f"{Colors.YELLOW}Warnings:{Colors.RESET}")
+        logger.warning(f"{Colors.YELLOW}Warnings:{Colors.RESET}")
         for w in warnings:
-            print(f"  ⚠️  {w}")
-        print()
+            logger.warning(f"  ⚠️  {w}")
+        logger.info("")
     
     if errors:
-        print(f"{Colors.RED}Errors:{Colors.RESET}")
+        logger.error(f"{Colors.RED}Errors:{Colors.RESET}")
         for e in errors:
-            print(f"  ❌ {e}")
-        print()
-        print(f"{Colors.RED}Validation failed.{Colors.RESET} {valid_count}/{len(files_to_check)} files valid.")
+            logger.error(f"  ❌ {e}")
+        logger.info("")
+        logger.error(f"{Colors.RED}Validation failed.{Colors.RESET} {valid_count}/{len(files_to_check)} files valid.")
         return 1
     
-    print(f"{Colors.GREEN}✓ All {valid_count} policy file(s) valid.{Colors.RESET}")
+    logger.info(f"{Colors.GREEN}✓ All {valid_count} policy file(s) valid.{Colors.RESET}")
     return 0
 
 
@@ -1130,9 +1131,9 @@ Documentation: https://github.com/imran-siddique/agent-os
     if args.version:
         try:
             from agent_os import __version__
-            print(f"agentos {__version__}")
+            logger.info(f"agentos {__version__}")
         except:
-            print("agentos (version unknown)")
+            logger.warning("agentos (version unknown)")
         return 0
     
     if args.command == "init":
