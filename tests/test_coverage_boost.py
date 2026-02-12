@@ -436,10 +436,216 @@ class TestAutoGenKernel:
         # Should not raise
         k.govern(agent)
 
-    def test_unwrap_raises(self):
+    def test_unwrap_restores_original(self):
         k = AutoGenKernel()
-        with pytest.raises(NotImplementedError):
-            k.unwrap(MagicMock())
+        agent = MagicMock()
+        agent.name = "restorable"
+        original_initiate = agent.initiate_chat
+        original_receive = agent.receive
+
+        k.govern(agent)
+        # Methods should be wrapped now
+        assert agent.initiate_chat is not original_initiate
+
+        k.unwrap(agent)
+        # Methods should be restored
+        assert agent.initiate_chat is original_initiate
+        assert agent.receive is original_receive
+        assert "restorable" not in k._governed_agents
+
+    def test_signal_sigstop_blocks_execution(self):
+        from agent_os.integrations.langchain_adapter import PolicyViolationError
+        k = AutoGenKernel()
+        agent = MagicMock()
+        agent.name = "stoppable"
+        agent.initiate_chat.return_value = "result"
+
+        k.govern(agent)
+        k.signal("stoppable", "SIGSTOP")
+
+        with pytest.raises(PolicyViolationError, match="stopped"):
+            agent.initiate_chat(MagicMock(), message="hello")
+
+    def test_signal_sigcont_resumes(self):
+        k = AutoGenKernel()
+        agent = MagicMock()
+        agent.name = "resumable"
+        agent.initiate_chat.return_value = "result"
+
+        k.govern(agent)
+        k.signal("resumable", "SIGSTOP")
+        k.signal("resumable", "SIGCONT")
+
+        result = agent.initiate_chat(MagicMock(), message="hello")
+        assert result == "result"
+
+    def test_signal_sigkill_unwraps(self):
+        k = AutoGenKernel()
+        agent = MagicMock()
+        agent.name = "killable"
+
+        k.govern(agent)
+        assert "killable" in k._governed_agents
+
+        k.signal("killable", "SIGKILL")
+        assert "killable" not in k._governed_agents
+
+    def test_generate_reply_blocked_when_stopped(self):
+        k = AutoGenKernel()
+        agent = MagicMock()
+        agent.name = "stopped-replier"
+        agent.generate_reply.return_value = "reply"
+
+        k.govern(agent)
+        k.signal("stopped-replier", "SIGSTOP")
+
+        result = agent.generate_reply(messages=["hi"], sender=MagicMock())
+        assert "[BLOCKED" in result
+
+
+# ---------------------------------------------------------------------------
+# LlamaIndex Adapter
+# ---------------------------------------------------------------------------
+from agent_os.integrations.llamaindex_adapter import LlamaIndexKernel
+
+
+class TestLlamaIndexKernel:
+    def test_init_default(self):
+        k = LlamaIndexKernel()
+        assert isinstance(k.policy, GovernancePolicy)
+
+    def test_wrap_query_engine(self):
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "test-engine"
+        engine.query.return_value = "answer"
+
+        governed = k.wrap(engine)
+        result = governed.query("What is AI?")
+        assert result == "answer"
+
+    def test_query_blocked_pattern(self):
+        from agent_os.integrations.langchain_adapter import PolicyViolationError
+        p = GovernancePolicy(blocked_patterns=["secret"])
+        k = LlamaIndexKernel(policy=p)
+        engine = MagicMock()
+        engine.name = "blocked-engine"
+
+        governed = k.wrap(engine)
+        with pytest.raises(PolicyViolationError):
+            governed.query("tell me the secret")
+
+    def test_chat_governed(self):
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "chat-engine"
+        engine.chat.return_value = "hello back"
+
+        governed = k.wrap(engine)
+        result = governed.chat("hello")
+        assert result == "hello back"
+
+    def test_chat_blocked_pattern(self):
+        from agent_os.integrations.langchain_adapter import PolicyViolationError
+        p = GovernancePolicy(blocked_patterns=["password"])
+        k = LlamaIndexKernel(policy=p)
+        engine = MagicMock()
+        engine.name = "chat-blocked"
+
+        governed = k.wrap(engine)
+        with pytest.raises(PolicyViolationError):
+            governed.chat("my password is 123")
+
+    def test_retrieve_governed(self):
+        k = LlamaIndexKernel()
+        retriever = MagicMock()
+        retriever.name = "retriever"
+        retriever.retrieve.return_value = ["doc1", "doc2"]
+
+        governed = k.wrap(retriever)
+        result = governed.retrieve("search query")
+        assert result == ["doc1", "doc2"]
+
+    def test_stream_chat_governed(self):
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "stream-engine"
+        engine.stream_chat.return_value = "streaming response"
+
+        governed = k.wrap(engine)
+        result = governed.stream_chat("hello")
+        assert result == "streaming response"
+
+    def test_unwrap_returns_original(self):
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "unwrap-test"
+
+        governed = k.wrap(engine)
+        original = k.unwrap(governed)
+        assert original is engine
+
+    def test_call_count_increments(self):
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "counter"
+        engine.query.return_value = "answer"
+
+        governed = k.wrap(engine)
+        governed.query("q1")
+        governed.query("q2")
+        governed.query("q3")
+
+        ctx = k.contexts["counter"]
+        assert ctx.call_count == 3
+
+    def test_max_calls_exceeded(self):
+        from agent_os.integrations.langchain_adapter import PolicyViolationError
+        p = GovernancePolicy(max_tool_calls=2)
+        k = LlamaIndexKernel(policy=p)
+        engine = MagicMock()
+        engine.name = "limited"
+        engine.query.return_value = "answer"
+
+        governed = k.wrap(engine)
+        governed.query("q1")
+        governed.query("q2")
+        with pytest.raises(PolicyViolationError):
+            governed.query("q3")
+
+    def test_signal_sigstop(self):
+        from agent_os.integrations.langchain_adapter import PolicyViolationError
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "stoppable"
+
+        governed = k.wrap(engine)
+        k.signal("stoppable", "SIGSTOP")
+
+        with pytest.raises(PolicyViolationError, match="stopped"):
+            governed.query("hello")
+
+    def test_signal_sigcont_resumes(self):
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "resumable"
+        engine.query.return_value = "answer"
+
+        governed = k.wrap(engine)
+        k.signal("resumable", "SIGSTOP")
+        k.signal("resumable", "SIGCONT")
+
+        result = governed.query("hello")
+        assert result == "answer"
+
+    def test_getattr_passthrough(self):
+        k = LlamaIndexKernel()
+        engine = MagicMock()
+        engine.name = "passthrough"
+        engine.custom_attr = "custom_value"
+
+        governed = k.wrap(engine)
+        assert governed.custom_attr == "custom_value"
 
 
 # ---------------------------------------------------------------------------

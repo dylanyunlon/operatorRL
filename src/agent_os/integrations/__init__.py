@@ -5,6 +5,7 @@ Adapters to wrap existing agent frameworks with Agent OS governance.
 
 Supported Frameworks:
 - LangChain: Chains, Agents, Runnables
+- LlamaIndex: Query Engines, Chat Engines, Agents
 - CrewAI: Crews and Agents
 - AutoGen: Multi-agent conversations
 - OpenAI Assistants: Assistants API with tools
@@ -15,6 +16,11 @@ Usage:
     from agent_os.integrations import LangChainKernel
     kernel = LangChainKernel()
     governed_chain = kernel.wrap(my_chain)
+    
+    # LlamaIndex
+    from agent_os.integrations import LlamaIndexKernel
+    kernel = LlamaIndexKernel()
+    governed_engine = kernel.wrap(my_query_engine)
     
     # OpenAI Assistants
     from agent_os.integrations import OpenAIKernel
@@ -27,6 +33,7 @@ Usage:
 """
 
 from .langchain_adapter import LangChainKernel
+from .llamaindex_adapter import LlamaIndexKernel
 from .crewai_adapter import CrewAIKernel
 from .autogen_adapter import AutoGenKernel
 from .openai_adapter import OpenAIKernel, GovernedAssistant
@@ -56,6 +63,8 @@ __all__ = [
     "BoundedSemaphore",
     # LangChain
     "LangChainKernel",
+    # LlamaIndex
+    "LlamaIndexKernel",
     # CrewAI
     "CrewAIKernel", 
     # AutoGen
