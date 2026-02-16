@@ -66,6 +66,8 @@ class RedisBackend:
     """Redis state backend (for production)."""
     
     def __init__(self, url: str = "redis://localhost:6379", key_prefix: str = "agent-os:"):
+        if not isinstance(key_prefix, str):
+            raise TypeError(f"key_prefix must be str, got {type(key_prefix).__name__}")
         self.url = url
         self._client = None
         # FIXME: Add connection timeout configuration

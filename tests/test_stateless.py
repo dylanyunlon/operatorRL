@@ -5,7 +5,7 @@ Test Stateless Kernel (MCP June 2026 compliant).
 import pytest
 import json
 from typing import Dict, Any
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock
 
 
 class TestStatelessKernel:
@@ -216,12 +216,19 @@ class TestRedisBackend:
         backend = RedisBackend(key_prefix=custom_prefix)
         assert backend._prefix == custom_prefix
 
+    def test_none_prefix_raises_error(self):
+        """Test that None prefix raises TypeError."""
+        from agent_os.stateless import RedisBackend
+        
+        with pytest.raises(TypeError):
+            RedisBackend(key_prefix=None)
+
     @pytest.mark.asyncio
     async def test_operations_use_prefix(self):
         """Test that get/set/delete operations actually use the prefix."""
         from agent_os.stateless import RedisBackend
         
-        # 1. Настраиваем backend и mock
+        # Setup backend and mock
         prefix = "test-prefix:"
         backend = RedisBackend(key_prefix=prefix)
         
