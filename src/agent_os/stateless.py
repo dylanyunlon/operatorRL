@@ -65,12 +65,11 @@ class MemoryBackend:
 class RedisBackend:
     """Redis state backend (for production)."""
     
-    def __init__(self, url: str = "redis://localhost:6379"):
+    def __init__(self, url: str = "redis://localhost:6379", key_prefix: str = "agent-os:"):
         self.url = url
         self._client = None
         # FIXME: Add connection timeout configuration
-        # HACK: Using hardcoded prefix - should be configurable
-        self._prefix = "agent-os:"
+        self._prefix = key_prefix
     
     async def _get_client(self):
         if self._client is None:
