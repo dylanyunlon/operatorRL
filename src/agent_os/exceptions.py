@@ -156,3 +156,13 @@ class RateLimitError(AgentOSError):
 
     def __init__(self, message, error_code=None, details=None):
         super().__init__(message, error_code or "RATE_LIMIT_EXCEEDED", details)
+
+
+# --- Security errors ---
+
+
+class SecurityError(AgentOSError):
+    """Raised when a sandbox security violation is detected."""
+
+    def __init__(self, message, error_code=None, details=None):
+        super().__init__(message, error_code or "SECURITY_VIOLATION", details)
