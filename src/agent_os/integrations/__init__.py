@@ -56,6 +56,7 @@ from .templates import PolicyTemplates
 from .webhooks import WebhookConfig, WebhookEvent, WebhookNotifier, DeliveryRecord
 from .policy_compose import compose_policies, PolicyHierarchy, override_policy
 from .health import HealthChecker, HealthReport, HealthStatus, ComponentHealth
+from .logging import GovernanceLogger, JSONFormatter, get_logger
 from agent_os.exceptions import (
     AgentOSError,
     PolicyError,
@@ -150,4 +151,8 @@ __all__ = [
     "HealthReport",
     "HealthStatus",
     "ComponentHealth",
+    # Structured Logging
+    "GovernanceLogger",
+    "JSONFormatter",
+    "get_logger",
 ]
