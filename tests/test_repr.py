@@ -35,7 +35,7 @@ class TestAgentConfigRepr:
         assert repr(cfg) == "AgentConfig(agent_id='agent-2', policies=['read_only', 'no_pii'])"
 
     def test_metadata_omitted(self):
-        cfg = AgentConfig(agent_id="a", metadata={"secret": "key123"})
+        cfg = AgentConfig(agent_id="agent-3", metadata={"secret": "key123"})
         assert "secret" not in repr(cfg)
         assert "key123" not in repr(cfg)
 

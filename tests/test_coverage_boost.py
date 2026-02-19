@@ -1260,13 +1260,13 @@ class TestToolUsingAgent:
         assert "not in allowed" in result.error
 
     def test_list_allowed_tools(self):
-        config = AgentConfig(agent_id="t")
+        config = AgentConfig(agent_id="tool-list-agent")
         agent = ConcreteToolAgent(config, tools=["a", "b"])
         tools = agent.list_allowed_tools()
         assert set(tools) == {"a", "b"}
 
     def test_list_allowed_tools_none(self):
-        config = AgentConfig(agent_id="t")
+        config = AgentConfig(agent_id="tool-list-agent")
         agent = ConcreteToolAgent(config)
         assert agent.list_allowed_tools() is None
 
