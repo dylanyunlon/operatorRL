@@ -5,17 +5,26 @@ Usage:
     agentos init [--template TEMPLATE]     Initialize .agents/ directory
     agentos secure [--policy POLICY]       Enable kernel governance
     agentos audit [--format FORMAT]        Audit agent security
-    agentos status                         Show kernel status
+    agentos status [--format FORMAT]       Show kernel status
     agentos check <file>                   Check file for safety violations
     agentos review <file> [--cmvk]         Multi-model code review
     agentos validate [files]               Validate policy YAML files
     agentos install-hooks                  Install git pre-commit hooks
     agentos serve [--port PORT]            Start HTTP API server
     agentos metrics                        Output Prometheus metrics
+
+Environment variables:
+    AGENTOS_CONFIG      Path to config file (overrides default .agents/)
+    AGENTOS_LOG_LEVEL   Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING)
+    AGENTOS_BACKEND     State backend type: memory, redis (default: memory)
+    AGENTOS_REDIS_URL   Redis connection URL (default: redis://localhost:6379)
 """
 
 import argparse
+import csv
+import io
 import json
+import logging
 import os
 import re
 import subprocess
@@ -24,6 +33,50 @@ import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
+
+
+# ============================================================================
+# Environment Variable Configuration
+# ============================================================================
+
+AGENTOS_ENV_VARS = {
+    "AGENTOS_CONFIG": "Path to config file (overrides default .agents/)",
+    "AGENTOS_LOG_LEVEL": "Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING)",
+    "AGENTOS_BACKEND": "State backend type: memory, redis (default: memory)",
+    "AGENTOS_REDIS_URL": "Redis connection URL (default: redis://localhost:6379)",
+}
+
+VALID_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
+VALID_BACKENDS = ("memory", "redis")
+
+
+def get_env_config() -> Dict[str, Optional[str]]:
+    """Read configuration from environment variables."""
+    return {
+        "config_path": os.environ.get("AGENTOS_CONFIG"),
+        "log_level": os.environ.get("AGENTOS_LOG_LEVEL", "WARNING").upper(),
+        "backend": os.environ.get("AGENTOS_BACKEND", "memory").lower(),
+        "redis_url": os.environ.get("AGENTOS_REDIS_URL", "redis://localhost:6379"),
+    }
+
+
+def configure_logging(level_name: str) -> None:
+    """Configure logging from the AGENTOS_LOG_LEVEL environment variable."""
+    level_name = level_name.upper()
+    if level_name not in VALID_LOG_LEVELS:
+        level_name = "WARNING"
+    level = getattr(logging, level_name, logging.WARNING)
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+
+
+def get_config_path(args_path: Optional[str] = None) -> Path:
+    """Resolve the config path from args or AGENTOS_CONFIG env var."""
+    if args_path:
+        return Path(args_path)
+    env_config = os.environ.get("AGENTOS_CONFIG")
+    if env_config:
+        return Path(env_config)
+    return Path(".")
 
 
 # ============================================================================
@@ -579,68 +632,115 @@ def cmd_secure(args):
 
 def cmd_audit(args):
     """Audit agent security configuration."""
-    root = Path(args.path or ".")
+    root = Path(get_config_path(getattr(args, "path", None)))
     agents_dir = root / ".agents"
-    
+    output_format = getattr(args, "format", "text")
+
     if not agents_dir.exists():
-        print(handle_missing_config(str(root)))
+        if output_format == "json":
+            print(json.dumps({"error": "Config directory not found", "passed": False}, indent=2))
+        else:
+            print(handle_missing_config(str(root)))
         return 1
-    
-    print(f"Auditing {root}...")
-    print()
-    
+
     files = {
         "agents.md": agents_dir / "agents.md",
         "security.md": agents_dir / "security.md",
     }
-    
-    findings = []
-    
+
+    findings: List[Dict[str, str]] = []
+    file_status: Dict[str, bool] = {}
+
     for name, path in files.items():
-        if path.exists():
-            print(f"  [OK] {name}")
-        else:
-            print(f"  [MISSING] {name}")
-            findings.append(f"Missing {name}")
-    
-    print()
-    
+        exists = path.exists()
+        file_status[name] = exists
+        if not exists:
+            findings.append({"severity": "error", "message": f"Missing {name}"})
+
     security_md = files["security.md"]
     if security_md.exists():
         content = security_md.read_text()
-        
+
         dangerous = [
             ("effect: allow", "Permissive allow - consider adding constraints"),
         ]
-        
+
         for pattern, warning in dangerous:
             if pattern in content and "action: *" in content:
-                findings.append(f"Warning: {warning}")
-        
+                findings.append({"severity": "warning", "message": warning})
+
         required = ["kernel:", "signals:", "policies:"]
         for section in required:
             if section not in content:
-                findings.append(f"Missing required section: {section}")
-    
-    if findings:
-        print("Findings:")
-        for f in findings:
-            print(f"  - {f}")
-    else:
-        print("No issues found.")
-    
-    print()
-    
-    if args.format == "json":
+                findings.append({"severity": "error", "message": f"Missing required section: {section}"})
+
+    passed = all(f["severity"] != "error" for f in findings) and len(
+        [f for f in findings if f["severity"] == "error"]
+    ) == 0
+
+    # CSV export
+    export_format = getattr(args, "export", None)
+    if export_format == "csv":
+        output_path = getattr(args, "output", None) or "audit.csv"
+        _export_audit_csv(root, file_status, findings, passed, output_path)
+        if output_format != "json":
+            print(f"{Colors.GREEN}✓{Colors.RESET} Audit exported to {output_path}")
+
+    if output_format == "json":
         result = {
             "path": str(root),
-            "files": {name: path.exists() for name, path in files.items()},
-            "findings": findings,
-            "passed": len(findings) == 0
+            "files": file_status,
+            "findings": [f["message"] for f in findings],
+            "passed": passed,
         }
         print(json.dumps(result, indent=2))
-    
-    return 0 if len(findings) == 0 else 1
+    else:
+        print(f"Auditing {root}...")
+        print()
+
+        for name, exists in file_status.items():
+            if exists:
+                print(f"  {Colors.GREEN}✓{Colors.RESET} {name}")
+            else:
+                print(f"  {Colors.RED}✗{Colors.RESET} {name}")
+
+        print()
+
+        if findings:
+            print("Findings:")
+            for f in findings:
+                if f["severity"] == "warning":
+                    print(f"  {Colors.YELLOW}⚠{Colors.RESET} {f['message']}")
+                else:
+                    print(f"  {Colors.RED}✗{Colors.RESET} {f['message']}")
+        else:
+            print(f"{Colors.GREEN}✓{Colors.RESET} No issues found.")
+
+        print()
+
+    return 0 if passed else 1
+
+
+def _export_audit_csv(
+    root: Path,
+    file_status: Dict[str, bool],
+    findings: List[Dict[str, str]],
+    passed: bool,
+    output_path: str,
+) -> None:
+    """Export audit results to a CSV file."""
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["type", "name", "severity", "message"])
+        for name, exists in file_status.items():
+            writer.writerow([
+                "file",
+                name,
+                "ok" if exists else "error",
+                "Present" if exists else "Missing",
+            ])
+        for finding in findings:
+            writer.writerow(["finding", "", finding["severity"], finding["message"]])
 
 
 # ============================================================================
@@ -650,52 +750,62 @@ def cmd_audit(args):
 def cmd_check(args):
     """Check file(s) for safety violations."""
     checker = PolicyChecker()
-    
+    output_format = getattr(args, "format", "text")
+
     # Handle --staged flag
     if args.staged:
         all_violations = checker.check_staged_files()
         if not all_violations:
-            print(f"{Colors.GREEN}✓{Colors.RESET} No violations in staged files")
+            if output_format == "json":
+                print(json.dumps({"violations": [], "summary": {"total": 0}}, indent=2))
+            else:
+                print(f"{Colors.GREEN}✓{Colors.RESET} No violations in staged files")
             return 0
-        
+
         total = sum(len(v) for v in all_violations.values())
-        print(f"{Colors.RED}⚠️  {total} violation(s) found in staged files:{Colors.RESET}")
-        print()
-        
-        for filepath, violations in all_violations.items():
-            print(f"{Colors.BOLD}{filepath}{Colors.RESET}")
-            _print_violations(violations, args)
-        
+
+        if output_format == "json":
+            _output_json_from_violations(all_violations)
+        else:
+            print(f"{Colors.RED}✗{Colors.RESET} {total} violation(s) found in staged files:")
+            print()
+            for filepath, violations in all_violations.items():
+                print(f"{Colors.BOLD}{filepath}{Colors.RESET}")
+                _print_violations(violations, args)
+
         return 1
-    
+
     # Check specified files
     if not args.files:
         print("Usage: agentos check <file> [file2 ...]")
         print("       agentos check --staged")
         return 1
-    
+
     exit_code = 0
     for filepath in args.files:
         try:
             violations = checker.check_file(filepath)
-            
+
             if not violations:
-                print(f"{Colors.GREEN}✓{Colors.RESET} {filepath}: No violations")
+                if output_format != "json":
+                    print(f"{Colors.GREEN}✓{Colors.RESET} {filepath}: No violations")
                 continue
-            
-            print(f"{Colors.RED}⚠️  {len(violations)} violation(s) found in {filepath}:{Colors.RESET}")
-            print()
-            _print_violations(violations, args)
+
+            if output_format != "json":
+                print(f"{Colors.RED}✗{Colors.RESET} {len(violations)} violation(s) found in {filepath}:")
+                print()
+                _print_violations(violations, args)
             exit_code = 1
-            
+
         except FileNotFoundError as e:
-            print(f"{Colors.RED}Error:{Colors.RESET} {e}")
+            if output_format != "json":
+                print(f"{Colors.RED}✗{Colors.RESET} {e}")
             exit_code = 1
-    
-    # JSON output for CI
-    if args.format == 'json':
+
+    # JSON output
+    if output_format == "json":
         _output_json(args.files, checker)
-    
+
     return exit_code
 
 
@@ -710,11 +820,32 @@ def _print_violations(violations: List[PolicyViolation], args):
         }.get(v.severity, Colors.WHITE)
         
         print(f"  {Colors.DIM}Line {v.line}:{Colors.RESET} {v.code[:60]}{'...' if len(v.code) > 60 else ''}")
-        print(f"    {severity_color}Violation:{Colors.RESET} {v.violation}")
+        print(f"    {severity_color}✗ Violation:{Colors.RESET} {v.violation}")
         print(f"    {Colors.DIM}Policy:{Colors.RESET} {v.policy}")
-        if v.suggestion and not args.ci:
-            print(f"    {Colors.GREEN}Suggestion:{Colors.RESET} {v.suggestion}")
+        if v.suggestion and not getattr(args, "ci", False):
+            print(f"    {Colors.GREEN}✓ Suggestion:{Colors.RESET} {v.suggestion}")
         print()
+
+
+def _output_json_from_violations(all_violations: Dict[str, List[PolicyViolation]]):
+    """Output violations from a dict of {filepath: violations} as JSON."""
+    results: Dict = {
+        "violations": [],
+        "summary": {"total": 0, "critical": 0, "high": 0, "medium": 0, "low": 0},
+    }
+    for filepath, violations in all_violations.items():
+        for v in violations:
+            results["violations"].append({
+                "file": filepath,
+                "line": v.line,
+                "code": v.code,
+                "violation": v.violation,
+                "policy": v.policy,
+                "severity": v.severity,
+            })
+            results["summary"]["total"] += 1
+            results["summary"][v.severity] = results["summary"].get(v.severity, 0) + 1
+    print(json.dumps(results, indent=2))
 
 
 def _output_json(files: List[str], checker: PolicyChecker):
@@ -944,45 +1075,88 @@ echo "✓ Agent OS: All checks passed"
 
 def cmd_status(args):
     """Show kernel status."""
+    output_format = getattr(args, "format", "text")
+    env_cfg = get_env_config()
+
+    version_str = "unknown"
+    installed = False
+    try:
+        import agent_os
+        version_str = agent_os.__version__
+        installed = True
+    except ImportError:
+        pass
+
+    root = Path(".")
+    agents_dir = root / ".agents"
+    configured = agents_dir.exists()
+
+    packages: Dict[str, bool] = {}
+    try:
+        from agent_os import AVAILABLE_PACKAGES
+        packages = dict(AVAILABLE_PACKAGES)
+    except Exception:
+        pass
+
+    if output_format == "json":
+        result = {
+            "version": version_str,
+            "installed": installed,
+            "project": str(root.absolute()),
+            "configured": configured,
+            "packages": packages,
+            "env": {
+                "backend": env_cfg["backend"],
+                "log_level": env_cfg["log_level"],
+                "config_path": env_cfg["config_path"],
+            },
+        }
+        print(json.dumps(result, indent=2))
+        return 0 if installed else 1
+
     print("Agent OS Kernel Status")
     print("=" * 40)
     print()
-    
-    try:
-        import agent_os
-        print(f"  Version: {agent_os.__version__}")
-        print(f"  Status: Installed")
-    except ImportError:
-        print(f"  Status: Not installed")
+
+    if installed:
+        print(f"  {Colors.GREEN}✓{Colors.RESET} Version: {version_str}")
+        print(f"  {Colors.GREEN}✓{Colors.RESET} Status: Installed")
+    else:
+        print(f"  {Colors.RED}✗{Colors.RESET} Status: Not installed")
         print()
         print("Install with: pip install agent-os-kernel")
         return 1
-    
+
     print()
-    
-    root = Path(".")
-    agents_dir = root / ".agents"
-    
-    if agents_dir.exists():
-        print(f"  Project: {root.absolute()}")
-        print(f"  Agents: Configured (.agents/ found)")
+
+    if configured:
+        print(f"  {Colors.GREEN}✓{Colors.RESET} Project: {root.absolute()}")
+        print(f"  {Colors.GREEN}✓{Colors.RESET} Agents: Configured (.agents/ found)")
     else:
-        print(f"  Project: {root.absolute()}")
-        print(f"  Agents: Not configured")
+        print(f"  {Colors.YELLOW}⚠{Colors.RESET} Project: {root.absolute()}")
+        print(f"  {Colors.YELLOW}⚠{Colors.RESET} Agents: Not configured")
         print()
         print("Initialize with: agentos init")
-    
+
     print()
-    
+
     print("Packages:")
-    try:
-        from agent_os import AVAILABLE_PACKAGES
-        for pkg, available in AVAILABLE_PACKAGES.items():
-            status = "installed" if available else "not installed"
-            print(f"  - {pkg}: {status}")
-    except:
+    if packages:
+        for pkg, available in packages.items():
+            if available:
+                print(f"  {Colors.GREEN}✓{Colors.RESET} {pkg}: installed")
+            else:
+                print(f"  {Colors.DIM}-{Colors.RESET} {pkg}: not installed")
+    else:
         print("  Unable to check packages")
-    
+
+    print()
+    print("Environment:")
+    print(f"  Backend:   {env_cfg['backend']}")
+    print(f"  Log level: {env_cfg['log_level']}")
+    if env_cfg["config_path"]:
+        print(f"  Config:    {env_cfg['config_path']}")
+
     return 0
 
 
@@ -1259,8 +1433,46 @@ def cmd_metrics(args: argparse.Namespace) -> int:
     return 0
 
 
+# ============================================================================
+# Health Check (agentos health)
+# ============================================================================
+
+
+def cmd_health(args: argparse.Namespace) -> int:
+    """Run system health checks and print report."""
+    from agent_os.integrations.health import HealthChecker
+
+    checker = HealthChecker()
+    checker.register_check("policy_engine", checker._check_policy_engine)
+    checker.register_check("audit_backend", checker._check_audit_backend)
+    report = checker.check_health()
+
+    fmt = getattr(args, "format", "text")
+    if fmt == "json":
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        status_color = (
+            Colors.GREEN if report.is_healthy()
+            else Colors.YELLOW if report.is_ready()
+            else Colors.RED
+        )
+        print(
+            f"{Colors.BOLD}System Health:{Colors.RESET} "
+            f"{status_color}{report.status.value}{Colors.RESET}"
+        )
+        for name, comp in report.components.items():
+            indicator = "✓" if comp.status.value == "healthy" else "✗"
+            print(f"  {indicator} {name}: {comp.status.value} ({comp.latency_ms:.1f}ms)")
+        print(f"  Uptime: {report.uptime_seconds:.1f}s")
+    return 0 if report.is_ready() else 1
+
+
 def main():
     """Main entry point."""
+    # Configure logging from environment
+    env_cfg = get_env_config()
+    configure_logging(env_cfg["log_level"])
+
     parser = argparse.ArgumentParser(
         prog="agentos",
         description="Agent OS CLI - Kernel-level governance for AI agents",
@@ -1273,6 +1485,15 @@ Examples:
   agentos validate                   Validate policy YAML files
   agentos install-hooks              Install git pre-commit hook
   agentos init                       Initialize Agent OS in project
+  agentos audit --format json        Audit with JSON output
+  agentos audit --export csv -o a.csv  Export audit to CSV
+  agentos status --format json       Status as JSON
+
+Environment variables:
+  AGENTOS_CONFIG      Path to config file (overrides default .agents/)
+  AGENTOS_LOG_LEVEL   Logging level: DEBUG, INFO, WARNING, ERROR
+  AGENTOS_BACKEND     State backend type: memory, redis
+  AGENTOS_REDIS_URL   Redis connection URL
 
 Documentation: https://github.com/imran-siddique/agent-os
 """
@@ -1318,14 +1539,20 @@ Documentation: https://github.com/imran-siddique/agent-os
     audit_parser.add_argument("--path", "-p", help="Path to audit (default: current directory)")
     audit_parser.add_argument("--format", "-f", choices=["text", "json"], default="text",
                              help="Output format: text (human-readable) or json (machine-readable)")
+    audit_parser.add_argument("--export", choices=["csv"], default=None,
+                             help="Export audit results (csv)")
+    audit_parser.add_argument("--output", "-o", default=None,
+                             help="Output file path for export (default: audit.csv)")
     
     # status command
-    subparsers.add_parser(
+    status_parser = subparsers.add_parser(
         "status",
         help="Show kernel status, loaded policies, and agent health",
         description="Display the current kernel state including active policies, "
                     "registered agents, and recent activity summary.",
     )
+    status_parser.add_argument("--format", choices=["text", "json"], default="text",
+                              help="Output format: text (human-readable) or json (machine-readable)")
     
     # check command
     check_parser = subparsers.add_parser(
@@ -1394,6 +1621,18 @@ Documentation: https://github.com/imran-siddique/agent-os
         description="Print kernel metrics in Prometheus exposition text format "
                     "for scraping by monitoring systems.",
     )
+
+    # health command
+    health_parser = subparsers.add_parser(
+        "health",
+        help="Run system health checks and report status",
+        description="Execute registered health checks (kernel, policy engine, "
+                    "audit backend) and print a JSON report.",
+    )
+    health_parser.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default: text)",
+    )
     
     args = parser.parse_args()
     
@@ -1420,6 +1659,7 @@ Documentation: https://github.com/imran-siddique/agent-os
         "validate": cmd_validate,
         "serve": cmd_serve,
         "metrics": cmd_metrics,
+        "health": cmd_health,
     }
 
     handler = commands.get(args.command)

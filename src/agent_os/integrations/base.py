@@ -307,6 +307,7 @@ class GovernancePolicy:
     def to_dict(self) -> dict[str, Any]:
         """Serialize policy to a dictionary."""
         return {
+            "name": self.name,
             "max_tokens": self.max_tokens,
             "max_tool_calls": self.max_tool_calls,
             "allowed_tools": self.allowed_tools,
@@ -325,6 +326,43 @@ class GovernancePolicy:
             "backpressure_threshold": self.backpressure_threshold,
             "version": self.version,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "GovernancePolicy":
+        """Deserialize policy from a dictionary.
+
+        Args:
+            data: Dictionary as produced by ``to_dict()``.
+
+        Returns:
+            Reconstructed GovernancePolicy instance.
+        """
+        data = dict(data)  # shallow copy to avoid mutating caller's dict
+        # Convert blocked_patterns back to tuples where needed
+        raw_patterns = data.get("blocked_patterns", [])
+        patterns: list[Union[str, tuple[str, PatternType]]] = []
+        for p in raw_patterns:
+            if isinstance(p, str):
+                patterns.append(p)
+            elif isinstance(p, dict) and "pattern" in p and "type" in p:
+                try:
+                    pt = PatternType(p["type"])
+                except ValueError:
+                    raise ValueError(f"Unknown pattern type: {p['type']!r}")
+                patterns.append((p["pattern"], pt))
+            else:
+                raise ValueError(f"Invalid blocked_pattern entry: {p!r}")
+        data["blocked_patterns"] = patterns
+
+        valid_fields = {
+            "name", "max_tokens", "max_tool_calls", "allowed_tools",
+            "blocked_patterns", "require_human_approval", "timeout_seconds",
+            "confidence_threshold", "drift_threshold", "log_all_calls",
+            "checkpoint_frequency", "max_concurrent", "backpressure_threshold",
+            "version",
+        }
+        filtered = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered)
 
     def compare_versions(self, other: "GovernancePolicy") -> dict:
         """Compare this policy with another, including version info.

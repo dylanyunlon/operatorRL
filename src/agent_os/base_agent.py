@@ -24,6 +24,7 @@ import json
 import os
 import re
 import sys
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -160,6 +161,34 @@ class AgentConfig:
     def __repr__(self) -> str:
         return f"AgentConfig(agent_id={self.agent_id!r}, policies={self.policies!r})"
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize configuration to a dictionary."""
+        return {
+            "agent_id": self.agent_id,
+            "policies": self.policies,
+            "metadata": self.metadata,
+            "max_audit_log_size": self.max_audit_log_size,
+            "max_metadata_size_bytes": self.max_metadata_size_bytes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AgentConfig":
+        """Deserialize an AgentConfig from a dictionary.
+
+        Args:
+            data: Dictionary as produced by ``to_dict()``.
+
+        Returns:
+            Reconstructed AgentConfig instance.
+        """
+        return cls(
+            agent_id=data["agent_id"],
+            policies=data.get("policies", []),
+            metadata=data.get("metadata", {}),
+            max_audit_log_size=data.get("max_audit_log_size", 10000),
+            max_metadata_size_bytes=data.get("max_metadata_size_bytes", 1_048_576),
+        )
+
 
 @dataclass
 class AuditEntry:
@@ -172,6 +201,7 @@ class AuditEntry:
     decision: PolicyDecision
     result_success: Optional[bool] = None
     error: Optional[str] = None
+    execution_time_ms: Optional[float] = None
 
     def __repr__(self) -> str:
         return (
@@ -189,7 +219,30 @@ class AuditEntry:
             "decision": self.decision.value,
             "result_success": self.result_success,
             "error": self.error,
+            "execution_time_ms": self.execution_time_ms,
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AuditEntry":
+        """Deserialize an AuditEntry from a dictionary.
+
+        Args:
+            data: Dictionary as produced by ``to_dict()``.
+
+        Returns:
+            Reconstructed AuditEntry instance.
+        """
+        return cls(
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            agent_id=data["agent_id"],
+            request_id=data["request_id"],
+            action=data["action"],
+            params={k: None for k in data.get("params_keys", [])},
+            decision=PolicyDecision(data["decision"]),
+            result_success=data.get("result_success"),
+            error=data.get("error"),
+            execution_time_ms=data.get("execution_time_ms"),
+        )
 
 
 class BaseAgent(ABC):
@@ -402,8 +455,10 @@ class BaseAgent(ABC):
             decision=PolicyDecision.ALLOW,  # Will be updated
         )
         
-        # Execute through kernel
+        # Execute through kernel with timing
+        t0 = time.monotonic()
         result = await self._kernel.execute(action, params, ctx)
+        elapsed_ms = (time.monotonic() - t0) * 1000.0
         
         # Update audit entry with result
         if result.signal == "SIGKILL":
@@ -414,6 +469,7 @@ class BaseAgent(ABC):
             audit.decision = PolicyDecision.DEFER
         audit.result_success = result.success
         audit.error = result.error
+        audit.execution_time_ms = elapsed_ms
         
         self._audit_log.append(audit)
         if len(self._audit_log) > self._max_audit_entries:
@@ -432,6 +488,63 @@ class BaseAgent(ABC):
     def clear_audit_log(self) -> None:
         """Clear the agent's audit log."""
         self._audit_log.clear()
+
+    def get_execution_stats(self) -> Dict[str, Any]:
+        """Return execution time statistics from audit log entries.
+
+        Returns:
+            Dictionary with avg, min, max, p99 execution times in milliseconds,
+            and the total count of timed entries.
+        """
+        times = [
+            e.execution_time_ms
+            for e in self._audit_log
+            if e.execution_time_ms is not None
+        ]
+        if not times:
+            return {"count": 0, "avg_ms": 0.0, "min_ms": 0.0, "max_ms": 0.0, "p99_ms": 0.0}
+        times_sorted = sorted(times)
+        count = len(times_sorted)
+        p99_idx = min(int(count * 0.99), count - 1)
+        return {
+            "count": count,
+            "avg_ms": sum(times_sorted) / count,
+            "min_ms": times_sorted[0],
+            "max_ms": times_sorted[-1],
+            "p99_ms": times_sorted[p99_idx],
+        }
+
+    def query_audit_log(
+        self,
+        action: Optional[str] = None,
+        decision: Optional[str] = None,
+        since: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Query audit log with optional filters.
+
+        Args:
+            action: Filter by action name (exact match).
+            decision: Filter by decision value (e.g. "allow", "deny").
+            since: Only include entries at or after this timestamp.
+            limit: Maximum number of entries to return.
+            offset: Number of matching entries to skip (for pagination).
+
+        Returns:
+            List of matching audit entries as dictionaries.
+        """
+        results: List[AuditEntry] = self._audit_log
+        if action is not None:
+            results = [e for e in results if e.action == action]
+        if decision is not None:
+            results = [e for e in results if e.decision.value == decision]
+        if since is not None:
+            results = [e for e in results if e.timestamp >= since]
+        results = results[offset:]
+        if limit is not None:
+            results = results[:limit]
+        return [e.to_dict() for e in results]
 
     def get_escalation_queue(self) -> List[EscalationRequest]:
         """Get pending escalation requests."""
