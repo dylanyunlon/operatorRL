@@ -44,6 +44,56 @@
 
 > **6 framework integrations** across 170K+ GitHub stars. Governance for [Dify](https://github.com/langgenius/dify-plugins/pull/2060) (65K ⭐), [LlamaIndex](https://github.com/run-llama/llama_index/pull/20644) (47K ⭐), [LangGraph](https://pypi.org/project/langgraph-trust/), [OpenAI Agents](https://pypi.org/project/openai-agents-trust/), [Agent-Lightning](https://github.com/microsoft/agent-lightning/pull/478), and [OpenClaw](https://clawhub.ai/imran-siddique/agentmesh-governance).
 
+## 📊 By The Numbers
+
+<table>
+<tr>
+<td align="center"><h3>1,577+</h3><sub>Tests Passing</sub></td>
+<td align="center"><h3>6</h3><sub>Framework Integrations</sub></td>
+<td align="center"><h3>170K+</h3><sub>Combined Stars of<br/>Integrated Projects</sub></td>
+<td align="center"><h3>10+</h3><sub>Framework Proposals<br/>Under Review</sub></td>
+</tr>
+</table>
+
+### 🏢 Adopted By Leading AI Frameworks
+
+| Framework | Stars | Status | Link |
+|-----------|-------|--------|------|
+| **Dify** | 65K ⭐ | ✅ Merged | [dify-plugins#2060](https://github.com/langgenius/dify-plugins/pull/2060) |
+| **LlamaIndex** | 47K ⭐ | ✅ Merged | [llama_index#20644](https://github.com/run-llama/llama_index/pull/20644) |
+| **Microsoft Agent-Lightning** | 15K ⭐ | ✅ Merged | [agent-lightning#478](https://github.com/microsoft/agent-lightning/pull/478) |
+| **LangGraph** | 24K ⭐ | 📦 Published on PyPI | [langgraph-trust](https://pypi.org/project/langgraph-trust/) |
+| **OpenAI Agents SDK** | — | 📦 Published on PyPI | [openai-agents-trust](https://pypi.org/project/openai-agents-trust/) |
+| **OpenClaw** | — | 📦 Published on ClawHub | [agentmesh-governance](https://clawhub.ai/imran-siddique/agentmesh-governance) |
+
+<details>
+<summary><b>📋 Proposals under review at 10+ frameworks (click to expand)</b></summary>
+
+| Framework | Stars | Proposal |
+|-----------|-------|----------|
+| AutoGen | 54K ⭐ | [microsoft/autogen#7242](https://github.com/microsoft/autogen/issues/7242) |
+| CrewAI | 44K ⭐ | [crewAIInc/crewAI#4502](https://github.com/crewAIInc/crewAI/issues/4502) |
+| Haystack | 22K ⭐ | [deepset-ai/haystack#10615](https://github.com/deepset-ai/haystack/issues/10615) |
+| Semantic Kernel | 27K ⭐ | [microsoft/semantic-kernel#13556](https://github.com/microsoft/semantic-kernel/issues/13556) |
+| smolagents | 25K ⭐ | [huggingface/smolagents#1989](https://github.com/huggingface/smolagents/issues/1989) |
+| LangGraph | 24K ⭐ | [langchain-ai/langgraph#6824](https://github.com/langchain-ai/langgraph/issues/6824) |
+| Google ADK | 18K ⭐ | [google/adk-python#4517](https://github.com/google/adk-python/issues/4517) |
+| PydanticAI | 15K ⭐ | [pydantic/pydantic-ai#4335](https://github.com/pydantic/pydantic-ai/issues/4335) |
+| OpenAI Agents SDK | — | [openai/openai-agents-python#2515](https://github.com/openai/openai-agents-python/issues/2515) |
+| A2A Protocol | 21K ⭐ | [a2aproject/A2A#1501](https://github.com/a2aproject/A2A/issues/1501) |
+| Oracle Agent Spec | — | [oracle/agent-spec#105](https://github.com/oracle/agent-spec/issues/105) |
+| AI Card Spec | — | [agent-card/ai-card#16](https://github.com/Agent-Card/ai-card/issues/16) |
+
+</details>
+
+### 💡 Why Agent OS?
+
+> **The AI agent market is projected to reach $47B by 2030.** As enterprises deploy autonomous agents at scale, governance becomes the critical infrastructure layer. Agent OS is the kernel that ensures every agent action is policy-enforced, auditable, and compliant — making AI agents enterprise-ready.
+
+**The problem:** AI agents can execute arbitrary tools, access sensitive data, and make autonomous decisions — with no built-in governance, audit trails, or policy enforcement.
+
+**Our solution:** A governance kernel that sits between agents and their actions, providing deterministic policy enforcement in <1ms with zero agent code changes.
+
 ---
 
 ## ⚡ Quick Start in 30 Seconds
