@@ -3,7 +3,7 @@ Test Stateless Kernel (MCP June 2026 compliant).
 """
 
 import json
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -517,3 +517,123 @@ class TestSerializationErrorHandling:
         d = err.to_dict()
         assert d["error"] == "SERIALIZATION_ERROR"
         assert d["details"]["key"] == "k"
+
+
+class TestRedisErrorHandling:
+    """Test Redis backend error handling (#155)."""
+
+    @pytest.mark.asyncio
+    async def test_connection_error_on_get(self):
+        """Test that ConnectionError on get propagates cleanly."""
+        from agent_os.stateless import RedisBackend
+
+        backend = RedisBackend()
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = ConnectionError("Connection refused")
+        backend._client = mock_client
+
+        with pytest.raises(ConnectionError, match="Connection refused"):
+            await backend.get("some-key")
+
+    @pytest.mark.asyncio
+    async def test_connection_error_on_set(self):
+        """Test that ConnectionError on set propagates cleanly."""
+        from agent_os.stateless import RedisBackend
+
+        backend = RedisBackend()
+        mock_client = AsyncMock()
+        mock_client.set.side_effect = ConnectionError("Connection refused")
+        backend._client = mock_client
+
+        with pytest.raises(ConnectionError, match="Connection refused"):
+            await backend.set("key", {"data": "value"})
+
+    @pytest.mark.asyncio
+    async def test_connection_error_on_delete(self):
+        """Test that ConnectionError on delete propagates cleanly."""
+        from agent_os.stateless import RedisBackend
+
+        backend = RedisBackend()
+        mock_client = AsyncMock()
+        mock_client.delete.side_effect = ConnectionError("Connection refused")
+        backend._client = mock_client
+
+        with pytest.raises(ConnectionError, match="Connection refused"):
+            await backend.delete("key")
+
+    @pytest.mark.asyncio
+    async def test_reconnect_after_failure(self):
+        """Test that a new client is created after resetting _client."""
+        from agent_os.stateless import RedisBackend
+
+        backend = RedisBackend()
+        mock_client_bad = AsyncMock()
+        mock_client_bad.get.side_effect = ConnectionError("down")
+        backend._client = mock_client_bad
+
+        with pytest.raises(ConnectionError):
+            await backend.get("key")
+
+        # Simulate reconnection by resetting client
+        mock_client_good = AsyncMock()
+        mock_client_good.get.return_value = json.dumps({"ok": True}).encode()
+        backend._client = mock_client_good
+
+        result = await backend.get("key")
+        assert result == {"ok": True}
+
+    @pytest.mark.asyncio
+    async def test_unavailable_redis_via_get_client(self):
+        """Test that _get_client raises when Redis is unavailable."""
+        from agent_os.stateless import RedisBackend
+
+        backend = RedisBackend(url="redis://unreachable:6379")
+
+        with patch("redis.asyncio.from_url", side_effect=ConnectionError("unreachable")):
+            with pytest.raises(ConnectionError, match="unreachable"):
+                await backend._get_client()
+
+    @pytest.mark.asyncio
+    async def test_timeout_error_on_get(self):
+        """Test that TimeoutError on get propagates cleanly."""
+        from agent_os.stateless import RedisBackend
+
+        backend = RedisBackend()
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = TimeoutError("Read timed out")
+        backend._client = mock_client
+
+        with pytest.raises(TimeoutError, match="Read timed out"):
+            await backend.get("key")
+
+    @pytest.mark.asyncio
+    async def test_kernel_execute_with_failing_backend_state_ref(self):
+        """Test StatelessKernel propagates backend errors when loading state."""
+        from agent_os.stateless import ExecutionContext, StatelessKernel
+
+        failing_backend = AsyncMock()
+        failing_backend.get.side_effect = ConnectionError("Redis down")
+
+        kernel = StatelessKernel(backend=failing_backend)
+        context = ExecutionContext(
+            agent_id="test",
+            policies=[],
+            state_ref="state:test",
+        )
+
+        with pytest.raises(ConnectionError, match="Redis down"):
+            await kernel.execute(action="query", params={}, context=context)
+
+    @pytest.mark.asyncio
+    async def test_kernel_execute_without_state_ref_ignores_backend(self):
+        """Test StatelessKernel works even with a broken backend if no state_ref."""
+        from agent_os.stateless import ExecutionContext, StatelessKernel
+
+        failing_backend = AsyncMock()
+        failing_backend.get.side_effect = ConnectionError("Redis down")
+
+        kernel = StatelessKernel(backend=failing_backend)
+        context = ExecutionContext(agent_id="test", policies=[])
+
+        result = await kernel.execute(action="query", params={}, context=context)
+        assert result.success is True

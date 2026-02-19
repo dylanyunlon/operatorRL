@@ -596,3 +596,301 @@ class TestColorsInstanceIsolation:
 
         assert results["on"] != "", "Enabled instance keeps codes"
         assert results["off"] == "", "Disabled instance has empty codes"
+
+
+# ============================================================================
+# Tests for CLI init command (#156)
+# ============================================================================
+
+
+class TestCLIInitExtended:
+    """Extended tests for agentos init command (#156)."""
+
+    def test_init_default_template(self):
+        """Test init with default (strict) template creates all expected files."""
+        from agent_os.cli import cmd_init
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            class Args:
+                path = tmpdir
+                template = "strict"
+                force = False
+
+            result = cmd_init(Args())
+
+            assert result == 0
+            agents_dir = Path(tmpdir) / ".agents"
+            assert agents_dir.exists()
+            assert (agents_dir / "agents.md").exists()
+            assert (agents_dir / "security.md").exists()
+
+    def test_init_custom_project_name_in_path(self):
+        """Test init with a custom project subdirectory."""
+        from agent_os.cli import cmd_init
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir) / "my-custom-project"
+            project_path.mkdir()
+
+            class Args:
+                path = str(project_path)
+                template = "strict"
+                force = False
+
+            result = cmd_init(Args())
+
+            assert result == 0
+            assert (project_path / ".agents" / "agents.md").exists()
+            assert (project_path / ".agents" / "security.md").exists()
+
+    def test_init_generated_files_have_content(self):
+        """Test that generated files are non-empty and contain expected content."""
+        from agent_os.cli import cmd_init
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            class Args:
+                path = tmpdir
+                template = "strict"
+                force = False
+
+            cmd_init(Args())
+
+            agents_md = (Path(tmpdir) / ".agents" / "agents.md").read_text()
+            assert len(agents_md) > 0
+            assert "Agent" in agents_md
+
+            security_md = (Path(tmpdir) / ".agents" / "security.md").read_text()
+            assert "kernel:" in security_md
+            assert "signals:" in security_md
+            assert "policies:" in security_md
+
+    def test_init_idempotency_with_force(self):
+        """Test running init twice with --force produces same result."""
+        from agent_os.cli import cmd_init
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            class Args:
+                path = tmpdir
+                template = "strict"
+                force = False
+
+            assert cmd_init(Args()) == 0
+            first_content = (Path(tmpdir) / ".agents" / "security.md").read_text()
+
+            # Second run without force should fail
+            assert cmd_init(Args()) == 1
+
+            # Second run with force should succeed
+            class ForceArgs:
+                path = tmpdir
+                template = "strict"
+                force = True
+
+            assert cmd_init(ForceArgs()) == 0
+            second_content = (Path(tmpdir) / ".agents" / "security.md").read_text()
+            assert first_content == second_content
+
+
+# ============================================================================
+# Tests for CLI audit command (#157)
+# ============================================================================
+
+
+class TestCLIAuditExtended:
+    """Extended tests for agentos audit command (#157)."""
+
+    def test_audit_with_complete_config(self):
+        """Test audit with fully initialized project passes."""
+        from agent_os.cli import cmd_init, cmd_audit
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            class InitArgs:
+                path = tmpdir
+                template = "strict"
+                force = False
+            cmd_init(InitArgs())
+
+            class AuditArgs:
+                path = tmpdir
+                format = "text"
+
+            assert cmd_audit(AuditArgs()) == 0
+
+    def test_audit_with_empty_agents_dir(self):
+        """Test audit with empty .agents/ directory reports missing files."""
+        from agent_os.cli import cmd_audit
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / ".agents").mkdir()
+
+            class Args:
+                path = tmpdir
+                format = "text"
+
+            result = cmd_audit(Args())
+            assert result == 1
+
+    def test_audit_json_output_structure(self, capsys):
+        """Test audit --format json returns valid JSON with expected keys."""
+        from agent_os.cli import cmd_init, cmd_audit
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            class InitArgs:
+                path = tmpdir
+                template = "strict"
+                force = False
+            cmd_init(InitArgs())
+
+            class AuditArgs:
+                path = tmpdir
+                format = "json"
+
+            result = cmd_audit(AuditArgs())
+            assert result == 0
+            output = capsys.readouterr().out
+            # JSON output is printed after the text output
+            assert '"passed": true' in output or '"passed":true' in output
+
+    def test_audit_no_agents_dir(self):
+        """Test audit without .agents/ directory returns 1."""
+        from agent_os.cli import cmd_audit
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            class Args:
+                path = tmpdir
+                format = "text"
+
+            assert cmd_audit(Args()) == 1
+
+    def test_audit_missing_security_md_only(self):
+        """Test audit with agents.md but no security.md fails."""
+        from agent_os.cli import cmd_audit
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            agents_dir = Path(tmpdir) / ".agents"
+            agents_dir.mkdir()
+            (agents_dir / "agents.md").write_text("# Agent\n")
+
+            class Args:
+                path = tmpdir
+                format = "text"
+
+            result = cmd_audit(Args())
+            assert result == 1
+
+
+# ============================================================================
+# Tests for CLI validate command (#158)
+# ============================================================================
+
+
+class TestCLIValidateExtended:
+    """Extended tests for agentos validate command (#158)."""
+
+    def test_validate_valid_policy(self):
+        """Test validate with a valid policy YAML."""
+        from agent_os.cli import cmd_validate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            policy_file = Path(tmpdir) / "policy.yaml"
+            policy_file.write_text(
+                "version: '1.0'\nname: test-policy\nrules:\n  - type: allow\n"
+            )
+
+            class Args:
+                files = [str(policy_file)]
+                strict = False
+
+            result = cmd_validate(Args())
+            assert result == 0
+
+    def test_validate_invalid_yaml_syntax(self):
+        """Test validate with invalid YAML syntax reports error."""
+        from agent_os.cli import cmd_validate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            policy_file = Path(tmpdir) / "bad.yaml"
+            policy_file.write_text("version: '1.0'\nname: [unterminated\n")
+
+            class Args:
+                files = [str(policy_file)]
+                strict = False
+
+            result = cmd_validate(Args())
+            assert result == 1
+
+    def test_validate_missing_required_fields(self):
+        """Test validate catches missing required fields (version, name)."""
+        from agent_os.cli import cmd_validate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            policy_file = Path(tmpdir) / "incomplete.yaml"
+            policy_file.write_text("description: no version or name\n")
+
+            class Args:
+                files = [str(policy_file)]
+                strict = False
+
+            result = cmd_validate(Args())
+            assert result == 1
+
+    def test_validate_missing_name_field(self, capsys):
+        """Test validate reports helpful error for missing 'name' field."""
+        from agent_os.cli import cmd_validate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            policy_file = Path(tmpdir) / "noname.yaml"
+            policy_file.write_text("version: '1.0'\nrules:\n  - type: allow\n")
+
+            class Args:
+                files = [str(policy_file)]
+                strict = False
+
+            result = cmd_validate(Args())
+            assert result == 1
+            output = capsys.readouterr().out
+            assert "name" in output.lower()
+
+    def test_validate_empty_file(self):
+        """Test validate catches empty YAML files."""
+        from agent_os.cli import cmd_validate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            policy_file = Path(tmpdir) / "empty.yaml"
+            policy_file.write_text("")
+
+            class Args:
+                files = [str(policy_file)]
+                strict = False
+
+            result = cmd_validate(Args())
+            assert result == 1
+
+    def test_validate_nonexistent_file(self):
+        """Test validate handles non-existent file path."""
+        from agent_os.cli import cmd_validate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            class Args:
+                files = [str(Path(tmpdir) / "ghost.yaml")]
+                strict = False
+
+            result = cmd_validate(Args())
+            assert result == 1
+
+    def test_validate_rules_not_a_list(self):
+        """Test validate catches 'rules' field that is not a list."""
+        from agent_os.cli import cmd_validate
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            policy_file = Path(tmpdir) / "badrules.yaml"
+            policy_file.write_text(
+                "version: '1.0'\nname: bad\nrules: not-a-list\n"
+            )
+
+            class Args:
+                files = [str(policy_file)]
+                strict = False
+
+            result = cmd_validate(Args())
+            assert result == 1
