@@ -21,7 +21,7 @@
 
 > ⭐ **If this project helps you, please star it!** It helps others discover Agent OS.
 
-[Quick Start](#quick-example) • [Documentation](https://imran-siddique.github.io/agent-os-docs/) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=agent-os.agent-os-vscode) • [Examples](examples/) • [AgentMesh (Multi-Agent Trust)](https://github.com/imran-siddique/agent-mesh)
+[Quick Start](#quick-example) • [Documentation](https://imran-siddique.github.io/agent-os-docs/) • [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=agent-os.agent-os-vscode) • [Examples](examples/) • [Agent Hypervisor](https://github.com/imran-siddique/agent-hypervisor) • [AgentMesh](https://github.com/imran-siddique/agent-mesh) • [Agent SRE](https://github.com/imran-siddique/agent-sre)
 
 <br/>
 
