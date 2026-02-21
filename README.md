@@ -1030,6 +1030,22 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ---
 
+## Frequently Asked Questions
+
+**What is the difference between Agent OS and prompt-based guardrails?**
+Prompt-based guardrails ask the LLM to self-police, which fails 26.67% of the time. Agent OS enforces governance at the system level using deterministic policy engines and POSIX-inspired access controls, achieving 0% policy violations. It controls what agents *can* do (capability-based), not just what they *should not* do (filter-based).
+
+**How does Agent OS work with other frameworks?**
+Agent OS integrates with 14+ frameworks via adapters. Install the governance layer alongside your existing framework: use `langgraph-trust` for LangGraph, `openai-agents-trust` for OpenAI Agents, or the MCP server for any MCP-compatible client. Agent OS acts as a kernel layer underneath your agent framework.
+
+**What is the Agent Governance Ecosystem?**
+Agent OS is part of a suite of four projects: Agent OS (policy kernel), [AgentMesh](https://github.com/imran-siddique/agent-mesh) (trust network), [Agent Hypervisor](https://github.com/imran-siddique/agent-hypervisor) (runtime supervisor), and [Agent SRE](https://github.com/imran-siddique/agent-sre) (reliability platform). Together they provide 4,310+ tests across 17 modules.
+
+**Can I use Agent OS in production?**
+Yes. Agent OS has 1,500+ tests, a VS Code extension, PyPI package (`pip install agent-os-kernel`), and is integrated into production frameworks like Dify (65K stars) and LlamaIndex (47K stars). It supports Python 3.9+ and runs on any platform.
+
+---
+
 ## Contributing
 
 ```bash
