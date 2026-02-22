@@ -317,6 +317,11 @@ class _GovernedMessages:
                             f"Tool not allowed: {tool_name}"
                         )
 
+                if self._kernel.policy.require_human_approval:
+                    raise PolicyViolationError(
+                        f"Tool '{tool_name}' requires human approval per governance policy"
+                    )
+
         # Post-execute bookkeeping
         self._kernel.post_execute(self._ctx, response)
 

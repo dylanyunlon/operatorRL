@@ -801,8 +801,8 @@ class BaseIntegration(ABC):
         for cb in self._event_listeners.get(event_type, []):
             try:
                 cb(data)
-            except Exception:
-                pass  # Don't let listener errors break governance flow
+            except Exception:  # noqa: BLE001 — listener errors must not break governance flow
+                pass
     
     def pre_execute(self, ctx: ExecutionContext, input_data: Any) -> tuple[bool, Optional[str]]:
         """
@@ -838,7 +838,7 @@ class BaseIntegration(ABC):
         # Check confidence threshold
         if self.policy.confidence_threshold > 0.0:
             confidence = getattr(input_data, 'confidence', None)
-            if confidence is not None and confidence < self.policy.confidence_threshold:
+            if isinstance(confidence, (int, float)) and confidence < self.policy.confidence_threshold:
                 reason = (
                     f"Confidence {confidence:.2f} below threshold "
                     f"{self.policy.confidence_threshold:.2f}"
@@ -850,12 +850,28 @@ class BaseIntegration(ABC):
     
     def post_execute(self, ctx: ExecutionContext, output_data: Any) -> tuple[bool, Optional[str]]:
         """
-        Post-execution validation.
+        Post-execution validation including drift detection.
         
         Returns (valid, reason) tuple.
         """
         ctx.call_count += 1
         
+        # Drift detection: compare output against policy threshold
+        if self.policy.drift_threshold > 0.0:
+            drift_score = getattr(output_data, 'drift_score', None)
+            if isinstance(drift_score, (int, float)) and drift_score > self.policy.drift_threshold:
+                reason = (
+                    f"Drift score {drift_score:.2f} exceeds threshold "
+                    f"{self.policy.drift_threshold:.2f}"
+                )
+                self.emit(GovernanceEventType.POLICY_VIOLATION, {
+                    "agent_id": ctx.agent_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "reason": reason,
+                    "drift_score": drift_score,
+                })
+                return False, reason
+
         # Checkpoint if needed
         if ctx.call_count % self.policy.checkpoint_frequency == 0:
             checkpoint_id = f"checkpoint-{ctx.call_count}"

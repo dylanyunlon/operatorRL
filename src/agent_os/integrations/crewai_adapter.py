@@ -18,7 +18,7 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-from .base import BaseIntegration, GovernancePolicy, ExecutionContext
+from .base import BaseIntegration, GovernancePolicy, ExecutionContext, PolicyViolationError
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +121,17 @@ class CrewAIKernel(BaseIntegration):
                     def governed_execute(task, *args, **kwargs):
                         task_id = getattr(task, 'id', None) or str(id(task))
                         logger.info("Agent task execution started: crew_name=%s, task_id=%s", crew_name, task_id)
-                        self._kernel.pre_execute(self._ctx, task)
+                        if self._kernel.policy.require_human_approval:
+                            raise PolicyViolationError(
+                                f"Task '{task_id}' requires human approval per governance policy"
+                            )
+                        allowed, reason = self._kernel.pre_execute(self._ctx, task)
+                        if not allowed:
+                            raise PolicyViolationError(f"Task blocked: {reason}")
                         result = original_execute(task, *args, **kwargs)
-                        self._kernel.post_execute(self._ctx, result)
+                        valid, drift_reason = self._kernel.post_execute(self._ctx, result)
+                        if not valid:
+                            logger.warning("Post-execute violation: crew_name=%s, task_id=%s, reason=%s", crew_name, task_id, drift_reason)
                         logger.info("Agent task execution completed: crew_name=%s, task_id=%s", crew_name, task_id)
                         return result
                     agent.execute_task = governed_execute
