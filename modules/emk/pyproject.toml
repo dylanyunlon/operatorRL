@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "emk"
-version = "0.2.0"
-description = "Episodic Memory Kernel - An immutable, append-only ledger of agent experiences for AI systems"
+version = "1.0.0"
+description = "Community Edition — Episodic Memory Kernel for AI agent experience storage"
 authors = [
     {name = "Imran Siddique", email = "imran-siddique@users.noreply.github.com"}
 ]
