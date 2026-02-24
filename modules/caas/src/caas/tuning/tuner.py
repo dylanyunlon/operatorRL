@@ -7,15 +7,22 @@ from typing import Dict, List, Any
 from collections import Counter
 
 from caas.models import Document, DocumentType, Section, ContentTier
-from caas.ingestion.structure_parser import StructureParser
+
+
+# Basic tier weight mapping (replaces StructureParser.get_tier_base_weight)
+_TIER_WEIGHTS = {
+    ContentTier.TIER_1_HIGH: 2.0,
+    ContentTier.TIER_2_MEDIUM: 1.0,
+    ContentTier.TIER_3_LOW: 0.5,
+}
 
 
 class WeightTuner:
     """Automatically tunes weights for document sections."""
     
     def __init__(self):
-        """Initialize the weight tuner with structure parser."""
-        self.structure_parser = StructureParser()
+        """Initialize the weight tuner."""
+        pass
     
     # Base weights for different document types
     TYPE_SPECIFIC_WEIGHTS = {
@@ -84,12 +91,10 @@ class WeightTuner:
         Returns:
             Document with optimized weights
         """
-        # First, parse structure and assign tiers
-        document.sections = self.structure_parser.parse_and_assign_tiers(
-            document.sections,
-            document.detected_type,
-            document.content
-        )
+        # Assign default tier to sections that don't have one
+        for section in document.sections:
+            if not section.tier:
+                section.tier = ContentTier.TIER_2_MEDIUM
         
         # Get base weights for document type
         base_weights = self.TYPE_SPECIFIC_WEIGHTS.get(
@@ -128,7 +133,7 @@ class WeightTuner:
         
         # Start with tier-based base weight
         if section.tier:
-            weight = self.structure_parser.get_tier_base_weight(section.tier)
+            weight = _TIER_WEIGHTS.get(section.tier, 1.0)
         else:
             # Fallback to default if tier not assigned
             weight = base_weights.get("default", 1.0)

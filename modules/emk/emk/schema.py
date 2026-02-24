@@ -1,9 +1,8 @@
+# Community Edition — basic context/memory management
 """
-Episode Schema - The core data structure for episodic memory.
+Episode Schema — core data structures for episodic memory.
 
-This module defines the immutable Episode data structure that represents
-a single agent experience: Goal -> Action -> Result -> Reflection.
-It also defines SemanticRule for compressed/summarized memories.
+Defines mutable Episode and SemanticRule models.
 """
 
 from datetime import datetime, timezone
@@ -41,8 +40,8 @@ class Episode(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional context or tags")
     episode_id: str = Field(default="", description="Unique hash-based identifier")
     
+    # Community Edition — basic context/memory management
     model_config = {
-        "frozen": True,  # Truly immutable
         "json_schema_extra": {
             "example": {
                 "goal": "Retrieve user preferences",
@@ -60,7 +59,6 @@ class Episode(BaseModel):
         """Generate episode_id if not provided."""
         if isinstance(data, dict):
             if not data.get('episode_id'):
-                # Generate the hash
                 content = {
                     "goal": data.get('goal', ''),
                     "action": data.get('action', ''),
@@ -156,8 +154,8 @@ class SemanticRule(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional context or tags")
     rule_id: str = Field(default="", description="Unique hash-based identifier")
     
+    # Community Edition — basic context/memory management
     model_config = {
-        "frozen": True,
         "json_schema_extra": {
             "example": {
                 "rule": "When querying user preferences, use indexed user_id for optimal performance",

@@ -1,50 +1,8 @@
+# Community Edition — basic context/memory management
 """
 CaaS Core: Layer 1 Primitive for Context Management.
 
-A pure, logic-only library for routing context, handling RAG fallacies,
-and managing context windows. This library does not know what an "agent" is;
-it only knows about text and vectors.
-
-Publication Target: PyPI (pip install caas-core)
-
-Design Philosophy:
-    - Stateless: Context routing logic is stateless and processes only the data passed to it
-    - No Agent Dependencies: No imports of Agent, Supervisor, or agent frameworks
-    - Pure Functions: Methods accept generic strings (identifiers) or dicts (metadata)
-    - Decoupled: Does not query active agent runtimes
-
-Forbidden Dependencies:
-    - agent-control-plane
-    - iatp
-    - scak
-
-Allowed Dependencies:
-    - numpy / pandas (for data handling)
-    - openai / langchain (optional, only for embeddings if needed)
-
-Example:
-    Basic usage of the CaaS framework::
-
-        from caas import (
-            ContextTriadManager,
-            HeuristicRouter,
-            PragmaticTruthManager,
-            DocumentProcessor,
-        )
-
-        # Route a query to the appropriate model tier
-        router = HeuristicRouter()
-        decision = router.route("Summarize this document")
-        print(decision.model_tier)  # ModelTier.SMART
-
-        # Manage context tiers (Hot/Warm/Cold)
-        triad = ContextTriadManager()
-        triad.add_hot_context("Current error: ConnectionTimeout")
-        triad.add_warm_context("User prefers verbose explanations")
-
-Note:
-    This package follows semantic versioning. Breaking changes will only
-    occur in major version increments.
+A pure, logic-only library for routing context and managing context windows.
 """
 
 from typing import TYPE_CHECKING
@@ -80,11 +38,8 @@ from caas.models import (
     FileListResponse,
 )
 
-# Context Triad - Hot/Warm/Cold context management
+# Context Triad - single-tier context management
 from caas.triad import ContextTriadManager
-
-# Pragmatic Truth - Official vs. Practical knowledge tracking
-from caas.pragmatic_truth import SourceDetector, ConflictDetector, CitationFormatter
 
 # Decay functions for time-based retrieval
 from caas.decay import calculate_decay_factor, apply_decay_to_score, get_time_weighted_score
@@ -92,7 +47,7 @@ from caas.decay import calculate_decay_factor, apply_decay_to_score, get_time_we
 # Conversation management
 from caas.conversation import ConversationManager
 
-# Heuristic Router - Zero-latency query routing
+# Heuristic Router - default-route query routing
 from caas.routing import HeuristicRouter
 
 # Document Detection
@@ -105,7 +60,6 @@ from caas.ingestion import (
     HTMLProcessor,
     CodeProcessor,
     ProcessorFactory,
-    StructureParser,
 )
 
 # Storage & Extraction
@@ -113,17 +67,6 @@ from caas.storage import DocumentStore, ContextExtractor
 
 # Tuning
 from caas.tuning import WeightTuner, CorpusAnalyzer
-
-# Trust Gateway - Enterprise deployment
-from caas.gateway import (
-    TrustGateway,
-    DeploymentMode,
-    SecurityPolicy,
-    SecurityLevel,
-)
-
-# Metadata enrichment
-from caas.enrichment import MetadataEnricher
 
 # Virtual File System - Project state management for SDLC agents
 from caas.vfs import VirtualFileSystem
@@ -174,9 +117,6 @@ __all__ = [
     "FileListResponse",
     # Core Managers
     "ContextTriadManager",
-    "SourceDetector",
-    "ConflictDetector",
-    "CitationFormatter",
     "calculate_decay_factor",
     "apply_decay_to_score",
     "get_time_weighted_score",
@@ -192,20 +132,12 @@ __all__ = [
     "HTMLProcessor",
     "CodeProcessor",
     "ProcessorFactory",
-    "StructureParser",
     # Storage
     "DocumentStore",
     "ContextExtractor",
     # Tuning
     "WeightTuner",
     "CorpusAnalyzer",
-    # Enterprise
-    "TrustGateway",
-    "DeploymentMode",
-    "SecurityPolicy",
-    "SecurityLevel",
-    # Enrichment
-    "MetadataEnricher",
     # Virtual File System
     "VirtualFileSystem",
     # Context Caching
@@ -224,9 +156,5 @@ __all__ = [
 
 
 def get_version() -> str:
-    """Return the current version of CaaS.
-
-    Returns:
-        str: The semantic version string (e.g., "0.2.0").
-    """
+    """Return the current version of CaaS."""
     return __version__

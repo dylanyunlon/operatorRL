@@ -1,10 +1,8 @@
+# Community Edition — basic context/memory management
 """
 emk - Episodic Memory Kernel.
 
-An immutable, append-only ledger of agent experiences for AI systems.
-
-This package provides a Layer 1 primitive for storing agent experiences
-as structured episodes following the pattern: Goal → Action → Result → Reflection.
+A mutable ledger of agent experiences for AI systems.
 
 Example:
     >>> from emk import Episode, FileAdapter
@@ -16,15 +14,6 @@ Example:
     ...     reflection="Efficient query"
     ... )
     >>> episode_id = store.store(episode)
-
-Attributes:
-    __version__: Package version string.
-    __author__: Package author.
-    __license__: Package license.
-
-See Also:
-    - GitHub: https://github.com/imran-siddique/emk
-    - Documentation: https://github.com/imran-siddique/emk#readme
 """
 
 from typing import TYPE_CHECKING, List
@@ -37,7 +26,6 @@ __license__ = "MIT"
 from emk.schema import Episode, SemanticRule
 from emk.store import VectorStoreAdapter, FileAdapter
 from emk.indexer import Indexer
-from emk.sleep_cycle import MemoryCompressor
 
 # Define explicit public API
 __all__: List[str] = [
@@ -48,10 +36,9 @@ __all__: List[str] = [
     # Core classes
     "Episode",
     "SemanticRule",
-    "VectorStoreAdapter", 
+    "VectorStoreAdapter",
     "FileAdapter",
     "Indexer",
-    "MemoryCompressor",
 ]
 
 # Optional ChromaDB adapter - only import if chromadb is installed
@@ -59,7 +46,6 @@ try:
     from emk.store import ChromaDBAdapter
     __all__.append("ChromaDBAdapter")
 except ImportError:
-    # ChromaDB not installed, ChromaDBAdapter will not be available
     if TYPE_CHECKING:
         from emk.store import ChromaDBAdapter  # noqa: F401
 
@@ -72,28 +58,15 @@ try:
     )
     __all__.extend([
         "upload_episodes_to_hub",
-        "download_episodes_from_hub", 
+        "download_episodes_from_hub",
         "push_experiment_results",
     ])
 except ImportError:
-    # huggingface_hub not installed
     pass
 
 
 def get_version_info() -> dict:
-    """
-    Get detailed version information about the emk package.
-    
-    Returns:
-        dict: A dictionary containing version, author, license, and
-            available optional features.
-    
-    Example:
-        >>> import emk
-        >>> info = emk.get_version_info()
-        >>> print(info['version'])
-        '0.1.0'
-    """
+    """Get detailed version information about the emk package."""
     features = {
         "chromadb": "ChromaDBAdapter" in __all__,
         "huggingface": "upload_episodes_to_hub" in __all__,
