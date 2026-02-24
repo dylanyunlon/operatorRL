@@ -7,7 +7,7 @@ Production-grade AI agent for analyzing legal contracts with governance.
 Features:
 - Attorney-client privilege protection
 - Risky clause detection (unlimited liability, non-competes, IP)
-- Cross-model verification for legal accuracy
+- Verification for legal accuracy
 - Conflict of interest checking
 - Tamper-evident audit logging
 - PII redaction in outputs
@@ -454,11 +454,11 @@ class ClauseAnalyzer:
 
 
 # ============================================================
-# CROSS-MODEL VERIFIER
+# VERIFIER
 # ============================================================
 
 class LegalVerifier:
-    """Cross-model verification for legal analysis."""
+    """Verification for legal analysis."""
     
     def __init__(self):
         self.models = ["gpt-4-legal", "claude-3-legal", "legal-bert"]
@@ -549,7 +549,7 @@ class ContractAnalysisAgent:
     1. Check user authorization and conflicts
     2. Parse contract structure
     3. Analyze clauses for risk
-    4. Cross-model verification
+    4. Verification
     5. Generate findings with redaction
     6. Create audit trail
     """
@@ -642,7 +642,7 @@ class ContractAnalysisAgent:
         findings = self.clause_analyzer.analyze(contract.content)
         print(f"🔍 Initial scan: {len(findings)} potential issues")
         
-        # Cross-model verification
+        # Verification
         agreement, verified_findings = await self.verifier.verify_findings(
             contract.content, findings
         )

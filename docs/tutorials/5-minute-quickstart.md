@@ -36,7 +36,7 @@ pip install agent-os-kernel
 **Optional extras:**
 
 ```bash
-pip install agent-os-kernel[cmvk]           # Cross-model verification
+pip install agent-os-kernel[cmvk]           # Verification
 pip install agent-os-kernel[observability]  # Prometheus/OpenTelemetry
 pip install agent-os-kernel[full]           # Everything
 ```
@@ -154,7 +154,7 @@ The kernel blocked the action **before** it executed.
 |------|----------|-------------------|
 | 10 min | [30-Minute Deep Dive](30-minute-deep-dive.md) | Policies, signals, VFS |
 | 15 min | [Episodic Memory](../../notebooks/02-episodic-memory-demo.ipynb) | Agent memory that persists |
-| 15 min | [Verification](../../notebooks/04-cross-model-verification.ipynb) | Detect hallucinations |
+| 15 min | [Verification](../../notebooks/04-verification.ipynb) | Detect hallucinations |
 | 20 min | [Time-Travel Debugging](../../notebooks/03-time-travel-debugging.ipynb) | Replay and debug decisions |
 
 ---

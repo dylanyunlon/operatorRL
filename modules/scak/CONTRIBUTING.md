@@ -365,7 +365,7 @@ def handle_failure(
     context: dict
 ) -> dict:
     """
-    Handle agent failure with Dual-Loop Architecture.
+    Handle agent failure with self-correction architecture.
     
     Args:
         agent_id: Unique agent identifier

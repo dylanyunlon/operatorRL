@@ -131,10 +131,10 @@ async def ingest_document(
     1. Process the raw content
     2. Auto-detect the document type and structure
     3. Auto-tune weights for sections
-    4. Detect or use provided source type for Pragmatic Truth tracking
+    4. Detect or use provided source type for source attribution tracking
     5. Store the processed document
     
-    Pragmatic Truth Support:
+    Source Attribution Support:
     - source_type: Explicitly specify source type (official_docs, team_chat, practical_logs, etc.)
     - source_url: Optional URL to the original source
     
@@ -279,10 +279,10 @@ async def get_context(document_id: str, request: ContextRequest):
     - Time-based decay (prioritizes recent content)
     - Optional query for focused extraction
     - Token limits
-    - Source citations for transparency (Pragmatic Truth)
+    - Source citations for transparency (source attribution)
     - Conflict detection between official and practical sources
     
-    Pragmatic Truth Philosophy:
+    Source Attribution Philosophy:
     - Provides REAL answers, not just OFFICIAL ones
     - When official docs conflict with practical experience, shows both
     - Includes transparent citations (e.g., "from Slack conversation")
@@ -625,7 +625,7 @@ async def get_context_triad(request: ContextTriadRequest):
        - Policy: Never let cold data pollute the hot window
     
     Args:
-        request: Context triad request with layer flags and query
+        request: Tiered context request with layer flags and query
     
     Returns:
         Context from requested layers
@@ -651,7 +651,7 @@ async def get_context_triad(request: ContextTriadRequest):
         
         return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get context triad: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get tiered context: {str(e)}")
 
 
 @app.get("/triad/state")
@@ -660,7 +660,7 @@ async def get_triad_state():
     Get the current state of the tiered context.
     
     Returns:
-        Current context triad state with item counts
+        Current tiered context state with item counts
     """
     state = triad_manager.get_state()
     return {

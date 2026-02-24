@@ -343,7 +343,7 @@ agent-os/
 │   └── integrations/         # Framework adapters (LangChain, OpenAI, etc.)
 ├── modules/                  # Kernel Modules (4-layer architecture)
 │   ├── primitives/           # Layer 1: Base types and failures
-│   ├── cmvk/                 # Layer 1: Cross-model verification
+│   ├── cmvk/                 # Layer 1: Verification
 │   ├── emk/                  # Layer 1: Episodic memory kernel
 │   ├── caas/                 # Layer 1: Context-as-a-Service
 │   ├── amb/                  # Layer 2: Agent message bus
@@ -378,7 +378,7 @@ agent-os/
 | Module | Layer | PyPI Package | Description | Status |
 |--------|-------|-------------|-------------|--------|
 | [`primitives`](modules/primitives/) | 1 | `agent-primitives` | Base failure types, severity levels | ✅ Stable |
-| [`cmvk`](modules/cmvk/) | 1 | `cmvk` | Cross-model verification, drift detection | ✅ Stable |
+| [`cmvk`](modules/cmvk/) | 1 | `cmvk` | Verification, drift detection | ✅ Stable |
 | [`emk`](modules/emk/) | 1 | `emk` | Episodic memory kernel (append-only ledger) | ✅ Stable |
 | [`caas`](modules/caas/) | 1 | `caas-core` | Context-as-a-Service, RAG pipeline | ✅ Stable |
 | [`amb`](modules/amb/) | 2 | `amb-core` | Agent message bus (async pub/sub) | ✅ Stable |
@@ -897,7 +897,7 @@ See [MCP server documentation](extensions/mcp-server/README.md) for full details
 | [Hello Agent OS](notebooks/01-hello-agent-os.ipynb) | Your first governed agent | 5 min |
 | [Episodic Memory](notebooks/02-episodic-memory-demo.ipynb) | Agent memory that persists | 15 min |
 | [Time-Travel Debugging](notebooks/03-time-travel-debugging.ipynb) | Replay and debug decisions | 20 min |
-| [Verification](notebooks/04-cross-model-verification.ipynb) | Detect hallucinations | 15 min |
+| [Verification](notebooks/04-verification.ipynb) | Detect hallucinations | 15 min |
 | [Multi-Agent Coordination](notebooks/05-multi-agent-coordination.ipynb) | Trust between agents | 20 min |
 | [Policy Engine](notebooks/06-policy-engine.ipynb) | Deep dive into policies | 15 min |
 
