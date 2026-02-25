@@ -115,7 +115,7 @@ def test_doer_agent_structure():
     # Set a dummy API key for testing structure
     original_key = os.getenv("OPENAI_API_KEY")
     if not original_key:
-        os.environ["OPENAI_API_KEY"] = "sk-test-dummy-key-for-structure-testing"
+        os.environ["OPENAI_API_KEY"] = "test-placeholder-key"
     
     try:
         # Test initialization
@@ -145,7 +145,7 @@ def test_observer_agent_structure():
     # Set a dummy API key for testing structure
     original_key = os.getenv("OPENAI_API_KEY")
     if not original_key:
-        os.environ["OPENAI_API_KEY"] = "sk-test-dummy-key-for-structure-testing"
+        os.environ["OPENAI_API_KEY"] = "test-placeholder-key"
     
     # Create temporary files
     test_checkpoint = os.path.join(tempfile.gettempdir(), 'test_checkpoint.json')

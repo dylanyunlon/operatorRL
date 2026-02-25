@@ -454,14 +454,14 @@ def demo():
 import os
 
 # Configuration
-DATABASE_URL = "postgresql://admin:password123@localhost/db"
-API_KEY = "FAKE_STRIPE_KEY_FOR_DEMO_ONLY"
-AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+API_KEY = os.environ.get("STRIPE_API_KEY", "")
+AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "")
 
 def get_config():
     return {
         "debug": True,
-        "secret": "super_secret_value_123"
+        "secret": os.environ.get("APP_SECRET", "")
     }
 ''',
         "src/database.py": '''

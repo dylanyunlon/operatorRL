@@ -7,6 +7,9 @@ This demonstrates how the system captures implicit feedback through:
 3. Acceptance Signal: When user accepts output and moves on
 
 These signals provide a better learning signal than explicit feedback alone.
+
+Required environment variables:
+    OPENAI_API_KEY - Your OpenAI API key
 """
 
 import os
@@ -41,8 +44,8 @@ def scenario_undo_signal():
     if os.path.exists(stream_file):
         os.remove(stream_file)
     
-    # Set a dummy API key for demo
-    os.environ["OPENAI_API_KEY"] = "sk-dummy-key-for-demo"
+    # Use API key from environment
+    os.environ.setdefault("OPENAI_API_KEY", "test-placeholder")
     
     doer = DoerAgent(
         stream_file=stream_file,
@@ -83,8 +86,8 @@ def scenario_abandonment_signal():
     
     stream_file = os.path.join(tempfile.gettempdir(), 'demo_signals.jsonl')
     
-    # Set a dummy API key for demo
-    os.environ["OPENAI_API_KEY"] = "sk-dummy-key-for-demo"
+    # Use API key from environment
+    os.environ.setdefault("OPENAI_API_KEY", "test-placeholder")
     
     doer = DoerAgent(
         stream_file=stream_file,
@@ -126,8 +129,8 @@ def scenario_acceptance_signal():
     
     stream_file = os.path.join(tempfile.gettempdir(), 'demo_signals.jsonl')
     
-    # Set a dummy API key for demo
-    os.environ["OPENAI_API_KEY"] = "sk-dummy-key-for-demo"
+    # Use API key from environment
+    os.environ.setdefault("OPENAI_API_KEY", "test-placeholder")
     
     doer = DoerAgent(
         stream_file=stream_file,
@@ -166,8 +169,8 @@ def observer_processing():
     if os.path.exists(checkpoint_file):
         os.remove(checkpoint_file)
     
-    # Set a dummy API key for demo
-    os.environ["OPENAI_API_KEY"] = "sk-dummy-key-for-demo"
+    # Use API key from environment
+    os.environ.setdefault("OPENAI_API_KEY", "test-placeholder")
     
     observer = ObserverAgent(
         stream_file=stream_file,

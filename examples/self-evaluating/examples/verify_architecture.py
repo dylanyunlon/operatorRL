@@ -1,6 +1,9 @@
 """
 Manual verification script - tests the decoupled architecture flow.
 This can be run without an OpenAI API key to verify the structure.
+
+Required environment variables:
+    OPENAI_API_KEY - Your OpenAI API key
 """
 
 import os
@@ -53,8 +56,8 @@ assert len(events) == 2
 print(f"✓ Telemetry system works: {len(events)} events emitted and read")
 
 print("\nStep 2: Testing DoerAgent structure...")
-# Set dummy key for structure testing
-os.environ["OPENAI_API_KEY"] = "sk-test-dummy"
+# Use API key from environment
+os.environ.setdefault("OPENAI_API_KEY", "test-placeholder")
 
 from src.agent import DoerAgent
 

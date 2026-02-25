@@ -170,7 +170,7 @@ def test_doer_agent_signal_emission():
     # Set a dummy API key for testing structure
     original_key = os.getenv("OPENAI_API_KEY")
     if not original_key:
-        os.environ["OPENAI_API_KEY"] = "sk-test-dummy-key"
+        os.environ["OPENAI_API_KEY"] = "test-placeholder-key"
     
     test_stream = os.path.join(tempfile.gettempdir(), 'test_doer_signals.jsonl')
     if os.path.exists(test_stream):
@@ -245,7 +245,7 @@ def test_observer_signal_analysis():
     # Set a dummy API key for testing structure
     original_key = os.getenv("OPENAI_API_KEY")
     if not original_key:
-        os.environ["OPENAI_API_KEY"] = "sk-test-dummy-key"
+        os.environ["OPENAI_API_KEY"] = "test-placeholder-key"
     
     test_checkpoint = os.path.join(tempfile.gettempdir(), 'test_observer_signals.json')
     if os.path.exists(test_checkpoint):

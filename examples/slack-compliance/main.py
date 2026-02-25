@@ -540,7 +540,7 @@ def demo():
             "id": "msg-004",
             "channel": "C12345",
             "user": "U67890",
-            "content": "API_KEY=FAKE_STRIPE_KEY_FOR_DEMO_ONLY"
+            "content": "API_KEY=<set-via-environment-variable>"
         },
         {
             "id": "msg-005",
