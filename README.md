@@ -294,40 +294,47 @@ This is the same principle operating systems use: applications request resources
 
 ```mermaid
 graph TB
-    subgraph "Layer 4: Intelligence"
-        SCAK[Self-Correcting Agent Kernel]
-        MUTE[Mute Agent]
+    subgraph Frameworks["External Frameworks"]
+        LC[LangChain]
+        CA[CrewAI]
+        AG[AutoGen]
+        OA[OpenAI]
+        AN[Anthropic]
+        GE[Gemini]
     end
-    
-    subgraph "Layer 3: Control Plane"
-        KERNEL[🎯 THE KERNEL<br/>Policy Engine + Signals]
-        OBS[Observability<br/>Prometheus + OTEL]
+
+    ADAPT[[Adapters]]
+
+    subgraph L4["Layer 4: Intelligence"]
+        SC[Self-Correction]
+        SA[Semantic Analysis]
     end
-    
-    subgraph "Layer 2: Infrastructure"
-        AMB[Agent Message Bus]
-        IATP[Inter-Agent Trust Protocol]
-        ATR[Agent Tool Registry]
+
+    subgraph L3["Layer 3: Control Plane"]
+        PE[Policy Engine]
+        AL[Audit Logging]
     end
-    
-    subgraph "Layer 1: Primitives"
-        PRIM[Base Types + Failures]
-        CMVK[Verification]
-        CAAS[Context-as-a-Service]
-        EMK[Episodic Memory Kernel]
+
+    subgraph L2["Layer 2: Infrastructure"]
+        NM[Nexus Marketplace]
+        OB[Observability]
     end
-    
-    SCAK --> KERNEL
-    MUTE --> KERNEL
-    KERNEL --> AMB
-    KERNEL --> IATP
-    KERNEL --> OBS
-    AMB --> PRIM
-    IATP --> PRIM
-    ATR --> PRIM
-    CMVK --> PRIM
-    EMK --> PRIM
-    CAAS --> PRIM
+
+    subgraph L1["Layer 1: Primitives"]
+        VE[Verification Engine]
+        CS[Context Service]
+        MS[Memory Store]
+    end
+
+    LC & CA & AG & OA & AN & GE --> ADAPT
+    ADAPT --> L4
+    SC & SA --> PE
+    SC & SA --> AL
+    PE & AL --> NM
+    PE & AL --> OB
+    NM & OB --> VE
+    NM & OB --> CS
+    NM & OB --> MS
 ```
 
 ### Directory Structure
