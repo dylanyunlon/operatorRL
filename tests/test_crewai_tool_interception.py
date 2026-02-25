@@ -180,7 +180,7 @@ class TestCrewAIToolInterception:
         assert tool._governed is True
 
     def test_human_approval_blocks_task(self):
-        """require_human_approval should block task execution."""
+        """require_human_approval should block execution at kickoff."""
         tool = self._make_tool("web_search")
         agent = self._make_agent(tools=[tool])
         crew = self._make_crew(agents=[agent])
@@ -189,15 +189,9 @@ class TestCrewAIToolInterception:
         kernel = CrewAIKernel(policy=policy)
         governed = kernel.wrap(crew)
 
-        # The kickoff itself should succeed (pre_execute passes),
-        # but the agent's execute_task should raise
-        # We need to simulate CrewAI calling execute_task internally
-        governed.kickoff()
-
-        task = MagicMock()
-        task.id = "task-1"
+        # With the base pre_execute check, kickoff is blocked immediately
         with pytest.raises(PolicyViolationError, match="requires human approval"):
-            agent.execute_task(task)
+            governed.kickoff()
 
     def test_call_count_tracks_across_tools(self):
         """Call count should track across all tools, not per tool."""

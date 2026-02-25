@@ -664,6 +664,7 @@ class PolicyInterceptor:
     Default interceptor that enforces GovernancePolicy rules.
 
     Checks:
+    - Human approval requirement (require_human_approval)
     - Tool is in allowed_tools (if specified)
     - Arguments don't contain blocked patterns
     - Call count within limits
@@ -674,6 +675,13 @@ class PolicyInterceptor:
         self.context = context
 
     def intercept(self, request: ToolCallRequest) -> ToolCallResult:
+        # Check human approval requirement
+        if self.policy.require_human_approval:
+            return ToolCallResult(
+                allowed=False,
+                reason=f"Tool '{request.tool_name}' requires human approval per governance policy",
+            )
+
         # Check allowed tools
         if self.policy.allowed_tools and request.tool_name not in self.policy.allowed_tools:
             return ToolCallResult(
@@ -864,7 +872,13 @@ class BaseIntegration(ABC):
             reason = f"Blocked pattern detected: {matched[0]}"
             self.emit(GovernanceEventType.TOOL_CALL_BLOCKED, {**event_base, "reason": reason, "pattern": matched[0]})
             return False, reason
-        
+
+        # Check human approval requirement
+        if self.policy.require_human_approval:
+            reason = "Execution requires human approval per governance policy"
+            self.emit(GovernanceEventType.POLICY_VIOLATION, {**event_base, "reason": reason})
+            return False, reason
+
         # Check confidence threshold
         if self.policy.confidence_threshold > 0.0:
             confidence = getattr(input_data, 'confidence', None)

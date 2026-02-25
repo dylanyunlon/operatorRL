@@ -263,16 +263,8 @@ class PydanticAIKernel(BaseIntegration):
 
         Returns a ToolCallResult indicating whether the call is allowed.
         """
-        interceptor = PolicyInterceptor(self.policy, ctx)
-        request = ToolCallRequest(
-            tool_name=tool_name,
-            arguments=arguments,
-            agent_id=ctx.agent_id,
-        )
-        result = interceptor.intercept(request)
-
-        # Human approval check
-        if result.allowed and self.policy.require_human_approval:
+        # Handle human approval callback before the interceptor
+        if self.policy.require_human_approval:
             if self._approval_callback:
                 approved = self._approval_callback(tool_name, arguments)
                 if not approved:
@@ -280,13 +272,25 @@ class PydanticAIKernel(BaseIntegration):
                         allowed=False,
                         reason=f"Human approval denied for tool '{tool_name}'",
                     )
+                # Approved — skip the interceptor's require_human_approval check
+                # by using a policy copy without the flag
+                from dataclasses import replace
+                policy_for_interceptor = replace(self.policy, require_human_approval=False)
             else:
                 return ToolCallResult(
                     allowed=False,
                     reason=f"Tool '{tool_name}' requires human approval",
                 )
+        else:
+            policy_for_interceptor = self.policy
 
-        return result
+        interceptor = PolicyInterceptor(policy_for_interceptor, ctx)
+        request = ToolCallRequest(
+            tool_name=tool_name,
+            arguments=arguments,
+            agent_id=ctx.agent_id,
+        )
+        return interceptor.intercept(request)
 
     def get_stats(self) -> Dict[str, Any]:
         """Get governance statistics."""
