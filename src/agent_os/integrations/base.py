@@ -7,7 +7,9 @@ All framework adapters inherit from this base class.
 from __future__ import annotations
 
 import asyncio
+import difflib
 import fnmatch
+import hashlib
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -33,6 +35,28 @@ class GovernanceEventType(Enum):
     TOOL_CALL_BLOCKED = "tool_call_blocked"
     CHECKPOINT_CREATED = "checkpoint_created"
     DRIFT_DETECTED = "drift_detected"
+
+
+@dataclass
+class DriftResult:
+    """Result of a drift detection comparison.
+
+    Attributes:
+        score: Drift score in [0.0, 1.0]. 0 = identical, 1 = completely different.
+        exceeded: Whether the score exceeded the configured threshold.
+        threshold: The threshold that was checked against.
+        baseline_hash: Hash of the baseline output.
+        current_hash: Hash of the current output.
+    """
+    score: float
+    exceeded: bool
+    threshold: float
+    baseline_hash: str
+    current_hash: str
+
+    def __repr__(self) -> str:
+        status = "EXCEEDED" if self.exceeded else "OK"
+        return f"DriftResult(score={self.score:.4f}, threshold={self.threshold}, {status})"
 
 
 @dataclass
@@ -533,6 +557,9 @@ class ExecutionContext:
     total_tokens: int = 0
     tool_calls: list[dict] = field(default_factory=list)
     checkpoints: list[str] = field(default_factory=list)
+    _baseline_hash: Optional[str] = field(default=None, repr=False)
+    _baseline_text: Optional[str] = field(default=None, repr=False)
+    _drift_scores: list[float] = field(default_factory=list, repr=False)
 
     def __repr__(self) -> str:
         return f"ExecutionContext(agent_id={self.agent_id!r}, session_id={self.session_id!r})"
@@ -854,26 +881,52 @@ class BaseIntegration(ABC):
     def post_execute(self, ctx: ExecutionContext, output_data: Any) -> tuple[bool, Optional[str]]:
         """
         Post-execution validation including drift detection.
-        
+
+        Computes a similarity score between the serialized output and the
+        baseline (first output) using ``SequenceMatcher``.  The drift score
+        is ``1.0 - similarity`` (0.0 = identical, 1.0 = completely different).
+
+        When the score exceeds ``policy.drift_threshold`` a
+        ``DRIFT_DETECTED`` governance event is emitted and a warning is
+        logged.  Callers can register listeners for this event to enforce
+        blocking behaviour if desired.
+
         Returns (valid, reason) tuple.
         """
         ctx.call_count += 1
-        
-        # Drift detection: compare output against policy threshold
+
+        # Drift detection: compare output against baseline
         if self.policy.drift_threshold > 0.0:
-            drift_score = getattr(output_data, 'drift_score', None)
-            if isinstance(drift_score, (int, float)) and drift_score > self.policy.drift_threshold:
-                reason = (
-                    f"Drift score {drift_score:.2f} exceeds threshold "
-                    f"{self.policy.drift_threshold:.2f}"
-                )
-                self.emit(GovernanceEventType.POLICY_VIOLATION, {
-                    "agent_id": ctx.agent_id,
-                    "timestamp": datetime.now().isoformat(),
-                    "reason": reason,
-                    "drift_score": drift_score,
-                })
-                return False, reason
+            drift_result = self.compute_drift(ctx, output_data)
+            if drift_result is not None:
+                ctx._drift_scores.append(drift_result.score)
+                if drift_result.exceeded:
+                    reason = (
+                        f"Drift score {drift_result.score:.2f} exceeds threshold "
+                        f"{self.policy.drift_threshold:.2f}"
+                    )
+                    logger.warning(
+                        "Drift detected agent=%s score=%.4f threshold=%.2f",
+                        ctx.agent_id,
+                        drift_result.score,
+                        drift_result.threshold,
+                    )
+                    self.emit(GovernanceEventType.DRIFT_DETECTED, {
+                        "agent_id": ctx.agent_id,
+                        "timestamp": datetime.now().isoformat(),
+                        "reason": reason,
+                        "drift_score": drift_result.score,
+                        "threshold": drift_result.threshold,
+                        "baseline_hash": drift_result.baseline_hash,
+                        "current_hash": drift_result.current_hash,
+                    })
+                else:
+                    logger.debug(
+                        "Drift check agent=%s score=%.4f threshold=%.2f",
+                        ctx.agent_id,
+                        drift_result.score,
+                        drift_result.threshold,
+                    )
 
         # Checkpoint if needed
         if ctx.call_count % self.policy.checkpoint_frequency == 0:
@@ -885,8 +938,40 @@ class BaseIntegration(ABC):
                 "checkpoint_id": checkpoint_id,
                 "call_count": ctx.call_count,
             })
-        
+
         return True, None
+
+    @staticmethod
+    def compute_drift(ctx: ExecutionContext, output_data: Any) -> Optional[DriftResult]:
+        """Compute drift between *output_data* and the baseline stored in *ctx*.
+
+        On the first call the output is recorded as the baseline and ``None``
+        is returned (no comparison possible).  Subsequent calls use
+        ``SequenceMatcher`` to compute a similarity ratio between the
+        serialised baseline and the current output.  The drift score is
+        ``1.0 - similarity`` (0.0 = identical, 1.0 = completely different).
+        """
+        current_text = str(output_data)
+        current_hash = hashlib.sha256(current_text.encode()).hexdigest()
+
+        if ctx._baseline_hash is None:
+            ctx._baseline_hash = current_hash
+            ctx._baseline_text = current_text
+            return None
+
+        # SequenceMatcher ratio: 1.0 = identical, 0.0 = nothing in common
+        similarity = difflib.SequenceMatcher(
+            None, ctx._baseline_text, current_text
+        ).ratio()
+        score = 1.0 - similarity
+
+        return DriftResult(
+            score=score,
+            exceeded=score > ctx.policy.drift_threshold,
+            threshold=ctx.policy.drift_threshold,
+            baseline_hash=ctx._baseline_hash,
+            current_hash=current_hash,
+        )
     
     async def async_pre_execute(self, ctx: ExecutionContext, input_data: Any) -> tuple[bool, Optional[str]]:
         """

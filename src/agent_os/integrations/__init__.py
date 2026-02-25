@@ -55,6 +55,7 @@ from agent_os.integrations.pydantic_ai_adapter import PydanticAIKernel
 from .base import (
     AsyncGovernedWrapper,
     BaseIntegration,
+    DriftResult,
     GovernancePolicy,
     ToolCallInterceptor,
     ToolCallRequest,
@@ -97,6 +98,7 @@ __all__ = [
     # Base
     "AsyncGovernedWrapper",
     "BaseIntegration",
+    "DriftResult",
     "GovernancePolicy",
     # Tool Call Interceptor (vendor-neutral)
     "ToolCallInterceptor",
