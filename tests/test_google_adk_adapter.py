@@ -18,6 +18,8 @@ from agent_os.integrations.google_adk_adapter import (
     GoogleADKKernel,
     PolicyConfig,
     PolicyViolationError,
+    _HAS_ADK,
+    _check_adk_available,
 )
 
 
@@ -54,11 +56,23 @@ class TestPolicyConfig:
         assert p.blocked_patterns == []
         assert p.pii_detection is True
         assert p.log_all_calls is True
+        assert p.require_human_approval is False
+        assert p.sensitive_tools == []
+        assert p.max_budget is None
 
     def test_custom(self):
         p = PolicyConfig(max_tool_calls=5, blocked_tools=["exec"])
         assert p.max_tool_calls == 5
         assert p.blocked_tools == ["exec"]
+
+    def test_human_approval_fields(self):
+        p = PolicyConfig(require_human_approval=True, sensitive_tools=["delete", "send_email"])
+        assert p.require_human_approval is True
+        assert p.sensitive_tools == ["delete", "send_email"]
+
+    def test_budget_field(self):
+        p = PolicyConfig(max_budget=100.0)
+        assert p.max_budget == 100.0
 
 
 # =============================================================================
@@ -69,12 +83,12 @@ class TestPolicyConfig:
 class TestGoogleADKKernelInit:
     def test_default_policy(self):
         k = GoogleADKKernel()
-        assert k.policy.max_tool_calls == 50
+        assert k._adk_config.max_tool_calls == 50
 
     def test_explicit_policy(self):
         p = PolicyConfig(max_tool_calls=3)
         k = GoogleADKKernel(policy=p)
-        assert k.policy.max_tool_calls == 3
+        assert k._adk_config.max_tool_calls == 3
 
     def test_convenience_kwargs(self):
         k = GoogleADKKernel(
@@ -82,9 +96,9 @@ class TestGoogleADKKernelInit:
             blocked_tools=["shell"],
             blocked_patterns=["DROP TABLE"],
         )
-        assert k.policy.max_tool_calls == 7
-        assert k.policy.blocked_tools == ["shell"]
-        assert k.policy.blocked_patterns == ["DROP TABLE"]
+        assert k._adk_config.max_tool_calls == 7
+        assert k._adk_config.blocked_tools == ["shell"]
+        assert k._adk_config.blocked_patterns == ["DROP TABLE"]
 
     def test_custom_violation_handler(self):
         captured = []
@@ -92,6 +106,22 @@ class TestGoogleADKKernelInit:
         k.before_tool_callback(FakeToolContext(tool_name="blocked"), blocked_tools=None)
         # No violation yet, should be empty
         assert captured == []
+
+    def test_extends_base_integration(self):
+        """GoogleADKKernel should extend BaseIntegration."""
+        from agent_os.integrations.base import BaseIntegration
+        k = GoogleADKKernel()
+        assert isinstance(k, BaseIntegration)
+
+    def test_graceful_import_handling(self):
+        """_HAS_ADK should be a boolean (True if google-adk is installed, False otherwise)."""
+        assert isinstance(_HAS_ADK, bool)
+
+    def test_check_adk_available_when_missing(self):
+        """_check_adk_available should raise ImportError when google-adk is not installed."""
+        if not _HAS_ADK:
+            with pytest.raises(ImportError, match="google-adk"):
+                _check_adk_available()
 
 
 # =============================================================================
@@ -151,8 +181,8 @@ class TestBeforeToolCallback:
         assert k._tool_call_count == 2
 
     def test_timeout(self):
-        k = GoogleADKKernel(timeout_seconds=0)
-        k._start_time = time.time() - 1  # force expired
+        k = GoogleADKKernel(timeout_seconds=1)
+        k._start_time = time.time() - 10  # force expired
         result = k.before_tool_callback(FakeToolContext())
         assert result is not None
         assert "timeout" in result["error"].lower()
@@ -224,8 +254,8 @@ class TestBeforeAgentCallback:
         assert "error" in result
 
     def test_timeout(self):
-        k = GoogleADKKernel(timeout_seconds=0)
-        k._start_time = time.time() - 1
+        k = GoogleADKKernel(timeout_seconds=1)
+        k._start_time = time.time() - 10
         result = k.before_agent_callback(FakeCallbackContext())
         assert result is not None
         assert "timeout" in result["error"].lower()
@@ -262,6 +292,187 @@ class TestAfterAgentCallback:
         k = GoogleADKKernel()
         result = k.after_agent_callback(FakeCallbackContext(), content=None)
         assert result is None
+
+
+# =============================================================================
+# Human Approval Flow
+# =============================================================================
+
+
+class TestHumanApproval:
+    def test_no_approval_needed_by_default(self):
+        k = GoogleADKKernel()
+        result = k.before_tool_callback(FakeToolContext(tool_name="search"))
+        assert result is None
+
+    def test_approval_required_for_all_tools(self):
+        k = GoogleADKKernel(require_human_approval=True)
+        result = k.before_tool_callback(FakeToolContext(tool_name="search"))
+        assert result is not None
+        assert result.get("needs_approval") is True
+        assert "call_id" in result
+
+    def test_approval_required_only_for_sensitive_tools(self):
+        k = GoogleADKKernel(
+            require_human_approval=True,
+            sensitive_tools=["delete_file", "send_email"],
+        )
+        # Non-sensitive tool: allowed
+        result = k.before_tool_callback(FakeToolContext(tool_name="search"))
+        assert result is None
+        # Sensitive tool: needs approval
+        result = k.before_tool_callback(FakeToolContext(tool_name="delete_file"))
+        assert result is not None
+        assert result.get("needs_approval") is True
+
+    def test_approve_pending_call(self):
+        k = GoogleADKKernel(require_human_approval=True, sensitive_tools=["delete_file"])
+        result = k.before_tool_callback(FakeToolContext(tool_name="delete_file"))
+        call_id = result["call_id"]
+
+        assert len(k.get_pending_approvals()) == 1
+        assert k.approve(call_id) is True
+        assert len(k.get_pending_approvals()) == 0
+
+    def test_deny_pending_call(self):
+        k = GoogleADKKernel(require_human_approval=True, sensitive_tools=["send_email"])
+        result = k.before_tool_callback(FakeToolContext(tool_name="send_email"))
+        call_id = result["call_id"]
+
+        assert k.deny(call_id) is True
+        assert len(k.get_pending_approvals()) == 0
+
+    def test_approve_nonexistent_call_returns_false(self):
+        k = GoogleADKKernel()
+        assert k.approve("nonexistent") is False
+
+    def test_deny_nonexistent_call_returns_false(self):
+        k = GoogleADKKernel()
+        assert k.deny("nonexistent") is False
+
+    def test_approval_logs_audit_events(self):
+        k = GoogleADKKernel(require_human_approval=True, sensitive_tools=["delete_file"])
+        result = k.before_tool_callback(FakeToolContext(tool_name="delete_file"))
+        call_id = result["call_id"]
+        k.approve(call_id)
+
+        event_types = [e.event_type for e in k.get_audit_log()]
+        assert "approval_required" in event_types
+        assert "approval_granted" in event_types
+
+    def test_denial_logs_audit_events(self):
+        k = GoogleADKKernel(require_human_approval=True, sensitive_tools=["delete_file"])
+        result = k.before_tool_callback(FakeToolContext(tool_name="delete_file"))
+        call_id = result["call_id"]
+        k.deny(call_id)
+
+        event_types = [e.event_type for e in k.get_audit_log()]
+        assert "approval_denied" in event_types
+
+
+# =============================================================================
+# Budget Limits
+# =============================================================================
+
+
+class TestBudgetLimits:
+    def test_no_budget_by_default(self):
+        k = GoogleADKKernel()
+        assert k._adk_config.max_budget is None
+        # Should not block any calls
+        for _ in range(10):
+            assert k.before_tool_callback(FakeToolContext()) is None
+
+    def test_budget_enforced(self):
+        k = GoogleADKKernel(max_budget=3.0)
+        # Each call costs 1.0 by default
+        assert k.before_tool_callback(FakeToolContext()) is None  # spent=1
+        assert k.before_tool_callback(FakeToolContext()) is None  # spent=2
+        assert k.before_tool_callback(FakeToolContext()) is None  # spent=3
+        result = k.before_tool_callback(FakeToolContext())  # would be 4 > 3
+        assert result is not None
+        assert "budget" in result["error"].lower()
+
+    def test_budget_custom_cost(self):
+        k = GoogleADKKernel(max_budget=5.0)
+        assert k.before_tool_callback(FakeToolContext(), cost=3.0) is None  # spent=3
+        result = k.before_tool_callback(FakeToolContext(), cost=3.0)  # 3+3=6 > 5
+        assert result is not None
+        assert "budget" in result["error"].lower()
+
+    def test_budget_tracked_in_stats(self):
+        k = GoogleADKKernel(max_budget=10.0)
+        k.before_tool_callback(FakeToolContext(), cost=2.5)
+        stats = k.get_stats()
+        assert stats["budget_spent"] == 2.5
+        assert stats["budget_limit"] == 10.0
+
+    def test_budget_resets(self):
+        k = GoogleADKKernel(max_budget=2.0)
+        k.before_tool_callback(FakeToolContext())
+        k.before_tool_callback(FakeToolContext())
+        # Budget exhausted
+        result = k.before_tool_callback(FakeToolContext())
+        assert result is not None
+
+        k.reset()
+        # After reset, budget is fresh
+        assert k.before_tool_callback(FakeToolContext()) is None
+
+
+# =============================================================================
+# Wrap / Unwrap
+# =============================================================================
+
+
+class TestWrapUnwrap:
+    def test_wrap_injects_callbacks(self):
+        k = GoogleADKKernel()
+        agent = MagicMock()
+        agent.name = "test-agent"
+        agent.before_tool_callback = None
+        agent.after_tool_callback = None
+        agent.before_agent_callback = None
+        agent.after_agent_callback = None
+
+        wrapped = k.wrap(agent)
+        assert wrapped.before_tool_callback is not None
+        assert wrapped.after_tool_callback is not None
+        assert callable(wrapped.before_tool_callback)
+
+    def test_unwrap_clears_callbacks(self):
+        k = GoogleADKKernel()
+        agent = MagicMock()
+        agent.name = "test-agent"
+        agent.before_tool_callback = None
+        agent.after_tool_callback = None
+        agent.before_agent_callback = None
+        agent.after_agent_callback = None
+
+        k.wrap(agent)
+        k.unwrap(agent)
+        assert agent.before_tool_callback is None
+        assert agent.after_tool_callback is None
+
+    def test_wrap_logs_audit_event(self):
+        k = GoogleADKKernel()
+        agent = MagicMock()
+        agent.name = "my-agent"
+        agent.before_tool_callback = None
+
+        k.wrap(agent)
+        events = k.get_audit_log()
+        assert any(e.event_type == "agent_wrapped" for e in events)
+
+    def test_wrap_returns_same_agent(self):
+        """wrap() modifies in-place and returns the same agent reference."""
+        k = GoogleADKKernel()
+        agent = MagicMock()
+        agent.name = "a"
+        agent.before_tool_callback = None
+
+        wrapped = k.wrap(agent)
+        assert wrapped is agent
 
 
 # =============================================================================
@@ -334,6 +545,19 @@ class TestAuditAndStats:
         assert len(v) == 2
         assert all(isinstance(e, PolicyViolationError) for e in v)
 
+    def test_stats_include_approval_and_budget(self):
+        k = GoogleADKKernel(
+            require_human_approval=True,
+            sensitive_tools=["delete"],
+            max_budget=100.0,
+        )
+        stats = k.get_stats()
+        assert "pending_approvals" in stats
+        assert "budget_spent" in stats
+        assert "budget_limit" in stats
+        assert stats["policy"]["require_human_approval"] is True
+        assert stats["policy"]["sensitive_tools"] == ["delete"]
+
 
 # =============================================================================
 # get_callbacks()
@@ -364,6 +588,65 @@ class TestGetCallbacks:
         result = cbs["before_tool_callback"](FakeToolContext(tool_name="danger"))
         assert result is not None
         assert "error" in result
+
+
+# =============================================================================
+# Health Check
+# =============================================================================
+
+
+class TestHealthCheck:
+    def test_healthy_by_default(self):
+        k = GoogleADKKernel()
+        health = k.health_check()
+        assert health["status"] == "healthy"
+        assert health["backend"] == "google_adk"
+        assert isinstance(health["adk_available"], bool)
+        assert health["violations"] == 0
+
+    def test_degraded_after_violation(self):
+        k = GoogleADKKernel(blocked_tools=["shell"])
+        k.before_tool_callback(FakeToolContext(tool_name="shell"))
+        health = k.health_check()
+        assert health["status"] == "degraded"
+        assert health["violations"] == 1
+
+    def test_health_includes_uptime(self):
+        k = GoogleADKKernel()
+        health = k.health_check()
+        assert "uptime_seconds" in health
+        assert health["uptime_seconds"] >= 0
+
+
+# =============================================================================
+# Error Handling
+# =============================================================================
+
+
+class TestErrorHandling:
+    def test_policy_violation_error_attributes(self):
+        e = PolicyViolationError("test_policy", "something bad", severity="critical")
+        assert e.policy_name == "test_policy"
+        assert e.description == "something bad"
+        assert e.severity == "critical"
+        assert "test_policy" in str(e)
+
+    def test_violation_handler_receives_errors(self):
+        violations = []
+        k = GoogleADKKernel(
+            blocked_tools=["shell"],
+            on_violation=lambda e: violations.append(e),
+        )
+        k.before_tool_callback(FakeToolContext(tool_name="shell"))
+        assert len(violations) == 1
+        assert isinstance(violations[0], PolicyViolationError)
+
+    def test_multiple_violations_accumulated(self):
+        k = GoogleADKKernel(blocked_tools=["a", "b", "c"])
+        k.before_tool_callback(FakeToolContext(tool_name="a"))
+        k.before_tool_callback(FakeToolContext(tool_name="b"))
+        k.before_tool_callback(FakeToolContext(tool_name="c"))
+        assert len(k.get_violations()) == 3
 
 
 # =============================================================================
@@ -433,9 +716,31 @@ class TestIntegration:
         assert len(violations) == 3  # blocked tool + content in args + output filter
         assert len(k.get_audit_log()) >= 6
 
-    def test_policy_violation_error(self):
-        e = PolicyViolationError("test_policy", "something bad", severity="critical")
-        assert e.policy_name == "test_policy"
-        assert e.description == "something bad"
-        assert e.severity == "critical"
-        assert "test_policy" in str(e)
+    def test_full_lifecycle_with_approval(self):
+        """End-to-end test with human approval in the loop."""
+        k = GoogleADKKernel(
+            require_human_approval=True,
+            sensitive_tools=["delete_file"],
+            blocked_tools=["shell"],
+        )
+
+        # Non-sensitive tool: allowed immediately
+        assert k.before_tool_callback(FakeToolContext(tool_name="search")) is None
+
+        # Sensitive tool: blocked pending approval
+        result = k.before_tool_callback(FakeToolContext(tool_name="delete_file"))
+        assert result is not None
+        assert result["needs_approval"] is True
+        call_id = result["call_id"]
+
+        # Approve and verify audit trail
+        assert k.approve(call_id) is True
+        audit_types = [e.event_type for e in k.get_audit_log()]
+        assert "approval_required" in audit_types
+        assert "approval_granted" in audit_types
+
+        # Blocked tool still blocked (not just approval-gated)
+        result = k.before_tool_callback(FakeToolContext(tool_name="shell"))
+        assert result is not None
+        assert "blocked" in result["error"].lower()
+
