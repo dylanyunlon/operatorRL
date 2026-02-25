@@ -11,6 +11,7 @@
 [![CI](https://github.com/imran-siddique/agent-os/actions/workflows/ci.yml/badge.svg)](https://github.com/imran-siddique/agent-os/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-os-kernel)](https://pypi.org/project/agent-os-kernel/)
 [![Downloads](https://img.shields.io/pypi/dm/agent-os-kernel)](https://pypi.org/project/agent-os-kernel/)
+[![OWASP](https://img.shields.io/badge/OWASP_Agentic_Top_10-8/10_Covered-brightgreen)](docs/owasp-agentic-top10-mapping.md)
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=agent-os.agent-os-vscode)
 [![Documentation](https://img.shields.io/badge/docs-imran--siddique.github.io-blue)](https://imran-siddique.github.io/agent-os-docs/)
 [![Featured in awesome-llm-apps](https://img.shields.io/badge/Featured%20in-awesome--llm--apps-orange)](https://github.com/Shubhamsaboo/awesome-llm-apps)
@@ -63,7 +64,7 @@
 
 <table>
 <tr>
-<td align="center"><h3>1,577+</h3><sub>Tests Passing</sub></td>
+<td align="center"><h3>1,680+</h3><sub>Tests Passing</sub></td>
 <td align="center"><h3>6</h3><sub>Framework Integrations</sub></td>
 <td align="center"><h3>170K+</h3><sub>Combined Stars of<br/>Integrated Projects</sub></td>
 <td align="center"><h3>&lt;0.1ms p99</h3><sub>Governance Latency<br/><a href="benchmarks/results/BENCHMARKS.md">Benchmarks</a></sub></td>
@@ -120,6 +121,35 @@
 | **Agent OS** | **Action interception** | **During execution** |
 
 > **Agent frameworks** build agents. **Safety tools** filter I/O. **Agent OS** intercepts actions mid-execution — the only kernel-level governance layer.
+
+### 🛡️ OWASP Agentic Top 10 Coverage
+
+Agent OS + ecosystem covers **8 out of 10** [OWASP Agentic Application Security risks](docs/owasp-agentic-top10-mapping.md):
+
+| Risk | Coverage | Module |
+|------|----------|--------|
+| ASI01 Agent Goal Hijack | ✅ Full | `GovernancePolicy.blocked_patterns` |
+| ASI02 Tool Misuse | ✅ Full | `MCPGateway` — tool filtering, rate limiting, audit |
+| ASI03 Identity & Privilege | ✅ Full | `require_human_approval`, RBAC policies |
+| ASI04 Supply Chain | ⚠️ Partial | Tool allowlisting (no deep scanning yet) |
+| ASI05 Code Execution | ✅ Full | `blocked_patterns`, sandbox integration |
+| ASI06 Memory Poisoning | ✅ Full | `MemoryGuard` — hash integrity, injection detection |
+| ASI07 Inter-Agent Comms | ✅ Full | AgentMesh trust handshake, HMAC auth |
+| ASI08 Cascading Failures | ✅ Full | Agent SRE circuit breakers, cascade detection |
+| ASI09 Human-Agent Trust | ✅ Full | Human approval workflows, audit logging |
+| ASI10 Rogue Agents | ⚠️ Partial | Agent Hypervisor execution rings, kill switch |
+
+> 📄 [Full OWASP mapping →](docs/owasp-agentic-top10-mapping.md)
+
+### 🌐 The Agent Governance Ecosystem
+
+| Layer | Package | Purpose | Install |
+|-------|---------|---------|---------|
+| **Kernel** | [Agent OS](https://github.com/imran-siddique/agent-os) | Policy enforcement, action interception | `pip install agent-os-kernel` |
+| **Network** | [AgentMesh](https://github.com/imran-siddique/agent-mesh) | Identity, trust, delegation | `pip install agentmesh-platform` |
+| **Reliability** | [Agent SRE](https://github.com/imran-siddique/agent-sre) | SLOs, chaos testing, circuit breakers | `pip install agent-sre` |
+| **Runtime** | [Agent Hypervisor](https://github.com/imran-siddique/agent-hypervisor) | Execution rings, resource limits, saga | `pip install agent-hypervisor` |
+| **Full Stack** | [ai-agent-governance](https://pypi.org/project/ai-agent-governance/) | All of the above | `pip install ai-agent-governance[full]` |
 
 ---
 
