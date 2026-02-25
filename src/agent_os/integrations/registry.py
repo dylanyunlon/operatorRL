@@ -8,8 +8,11 @@ discovery of BaseIntegration subclasses.
 
 import importlib
 import inspect
+import logging
 import pkgutil
 from typing import Type
+
+logger = logging.getLogger(__name__)
 
 from .base import BaseIntegration
 
@@ -78,7 +81,8 @@ class AdapterRegistry:
             full_name = f"agent_os.integrations.{modname}"
             try:
                 mod = importlib.import_module(full_name)
-            except Exception:
+            except Exception:  # noqa: BLE001 — optional adapter may not be installed
+                logger.debug("Failed to import adapter module %s", full_name, exc_info=True)
                 continue
             for _attr_name, obj in inspect.getmembers(mod, inspect.isclass):
                 if (

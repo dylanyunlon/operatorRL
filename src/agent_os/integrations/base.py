@@ -840,7 +840,7 @@ class BaseIntegration(ABC):
             try:
                 cb(data)
             except Exception:  # noqa: BLE001 — listener errors must not break governance flow
-                logger.debug("Governance event listener error", exc_info=True)
+                logger.warning("Governance event listener error", exc_info=True)
     
     def pre_execute(self, ctx: ExecutionContext, input_data: Any) -> tuple[bool, Optional[str]]:
         """

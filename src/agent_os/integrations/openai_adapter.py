@@ -626,6 +626,7 @@ class GovernedAssistant:
                         result = self._tool_registry[func_name_exec](**args)
                         output = json.dumps(result) if not isinstance(result, str) else result
                     except Exception as e:
+                        logger.warning("Tool execution failed for %s", func_name_exec, exc_info=True)
                         output = json.dumps({"status": "error", "message": str(e)})
 
             if output is None:
