@@ -253,7 +253,7 @@ class OpenAIKernel(BaseIntegration):
                 run_id=run_id
             )
         except Exception:  # noqa: BLE001 — best-effort cancel, run may already be complete
-            pass
+            logger.debug("Run cancel failed (may already be complete)", exc_info=True)
 
     def is_cancelled(self, run_id: str) -> bool:
         """Check whether a run has been cancelled via :meth:`cancel_run`.
