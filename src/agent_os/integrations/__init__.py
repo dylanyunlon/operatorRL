@@ -13,6 +13,7 @@ Supported Frameworks:
 - Google Gemini: GenerativeModel with function calling
 - Mistral AI: Chat API with tool calls
 - Semantic Kernel: Microsoft's AI orchestration framework
+- PydanticAI: Model-agnostic agents with tool governance
 
 Usage:
     # LangChain
@@ -50,6 +51,7 @@ from agent_os.integrations.semantic_kernel_adapter import (
 from agent_os.integrations.guardrails_adapter import GuardrailsKernel
 from agent_os.integrations.google_adk_adapter import GoogleADKKernel
 from agent_os.integrations.a2a_adapter import A2AGovernanceAdapter, A2APolicy, A2AEvaluation
+from agent_os.integrations.pydantic_ai_adapter import PydanticAIKernel
 from .base import (
     AsyncGovernedWrapper,
     BaseIntegration,
@@ -135,6 +137,8 @@ __all__ = [
     "A2AGovernanceAdapter",
     "A2APolicy",
     "A2AEvaluation",
+    # PydanticAI
+    "PydanticAIKernel",
     # Token Budget Tracking
     "TokenBudgetTracker",
     "TokenBudgetStatus",
