@@ -189,10 +189,23 @@ class MemoryGuard:
         """
         alerts: List[Alert] = []
 
-        alerts.extend(self._check_injection_patterns(content, source))
-        alerts.extend(self._check_code_injection(content, source))
-        alerts.extend(self._check_special_characters(content, source))
-        alerts.extend(self._check_unicode_manipulation(content, source))
+        try:
+            alerts.extend(self._check_injection_patterns(content, source))
+            alerts.extend(self._check_code_injection(content, source))
+            alerts.extend(self._check_special_characters(content, source))
+            alerts.extend(self._check_unicode_manipulation(content, source))
+        except Exception:
+            # Fail closed: block the write if validation itself errors
+            logger.error(
+                "Memory validation error — blocking write (fail closed) | source=%s",
+                source, exc_info=True,
+            )
+            alerts.append(Alert(
+                alert_type=AlertType.INJECTION_PATTERN,
+                severity=AlertSeverity.CRITICAL,
+                message=f"Validation error — write blocked (fail closed) for source {source}",
+                entry_source=source,
+            ))
 
         allowed = not any(
             a.severity in (AlertSeverity.HIGH, AlertSeverity.CRITICAL)
@@ -250,20 +263,32 @@ class MemoryGuard:
         """
         all_alerts: List[Alert] = []
         for entry in entries:
-            # Integrity check
-            if not self.verify_integrity(entry):
+            try:
+                # Integrity check
+                if not self.verify_integrity(entry):
+                    all_alerts.append(Alert(
+                        alert_type=AlertType.INTEGRITY_VIOLATION,
+                        severity=AlertSeverity.CRITICAL,
+                        message=f"Hash mismatch for entry from {entry.source}",
+                        entry_source=entry.source,
+                    ))
+
+                # Content checks (reuse validate_write logic)
+                all_alerts.extend(self._check_injection_patterns(entry.content, entry.source))
+                all_alerts.extend(self._check_code_injection(entry.content, entry.source))
+                all_alerts.extend(self._check_special_characters(entry.content, entry.source))
+                all_alerts.extend(self._check_unicode_manipulation(entry.content, entry.source))
+            except Exception:
+                logger.error(
+                    "Error scanning memory entry — flagging as suspicious | source=%s",
+                    entry.source, exc_info=True,
+                )
                 all_alerts.append(Alert(
                     alert_type=AlertType.INTEGRITY_VIOLATION,
                     severity=AlertSeverity.CRITICAL,
-                    message=f"Hash mismatch for entry from {entry.source}",
+                    message=f"Scan error for entry from {entry.source} — flagged as suspicious",
                     entry_source=entry.source,
                 ))
-
-            # Content checks (reuse validate_write logic)
-            all_alerts.extend(self._check_injection_patterns(entry.content, entry.source))
-            all_alerts.extend(self._check_code_injection(entry.content, entry.source))
-            all_alerts.extend(self._check_special_characters(entry.content, entry.source))
-            all_alerts.extend(self._check_unicode_manipulation(entry.content, entry.source))
 
         return all_alerts
 

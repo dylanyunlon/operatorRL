@@ -141,7 +141,19 @@ class MCPGateway:
             ``(allowed, reason)`` — *allowed* is True when the call may
             proceed; *reason* explains the decision.
         """
-        allowed, reason, approval = self._evaluate(agent_id, tool_name, params)
+        try:
+            allowed, reason, approval = self._evaluate(agent_id, tool_name, params)
+        except Exception:
+            # Fail closed: deny access on unexpected evaluation errors
+            logger.error(
+                "MCP Gateway evaluation error — failing closed | agent=%s tool=%s",
+                agent_id, tool_name, exc_info=True,
+            )
+            allowed, reason, approval = (
+                False,
+                "Internal gateway error — access denied (fail closed)",
+                None,
+            )
 
         # Record audit entry
         entry = AuditEntry(
@@ -216,7 +228,14 @@ class MCPGateway:
         # 5. Human approval
         if self.policy.require_human_approval or tool_name in self.sensitive_tools:
             if self.approval_callback is not None:
-                status = self.approval_callback(agent_id, tool_name, params)
+                try:
+                    status = self.approval_callback(agent_id, tool_name, params)
+                except Exception:
+                    logger.error(
+                        "Approval callback error — denying access | agent=%s tool=%s",
+                        agent_id, tool_name, exc_info=True,
+                    )
+                    return False, "Approval callback error — access denied (fail closed)", None
             else:
                 status = ApprovalStatus.PENDING
 

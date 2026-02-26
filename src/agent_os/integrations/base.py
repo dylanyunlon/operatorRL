@@ -839,8 +839,11 @@ class BaseIntegration(ABC):
         for cb in self._event_listeners.get(event_type, []):
             try:
                 cb(data)
-            except Exception:  # noqa: BLE001 — listener errors must not break governance flow
-                logger.warning("Governance event listener error", exc_info=True)
+            except Exception as exc:  # noqa: BLE001 — listener errors must not break governance flow
+                logger.warning(
+                    "Governance event listener error for %s: %s",
+                    event_type, exc, exc_info=True,
+                )
     
     def pre_execute(self, ctx: ExecutionContext, input_data: Any) -> tuple[bool, Optional[str]]:
         """
