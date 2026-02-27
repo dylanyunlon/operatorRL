@@ -292,6 +292,14 @@ from agent_os.mcp_security import (
     ScanResult,
 )
 
+# LlamaFirewall Integration — defense-in-depth with Meta's LlamaFirewall
+from agent_os.integrations.llamafirewall import (
+    LlamaFirewallAdapter,
+    FirewallMode,
+    FirewallVerdict,
+    FirewallResult,
+)
+
 # Context Budget Scheduler — token budget as a kernel primitive (always available)
 from agent_os.context_budget import (
     ContextScheduler,
@@ -494,6 +502,12 @@ __all__ = [
     "MCPThreat",
     "ToolFingerprint",
     "ScanResult",
+    
+    # LlamaFirewall Integration
+    "LlamaFirewallAdapter",
+    "FirewallMode",
+    "FirewallVerdict",
+    "FirewallResult",
     
     # Context Budget Scheduler
     "ContextScheduler",

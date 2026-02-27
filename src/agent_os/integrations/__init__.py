@@ -52,6 +52,12 @@ from agent_os.integrations.guardrails_adapter import GuardrailsKernel
 from agent_os.integrations.google_adk_adapter import GoogleADKKernel
 from agent_os.integrations.a2a_adapter import A2AGovernanceAdapter, A2APolicy, A2AEvaluation
 from agent_os.integrations.pydantic_ai_adapter import PydanticAIKernel
+from agent_os.integrations.llamafirewall import (
+    LlamaFirewallAdapter,
+    FirewallMode,
+    FirewallVerdict,
+    FirewallResult,
+)
 from .base import (
     AsyncGovernedWrapper,
     BaseIntegration,
@@ -141,6 +147,11 @@ __all__ = [
     "A2AEvaluation",
     # PydanticAI
     "PydanticAIKernel",
+    # LlamaFirewall
+    "LlamaFirewallAdapter",
+    "FirewallMode",
+    "FirewallVerdict",
+    "FirewallResult",
     # Token Budget Tracking
     "TokenBudgetTracker",
     "TokenBudgetStatus",
