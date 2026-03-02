@@ -2,6 +2,10 @@
 
 > **Build safe AI agents with natural language and 0% policy violations**
 
+<a href="https://glama.ai/mcp/servers/@imran-siddique/agentos-mcp-server">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@imran-siddique/agentos-mcp-server/badge" />
+</a>
+
 [![npm version](https://badge.fury.io/js/agentos-mcp-server.svg)](https://www.npmjs.com/package/agentos-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.github.imran--siddique%2Fagentos-blue)](https://registry.modelcontextprotocol.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
