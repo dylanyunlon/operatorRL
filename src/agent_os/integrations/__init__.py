@@ -64,6 +64,7 @@ from agent_os.integrations.gemini_adapter import GeminiKernel, GovernedGeminiMod
 from agent_os.integrations.google_adk_adapter import GoogleADKKernel
 from agent_os.integrations.guardrails_adapter import GuardrailsKernel
 from agent_os.integrations.langchain_adapter import LangChainKernel
+from agent_os.integrations.maf_adapter import MAFKernel, govern as maf_govern
 from agent_os.integrations.llamafirewall import (
     FirewallMode,
     FirewallResult,
@@ -148,6 +149,9 @@ __all__ = [
     "A2AEvaluation",
     # PydanticAI
     "PydanticAIKernel",
+    # Microsoft Agent Framework (MAF)
+    "MAFKernel",
+    "maf_govern",
     # LlamaFirewall
     "LlamaFirewallAdapter",
     "FirewallMode",
