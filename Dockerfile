@@ -1,6 +1,7 @@
 # Agent OS Development Dockerfile
 # Build: docker build -t agent-os .
 # Run:   docker run -it agent-os
+# MCP:   docker run -i agent-os --stdio
 
 FROM python:3.11-slim
 
@@ -38,9 +39,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Expose API port
 EXPOSE 8080
 
-# Default command - run governance API server
-CMD ["python", "-m", "agent_os.server", "--host", "0.0.0.0", "--port", "8080"]
+# Default: MCP stdio mode (required for Glama inspection)
+# Override with: docker run agent-os python -m agent_os.server --host 0.0.0.0 --port 8080
+ENTRYPOINT ["python", "-m", "mcp_kernel_server.cli"]
+CMD ["--stdio"]
 
-# Healthcheck
+# Healthcheck (for HTTP mode only)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import httpx; r = httpx.get('http://localhost:8080/health'); assert r.status_code == 200" || exit 1
