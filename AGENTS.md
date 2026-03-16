@@ -1,80 +1,41 @@
-# Agent-OS — Coding Agent Instructions
+# Repository Guidelines
 
-## Project Overview
+## Architecture Overview
+Agent Lightning runs through a continuous loop: runners and tracers emit spans, `LightningStore` (`agentlightning/store/`) keeps them synchronized, and algorithms in `agentlightning/algorithm/` consume those traces to improve behavior.
 
-Agent-OS is a **governance-first kernel for AI agents** — a Python framework providing policy enforcement, semantic intent classification, identity management, and execution control for autonomous AI agents.
+## Project Structure & Module Organization
+- `agentlightning/`: adapters, execution stack, training loop, tracer, reward logic, and the `agl` CLI.
+- `docs/` & `examples/`: narrative and procedural docs (assets in `docs/assets/`, navigation in `mkdocs.yml`) plus runnable workflows whose READMEs point to their companion how-to guides. `docs/how-to` covers task-focused instructions, while `docs/tutorials` explains concepts and subsystems.
+- `dashboard/`, `scripts/`, `tests/`: UI bundles, release/dataset/CI automation, and mirrored coverage of the runtime tree. Record download steps rather than committing binaries.
 
-**Architecture:** 4-layer modular kernel
+## Build, Test, and Development Commands
+- `uv sync --group dev` — provision tooling once per environment.
+- `uv run --no-sync pytest -v` — execute the full suite; add a path or `-k expr` to narrow the run.
+- `uv run --no-sync pyright` — enforce static typing parity with CI.
+- `uv run --no-sync pre-commit run --all-files --show-diff-on-failure` and `uv run --no-sync mkdocs build --strict` — keep formatting tidy and documentation valid.
+Always commit the refreshed `uv.lock` when dependencies shift, and mention optional groups (VERL, APO, GPU) in PR notes.
 
-- **Layer 1 (Primitives):** Core identity (CMVK), credentials (CaaS), execution memory (EMK)
-- **Layer 2 (Infrastructure):** Inter-agent trust protocol (IATP), agent message bus (AMB), agent trust registry (ATR)
-- **Layer 3 (Framework):** Control plane, observability, nexus orchestration
-- **Layer 4 (Intelligence):** Semantic context awareness (SCAK), mute-agent, MCP kernel server
+## Common Issues & Fixes
+- When `uv run` errors with `Permission denied` under `~/.cache`, override both cache locations inline: ``UV_CACHE="$(pwd)/.cache_uv" XDG_CACHE_HOME="$(pwd)/.cache_xdg" uv run --no-sync <command>``.
 
-## Build & Test Commands
+## Coding Style & Naming Conventions
+- Target `requires-python >= 3.10`, four-space indentation, 120-character lines (though docstrings may run longer), and formatter-owned diffs (Black + isort, `black` profile). Use `snake_case` for modules, functions, and variables; `PascalCase` for classes and React components; lowercase hyphenation for CLI flags, branch names, and TypeScript filenames.
+- Maintain exhaustive type hints (pyright enforces them) and prefer shared dataclasses or Pydantic models from `agentlightning.types`.
+- Author Google-style docstrings for new modules or public methods—succinct descriptions, no redundant type info, no redundant `Key features/components` bullet points. Use mkdocs styles: `[][]` syntax for cross-references and single backticks for inline code blocks.
+- Writing logs is encouraged, especially for long functions with multiple steps and try-except blocks that catch all exceptions. Use `logging.getLogger(__name__)` to get loggers. Distinguish between DEBUG, INFO, WARNING, and ERROR logs.
 
-```bash
-# Install dependencies (development mode)
-pip install -e ".[dev]"
+## Testing Guidelines
+- Mirror runtime directories under `tests/` and match filenames for quick traceability.
+- Parametrize pytest cases and apply markers (`openai`, `gpu`, `agentops`, `mongo`, `llmproxy`) so optional suites can be skipped via selectors like `-m "not mongo"` yet still exercised in CI.
+- Lean on fixtures, favor real stores/spans/agents over mocks, and drive coverage across the majority of branches.
+- If an imported module is missing from the environment, check whether `uv sync` has been run with the right groups. Do not make stubs for external dependencies unless necessary.
 
-# Run all tests
-pytest tests/ modules/*/tests -v --tb=short
+## Example Contributions
+- Ship each example with a README that includes smoke-test instructions so maintainers can validate quickly. The README must contain an "Included Files" section summarizing every file and its role.
+- Keep runnable example modules self-contained with a module-level docstring describing CLI usage. Document important or educational classes/functions with targeted docstrings and inline comments where clarity matters.
+- Add a CI workflow per example named `examples-<name>.yml` in `.github/workflows/`. Register it in `badge-<name>.yml`, `badge-examples.yml`, and `badge-latest.yml` when applicable so badges stay accurate.
 
-# Run tests with coverage
-pytest tests/ --cov=src/agent_os --cov-report=html --cov-branch
-
-# Type checking
-mypy src/
-
-# Lint
-ruff check .
-
-# Format
-ruff format .
-```
-
-## Code Style
-
-- **Formatter/Linter:** Ruff (line-length: 100, target: Python 3.9+)
-- **Rules:** E, W, F, I (isort), B (bugbear), C4, UP (pyupgrade)
-- **Type checker:** MyPy strict mode with Pydantic plugin
-- **Docstrings:** Google-style
-- **Imports:** Sorted by isort via Ruff
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `src/agent_os/integrations/base.py` | Core governance — GovernancePolicy, BaseIntegration, PolicyInterceptor, event hooks |
-| `src/agent_os/integrations/profiling.py` | @profile_governance decorator |
-| `src/agent_os/base_agent.py` | Base agent class with audit logging |
-| `src/agent_os/stateless.py` | Stateless agent with optional Redis |
-| `tests/test_integrations.py` | Main governance test suite |
-| `modules/` | 14+ modular kernel components |
-
-## Coding Conventions
-
-- All public APIs must have type hints (`mypy --strict`)
-- Use `dataclass` or Pydantic `BaseModel` for data structures
-- GovernancePolicy fields: `max_tokens_per_request`, `max_tool_calls_per_request`, `blocked_patterns`, `allowed_tools`, `confidence_threshold`
-- Pattern types: `PatternType.SUBSTRING`, `PatternType.REGEX`, `PatternType.GLOB`
-- Event types: `GovernanceEventType.POLICY_CHECK`, `.POLICY_VIOLATION`, `.TOOL_CALL_BLOCKED`, `.CHECKPOINT_CREATED`
-- Tests go in `tests/` (unit) or `modules/*/tests/` (module-specific)
-
-## Boundaries
-
-- **Never modify** `tests/test_mcp_server.py` (known pre-existing failure, excluded from CI)
-- **Never commit** secrets, API keys, or credentials
-- **Never loosen** existing GovernancePolicy constraints — policies can only be tightened
-- Keep backward compatibility — don't break existing public API signatures
-
-## Testing Requirements
-
-- All new features must include tests
-- Run `pytest tests/ -v --tb=short` before committing
-- Minimum: test happy path + at least one edge case per feature
-- Use `pytest-asyncio` for async tests (asyncio_mode = "auto")
-
-## Commit Style
-
-Use conventional commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`
+## Commit & Pull Request Guidelines
+- Branch from a fresh `main` using `feature/<slug>`, `fix/<slug>`, `docs/<slug>`, or `chore/<slug>`.
+- Write imperative, scoped commits, reference issues with `Fixes #123`, and rerun pre-commit plus the relevant pytest/doc builds before pushing.
+- Use PR descriptions to summarize intent, list verification commands, call out dependency or docs-navigation updates, and link new docs/examples via `mkdocs.yml` or `examples/README.md`. Include logs for dashboard changes.

@@ -1,170 +1,59 @@
-# Agent OS Documentation
+# Agent Lightning
 
-Welcome to the Agent OS documentation. Agent OS is a kernel architecture for governing autonomous AI agents with deterministic policy enforcement.
+Agent Lightning is the absolute trainer to light up AI agents.
 
-## Quick Navigation
+[Join our Discord community](https://discord.gg/RYk7CdvDR7) to connect with other users and contributors.
 
-### 🚀 Getting Started
+## Features
 
-| Guide | Time | Description |
-|-------|------|-------------|
-| [5-Minute Quickstart](tutorials/5-minute-quickstart.md) | 5 min | Minimal setup, maximum speed |
-| [30-Minute Deep Dive](tutorials/30-minute-deep-dive.md) | 30 min | Comprehensive walkthrough |
-| [First Governed Agent](tutorials/first-governed-agent.md) | 15 min | Build a complete agent |
-| [Cheatsheet](cheatsheet.md) | - | Quick reference card |
+- Turn your agent into an optimizable beast with **ZERO CODE CHANGE** (almost)! 💤
+- Build with **ANY** agent framework (LangChain, OpenAI Agent SDK, AutoGen, CrewAI, Microsoft Agent Framework...); or even WITHOUT agent framework (Python OpenAI). You name it! 🤖
+- **Selectively** optimize one or more agents in a multi-agent system. 🎯
+- Embraces **Algorithms** like Reinforcement Learning, Automatic Prompt Optimization, Supervised Fine-tuning and more. 🤗
 
-### 📓 Interactive Notebooks
+## How to Read this Documentation
 
-Learn by doing with our Jupyter notebooks:
+This documentation is organized into the following parts:
 
-| Notebook | Time | Description |
-|----------|------|-------------|
-| [Hello Agent OS](../notebooks/01-hello-agent-os.ipynb) | 5 min | Your first governed agent |
-| [Episodic Memory](../notebooks/02-episodic-memory-demo.ipynb) | 15 min | Persistent agent memory |
-| [Time-Travel Debugging](../notebooks/03-time-travel-debugging.ipynb) | 20 min | Replay agent decisions |
-| [Verification](../notebooks/04-verification.ipynb) | 15 min | Detect hallucinations |
-| [Multi-Agent Coordination](../notebooks/05-multi-agent-coordination.ipynb) | 20 min | Agent trust protocols |
-| [Policy Engine](../notebooks/06-policy-engine.ipynb) | 15 min | Deep dive into policies |
+- [Installation](tutorials/installation.md) - Get started with Agent Lightning
+- How-to Recipes (e.g., [Train SQL Agent with RL](how-to/train-sql-agent.md)) - Practical examples of training agents and customizing algorithms.
+- Learning More (e.g., [Debugging](tutorials/debug.md)) - Guides on specific topics like debugging or parallelization.
+- Algorithm Zoo (e.g., [APO](algorithm-zoo/apo.md)) - References for built-in algorithms.
+- Deep Dive (e.g., [Bird's Eye View](deep-dive/birds-eye-view.md)) - For a deeper understanding of what Agent-lightning is doing under the hood.
+- API References (e.g., [Agent](reference/agent.md)) - References for the Agent-lightning Python API.
 
-### 📚 Tutorials
+## Resources
 
-- [Using Message Bus Adapters](tutorials/message-bus-adapters.md) - Connect agents with Redis, Kafka, NATS
-- [Creating Custom Tools](tutorials/custom-tools.md) - Build safe tools for agents
+- 11/4/2025 [Tuning ANY AI agent with Tinker ✕ Agent-lightning](https://medium.com/@yugez/tuning-any-ai-agent-with-tinker-agent-lightning-part-1-1d8c9a397f0e) Medium. See also [Part 2](https://medium.com/@yugez/tuning-any-ai-agent-with-tinker-agent-lightning-part-2-332c5437f0dc).
+- 10/22/2025 [No More Retokenization Drift: Returning Token IDs via the OpenAI Compatible API Matters in Agent RL](https://blog.vllm.ai/2025/10/22/agent-lightning.html) vLLM blog. See also [Zhihu writeup](https://zhuanlan.zhihu.com/p/1965067274642785725).
+- 8/11/2025 [Training AI Agents to Write and Self-correct SQL with Reinforcement Learning](https://medium.com/@yugez/training-ai-agents-to-write-and-self-correct-sql-with-reinforcement-learning-571ed31281ad) Medium.
+- 8/5/2025 [Agent Lightning: Train ANY AI Agents with Reinforcement Learning](https://arxiv.org/abs/2508.03680) arXiv paper.
+- 7/26/2025 [We discovered an approach to train any AI agent with RL, with (almost) zero code changes.](https://www.reddit.com/r/LocalLLaMA/comments/1m9m670/we_discovered_an_approach_to_train_any_ai_agent/) Reddit.
+- 6/6/2025 [Agent Lightning - Microsoft Research](https://www.microsoft.com/en-us/research/project/agent-lightning/) Project page.
 
-### 🏗️ Architecture
+## Community Projects
 
-- [Kernel Internals](kernel-internals.md) - How the kernel works
+- [DeepWerewolf](https://github.com/af-74413592/DeepWerewolf) — A case study of agent RL training for the Chinese Werewolf game built with AgentScope and Agent Lightning.
+- [AgentFlow](https://agentflow.stanford.edu/) — A modular multi-agent framework that combines planner, executor, verifier, and generator agents with the Flow-GRPO algorithm to tackle long-horizon, sparse-reward tasks.
+- [Youtu-Agent](https://github.com/TencentCloudADP/Youtu-agent) — Youtu-Agent lets you build and train your agent with ease. Built with [a modified branch](https://github.com/microsoft/agent-lightning/tree/contrib/youtu-agent-lightning) of Agent Lightning, Youtu-Agent has verified up to 128 GPUs RL training on maths/code and search capabilities with steady convergence. Also check [the recipe](https://github.com/TencentCloudADP/youtu-agent/tree/rl/agl) and their blog [*Stop Wrestling with Your Agent RL: How Youtu-Agent Achieved Stable, 128-GPU Scaling Without Breaking a Sweat*](https://spotted-coconut-df8.notion.site/Stop-Wrestling-with-Your-Agent-RL-How-Youtu-Agent-Achieved-Stable-128-GPU-Scaling-Without-Breaking-2ca5e8f089ba80539a98c582b65e0233).
 
-### 🔧 Reference
 
-- [Framework Integrations](integrations.md) - LangChain, OpenAI, CrewAI
-- [Dependencies](dependencies.md) - Package dependencies
-- [Security Specification](security-spec.md) - Security model
-- [FAQ](faq.md) - Common questions and answers
+## Citation
 
-### 📋 RFCs
+If you find Agent Lightning useful in your research or projects, please cite our paper:
 
-- [RFC-003: Agent Signals](rfcs/RFC-003-Agent-Signals.md) - POSIX-style signals
-- [RFC-004: Agent Primitives](rfcs/RFC-004-Agent-Primitives.md) - Core primitives
-
-### 🎯 Case Studies
-
-- [Carbon Auditor](case-studies/) - Fraud detection example
-- [DeFi Sentinel](case-studies/) - Attack detection
-- [Grid Balancing](case-studies/) - Multi-agent coordination
-
----
-
-## Installation
-
-```bash
-# Core package
-pip install agent-os
-
-# With all features
-pip install agent-os-kernel[full]
+```bibtex
+@misc{luo2025agentlightningtrainai,
+      title={Agent Lightning: Train ANY AI Agents with Reinforcement Learning},
+      author={Xufang Luo and Yuge Zhang and Zhiyuan He and Zilong Wang and Siyun Zhao and Dongsheng Li and Luna K. Qiu and Yuqing Yang},
+      year={2025},
+      eprint={2508.03680},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2508.03680},
+}
 ```
 
-## One-Command Quickstart
+## License
 
-**macOS/Linux:**
-```bash
-curl -sSL https://get.agent-os.dev | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr -useb https://get.agent-os.dev/win | iex
-```
-
-## Hello World
-
-```python
-from agent_os import KernelSpace
-
-kernel = KernelSpace(policy="strict")
-
-@kernel.register
-async def my_agent(task: str):
-    return f"Processed: {task}"
-
-# Run with kernel governance
-result = await kernel.execute(my_agent, "analyze data")
-```
-
-## Key Concepts
-
-### Kernel vs User Space
-
-```
-┌─────────────────────────────────────────────────────────┐
-│              USER SPACE (Agent Code)                    │
-│   Your agent code runs here. Can crash, hallucinate.   │
-├─────────────────────────────────────────────────────────┤
-│              KERNEL SPACE (Agent OS)                    │
-│   Policy Engine checks every action before execution    │
-│   If policy violated → SIGKILL (non-catchable)         │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Signals
-
-Agent OS uses POSIX-style signals for control:
-
-| Signal | Description |
-|--------|-------------|
-| `SIGKILL` | Terminate immediately (cannot be caught) |
-| `SIGSTOP` | Pause for human review |
-| `SIGCONT` | Resume execution |
-
-### Policies
-
-Policies define what agents can and cannot do:
-
-```yaml
-policies:
-  - name: read_only
-    deny:
-      - action: file_write
-      - action: database_write
-```
-
-## IDE Extensions
-
-| IDE | Status | Link |
-|-----|--------|------|
-| VS Code | ✅ Available | [Marketplace](extensions/vscode/) |
-| JetBrains | ✅ Available | [Plugin](extensions/jetbrains/) |
-| Cursor | ✅ Available | [Extension](extensions/cursor/) |
-| GitHub Copilot | ✅ Available | [Extension](extensions/copilot/) |
-
-## Policy Templates
-
-Pre-built templates for common use cases:
-
-| Template | Use Case |
-|----------|----------|
-| [secure-coding](../templates/policies/secure-coding.yaml) | General development |
-| [data-protection](../templates/policies/data-protection.yaml) | PII handling |
-| [enterprise](../templates/policies/enterprise.yaml) | Production deployments |
-
-```bash
-# Use a template
-agentos init my-project --template secure-coding
-```
-
-## Support
-
-- [GitHub Issues](https://github.com/imran-siddique/agent-os/issues)
-- [Discussions](https://github.com/imran-siddique/agent-os/discussions)
-- [Contributing Guide](../CONTRIBUTING.md)
-
----
-
-<div align="center">
-
-**Kernel-level safety for AI agents.**
-
-[GitHub](https://github.com/imran-siddique/agent-os) · [Examples](../examples/)
-
-</div>
+See the [LICENSE](https://github.com/microsoft/agent-lightning/blob/main/LICENSE) file for details.

@@ -1,273 +1,422 @@
-"""Tests for structured JSON logging module."""
+# Copyright (c) Microsoft. All rights reserved.
 
-import json
+from __future__ import annotations
+
+import io
 import logging
-import os
-import threading
+import multiprocessing as mp
+from multiprocessing.queues import Queue
+from pathlib import Path
+from typing import Any, Dict, List
 
 import pytest
 
-from agent_os.integrations.logging import (
-    GovernanceLogger,
-    JSONFormatter,
-    get_logger,
-    _logger_cache,
-    _cache_lock,
+from agentlightning.logging import _to_level_value  # pyright: ignore[reportPrivateUsage]
+from agentlightning.logging import (
+    DATE_FORMAT,
+    DEFAULT_FORMAT,
 )
 
-
-@pytest.fixture(autouse=True)
-def _clean_loggers():
-    """Reset logger cache and handlers between tests."""
-    with _cache_lock:
-        _logger_cache.clear()
-    # Remove any handlers added during tests to avoid duplicate output
-    for name in ("agent_os", "test_mod", "test_thread", "test_env", "test_exc"):
-        lg = logging.getLogger(name)
-        lg.handlers.clear()
-    yield
-    for name in ("agent_os", "test_mod", "test_thread", "test_env", "test_exc"):
-        lg = logging.getLogger(name)
-        lg.handlers.clear()
+pytestmark = pytest.mark.utils
 
 
-def _capture(logger: GovernanceLogger) -> list:
-    """Attach a handler that captures formatted JSON strings."""
-    records: list[str] = []
-    handler = logging.Handler()
-    handler.setFormatter(JSONFormatter())
-    handler.emit = lambda record: records.append(handler.format(record))  # type: ignore[assignment]
-    logger._logger.addHandler(handler)
-    return records
+def _logging_worker(case: str, queue: Queue[Dict[str, Any]]) -> None:
+    """
+    Runs in a separate process using spawn. It performs a specific logging
+    configuration scenario and returns a summary dict via the queue.
+    """
+    import logging
+    import warnings
 
+    # Re-import inside the subprocess so everything is picklable & isolated
+    from agentlightning.logging import (
+        setup,
+        setup_module,
+    )
 
-# -- JSONFormatter ----------------------------------------------------------
-
-class TestJSONFormatter:
-    def test_basic_format(self):
-        formatter = JSONFormatter()
-        record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="hello", args=(), exc_info=None,
+    if case == "setup_module_plain_console":
+        logger = setup_module(
+            level="DEBUG",
+            name="agentlightning.test",
+            console=True,
+            color=False,
+            propagate=False,
         )
-        output = formatter.format(record)
-        data = json.loads(output)
-        assert data["level"] == "INFO"
-        assert data["message"] == "hello"
-        assert data["logger"] == "test"
-        assert data["timestamp"].endswith("Z")
 
-    def test_extra_fields(self):
-        formatter = JSONFormatter()
-        record = logging.LogRecord(
-            name="test", level=logging.WARNING, pathname="", lineno=0,
-            msg="warn", args=(), exc_info=None,
+        handlers = logger.handlers
+        handler = handlers[0] if handlers else None
+        fmt = handler.formatter._fmt if handler and handler.formatter else None
+        datefmt = handler.formatter.datefmt if handler and handler.formatter else None
+
+        queue.put(
+            {
+                "logger_name": logger.name,
+                "logger_level": logger.level,
+                "num_handlers": len(handlers),
+                "handler_class": handler.__class__.__name__ if handler else None,
+                "handler_level": handler.level if handler else None,
+                "fmt": fmt,
+                "datefmt": datefmt,
+            }
         )
-        record.agent_id = "a-1"  # type: ignore[attr-defined]
-        record.action = "read"  # type: ignore[attr-defined]
-        output = formatter.format(record)
-        data = json.loads(output)
-        assert data["agent_id"] == "a-1"
-        assert data["action"] == "read"
 
-    def test_exception_included(self):
-        import sys
-        formatter = JSONFormatter()
-        try:
-            raise ValueError("boom")
-        except ValueError:
-            exc_info = sys.exc_info()
-        record = logging.LogRecord(
-            name="test", level=logging.ERROR, pathname="", lineno=0,
-            msg="err", args=(), exc_info=exc_info,
+    elif case == "setup_module_color_rich":
+        # Rich variant: color=True uses RichHandler
+        logger = setup_module(
+            level="INFO",
+            name="agentlightning.rich",
+            console=True,
+            color=True,
+            propagate=False,
         )
-        output = formatter.format(record)
-        data = json.loads(output)
-        assert "exception" in data
-        assert "boom" in data["exception"]
+        handlers = logger.handlers
+        handler = handlers[0] if handlers else None
 
-
-# -- GovernanceLogger -------------------------------------------------------
-
-class TestGovernanceLogger:
-    def test_policy_decision(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.policy_decision(
-            agent_id="agent-1", action="write_file",
-            decision="allow", policy_name="default",
+        queue.put(
+            {
+                "logger_name": logger.name,
+                "logger_level": logger.level,
+                "num_handlers": len(handlers),
+                "handler_class": handler.__class__.__name__ if handler else None,
+                "handler_has_formatter": handler.formatter is not None if handler else None,
+            }
         )
-        assert len(captured) == 1
-        data = json.loads(captured[0])
-        assert data["level"] == "INFO"
-        assert data["agent_id"] == "agent-1"
-        assert data["action"] == "write_file"
-        assert data["decision"] == "allow"
-        assert data["policy_name"] == "default"
 
-    def test_policy_decision_with_reason(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.policy_decision(
-            agent_id="a1", action="x", decision="deny", reason="too risky",
+    elif case == "setup_with_submodules_apply_to_capture_warnings":
+        # Extra handler to attach via extra_handlers
+        stream = io.StringIO()
+        stream_handler = logging.StreamHandler(stream)
+
+        setup(
+            level="INFO",
+            console=False,
+            color=False,
+            propagate=False,
+            disable_existing_loggers=False,
+            capture_warnings=True,
+            submodule_levels={"agentlightning.io": "DEBUG"},
+            extra_handlers=[stream_handler],
+            apply_to=["external"],
         )
-        data = json.loads(captured[0])
-        assert "too risky" in data["message"]
 
-    def test_policy_violation(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.policy_violation(
-            agent_id="agent-2", action="delete_db",
-            policy_name="safety", reason="destructive action",
+        base = logging.getLogger("agentlightning")
+        sub = logging.getLogger("agentlightning.io")
+        ext = logging.getLogger("external")
+
+        # Capture warnings via logging after capture_warnings=True
+        class ListHandler(logging.Handler):
+            def __init__(self) -> None:
+                super().__init__()
+                self.records: List[logging.LogRecord] = []
+
+            def emit(self, record: logging.LogRecord) -> None:
+                self.records.append(record)
+
+        lh = ListHandler()
+        wlog = logging.getLogger("py.warnings")
+        wlog.handlers.clear()
+        wlog.addHandler(lh)
+        wlog.setLevel(logging.WARNING)
+        wlog.propagate = False
+
+        warnings.warn("from warnings", UserWarning)
+
+        queue.put(
+            {
+                "base_level": base.level,
+                "base_num_handlers": len(base.handlers),
+                "extra_in_base": stream_handler in base.handlers,
+                "sub_level": sub.level,
+                "ext_level": ext.level,
+                "ext_handlers_same": base.handlers == ext.handlers,
+                "ext_propagate": ext.propagate,
+                "warnings_logged": len(lh.records),
+            }
         )
-        data = json.loads(captured[0])
-        assert data["level"] == "WARNING"
-        assert data["decision"] == "deny"
-        assert "destructive action" in data["message"]
 
-    def test_budget_warning(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.budget_warning(agent_id="a-1", usage_pct=85.3, limit=100.0)
-        data = json.loads(captured[0])
-        assert data["level"] == "WARNING"
-        assert data["agent_id"] == "a-1"
-        assert "85.3%" in data["message"]
+    elif case == "setup_with_console_and_extra_handler":
+        # Console + extra handler combination to test handler attachment
+        stream = io.StringIO()
+        extra_handler = logging.StreamHandler(stream)
 
-    def test_adapter_call(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.adapter_call(
-            adapter_name="langchain", agent_id="a-1",
-            action="invoke", duration_ms=42,
+        setup(
+            level="WARNING",
+            console=True,
+            color=False,
+            propagate=False,
+            extra_handlers=[extra_handler],
         )
-        data = json.loads(captured[0])
-        assert data["level"] == "INFO"
-        assert data["duration_ms"] == 42
-        assert "langchain" in data["message"]
 
-    def test_audit_event(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.audit_event(
-            agent_id="a-1", event_type="checkpoint",
-            details={"step": 5},
+        base = logging.getLogger("agentlightning")
+        handler_classes = [h.__class__.__name__ for h in base.handlers]
+        has_extra = extra_handler in base.handlers
+
+        queue.put(
+            {
+                "base_level": base.level,
+                "num_handlers": len(base.handlers),
+                "handler_classes": handler_classes,
+                "has_extra": has_extra,
+            }
         )
-        data = json.loads(captured[0])
-        assert data["level"] == "INFO"
-        assert "checkpoint" in data["message"]
-        assert '"step": 5' in data["message"]
 
-    def test_audit_event_no_details(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.audit_event(agent_id="a-1", event_type="start")
-        data = json.loads(captured[0])
-        assert "start" in data["message"]
-
-    def test_error(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.error("disk full", error_code="E500", agent_id="a-1")
-        data = json.loads(captured[0])
-        assert data["level"] == "ERROR"
-        assert data["error_code"] == "E500"
-        assert data["agent_id"] == "a-1"
-        assert data["message"] == "disk full"
-
-    def test_error_minimal(self):
-        logger = GovernanceLogger("test_mod")
-        captured = _capture(logger)
-        logger.error("oops")
-        data = json.loads(captured[0])
-        assert data["level"] == "ERROR"
-        assert "agent_id" not in data
-        assert "error_code" not in data
+    else:
+        queue.put({})
 
 
-# -- get_logger / caching / env var ----------------------------------------
+def _logging_worker_files_string(queue: Queue[Dict[str, Any]], base_dir: str) -> None:
+    """
+    Runs in a separate spawned process and configures logging with a single
+    files=str path. Returns information about the attached FileHandler.
+    """
+    import logging
+    import os
 
-class TestGetLogger:
-    def test_returns_governance_logger(self):
-        logger = get_logger("test_mod")
-        assert isinstance(logger, GovernanceLogger)
+    from agentlightning.logging import setup
 
-    def test_caches_by_name(self):
-        a = get_logger("test_mod")
-        b = get_logger("test_mod")
-        assert a is b
+    log_path = os.path.join(base_dir, "logs", "agent.log")
 
-    def test_different_names_different_instances(self):
-        a = get_logger("test_mod")
-        b = get_logger("test_env")
-        assert a is not b
+    setup(
+        level="INFO",
+        console=False,
+        color=False,
+        propagate=False,
+        files=log_path,
+    )
+
+    base = logging.getLogger("agentlightning")
+    file_handlers = [h for h in base.handlers if isinstance(h, logging.FileHandler)]
+    fh = file_handlers[0] if file_handlers else None
+
+    fmt = fh.formatter._fmt if fh and fh.formatter else None
+    datefmt = fh.formatter.datefmt if fh and fh.formatter else None
+
+    queue.put(
+        {
+            "logger_level": base.level,
+            "num_handlers": len(base.handlers),
+            "num_file_handlers": len(file_handlers),
+            "file_base": fh.baseFilename if fh else None,
+            "file_level": fh.level if fh else None,
+            "fmt": fmt,
+            "datefmt": datefmt,
+        }
+    )
 
 
-class TestLogLevel:
-    def test_respects_env_var(self, monkeypatch):
-        monkeypatch.setenv("AGENT_OS_LOG_LEVEL", "WARNING")
-        logger = GovernanceLogger("test_env")
-        assert logger._logger.level == logging.WARNING
+def _logging_worker_files_mapping(queue: Queue[Dict[str, Any]], base_dir: str) -> None:
+    """
+    Runs in a separate spawned process and configures logging with a files=dict
+    mapping, then calls setup twice to verify idempotent FileHandler attachment.
+    """
+    import logging
+    import os
 
-    def test_explicit_level_overrides_env(self, monkeypatch):
-        monkeypatch.setenv("AGENT_OS_LOG_LEVEL", "DEBUG")
-        logger = GovernanceLogger("test_env", level="ERROR")
-        assert logger._logger.level == logging.ERROR
+    from agentlightning.logging import setup
 
-    def test_default_level_is_info(self, monkeypatch):
-        monkeypatch.delenv("AGENT_OS_LOG_LEVEL", raising=False)
-        logger = GovernanceLogger("test_env")
-        assert logger._logger.level == logging.INFO
+    base_log = os.path.join(base_dir, "agent.log")
+    external_log = os.path.join(base_dir, "external.log")
+
+    files_mapping: Dict[str, str] = {
+        "agentlightning": base_log,
+        "external": external_log,
+    }
+
+    def file_handlers(logger: logging.Logger) -> list[logging.FileHandler]:
+        return [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
+
+    # First setup call
+    setup(
+        level="DEBUG",
+        console=False,
+        color=False,
+        propagate=False,
+        files=files_mapping,
+    )
+
+    base_logger = logging.getLogger("agentlightning")
+    ext_logger = logging.getLogger("external")
+
+    base_fh_first = file_handlers(base_logger)
+    ext_fh_first = file_handlers(ext_logger)
+
+    # Second setup call with the same mapping should not add duplicate FileHandlers
+    setup(
+        level="DEBUG",
+        console=False,
+        color=False,
+        propagate=False,
+        files=files_mapping,
+    )
+
+    base_fh_second = file_handlers(base_logger)
+    ext_fh_second = file_handlers(ext_logger)
+
+    queue.put(
+        {
+            "base_level": base_logger.level,
+            "ext_level": ext_logger.getEffectiveLevel(),
+            "base_first_count": len(base_fh_first),
+            "ext_first_count": len(ext_fh_first),
+            "base_second_count": len(base_fh_second),
+            "ext_second_count": len(ext_fh_second),
+            "base_file_first": base_fh_first[0].baseFilename if base_fh_first else None,
+            "ext_file_first": ext_fh_first[0].baseFilename if ext_fh_first else None,
+            "base_file_second": base_fh_second[0].baseFilename if base_fh_second else None,
+            "ext_file_second": ext_fh_second[0].baseFilename if ext_fh_second else None,
+            # For sanity: capture handler levels as well
+            "base_handler_level": base_fh_first[0].level if base_fh_first else None,
+            "ext_handler_level": ext_fh_first[0].level if ext_fh_first else None,
+        }
+    )
 
 
-# -- Thread safety ----------------------------------------------------------
+def _run_case(case: str) -> Dict[str, Any]:
+    """Helper to run a scenario in a spawn’ed process and fetch the result."""
+    ctx = mp.get_context("spawn")
+    q: Queue[Dict[str, Any]] = ctx.Queue()
+    p = ctx.Process(target=_logging_worker, args=(case, q))
+    p.start()
+    result = q.get(timeout=10)
+    p.join(timeout=10)
+    assert p.exitcode == 0
+    return result
 
-class TestThreadSafety:
-    def test_concurrent_logging(self):
-        logger = GovernanceLogger("test_thread")
-        captured = _capture(logger)
-        errors: list[Exception] = []
 
-        def worker(tid: int) -> None:
-            try:
-                for i in range(20):
-                    logger.policy_decision(
-                        agent_id=f"agent-{tid}",
-                        action=f"action-{i}",
-                        decision="allow",
-                    )
-            except Exception as exc:
-                errors.append(exc)
+def test_to_level_value_int_and_str() -> None:
+    # direct, no multiprocessing needed
+    assert _to_level_value(logging.DEBUG) == logging.DEBUG
+    assert _to_level_value("info") == logging.INFO
+    assert _to_level_value("WARNING") == logging.WARNING
 
-        threads = [threading.Thread(target=worker, args=(t,)) for t in range(4)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+    with pytest.raises(ValueError):
+        _to_level_value("not-a-level")
 
-        assert not errors
-        assert len(captured) == 80
-        # Every captured record should be valid JSON
-        for raw in captured:
-            data = json.loads(raw)
-            assert "agent_id" in data
 
-    def test_get_logger_thread_safe(self):
-        results: list[GovernanceLogger] = []
-        errors: list[Exception] = []
+def test_setup_module_plain_console_spawn() -> None:
+    result = _run_case("setup_module_plain_console")
 
-        def worker() -> None:
-            try:
-                results.append(get_logger("test_thread"))
-            except Exception as exc:
-                errors.append(exc)
+    assert result["logger_name"] == "agentlightning.test"
+    assert result["logger_level"] == logging.DEBUG
 
-        threads = [threading.Thread(target=worker) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+    # Console handler with plain formatter configured
+    assert result["num_handlers"] == 1
+    assert result["handler_class"].endswith("StreamHandler")
+    assert result["handler_level"] == logging.DEBUG
+    assert result["fmt"] == DEFAULT_FORMAT
+    assert result["datefmt"] == DATE_FORMAT
 
-        assert not errors
-        assert all(r is results[0] for r in results)
+
+def test_setup_module_color_rich_spawn() -> None:
+    # Only run this test if rich is installed
+    pytest.importorskip("rich")
+
+    result = _run_case("setup_module_color_rich")
+
+    assert result["logger_name"] == "agentlightning.rich"
+    assert result["logger_level"] == logging.INFO
+    assert result["num_handlers"] == 1
+    # We can’t rely on full module path, just the class name
+    assert result["handler_class"].endswith("RichHandler")
+
+
+def test_setup_with_submodules_apply_to_and_capture_warnings_spawn() -> None:
+    result = _run_case("setup_with_submodules_apply_to_capture_warnings")
+
+    # Base logger level and handler attachment
+    assert result["base_level"] == logging.INFO
+    assert result["base_num_handlers"] >= 1
+    assert result["extra_in_base"] is True
+
+    # Submodule level overridden
+    assert result["sub_level"] == logging.DEBUG
+
+    # apply_to logger mirrors base handlers & level, propagation disabled
+    assert result["ext_level"] == logging.INFO
+    assert result["ext_handlers_same"] is True
+    assert result["ext_propagate"] is False
+
+    # capture_warnings=True causes warnings.warn to go through logging
+    assert result["warnings_logged"] >= 1
+
+
+def test_setup_with_console_and_extra_handler_spawn() -> None:
+    result = _run_case("setup_with_console_and_extra_handler")
+
+    # Level propagated to base logger
+    assert result["base_level"] == logging.WARNING
+
+    # Both console handler and extra handler should be attached
+    assert result["num_handlers"] >= 2
+    assert any(cls.endswith("StreamHandler") for cls in result["handler_classes"])
+    assert result["has_extra"] is True
+
+
+def test_setup_files_string_spawn(tmp_path: Path) -> None:
+    """
+    Verifies that passing files as a string attaches a single FileHandler with
+    the expected level and default formatter in a spawned process.
+    """
+    ctx = mp.get_context("spawn")
+    q: Queue[Dict[str, Any]] = ctx.Queue()
+    p = ctx.Process(target=_logging_worker_files_string, args=(q, str(tmp_path)))
+    p.start()
+    result = q.get(timeout=10)
+    p.join(timeout=10)
+    assert p.exitcode == 0
+
+    assert result["logger_level"] == logging.INFO
+    # We expect at least one handler and exactly one FileHandler
+    assert result["num_handlers"] >= 1
+    assert result["num_file_handlers"] == 1
+
+    # Filename should be inside the tmp_path tree
+    assert str(tmp_path) in result["file_base"]
+    # FileHandler uses the base logger level
+    assert result["file_level"] == logging.INFO
+
+    # Default formatter applied by _ensure_file_handler
+    assert result["fmt"] == DEFAULT_FORMAT
+    assert result["datefmt"] == DATE_FORMAT
+
+
+def test_setup_files_mapping_spawn(tmp_path: Path) -> None:
+    """
+    Verifies that passing files as a mapping attaches FileHandlers to each
+    logger and that calling setup twice does not create duplicate handlers.
+    """
+    ctx = mp.get_context("spawn")
+    q: Queue[Dict[str, Any]] = ctx.Queue()
+    p = ctx.Process(target=_logging_worker_files_mapping, args=(q, str(tmp_path)))
+    p.start()
+    result = q.get(timeout=10)
+    p.join(timeout=10)
+    assert p.exitcode == 0
+
+    # Base logger level is DEBUG
+    assert result["base_level"] == logging.DEBUG
+
+    # External's effective level is WARNING (inherited from root)
+    assert result["ext_level"] == logging.WARNING
+
+    # First setup: one FileHandler per logger
+    assert result["base_first_count"] == 1
+    assert result["ext_first_count"] == 1
+
+    # Second setup: still one FileHandler per logger (idempotence)
+    assert result["base_second_count"] == 1
+    assert result["ext_second_count"] == 1
+
+    # File paths are stable across calls
+    assert result["base_file_first"] == result["base_file_second"]
+    assert result["ext_file_first"] == result["ext_file_second"]
+
+    # Paths should live under tmp_path
+    assert str(tmp_path) in result["base_file_first"]
+    assert str(tmp_path) in result["ext_file_first"]
+
+    # Handler levels:
+    # - base handler uses the base logger level (DEBUG)
+    # - external handler uses external's effective level at creation (WARNING)
+    assert result["base_handler_level"] == logging.DEBUG
+    assert result["ext_handler_level"] == logging.WARNING
