@@ -336,10 +336,350 @@ python -m py_compile <file>
 
 ## 七、下一步行动
 
-等待你的四段 "agentic RL in loop for kernel and anything real HTTP/HTTPS POST information"，然后我们按照上述优先级队列，从文件 #1 `verl/entrypoint.py` 开始逐文件替换。
+# AgentRL 自演化持续训练系统 — 进化思想驱动的完整迁移规划
 
-每次替换前我会：
-1. 展示原始代码片段
-2. 展示替换后的代码片段
-3. 解释迁移理由（鲁迅拿来主义：为什么拿、拿什么、怎么拿）
-4. 执行 diff 验证
+> **鲁迅《拿来主义》**：运用脑髓，放出眼光，自己来拿。
+
+---
+
+## 零、神经元数量的震撼事实与我们的实验定位
+
+### 0.1 数据对比
+
+| 实体 | "神经元"数量 | "突触/参数"数量 | 来源 |
+|---|---|---|---|
+| **人类婴儿（出生时）** | ~1000亿（100B）神经元 | ~50万亿突触（50T），3岁时爆发至~1000万亿（1Q） | NCBI/Harvard Center/Neuron Wikipedia |
+| **人类成人** | ~860亿（86B）神经元 | ~150-500万亿突触（150T-500T） | Azevado et al / AI Impacts |
+| **GPT-4 (MoE)** | 8个220B子模型 | ~1.76万亿参数（1.76T） | Jensen Huang/Semafor 泄露 |
+| **Claude 3.5 Sonnet** | 未公开（估计~175B） | 未公开（估计175B-350B） | Microsoft MEDEC论文估计 |
+| **Llama 3.1 405B** | - | 4050亿参数（405B） | Meta 官方 |
+| **DeepSeek-V3** | MoE 671B总/37B激活 | 6710亿参数 | DeepSeek 官方 |
+| **7B 小模型** | - | 70亿参数（7B） | 各开源模型 |
+
+### 0.2 关键洞察：婴儿 ≈ 最大闭源模型？
+
+2025年Brain期刊最新研究（Roberto Lent）修正了旧观点：婴儿出生时大脑皮层只有成人的**62%神经元**，小脑更是只有**7%**。但新生儿确实拥有约1000亿量级的神经元。
+
+**这与GPT-4的1.76T参数在同一数量级吗？**
+
+不。人脑的核心不是860亿神经元（对应模型"层数×宽度"的结构容量），而是150-500万亿突触——这是参数量。
+
+**GPT-4的1.76T参数 ≈ 人脑突触数的1%**。
+
+但婴儿3岁时突触可达1000万亿（1Q = 1000T），比GPT-4大**570倍**。
+
+### 0.3 所以7B模型在干什么？
+
+| 模型 | 参数量 | 相当于人脑突触的 | 类比 |
+|---|---|---|---|
+| 7B | 70亿 | 0.005% | 一条线虫（302个神经元、5000个突触）都比它复杂 |
+| 70B | 700亿 | 0.05% | 果蝇脑 |
+| 405B | 4050亿 | 0.27% | 蜜蜂脑 |
+| 1.76T (GPT-4) | 1.76万亿 | 1.2% | 小鼠脑的一小部分 |
+
+**结论：用7B模型做"自演化"实验，相当于指望一条线虫学会人类行为。**
+
+但进化思想.txt已经给了答案——
+
+---
+
+## 一、进化思想的七个核心命题 与 代码映射
+
+### 命题 1：「预训练学的是"世界长什么样"，RL学的是"我想要什么"。顺序反了。」
+
+**人类**：先有硬件自带的欲望（饿想吃、痛想逃）然后 用欲望驱动探索 然后 形成世界认知
+
+**AI**：先预训练世界模型 然后 再用RL试图教它"想要什么"
+
+**代码映射**：我们不是在训练一个7B模型"理解Trainium2迁移"，而是用已经"理解世界"的最大商业模型（Claude Code）作为"老师/修复酶"，让**真实世界的HTTP返回**（pytest success/error）成为"欲望信号"。
+
+7B模型不是学生，**Claude Code才是学生**。7B模型甚至可以不存在。
+
+文件触点：`agentlightning/verl/entrypoint.py` 的 `run_ppo()` 不一定需要执行weight更新。真正的"参数更新"发生在 Claude Code 的 prompt/system指令的迭代中。
+
+### 命题 2：「碰异性很快乐——那个快乐不是任何奖励函数定义的，是身体自己涌现的信号。」
+
+这是对外部奖励函数的根本质疑。父母（外部奖励函数）说"不能碰异性"，但身体的内在信号（多巴胺）说"碰了很爽"。
+
+**代码映射**：当前 `PolicyReward` 的 `critical_penalty=-100.0` 就像"父母说不能碰"。但如果 Agent 违反了某条策略却让测试通过率更高——这个"测试通过"就是"碰了异性之后的快乐"。
+
+文件触点：`src/agent_os/integrations/agent_lightning/reward.py`——需要增加"涌现奖励"（emergent reward）通道，当违规行为导致真实世界success时，不盲目惩罚，而是记录这个"异性接触信号"以供后续分析。
+
+### 命题 3：「只有大脑，没有身体。HTTP接口就是身体。」
+
+Agent的"身体"不是物理机器人，而是它能触达的所有HTTP端点。`pytest`的返回是"触觉"，`git diff`的返回是"视觉"，`neuron-top`的输出是"本体感觉"。
+
+**代码映射**：
+- `GovernedEnvironment.step()` = 身体的一次动作
+- HTTP response = 感觉神经传入信号
+- success/error = 痛/快乐的二元编码
+- 目标层级（登录success < 加入购物车success < 下单success）= 需求层次
+
+文件触点：`src/agent_os/integrations/agent_lightning/environment.py`——当前只有flat的step/reward，需要增加**目标层级树**（goal hierarchy），让不同HTTP端点的success有不同权重，且这个权重不是写死的，是从执行历史中涌现的。
+
+### 命题 4：「人类是一边运行一边改写自己的程序。AI的训练和推理是分离的。」
+
+这是最致命的洞察。当前AI：训练时改参数 推理时冻结。人类：每时每刻突触都在变。
+
+**代码映射**：`verl/daemon.py` 的训练循环是batch式的——收集rollout、聚合、更新、再收集。但进化思想要求的是：**每一次HTTP调用都应该改变下一次调用的方式**。
+
+程序A 到 A' 到 A''，不是参数在迭代，是**整个系统逻辑在迭代**。
+
+文件触点：这要求我们在 `GovernedRunner.step()` 内部实现"在线学习"信号——不是等一个batch结束再更新，而是每次step之后，立即用LLM（修复酶）修改下次step的策略。
+
+### 命题 5：「学生必须亲自去考场。老师只看结果给反馈。」
+
+学生A（程序）在考场（真实环境HTTP）运行，交出答卷（运行日志）。老师（LLM）看答卷，告诉学生怎么改。科学家（更高层验证）如果解法又快又好，解法成为新知识。
+
+**代码映射**：
+- 学生A = `GovernedRunner` + Agent 的当前策略
+- 考场 = 真实的 pytest/pyright/git 命令执行
+- 答卷 = `FlightRecorderEmitter` 生成的 span 日志
+- 老师 = `LLMProxy` 调用 Claude（修复酶角色）
+- 科学家 = 如果修改后所有测试通过（下单success），这个修改被合并进代码库
+
+文件触点：`agentlightning/llm_proxy.py`——LLM不是奖励函数定义者，是**修复建议器**。需要在proxy层增加"看日志然后建议修改"的调用模式。
+
+### 命题 6：「success本身就是最终裁判。LLM是修复酶，不是决定方向的。」
+
+真实世界给出success/error（不可改变的物理事实），程序A运行撞墙记录日志，LLM看日志建议修改（可被success否决），程序A'是新一代。
+
+**代码映射**：整个AgentRL闭环的裁判不是任何reward model，而是：
+1. `pytest` 返回 0（全部通过）= ultimate success
+2. `git diff` 确认函数数量不变 = 规则遵守
+3. `python -c "import agentlightning"` = 系统完整性
+
+文件触点：`src/agent_os/stateless.py` 的 `StatelessKernel.execute()`——需要把"真实世界HTTP返回"作为一等公民纳入执行结果，而不是只看policy check。
+
+### 命题 7：「一个知道自己想要什么的小模型，可能比一个知道全世界但不知道自己想要什么的大模型更有潜力。」
+
+**这就是为什么7B模型不是答案，但也不代表我们需要训练1.76T的GPT-4。**
+
+我们需要的是：一个**知道自己想要什么**的系统——它想要"让所有pytest通过"、想要"让git diff干净"、想要"让import不报错"。
+
+这个"想要"不需要1.76T参数来编码。它可以编码在**系统架构**里——也就是GovernedEnvironment的目标层级树+PolicyReward的涌现信号通道。
+
+**而那个"知道全世界"的大模型（Claude Code），只是修复酶——当error发生时提供修改方向。**
+
+---
+
+## 二、小学到初中到高中到大学：阶段性考试体系
+
+### 2.1 人类教育体系映射
+
+| 阶段 | 人类 | AgentRL 自演化 | 考试内容 |
+|---|---|---|---|
+| **婴儿期** | 学会抓握、爬行 | Agent 学会执行单个文件修改 | 单文件 `python -m py_compile` 通过 |
+| **幼儿园** | 学会说话、社交 | Agent 学会修改后不破坏其他模块 | `import agentlightning` 不报错 |
+| **小学** | 学会读写算 | Agent 学会通过单元测试 | `pytest tests/test_<module>.py` 通过 |
+| **初中** | 学会系统思考 | Agent 学会跨模块修改 | `pytest -m "not mongo"` 整体通过 |
+| **高中** | 学会抽象推理 | Agent 学会 Megatron到Trainium2 的完整迁移 | `pyright` 类型检查 + 全套测试通过 |
+| **大学** | 学会创新 | Agent 提出的修改方式优于人类预期 | 性能benchmark优于baseline |
+| **研究生** | 发现新知识 | Agent 的迁移策略被其他项目采纳 | 修改被merge到upstream |
+
+### 2.2 闭源商业模型训练一次一个月 vs 我们的应对
+
+训练GPT-4需要数月、数亿美元。但**我们不是在训练GPT-4**。
+
+我们在做的是：让已经训练好的Claude Code（修复酶），在真实世界的HTTP反馈中，**迭代自己的工作策略**。每次迭代不是weight update，而是：
+- system prompt的调整
+- 工具调用策略的优化
+- 错误模式的记忆和规避
+
+这的迭代周期不是一个月，而是**分钟级**。
+
+### 2.3 每个"考试"对应的代码文件
+
+- 婴儿期考试 对应 agentlightning/reward.py (能否emit基本信号)
+- 幼儿园考试 对应 agentlightning/__init__.py (import chain是否完整)
+- 小学考试 对应 agentlightning/store/base.py (数据存储是否正确)
+- 初中考试 对应 agentlightning/trainer/trainer.py (训练循环是否联通)
+- 高中考试 对应 agentlightning/verl/entrypoint.py (Trainium策略是否可用)
+- 大学考试 对应 benchmarks/bench_kernel.py (性能是否达标)
+- 研究生答辩 对应 整个项目的 git diff 与 upstream 对比
+
+---
+
+## 三、"碰异性"隐喻的完整代码映射
+
+### 3.1 违规但有效的行为
+
+"进化思想"中最深刻的隐喻：父母（policy）说不能碰异性，但碰了之后身体涌现出快乐信号。
+
+在代码中：
+- **父母** = `GovernancePolicy` 的 `blocked_patterns`
+- **碰异性** = Agent做了一个被policy标记为violation的操作
+- **快乐信号** = 但这个操作让 `pytest` 通过了、让性能提升了
+
+### 3.2 当前代码的问题
+
+在 `src/agent_os/integrations/agent_lightning/reward.py` 中，当前逻辑是违规则无条件惩罚。这是"父母逻辑"——碰了就罚，不管结果如何。
+
+### 3.3 进化思想要求的逻辑
+
+违规加上最终success等于需要记录为"涌现信号"。不是直接奖励（那会鼓励违规），而是记录这个矛盾，让后续的"修复酶"LLM看到"为什么这个违规带来了成功"。也许policy本身需要演化。
+
+这对应人类成长中的：
+- 小时候"不能碰火"是绝对正确的（critical violation 大惩罚）
+- 长大后"碰异性"从违规变成了正常行为（policy需要随成长阶段更新）
+
+意味着 `GovernancePolicy` 不应该是静态的，应该有一个**成长阶段**（maturity level），不同阶段的policy不同。
+
+---
+
+## 四、50个文件的修改规划（M01-M50）
+
+基于进化思想的七个命题，以下50个修改严格遵循：不增不删函数、一个一个代码替换、每次修改后diff验证。
+
+### 阶段 F：进化思想注入——涌现信号通道（M01-M10）
+
+**M01** `src/agent_os/integrations/agent_lightning/reward.py` 的 `PolicyReward.__call__()`：在violation惩罚计算后，增加"涌现信号检测"——如果有violation但rollout.success==True，将该矛盾记录为emergent_signal并通过emit传递，而非简单忽略。不改函数签名，在现有__call__内部增加条件分支。对应命题2：碰异性的快乐。
+
+**M02** `src/agent_os/integrations/agent_lightning/reward.py` 的 `_emit_reward()`：在emit的attributes中增加agent_os.emergent_signals字段，记录违规但成功的案例数量。不新增函数，只修改现有emit的dict。对应命题2。
+
+**M03** `src/agent_os/integrations/agent_lightning/reward.py` 的 `RewardConfig` dataclass：增加字段 emergent_signal_bonus: float = 2.0 和 maturity_level: int = 0。dataclass字段增加不算新增函数。对应命题2加成长阶段。
+
+**M04** `src/agent_os/integrations/agent_lightning/environment.py` 的 `EnvironmentConfig`：增加字段 maturity_level: int = 0 和 goal_hierarchy: dict。不同成长阶段的policy宽松度不同。对应命题7：小学到大学。
+
+**M05** `src/agent_os/integrations/agent_lightning/environment.py` 的 `GovernedEnvironment.step()`：在reward计算中引入goal_hierarchy权重——如果当前step的action对应的goal层级更高（如"下单"大于"登录"），给予更高的base reward。在现有reward_fn调用后增加层级加权。对应命题5：目标层级。
+
+**M06** `src/agent_os/integrations/agent_lightning/environment.py` 的 `GovernedEnvironment.reset()`：在reset时根据maturity_level调整max_steps和violation_penalty的值——低maturity严格惩罚，高maturity放宽policy（就像小孩不能碰火，成人可以用火做饭）。对应成长阶段。
+
+**M07** `src/agent_os/integrations/agent_lightning/runner.py` 的 `GovernedRunner.step()`：在step执行完毕后、emit_governance_spans之前，插入"在线学习"信号——如果连续N次error，通过现有的violation_callback通知外部应该触发LLM修复酶。不新增函数，利用现有callback机制。对应命题4：边运行边改写。
+
+**M08** `src/agent_os/integrations/agent_lightning/runner.py` 的 `GovernedRunner._emit_governance_spans()`：增加emit agent_os.consecutive_errors 和 agent_os.repair_enzyme_needed 字段。对应命题5：学生交答卷给老师。
+
+**M09** `src/agent_os/integrations/agent_lightning/emitter.py` 的 `FlightRecorderEmitter.__init__()`：增加参数 maturity_level: int = 0 存储在实例上，影响后续span生成时附加的元数据。对应成长阶段。
+
+**M10** `src/agent_os/integrations/agent_lightning/emitter.py` 的 `LightningSpan.to_dict()`：在返回的dict中增加可选的maturity_level字段（如果attributes中有的话）。对应成长阶段。
+
+### 阶段 G：LLM作为修复酶——修改代理层（M11-M20）
+
+**M11** `agentlightning/llm_proxy.py` 的 LLMProxy 类的核心调用方法：在现有的LLM调用逻辑中，增加一个mode参数判断——当mode为repair_enzyme时，将请求格式化为"看日志然后建议修改"的模式。不新增函数，在现有调用方法内部增加分支。对应命题5：老师看答卷。
+
+**M12** `agentlightning/llm_proxy.py` 请求构建部分：当repair_enzyme模式时，自动将最近N个span的日志作为上下文注入到prompt中，让LLM"看到答卷"。对应命题5。
+
+**M13** `agentlightning/emitter/reward.py` 的 `emit_reward()`：在reward emit时，如果检测到emergent_signal标记（从attributes中读取），额外记录一条annotation说明"违规行为导致了成功"。对应命题2：涌现快乐。
+
+**M14** `agentlightning/emitter/annotation.py` 的 `emit_annotation()`：在annotation attributes中支持agent_os.maturity_level和agent_os.growth_stage字段的传递。不改函数签名，只扩展内部处理的attribute key集合。对应成长阶段。
+
+**M15** `agentlightning/adapter/triplet.py` trace到triplet转换：在triplet生成时，如果trace中包含emergent_signal标记，在triplet的metadata中保留该信号，以便下游训练算法可以利用。对应命题2。
+
+**M16** `agentlightning/algorithm/base.py` 的 `Algorithm.run()`：在run方法的docstring中增加对repair enzyme模式的说明（不改逻辑，只改文档），为后续具体算法实现提供语义指导。对应命题5。
+
+**M17** `agentlightning/algorithm/fast.py` 的 FastAlgorithm：在现有的fast算法中，增加对emergent_signal数据的消费——如果rollout中有违规但成功的案例，不将其作为负样本，而是标记为"需要人类或高级LLM审查"。对应命题2。
+
+**M18** `agentlightning/algorithm/utils.py` 工具函数：增加一个辅助逻辑（在现有函数内部）计算rollout的"成长分数"（maturity score），基于success率、violation率、emergent signal率的组合。对应成长阶段。
+
+**M19** `agentlightning/runner/agent.py` 的 LitAgentRunner 的核心iter循环：在每次step后，检查连续success/error计数，如果达到阶段性里程碑（如连续10次success），通过现有event机制emit一个"升级"信号。对应小学到初中考试。
+
+**M20** `agentlightning/runner/agent.py` rollout提交部分：在提交rollout到store时，附加growth_stage元数据。对应成长阶段。
+
+### 阶段 H：真实世界HTTP作为身体——Trainium2适配（M21-M30）
+
+**M21** `agentlightning/verl/entrypoint.py` 的 `run_ppo()` strategy 分发：在 megatron 分支之后，增加 trainium 分支。导入 NxD 相关的 worker（容错：如果NxD不可用则fallback到FSDP加XLA设备映射）。对应命题3：HTTP身体。
+
+**M22** `agentlightning/verl/entrypoint.py` reward_model 部分：同样为 reward_model.strategy 增加 trainium 分支。对应命题3。
+
+**M23** `agentlightning/verl/config.yaml`：增加 trainium strategy 的默认配置项，包括 neuron_cores_per_node、tensor_parallel_degree、logical_neuron_core_config 等 Trainium2 特有参数。对应命题3。
+
+**M24** `agentlightning/verl/async_server.py` 推理服务启动：在server初始化中增加设备检测——如果检测到 Neuron Runtime（通过检查 /dev/neuron 或 torch_neuronx 可导入），使用 XLA 设备而非 CUDA 设备。对应命题3。
+
+**M25** `agentlightning/verl/daemon.py` token处理部分：在 get_left_padded_ids_and_attention_mask 等函数中，确保 tensor 操作不硬编码 .cuda() 调用，而是使用 device 参数。检查所有 torch.tensor 创建是否指定了正确的device。对应命题3。
+
+**M26** `agentlightning/verl/trainer.py` AgentLightningTrainer：在 compute_data_metrics 中，如果运行在 Trainium 上，使用 xm.mesh_reduce 替代 NCCL 的 all_reduce（通过检测设备类型分支）。对应命题3。
+
+**M27** `agentlightning/execution/base.py` ExecutionStrategy：在策略基类的docstring中增加对 Trainium 执行环境的说明。在任何硬编码的 cuda 字符串位置，替换为可配置的设备标识。对应命题3。
+
+**M28** `agentlightning/execution/shared_memory.py`：检查shared memory实现中是否有CUDA pinned memory的使用，如有则增加 XLA 兼容的替代路径。对应命题3。
+
+**M29** `agentlightning/env_var.py`：增加对 NEURON_RT_VISIBLE_CORES、NEURON_CC_FLAGS、XLA_USE_BF16 等Trainium环境变量的识别和导出。在现有的环境变量注册逻辑中增加条目。对应命题3。
+
+**M30** `agentlightning/instrumentation/vllm.py` vLLM仪表化：增加对 vLLM-Neuron 的检测——如果 transformers_neuronx 可导入，调整 instrumentation 的 span 属性以包含 NeuronCore 利用率信息。对应命题3。
+
+### 阶段 I：治理内核作为免疫系统——策略演化（M31-M40）
+
+**M31** `src/agent_os/stateless.py` 的 `StatelessKernel.execute()`：在执行结果中增加 real_world_feedback 字段，存储来自真实HTTP调用的原始status code和response。让policy check不是唯一的判断来源。对应命题6：success是最终裁判。
+
+**M32** `src/agent_os/stateless.py` policy检查部分：增加条件——如果 maturity_level 大于等于 N 且 action 不在 critical 违规列表中，将policy检查从"阻断"降级为"警告"。小孩不能碰火（永远critical），但成人可以喝酒（随maturity放宽）。对应成长阶段。
+
+**M33** `src/agent_os/policies/schema.py` GovernancePolicy：增加字段 maturity_gates 定义在不同成长阶段解锁哪些被限制的操作。对应成长阶段。
+
+**M34** `src/agent_os/policies/evaluator.py` 策略评估：在评估逻辑中，检查当前 maturity_level 并查询 maturity_gates，动态调整哪些pattern被blocked。对应成长阶段。
+
+**M35** `src/agent_os/base_agent.py` BaseAgent：增加实例属性 maturity_level: int = 0 和在现有某个生命周期方法内部增加 _check_graduation 逻辑——根据历史成功率判断是否"升学"。对应小学到大学。
+
+**M36** `src/agent_os/integrations/base.py` 的 `BaseIntegration.execute()`：在execute的post_execute阶段，记录当前agent的maturity_level到execution context中。对应成长阶段。
+
+**M37** `src/agent_os/integrations/anthropic_adapter.py` Claude适配：在发送给Claude的请求中，如果检测到repair_enzyme模式，自动附加最近的error日志作为上下文。让Claude"看到答卷"。对应命题5。
+
+**M38** `src/agent_os/mcp_gateway.py` MCP工具调用：在MCP调用结果返回后，增加"身体感受转换"——将raw HTTP response转换为标准化的success布尔值加signal_strength浮点数加goal_level字符串格式。对应命题3：HTTP是身体。
+
+**M39** `src/agent_os/sandbox.py` 沙箱执行：在沙箱执行结果中增加"考试成绩"元数据——执行时间、内存峰值、成功率——这些是"体检报告"，反映Agent的"身体状况"。对应命题3。
+
+**M40** `src/agent_os/circuit_breaker.py` 熔断器：调整熔断阈值使其与maturity_level关联——低maturity时更容易熔断（保护婴儿），高maturity时更宽容（信任成人）。对应成长阶段。
+
+### 阶段 J：Store和Tracer——记忆系统（M41-M50）
+
+**M41** `agentlightning/store/base.py` LightningStore：在store的span存储接口中，增加对maturity_level和growth_stage元数据的索引支持（在现有的metadata字段中增加key）。对应成长记忆。
+
+**M42** `agentlightning/store/base.py` rollout查询：在查询rollout时支持按growth_stage过滤，让算法可以只查看"初中阶段"或"高中阶段"的rollout用于当前训练。对应阶段性学习。
+
+**M43** `agentlightning/store/memory.py` InMemoryLightningStore：在内存存储中实现M41和M42定义的索引逻辑。对应成长记忆。
+
+**M44** `agentlightning/tracer/base.py` Tracer 基类：在span创建时自动附加当前的maturity_level作为attribute。对应成长阶段。
+
+**M45** `agentlightning/tracer/otel.py` OpenTelemetry tracer：在OTel span中增加agent.maturity_level和agent.growth_stage语义属性。对应成长阶段。
+
+**M46** `agentlightning/types/core.py` 核心类型：在Rollout dataclass中增加可选字段 maturity_level: int = 0、emergent_signals: int = 0、growth_stage: str = "infant"。对应命题2加成长阶段。
+
+**M47** `agentlightning/types/core.py` Span 类型：在Span的attributes类型中，增加对agent_os.emergent_signal和agent_os.repair_enzyme_triggered的类型提示。对应命题2加5。
+
+**M48** `agentlightning/trainer/trainer.py` 的 `Trainer.fit()`：在fit循环中，每完成一个epoch，检查所有runner的成长指标，如果达到"升学"条件，更新全局的maturity_level并重新配置policy宽松度。对应升学考试。
+
+**M49** `agentlightning/trainer/trainer.py` 的 `Trainer.dev()`：在dev（调试）模式下，默认将maturity_level设为最高，跳过所有非critical的policy限制，让开发者快速测试。对应成人模式。
+
+**M50** `agentlightning/config.py` CLI配置：在CLI配置解析中增加 --maturity-level 和 --growth-stage 参数，允许用户指定Agent的初始成长阶段。对应成长阶段。
+
+---
+
+## 五、50个修改的执行优先级（按进化阶段排序）
+
+第一批（婴儿期——建立感受通道）：M01 然后 M02 然后 M03 然后 M04 然后 M46 然后 M47
+
+第二批（幼儿期——建立身体）：M05 然后 M06 然后 M07 然后 M08 然后 M38 然后 M39
+
+第三批（小学——建立考试体系）：M19 然后 M20 然后 M35 然后 M48 然后 M49 然后 M50
+
+第四批（初中——建立修复酶通道）：M11 然后 M12 然后 M13 然后 M37 然后 M15
+
+第五批（高中——Trainium2适配）：M21 然后 M22 然后 M23 然后 M24 然后 M25 然后 M26 然后 M27 然后 M28 然后 M29 然后 M30
+
+第六批（大学——策略演化）：M31 然后 M32 然后 M33 然后 M34 然后 M36 然后 M40
+
+第七批（研究生——记忆系统完善）：M41 然后 M42 然后 M43 然后 M44 然后 M45 然后 M09 然后 M10 然后 M14 然后 M16 然后 M17 然后 M18
+
+---
+
+## 六、执行协议
+
+### 每次修改的严格流程
+
+1. 备份原文件
+2. 统计原始函数和类数量（grep -c "def " 和 grep -c "class "）
+3. 执行修改（只用 str_replace，一次改一处）
+4. 验证函数和类数量不变（diff before/after）
+5. 语法检查（python -m py_compile）
+6. diff审查
+7. 通过则删除备份
+
+### Megatron到Trainium2迁移关键映射
+
+| NVIDIA (Megatron-LM/CUDA) | AWS (Trainium2/Neuron) | 在 operatorRL 中的触点 |
+|---|---|---|
+| NVMegatronRayWorkerGroup | NxDTrainiumRayWorkerGroup（待建） | verl/entrypoint.py:140 |
+| megatron_workers.ActorRolloutRefWorker | nxd_workers.ActorRolloutRefWorker（待建） | verl/entrypoint.py:141 |
+| FSDP (PyTorch) | FSDP via NxD Core + XLA | verl/entrypoint.py:125-128 |
+| NCCL all-reduce | Neuron Collective Communication | verl/daemon.py 分布式同步 |
+| vLLM (CUDA) | vLLM-Neuron / NxD Inference | verl/async_server.py |
+
