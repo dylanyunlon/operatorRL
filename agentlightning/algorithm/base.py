@@ -139,6 +139,14 @@ class Algorithm:
     ) -> Union[None, Awaitable[None]]:
         """Subclasses should implement this method to implement the algorithm.
 
+        When the algorithm operates in repair enzyme mode (命題5: 老師看答卷),
+        the LLM acts as a "repair enzyme" — it inspects error logs from the
+        most recent rollout spans and suggests fixes rather than optimizing
+        a reward model. In this mode, ``get_llm_proxy()`` will have
+        ``enable_repair_enzyme=True`` and the proxy's ``as_resource()``
+        method can be called with ``repair_enzyme_mode=True`` to inject
+        error context automatically.
+
         Args:
             train_dataset: The dataset to train on. Not all algorithms require a training dataset.
             val_dataset: The dataset to validate on. Not all algorithms require a validation dataset.

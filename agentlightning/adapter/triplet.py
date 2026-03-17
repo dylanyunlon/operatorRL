@@ -690,12 +690,21 @@ class TraceTree:
             logprobs_content = json.loads(logprobs_content)
             response_payload["logprobs"] = logprobs_content
 
+        # === M15: 涌现信号元数据保留 (命题2: 碰异性的快乐) ===
+        # 当trace中包含agent_os.emergent_signals标记时，将其保留在triplet metadata中
+        # 以便下游训练算法可以利用——不作为负样本，而是标记为"需要审查"
+        agent_os_metadata = {
+            k: v for k, v in (span.attributes or {}).items()
+            if isinstance(k, str) and k.startswith("agent_os.")
+        }
+
         return Triplet(
             prompt=prompt_payload,
             response=response_payload,
             reward=None,
             metadata=dict(
-                request=request_metadata, response=response_metadata, response_id=response_id, agent_name=agent_name
+                request=request_metadata, response=response_metadata, response_id=response_id, agent_name=agent_name,
+                **agent_os_metadata,
             ),
         )
 
