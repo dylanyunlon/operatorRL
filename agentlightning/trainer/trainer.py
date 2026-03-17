@@ -56,6 +56,20 @@ class Trainer(TrainerLegacy):
     [`dev()`][agentlightning.Trainer.dev] for fast, reproducible dry-runs. See the
     [Train the First Agent](../how-to/train-first-agent.md) and
     [Write the First Algorithm](../how-to/write-first-algorithm.md) tutorials for the broader context.
+    
+    === M48-M49: 成长阶段系统 (命题7: 小学到大学) ===
+    
+    Trainer支持成长阶段(maturity_level)系统，用于控制训练过程中的探索/利用权衡：
+    
+    - 0 (婴儿期): 最严格的策略约束，最小探索空间
+    - 1-2 (幼儿/小学): 基础能力形成
+    - 3-4 (初中/高中): 开始放宽某些non-critical约束
+    - 5-6 (大学/研究生): 成人模式，最大探索自由度
+    
+    成长阶段可以通过以下方式设置：
+    - 初始化时传入 `maturity_level` 参数
+    - 调用 `set_maturity_level()` 方法
+    - 训练过程中根据涌现信号自动升级 (需要启用 `auto_promotion`)
     """
 
     algorithm: Optional[Algorithm]
@@ -116,6 +130,19 @@ class Trainer(TrainerLegacy):
 
     port: Optional[int]
     """Port forwarded to [`ClientServerExecutionStrategy`][agentlightning.ClientServerExecutionStrategy]."""
+
+    # === M48-M49: 成长阶段相关属性 ===
+    maturity_level: int
+    """当前成长阶段级别 (0-6)"""
+    
+    auto_promotion: bool
+    """是否启用自动升学（根据涌现信号自动提升maturity_level）"""
+    
+    promotion_threshold: int
+    """触发升学所需的涌现信号数量"""
+    
+    _emergent_signal_count: int
+    """累计涌现信号计数（私有）"""
 
     def __init__(
         self,

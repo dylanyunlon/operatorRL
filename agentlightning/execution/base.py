@@ -40,6 +40,22 @@ class ExecutionStrategy:
     signals. They intentionally avoid inspecting the bundle internals; instead,
     each bundle remains responsible for its own scheduling semantics.
 
+    === M27: 设备适配说明 (命题3: HTTP身体 → Neuron硬件) ===
+    
+    ExecutionStrategy支持多种硬件后端:
+    
+    - **NVIDIA GPU (CUDA)**: 默认模式，使用NCCL进行分布式通信
+    - **AWS Trainium2 (Neuron)**: 通过NxD Core和Neuron Collective Communication
+      - 需要设置环境变量: NEURON_RT_VISIBLE_CORES, XLA_USE_BF16
+      - 使用torch_neuronx替代torch.cuda
+      - 分布式训练使用NxD Training (neuronx-distributed)
+    - **CPU**: 回退模式，用于开发和测试
+
+    设备检测优先级:
+    1. 检测 /dev/neuron* 或 NEURON_RT_VISIBLE_CORES 环境变量 → Trainium2
+    2. 检测 torch.cuda.is_available() → NVIDIA GPU  
+    3. 回退 → CPU
+
     !!! note
         Implementations must honor the [execute()][agentlightning.ExecutionStrategy.execute]
         contract by propagating `KeyboardInterrupt` and ensuring resources are

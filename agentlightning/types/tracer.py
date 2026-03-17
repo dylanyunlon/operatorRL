@@ -276,6 +276,14 @@ class Span(BaseModel):
     parent_id: Optional[str]
     """The parent span ID of the span."""
 
+    # === M44-M47: 成长阶段和涌现信号 (命题7: 小学到大学) ===
+    maturity_level: int = 0
+    """成长阶段级别 (0-6): 0=婴儿期, 1=幼儿期, 2=小学, 3=初中, 4=高中, 5=大学, 6=研究生"""
+    emergent_signal: Optional[str] = None
+    """涌现信号类型: 'tool_combo', 'novel_pattern', 'cross_domain', 'self_correction' 等"""
+    emergent_score: float = 0.0
+    """涌现信号强度 (0.0-1.0)"""
+
     # Core ReadableSpan fields
     name: str
     """The name of the span. See [OpenTelemetry docs](https://opentelemetry.io/docs/concepts/signals/traces/)."""

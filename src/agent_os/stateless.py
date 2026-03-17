@@ -297,12 +297,17 @@ class ExecutionContext:
             backend. When present, the kernel loads this state before
             execution and persists updates afterward.
         metadata: Arbitrary metadata passed through to the result.
+        maturity_level: M32 - 成长阶段级别 (命题7: 小学到大学)
+            0=婴儿期, 1=幼儿期, 2=小学, 3=初中, 4=高中, 5=大学, 6=研究生
+            不同阶段有不同的policy宽松度。
     """
     agent_id: str
     policies: list[str] = field(default_factory=list)
     history: list[dict[str, Any]] = field(default_factory=list)
     state_ref: str | None = None  # Reference to external state
     metadata: dict[str, Any] = field(default_factory=dict)
+    # === M32: 成长阶段级别 (命题7: 小学到大学) ===
+    maturity_level: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -310,7 +315,8 @@ class ExecutionContext:
             "policies": self.policies,
             "history": self.history,
             "state_ref": self.state_ref,
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            "maturity_level": self.maturity_level,
         }
 
 
@@ -351,6 +357,8 @@ class ExecutionResult:
             history and state reference. Callers should use this as the
             context for subsequent requests.
         metadata: Request metadata including ``request_id`` and timestamp.
+        real_world_feedback: M31 - 真实世界反馈 (命题1: 真实世界的不可改变性)
+            包含HTTP响应状态、外部API返回值等不可伪造的物理事实。
     """
     success: bool
     data: Any
@@ -358,6 +366,8 @@ class ExecutionResult:
     signal: str | None = None
     updated_context: ExecutionContext | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    # === M31: 真实世界反馈 (命题1: 真实世界的不可改变的物理事实) ===
+    real_world_feedback: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -482,8 +492,11 @@ class StatelessKernel:
         if context.state_ref:
             external_state = await self._backend_get(context.state_ref) or {}
 
-        # 2. Check policies
-        policy_result = self._check_policies(action, params, context.policies)
+        # 2. Check policies (M32: 传入maturity_level用于policy降级)
+        policy_result = self._check_policies(
+            action, params, context.policies, 
+            maturity_level=context.maturity_level
+        )
         if not policy_result["allowed"]:
             return ExecutionResult(
                 success=False,
@@ -543,7 +556,8 @@ class StatelessKernel:
         self,
         action: str,
         params: dict[str, Any],
-        policy_names: list[str]
+        policy_names: list[str],
+        maturity_level: int = 0,  # M32: 成长阶段参数
     ) -> dict[str, Any]:
         """Check if action is allowed under policies.
 
@@ -551,6 +565,9 @@ class StatelessKernel:
             action: The action being attempted (e.g., "database_query", "file_write")
             params: Parameters for the action
             policy_names: List of policy names to check against
+            maturity_level: M32 - 成长阶段级别 (命题7: 小学到大学)
+                0=婴儿期(最严格), 6=研究生(最宽松)
+                高maturity_level会放宽某些non-critical policy检查
 
         Returns:
             Dict with 'allowed' (bool) and 'reason' (str) keys.
@@ -561,32 +578,62 @@ class StatelessKernel:
             if not policy:
                 continue
 
+            # === M32: 成长阶段降级逻辑 ===
+            # 计算policy宽松度因子: 0.0 (最严格) ~ 0.6 (研究生级别)
+            # maturity_level >= 4 (高中及以上) 开始放宽non-critical检查
+            leniency_factor = min(maturity_level * 0.1, 0.6)
+            
+            # 判断policy是否为critical (不可降级)
+            is_critical_policy = policy.get("critical", False) or policy_name in ["strict", "no_pii"]
+            
             # Check blocked actions
-            if action in policy.get("blocked_actions", []):
+            blocked_actions = policy.get("blocked_actions", [])
+            if action in blocked_actions:
+                # M32: 如果maturity >= 4且非critical policy，允许通过但记录警告
+                if maturity_level >= 4 and not is_critical_policy:
+                    logger.warning(
+                        f"Action '{action}' would be blocked by '{policy_name}' policy, "
+                        f"but maturity_level={maturity_level} allows passage (non-critical)"
+                    )
+                    continue  # 允许通过
+                
                 allowed_actions = [a for a in ["read", "query", "list"]
-                                   if a not in policy.get("blocked_actions", [])]
+                                   if a not in blocked_actions]
                 suggestion = (f"Try a read-only action instead (e.g., {', '.join(allowed_actions[:3])})"
                               if allowed_actions else "Request policy exception from administrator")
                 return {
                     "allowed": False,
-                    "reason": f"Action '{action}' blocked by '{policy_name}' policy. {suggestion}."
+                    "reason": f"Action '{action}' blocked by '{policy_name}' policy. {suggestion}.",
+                    "maturity_level": maturity_level,
+                    "is_critical": is_critical_policy,
                 }
 
             # Check blocked patterns in params
             params_str = json.dumps(params).lower()
             for pattern in policy.get("blocked_patterns", []):
                 if pattern.lower() in params_str:
+                    # M32: blocked_patterns始终严格检查（通常涉及安全/隐私）
                     return {
                         "allowed": False,
                         "reason": (
                             f"Content blocked: '{pattern}' detected in request parameters. "
                             f"Policy '{policy_name}' prohibits this pattern. "
                             f"Remove the sensitive content and retry."
-                        )
+                        ),
+                        "maturity_level": maturity_level,
+                        "is_critical": True,  # 模式匹配始终是critical
                     }
 
             # Check requires approval
             if action in policy.get("require_approval", []):
+                # M32: maturity >= 5 (大学及以上) 可以绕过approval要求
+                if maturity_level >= 5 and not is_critical_policy:
+                    logger.info(
+                        f"Action '{action}' requires approval but maturity_level={maturity_level} "
+                        f"grants auto-approval (non-critical policy)"
+                    )
+                    continue  # 自动批准
+                    
                 if not params.get("approved"):
                     return {
                         "allowed": False,
@@ -594,7 +641,8 @@ class StatelessKernel:
                             f"Action '{action}' requires approval. "
                             f"Add approved=True to params after getting authorization, "
                             f"or use a non-restricted action instead."
-                        )
+                        ),
+                        "maturity_level": maturity_level,
                     }
 
         return {"allowed": True, "reason": None}

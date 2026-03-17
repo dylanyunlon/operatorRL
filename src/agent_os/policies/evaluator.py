@@ -44,12 +44,22 @@ class PolicyEvaluator:
         for path in sorted(directory.glob("*.yml")):
             self.policies.append(PolicyDocument.from_yaml(path))
 
-    def evaluate(self, context: dict[str, Any]) -> PolicyDecision:
+    def evaluate(
+        self, 
+        context: dict[str, Any],
+        maturity_level: int = 0,  # M34: 成长阶段参数
+    ) -> PolicyDecision:
         """Evaluate all loaded policy rules against the given context.
 
         Rules are sorted by priority (descending). The first matching rule
         determines the decision. If no rule matches, the default action from
         the first policy (or global allow) is used.
+        
+        Args:
+            context: Execution context dict with fields like 'tool_name', 'token_count'
+            maturity_level: M34 - 成长阶段级别 (命题7: 小学到大学)
+                0=婴儿期(最严格), 6=研究生(最宽松)
+                会影响规则的maturity_gates评估
         """
         try:
             all_rules: list[tuple[PolicyRule, PolicyDocument]] = []
@@ -61,19 +71,35 @@ class PolicyEvaluator:
             all_rules.sort(key=lambda pair: pair[0].priority, reverse=True)
 
             for rule, doc in all_rules:
+                # === M34: 检查maturity_gates ===
+                gate_result = self._check_maturity_gates(rule, maturity_level)
+                if gate_result.get("skip_rule"):
+                    # 在当前maturity_level下跳过此规则
+                    logger.debug(
+                        f"Skipping rule '{rule.name}' due to maturity_gate "
+                        f"(maturity_level={maturity_level})"
+                    )
+                    continue
+                
                 if _match_condition(rule.condition, context):
-                    allowed = rule.action in (PolicyAction.ALLOW, PolicyAction.AUDIT)
+                    # M34: 使用gate的action_override如果有
+                    effective_action = gate_result.get("action_override") or rule.action
+                    effective_message = gate_result.get("message_override") or rule.message
+                    
+                    allowed = effective_action in (PolicyAction.ALLOW, PolicyAction.AUDIT)
                     return PolicyDecision(
                         allowed=allowed,
                         matched_rule=rule.name,
-                        action=rule.action.value,
-                        reason=rule.message or f"Matched rule '{rule.name}'",
+                        action=effective_action.value if hasattr(effective_action, 'value') else str(effective_action),
+                        reason=effective_message or f"Matched rule '{rule.name}'",
                         audit_entry={
                             "policy": doc.name,
                             "rule": rule.name,
-                            "action": rule.action.value,
+                            "action": effective_action.value if hasattr(effective_action, 'value') else str(effective_action),
                             "context_snapshot": context,
                             "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "maturity_level": maturity_level,  # M34: 记录成长阶段
+                            "is_critical": getattr(rule, 'is_critical', False),
                         },
                     )
 
@@ -92,6 +118,7 @@ class PolicyEvaluator:
                     "action": default_action.value,
                     "context_snapshot": context,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "maturity_level": maturity_level,
                 },
             )
         except Exception:
@@ -110,8 +137,51 @@ class PolicyEvaluator:
                     "context_snapshot": context,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "error": True,
+                    "maturity_level": maturity_level,
                 },
             )
+
+    def _check_maturity_gates(
+        self, 
+        rule: PolicyRule, 
+        maturity_level: int
+    ) -> dict[str, Any]:
+        """检查规则的maturity_gates并返回适用的覆盖。
+        
+        Args:
+            rule: 要检查的策略规则
+            maturity_level: 当前成长阶段级别
+            
+        Returns:
+            Dict containing:
+                - skip_rule: 是否跳过此规则
+                - action_override: 覆盖的action（如果有）
+                - message_override: 覆盖的消息（如果有）
+        """
+        result: dict[str, Any] = {
+            "skip_rule": False,
+            "action_override": None,
+            "message_override": None,
+        }
+        
+        # M34: 关键规则不受maturity_level影响
+        if getattr(rule, 'is_critical', False):
+            return result
+        
+        # 检查maturity_gates
+        maturity_gates = getattr(rule, 'maturity_gates', [])
+        for gate in maturity_gates:
+            if gate.min_level <= maturity_level <= gate.max_level:
+                if gate.skip_rule:
+                    result["skip_rule"] = True
+                if gate.action_override:
+                    result["action_override"] = gate.action_override
+                if gate.message_override:
+                    result["message_override"] = gate.message_override
+                # 第一个匹配的gate生效
+                break
+        
+        return result
 
 
 def _match_condition(condition: Any, context: dict[str, Any]) -> bool:

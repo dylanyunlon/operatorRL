@@ -46,6 +46,29 @@ class PolicyCondition(BaseModel):
     value: Any = Field(..., description="Value to compare against")
 
 
+# === M33: 成长阶段门控 (命题7: 小学到大学) ===
+class MaturityGate(BaseModel):
+    """定义在特定maturity_level下的policy行为变化。
+    
+    例如: maturity_level >= 4 时，某些non-critical规则可以放宽。
+    成长阶段: 0=婴儿期, 1=幼儿期, 2=小学, 3=初中, 4=高中, 5=大学, 6=研究生
+    """
+    min_level: int = Field(default=0, ge=0, le=6, description="最小成长阶段级别 (0-6)")
+    max_level: int = Field(default=6, ge=0, le=6, description="最大成长阶段级别 (0-6)")
+    action_override: PolicyAction | None = Field(
+        default=None, 
+        description="在此阶段范围内覆盖默认action"
+    )
+    skip_rule: bool = Field(
+        default=False, 
+        description="在此阶段范围内跳过此规则"
+    )
+    message_override: str = Field(
+        default="", 
+        description="在此阶段范围内使用的替代消息"
+    )
+
+
 class PolicyRule(BaseModel):
     """A single governance rule within a policy document."""
 
@@ -54,6 +77,15 @@ class PolicyRule(BaseModel):
     action: PolicyAction
     priority: int = Field(default=0, description="Higher priority rules are evaluated first")
     message: str = Field(default="", description="Human-readable explanation")
+    # === M33: 成长阶段门控 ===
+    maturity_gates: list[MaturityGate] = Field(
+        default_factory=list,
+        description="按成长阶段调整规则行为的门控列表"
+    )
+    is_critical: bool = Field(
+        default=False, 
+        description="关键规则不受maturity_level影响，始终严格执行"
+    )
 
 
 class PolicyDefaults(BaseModel):

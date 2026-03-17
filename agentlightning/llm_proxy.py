@@ -1074,8 +1074,16 @@ class LLMProxy:
         launcher_args: PythonServerLauncherArgs | None = None,
         middlewares: Sequence[Union[Type[BaseHTTPMiddleware], str]] | None = None,
         callbacks: Sequence[Union[Type[CustomLogger], str]] | None = None,
+        # === M11: 修复酶模式开关 (命题4: 边运行边改写) ===
+        # 当连续错误达到阈值时，LLM将作为"修复酶"分析错误日志并建议修复
+        enable_repair_enzyme: bool = False,
+        repair_enzyme_error_context_lines: int = 50,  # 附加给LLM的错误日志行数
     ):
         self.store = store
+        # === M11: 修复酶模式配置 ===
+        self.enable_repair_enzyme = enable_repair_enzyme
+        self.repair_enzyme_error_context_lines = repair_enzyme_error_context_lines
+        self._repair_enzyme_error_buffer: List[str] = []  # 错误日志缓冲
 
         if launcher_args is not None and (
             port is not None or host is not None or launch_mode != "mp" or num_workers != 1
@@ -1317,6 +1325,9 @@ class LLMProxy:
         attempt_id: str | None = None,
         model: str | None = None,
         sampling_parameters: Dict[str, Any] | None = None,
+        # === M12: 修复酶模式参数 (命题4: 边运行边改写) ===
+        repair_enzyme_mode: bool = False,
+        error_logs: List[str] | None = None,  # M13: 错误日志上下文
     ) -> LLM:
         """Create an `LLM` resource pointing at this proxy with rollout context.
 
@@ -1329,6 +1340,8 @@ class LLMProxy:
             model: Logical model name to use. If omitted and exactly one model
                 is configured or all models have the same name, that model is used.
             sampling_parameters: Optional default sampling parameters.
+            repair_enzyme_mode: If True, enable repair enzyme mode for this resource.
+            error_logs: Error logs to include in repair enzyme context.
 
         Returns:
             LLM: Configured resource ready for OpenAI-compatible calls.
@@ -1350,17 +1363,34 @@ class LLMProxy:
                         f"Multiple models found in model_list: {self.model_list}. Please specify the model."
                     )
 
+        # === M12-M13: 修复酶模式处理 (命题4+5: 边运行边改写 + 学生交答卷) ===
+        # 当repair_enzyme_mode=True时，附加错误日志上下文
+        effective_sampling_params = dict(sampling_parameters or {})
+        if self.enable_repair_enzyme and repair_enzyme_mode:
+            # M13: 格式化错误日志作为上下文
+            if error_logs:
+                # 限制错误日志行数
+                truncated_logs = error_logs[-self.repair_enzyme_error_context_lines:]
+                error_context = "\n".join(truncated_logs)
+                # 将错误上下文存储在采样参数的metadata中
+                effective_sampling_params["_repair_enzyme_context"] = {
+                    "enabled": True,
+                    "error_logs": error_context,
+                    "log_lines": len(truncated_logs),
+                }
+                logger.debug(f"Repair enzyme mode enabled with {len(truncated_logs)} error log lines")
+
         if rollout_id is None and attempt_id is None:
             return ProxyLLM(
                 endpoint=self.server_launcher.access_endpoint,
                 model=model,
-                sampling_parameters=dict(sampling_parameters or {}),
+                sampling_parameters=effective_sampling_params,
             )
         elif rollout_id is not None and attempt_id is not None:
             return LLM(
                 endpoint=f"{self.server_launcher.access_endpoint}/rollout/{rollout_id}/attempt/{attempt_id}",
                 model=model,
-                sampling_parameters=dict(sampling_parameters or {}),
+                sampling_parameters=effective_sampling_params,
             )
         else:
             raise ValueError("Either rollout_id and attempt_id must be provided, or neither.")

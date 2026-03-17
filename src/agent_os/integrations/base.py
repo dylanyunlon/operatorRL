@@ -560,6 +560,10 @@ class ExecutionContext:
     _baseline_hash: str | None = field(default=None, repr=False)
     _baseline_text: str | None = field(default=None, repr=False)
     _drift_scores: list[float] = field(default_factory=list, repr=False)
+    # === M36: 成长阶段级别 (命题7: 小学到大学) ===
+    maturity_level: int = field(default=0)
+    # M36: 涌现信号计数
+    emergent_signal_count: int = field(default=0)
 
     def __repr__(self) -> str:
         return f"ExecutionContext(agent_id={self.agent_id!r}, session_id={self.session_id!r})"
@@ -923,10 +927,11 @@ class BaseIntegration(ABC):
                         f"{self.policy.drift_threshold:.2f}"
                     )
                     logger.warning(
-                        "Drift detected agent=%s score=%.4f threshold=%.2f",
+                        "Drift detected agent=%s score=%.4f threshold=%.2f maturity=%d",
                         ctx.agent_id,
                         drift_result.score,
                         drift_result.threshold,
+                        ctx.maturity_level,  # M36: 记录maturity_level
                     )
                     self.emit(GovernanceEventType.DRIFT_DETECTED, {
                         "agent_id": ctx.agent_id,
@@ -936,13 +941,15 @@ class BaseIntegration(ABC):
                         "threshold": drift_result.threshold,
                         "baseline_hash": drift_result.baseline_hash,
                         "current_hash": drift_result.current_hash,
+                        "maturity_level": ctx.maturity_level,  # M36: 记录maturity_level
                     })
                 else:
                     logger.debug(
-                        "Drift check agent=%s score=%.4f threshold=%.2f",
+                        "Drift check agent=%s score=%.4f threshold=%.2f maturity=%d",
                         ctx.agent_id,
                         drift_result.score,
                         drift_result.threshold,
+                        ctx.maturity_level,  # M36: 记录maturity_level
                     )
 
         # Checkpoint if needed
@@ -954,6 +961,8 @@ class BaseIntegration(ABC):
                 "timestamp": datetime.now().isoformat(),
                 "checkpoint_id": checkpoint_id,
                 "call_count": ctx.call_count,
+                "maturity_level": ctx.maturity_level,  # M36: 记录maturity_level
+                "emergent_signals": ctx.emergent_signal_count,  # M36: 记录涌现信号
             })
 
         return True, None

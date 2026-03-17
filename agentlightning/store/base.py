@@ -100,6 +100,16 @@ class LightningStoreStatistics(TypedDict, total=False):
     memory_capacity_bytes: int
     """Memory capacity of the store in bytes."""
 
+    # === M41-M43: 成长阶段统计 (命题7: 小学到大学) ===
+    maturity_level_distribution: Dict[int, int]
+    """各成长阶段的rollout/span分布: {0: 100, 1: 50, ...}"""
+    emergent_signal_count: int
+    """检测到的涌现信号总数"""
+    emergent_signals_by_type: Dict[str, int]
+    """按类型统计的涌现信号: {'tool_combo': 10, 'novel_pattern': 5, ...}"""
+    avg_maturity_level: float
+    """平均成长阶段级别"""
+
 
 class LightningStore:
     """Contract for the persistent control-plane that coordinates training rollouts.
