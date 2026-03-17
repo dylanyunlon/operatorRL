@@ -736,3 +736,17 @@ Agent的"身体"不是物理机器人，而是它能触达的所有HTTP端点。
 | 第五批 | M24-M28, M30 | Trainium2设备适配 |
 | 第六批 | M31-M40 | 治理内核策略演化 |
 | 第七批 | M41-M45, M47-M50 | Store和Tracer成长记忆 |
+
+上一次claude已经完成了任务，现在需要给claude按照这些要求完成接下来的任务：
+
+记住，最重要的不是写代码，而是预设测试流程，并在你的工具上运行测试：
+测试驱动开发（TDD）在 agentic 编程的加持下变得更加强大：
+
+1、Ask Claude to write 10 tests for every based on expected input/output pairs. Be explicit about the fact that you’re doing test-driven development so that it avoids creating mock implementations, even for functionality that doesn’t exist yet in the codebase.让 Claude 根据预期的输入/输出对编写测试。明确告诉它你正在进行测试驱动开发，这样它就不会创建模拟实现，即使是对于代码库中尚不存在的功能。
+2、Tell Claude to run the tests and confirm they fail. Explicitly telling it not to write any implementation code at this stage is often helpful.告诉 Claude 运行测试并确认它们失败。在这个阶段明确告诉它不要编写任何实现代码通常很有帮助。
+3、Ask Claude to commit the tests when you’re satisfied with them. 当你对测试满意后，让 Claude 提交这些测试。
+4、Ask Claude to write code that passes the tests, instructing it not to modify the tests. Tell Claude to keep going until all tests pass. It will usually take a few iterations for Claude to write code, run the tests, adjust the code, and run the tests again. 让 Claude 编写能通过测试的代码，并指示它不要修改测试。告诉 Claude 不断尝试，直到所有测试都通过。通常 Claude 需要几次迭代才能完成：编写代码、运行测试、调整代码、再运行测试。
+5、At this stage, it can help to ask it to verify with independent subagents that the implementation isn’t overfitting to the tests . 在这个阶段，让它用独立的子智能体来验证实现是否对测试过拟合，会很有帮助。 
+6、Ask Claude to commit the code once you’re satisfied with the changes. 一旦你对变更满意，就让 Claude 提交代码。
+
+Claude performs best when it has a clear target to iterate against
