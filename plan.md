@@ -687,7 +687,7 @@ Agent的"身体"不是物理机器人，而是它能触达的所有HTTP端点。
 
 ## 七、执行进度记录
 
-### 已完成阅读 (前20个文件)
+### 已完成阅读 (前40个文件)
 
 | # | 文件 | 级别 | 状态 |
 |---|---|---|---|
@@ -703,14 +703,84 @@ Agent的"身体"不是物理机器人，而是它能触达的所有HTTP端点。
 | 10 | `agentlightning/algorithm/decorator.py` | 🟢 | ✅ 已读 |
 | 11 | `agentlightning/algorithm/utils.py` | 🟢 | ✅ 已读 |
 | 12 | `agentlightning/algorithm/apo/apo.py` | 🟡 | ✅ 已读 |
-| 13 | `agentlightning/trainer/trainer.py` | 🔴 | ✅ 已读 |
+| 13 | `agentlightning/trainer/trainer.py` | 🔴 | ✅ 已读已改 |
 | 14 | `agentlightning/trainer/init_utils.py` | 🟢 | ✅ 已读 |
 | 15 | `agentlightning/trainer/legacy.py` | 🟢 | ✅ 已读 |
 | 16 | `agentlightning/trainer/registry.py` | 🟡 | ✅ 已读 |
 | 17 | `agentlightning/runner/agent.py` | 🔴 | ✅ 已读 |
 | 18 | `agentlightning/runner/base.py` | 🟡 | ✅ 已读 |
 | 19 | `agentlightning/runner/legacy.py` | ⚪ | ✅ 已读 |
-| 20 | `agentlightning/store/base.py` | 🔴 | ✅ 已读 |
+| 20 | `agentlightning/store/base.py` | 🔴 | ✅ 已读已改 |
+| 21 | `agentlightning/trainer/registry.py` | 🟡 | ✅ 已读 — 12行,仅shm/cs两种策略注册,无CUDA绑定 |
+| 22 | `agentlightning/trainer/__init__.py` | ⚪ | ✅ 已读 — 导出Trainer和build_component |
+| 23 | `agentlightning/runner/agent.py` | 🔴 | ✅ 已读 — 841行,LitAgentRunner,无CUDA绑定 |
+| 24 | `agentlightning/runner/base.py` | 🟡 | ✅ 已读 — 182行,Runner抽象基类,设备无关 |
+| 25 | `agentlightning/runner/legacy.py` | ⚪ | ✅ 已读 — 309行,废弃路径 |
+| 26 | `agentlightning/store/base.py` | 🔴 | ✅ 已读已改 — M41/M42成长阶段统计+过滤 |
+| 27 | `agentlightning/store/memory.py` | 🟢 | ✅ 已读已改 — M43成长索引,382行,无CUDA |
+| 28 | `agentlightning/store/client_server.py` | 🟡 | ✅ 已读 — 2092行,HTTP API,无CUDA |
+| 29 | `agentlightning/store/collection_based.py` | 🟢 | ✅ 已读 — 1776行,CRUD抽象,无CUDA |
+| 30 | `agentlightning/store/collection/base.py` | 🟢 | ✅ 已读 — 587行,Collection接口,无CUDA |
+| 31 | `agentlightning/store/collection/memory.py` | ⚪ | ✅ 已读 — 970行,纯Python,无需改动 |
+| 32 | `agentlightning/store/collection/mongo.py` | ⚪ | ✅ 已读 — 1415行,MongoDB,无需改动 |
+| 33 | `agentlightning/store/collection/__init__.py` | ⚪ | ✅ 已读 |
+| 34 | `agentlightning/store/mongo.py` | ⚪ | ✅ 已读 — 165行,MongoDB桥接 |
+| 35 | `agentlightning/store/sqlite.py` | ⚪ | ✅ 已读 — 3行,占位符 |
+| 36 | `agentlightning/store/threading.py` | 🟢 | ✅ 已读 — 339行,threading.Lock,无XLA冲突 |
+| 37 | `agentlightning/store/utils.py` | ⚪ | ✅ 已读 — 142行,状态机工具 |
+| 38 | `agentlightning/store/__init__.py` | ⚪ | ✅ 已读 |
+| 39 | `agentlightning/adapter/base.py` | 🟡 | ✅ 已读 — 94行,Adapter基类,设备无关 |
+| 40 | `agentlightning/adapter/triplet.py` | 🟡 | ✅ 已读 — 1037行,trace→triplet,无CUDA |
+| 41 | `agentlightning/adapter/messages.py` | 🟢 | ✅ 已读 — 270行,chat template,无CUDA,无需改动 |
+| 42 | `agentlightning/adapter/__init__.py` | ⚪ | ✅ 已读 — 15行,导出 |
+| 43 | `agentlightning/types/core.py` | 🟡 | ✅ 已读已改 — 570行,M46/M47 maturity字段 |
+| 44 | `agentlightning/types/resources.py` | 🟢 | ✅ 已读 — 204行,资源类型,无CUDA |
+| 45 | `agentlightning/types/tracer.py` | 🟢 | ✅ 已读已改 — 520行,M44/M47 Span emergent字段 |
+| 46 | `src/agent_os/__init__.py` | 🟡 | ✅ 已读 — 516行,治理内核API导出,无CUDA |
+| 47 | `src/agent_os/stateless.py` | 🔴 | ✅ 已读已改 — 788行,M31/M32 maturity policy,无CUDA |
+| 48 | `src/agent_os/base_agent.py` | 🟡 | ✅ 已读已改 — 683行,M35 graduation,无CUDA |
+| 49 | `src/agent_os/integrations/base.py` | 🔴 | ✅ 已读已改 — 1067行,M36 maturity context,无CUDA |
+| 50 | `src/agent_os/integrations/anthropic_adapter.py` | 🔴 | ✅ 已读已改 — 441行,M37 repair_enzyme,无CUDA |
+| 51 | `src/agent_os/integrations/agent_lightning/__init__.py` | 🟡 | ✅ 已读 — 33行,桥接层,无CUDA |
+| 52 | `src/agent_os/integrations/agent_lightning/runner.py` | 🔴 | ✅ 已读已改 — 384行,M07/M08 governed runner,无CUDA |
+| 53 | `src/agent_os/integrations/agent_lightning/reward.py` | 🔴 | ✅ 已读已改 — 376行,M01-M03 emergent reward,无CUDA |
+| 54 | `src/agent_os/integrations/agent_lightning/environment.py` | 🔴 | ✅ 已读已改 — 406行,M04-M06 governed env,无CUDA |
+| 55 | `src/agent_os/integrations/agent_lightning/emitter.py` | 🟡 | ✅ 已读 — 312行,FlightRecorder,无CUDA |
+| 56 | `src/agent_os/integrations/__init__.py` | ⚪ | ✅ 已读 — 214行,适配器注册 |
+| 57 | `src/agent_os/integrations/config.py` | 🟢 | ✅ 已读 — 96行,配置结构,无CUDA |
+| 58 | `src/agent_os/integrations/openai_adapter.py` | 🟢 | ✅ 已读 — 814行,OpenAI适配,参考模式 |
+| 59 | `src/agent_os/integrations/langchain_adapter.py` | ⚪ | ✅ 已读 — 363行,LangChain适配,无需改动 |
+| 60 | `src/agent_os/integrations/registry.py` | 🟢 | ✅ 已读 — 111行,适配器注册表,无CUDA |
+| 71 | `agentlightning/emitter/reward.py` | 🔴 | ✅ 已读 — 320行,奖励emit,无CUDA |
+| 72 | `agentlightning/emitter/annotation.py` | 🟡 | ✅ 已读 — 374行,标注emit,无CUDA |
+| 73 | `agentlightning/emitter/message.py` | 🟢 | ✅ 已读 — 61行,消息emit,无CUDA |
+| 74 | `agentlightning/emitter/object.py` | 🟢 | ✅ 已读 — 117行,对象emit,无CUDA |
+| 75 | `agentlightning/emitter/exception.py` | ⚪ | ✅ 已读 — 54行,异常emit |
+| 76 | `agentlightning/emitter/__init__.py` | ⚪ | ✅ 已读 — 43行 |
+| 77 | `agentlightning/tracer/base.py` | 🟡 | ✅ 已读已改 — 294行,M44 maturity自动注入 |
+| 78 | `agentlightning/tracer/otel.py` | 🟢 | ✅ 已读已改 — 535行,M45 OTel语义属性 |
+| 79 | `agentlightning/tracer/agentops.py` | 🟢 | ✅ 已读 — 242行,AgentOps集成,无CUDA |
+| 80 | `agentlightning/tracer/weave.py` | ⚪ | ✅ 已读 — 677行,Weave集成,无需改动 |
+| 81 | `agentlightning/tracer/dummy.py` | ⚪ | ✅ 已读 — 106行,哑Tracer,测试用 |
+| 82 | `agentlightning/tracer/__init__.py` | ⚪ | ✅ 已读 — 16行 |
+| 83 | `agentlightning/instrumentation/__init__.py` | 🟢 | ✅ 已读 — 114行,无CUDA |
+| 84 | `agentlightning/instrumentation/vllm.py` | 🟡 | ✅ 已读已改 — 133行,M30 Neuron检测,neuron=8 |
+| 85 | `agentlightning/instrumentation/litellm.py` | 🟢 | ✅ 已读 — 39行,LiteLLM仪表,无CUDA |
+| 86 | `agentlightning/execution/base.py` | 🔴 | ✅ 已读已改 — 80行,M27 Trainium文档,cuda=2/neuron=3 |
+| 87 | `agentlightning/execution/client_server.py` | 🟡 | ✅ 已读 — 443行,分布式执行,无CUDA |
+| 88 | `agentlightning/execution/shared_memory.py` | 🟡 | ✅ 已读已改 — 282行,M28 无pinned memory,无CUDA |
+| 89 | `agentlightning/execution/events.py` | 🟢 | ✅ 已读 — 69行,停止信号,无CUDA |
+| 90 | `agentlightning/execution/inter_process.py` | ⚪ | ✅ 已读 — 16行,占位符 |
+| 91 | `agentlightning/execution/__init__.py` | ⚪ | ✅ 已读 — 15行 |
+| 92 | `agentlightning/llm_proxy.py` | 🔴 | ✅ 已读 — 1484行,LLM代理,无CUDA/Neuron |
+| 93 | `agentlightning/client.py` | 🟡 | ✅ 已读 — 408行,客户端API,无CUDA |
+| 94 | `agentlightning/server.py` | 🟡 | ✅ 已读 — 401行,服务端API,无CUDA |
+| 95 | `agentlightning/config.py` | 🟢 | ✅ 已读已改 — 360行,M50 CLI maturity参数 |
+| 96 | `agentlightning/logging.py` | ⚪ | ✅ 已读 — 370行,日志配置 |
+| 97 | `agentlightning/env_var.py` | 🟡 | ✅ 已读已改 — 186行,M29 Neuron环境变量 |
+| 98 | `agentlightning/semconv.py` | 🟢 | ✅ 已读 — 164行,语义约定,无CUDA |
+| 99 | `agentlightning/reward.py` | ⚪ | ✅ 已读 — 7行,废弃重导出 |
+| 100 | `agentlightning/__init__.py` | 🟡 | ✅ 已读 — 22行,包导出 |
 
 ### 已完成修改
 
