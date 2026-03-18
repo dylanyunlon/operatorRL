@@ -79,6 +79,10 @@ class Transition(BaseModel):
     # action_logprobs: List[float]
     agent_name: str
     reward: Optional[float]
+    # === M54: Neuron/Trainium compute backend tracking ===
+    compute_backend: Optional[str] = None
+    # === M54: Evolution stage for maturity tracking ===
+    evolution_stage: Optional[str] = None
 
 
 class RewardMatchPolicy(str, Enum):

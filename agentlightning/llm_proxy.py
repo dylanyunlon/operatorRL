@@ -215,6 +215,8 @@ class LightningSpanExporter(SpanExporter):
         self._buffer: List[ReadableSpan] = []
         self._lock: Optional[threading.Lock] = None
         self._loop_lock_pid: Optional[int] = None
+        # === M57: Accelerator info for device tracking ===
+        self._accelerator_info: str = "auto"
 
         # Single dedicated event loop running in a daemon thread.
         # This decouples OTEL SDK threads from our async store I/O.
@@ -1084,6 +1086,10 @@ class LLMProxy:
         self.enable_repair_enzyme = enable_repair_enzyme
         self.repair_enzyme_error_context_lines = repair_enzyme_error_context_lines
         self._repair_enzyme_error_buffer: List[str] = []  # 错误日志缓冲
+        # === M57: Accelerator type detection for Trainium/CUDA ===
+        self._accelerator_type: str = "auto"
+        # === M57: Evolution generation counter ===
+        self._evolution_generation: int = 0
 
         if launcher_args is not None and (
             port is not None or host is not None or launch_mode != "mp" or num_workers != 1

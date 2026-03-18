@@ -104,6 +104,10 @@ class LitAgentRunner(Runner[T_task]):
         self._heartbeat_launch_mode = heartbeat_launch_mode
         self._heartbeat_include_gpu = heartbeat_include_gpu
         self._random_state = random.Random()
+        # === M60: Evolution step counter for self-evolution tracking ===
+        self._evolution_step_count: int = 0
+        # === M60: Compute backend for Trainium awareness ===
+        self._compute_backend: str = "auto"
 
         # Set later
         self._agent: Optional[LitAgent[T_task]] = None

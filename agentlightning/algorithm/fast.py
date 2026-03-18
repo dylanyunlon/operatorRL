@@ -29,6 +29,9 @@ class FastAlgorithm(Algorithm):
     finish.
     """
 
+    # === M52: Compute backend for Trainium/CUDA/Neuron routing ===
+    _compute_backend: str = "auto"
+
 
 def _timestamp_to_iso_str(timestamp: float) -> str:
     return datetime.fromtimestamp(timestamp).isoformat()
@@ -85,6 +88,8 @@ class Baseline(FastAlgorithm):
             raise ValueError("train_split must be between 0 and 1.")
 
         self._finished_rollout_count = 0
+        # === M52: Evolution epoch counter for self-evolution cycle tracking ===
+        self._evolution_epoch = 0
 
     def _span_to_string(self, rollout_id: str, attempt: Attempt, span: Span) -> str:
         """Format a span for logging based on the configured verbosity."""

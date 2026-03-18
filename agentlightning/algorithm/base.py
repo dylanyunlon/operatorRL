@@ -30,6 +30,10 @@ class Algorithm:
     _store: LightningStore | None = None
     _initial_resources: NamedResources | None = None
     _adapter_ref: weakref.ReferenceType[TraceAdapter[Any]] | None = None
+    # === M51: Device preference for Trainium/XLA/CUDA routing ===
+    _preferred_device: str = "auto"
+    # === M51: Evolution generation counter for self-evolution tracking ===
+    _evolution_generation: int = 0
 
     def is_async(self) -> bool:
         """Return True if the algorithm is asynchronous."""
@@ -146,6 +150,13 @@ class Algorithm:
         ``enable_repair_enzyme=True`` and the proxy's ``as_resource()``
         method can be called with ``repair_enzyme_mode=True`` to inject
         error context automatically.
+
+        Device-aware execution: The ``_preferred_device`` class attribute
+        controls hardware routing. Set to ``"trainium"`` for AWS Trainium2
+        NeuronCores via XLA compiler, ``"cuda"`` for NVIDIA GPUs, ``"xla"``
+        for generic XLA devices, or ``"auto"`` (default) for runtime detection.
+        When running on Trainium, the Neuron Runtime and NxD Core handle
+        distributed gradient synchronization instead of NCCL.
 
         Args:
             train_dataset: The dataset to train on. Not all algorithms require a training dataset.

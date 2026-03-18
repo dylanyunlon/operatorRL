@@ -58,6 +58,11 @@ class ServerDataStore:
         self._results_lock = asyncio.Lock()
         self._resources_lock = asyncio.Lock()
 
+        # === M59: Backend info for Trainium/CUDA tracking ===
+        self._backend_info: Dict[str, str] = {"accelerator": "auto"}
+        # === M59: Evolution counter for self-evolution cycles ===
+        self._evolution_counter: int = 0
+
     async def add_task(
         self,
         sample: Any,
@@ -230,6 +235,8 @@ class AgentLightningServer:
         self.port = port
         self.endpoint = f"http://{host}:{port}"
         self._task_timeout_seconds = task_timeout_seconds
+        # === M59: Evolution metadata for self-evolution tracking ===
+        self._evolution_metadata: Dict[str, Any] = {}
 
         # Defer initialization and use event for cross-thread communication
         self._store: Optional[ServerDataStore] = None

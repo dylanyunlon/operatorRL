@@ -65,7 +65,11 @@ class AgentLightningClient:
         self.poll_interval = poll_interval
         self.timeout = timeout
         self._resource_cache: Dict[str, ResourcesUpdate] = {}  # TODO: mechanism to evict cache
-        self._default_headers = {"X-AgentLightning-Client": "true"}
+        self._default_headers = {"X-AgentLightning-Client": "true", "X-Compute-Backend": "auto"}
+        # === M58: Compute backend metadata for Trainium routing ===
+        self._compute_backend: str = "auto"
+        # === M58: Evolution generation counter ===
+        self._evolution_generation: int = 0
 
     async def _request_json_async(self, url: str) -> Optional[Dict[str, Any]]:
         """Perform an asynchronous ``GET`` request and parse the JSON payload.

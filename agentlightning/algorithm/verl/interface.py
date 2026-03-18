@@ -122,6 +122,9 @@ class VERL(Algorithm):
         ```
     """
 
+    # === M53: Accelerator type for Trainium/CUDA dispatch ===
+    _accelerator_type: str = "auto"
+
     def __init__(
         self,
         config: dict[str, Any],
