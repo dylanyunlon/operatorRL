@@ -208,6 +208,13 @@ class Rollout(BaseModel):
     growth_stage: str = "infant"
     """成长阶段名称: infant, toddler, elementary, middle, high, college, graduate"""
 
+    # === M47: Span属性类型提示 (命题2 + 命题5) ===
+    # Span attributes中可包含以下AgentRL特有字段:
+    #   agent_os.emergent_signal: bool — 是否为涌现信号 (违规但成功)
+    #   agent_os.repair_enzyme_triggered: bool — 是否触发了修复酶 (LLM看答卷)
+    #   agent_os.maturity_level: int — rollout产生时的成长阶段
+    #   agent_os.growth_stage: str — 成长阶段名称
+
 
 class AttemptedRollout(Rollout):
     """Rollout paired with the currently active attempt."""

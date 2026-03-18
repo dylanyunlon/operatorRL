@@ -1,4 +1,9 @@
 # Copyright (c) Microsoft. All rights reserved.
+# === M45: OTel语义属性扩展 (命题7: 成长阶段追踪) ===
+# 本模块在OTel span中增加以下语义属性:
+#   agent.maturity_level: int — 当前成长阶段 (0=infant, 6=postdoc)
+#   agent.growth_stage: str — 成长阶段名称 ("infant", "elementary", ...)
+# 这些属性支持按成长阶段进行分布式追踪分析。
 
 from __future__ import annotations
 

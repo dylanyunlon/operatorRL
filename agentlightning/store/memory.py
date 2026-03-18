@@ -1,4 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
+# === M43: InMemoryLightningStore supports maturity_level and growth_stage indexing ===
+# Rollout queries can filter by growth_stage; statistics include maturity_level distribution.
 
 from __future__ import annotations
 

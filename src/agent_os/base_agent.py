@@ -291,6 +291,40 @@ class BaseAgent(ABC):
         self._escalation_queue: list[EscalationRequest] = []
         self._defer_timeout = defer_timeout
         self._defer_callback: Callable[[str, dict[str, Any]], asyncio.Future[PolicyDecision]] | None = None
+        # === M35: 成长阶段属性 (命题7: 小学到大学) ===
+        self._maturity_level: int = 0
+
+    @property
+    def maturity_level(self) -> int:
+        """M35: 当前成长阶段级别 (0=婴儿期, 6=研究生)."""
+        return self._maturity_level
+
+    @maturity_level.setter
+    def maturity_level(self, value: int) -> None:
+        """M35: 设置成长阶段，自动钳位到 [0, 6] 范围."""
+        self._maturity_level = max(0, min(6, value))
+
+    def _check_graduation(self) -> bool:
+        """M35: 检查是否满足升级条件 (命题7: 阶段性考试)。
+
+        基于审计日志中的历史成功率判断:
+        - 需要至少10次执行记录
+        - 成功率 > 80% 则升级一个等级
+        - 已达最高等级(6)返回False
+
+        Returns:
+            True 如果发生了升级, False 否则.
+        """
+        if self._maturity_level >= 6:
+            return False
+        if len(self._audit_log) < 10:
+            return False
+        recent = self._audit_log[-10:]
+        success_count = sum(1 for e in recent if e.decision == "allow")
+        if success_count / len(recent) > 0.8:
+            self._maturity_level = min(6, self._maturity_level + 1)
+            return True
+        return False
 
     @property
     def agent_id(self) -> str:

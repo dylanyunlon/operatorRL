@@ -11,6 +11,7 @@ import ast
 import importlib.abc
 import importlib.machinery
 import sys
+import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -305,12 +306,32 @@ class ExecutionSandbox:
 
         Returns:
             The return value of the function.
+            
+        Note:
+            M39: 考试成绩元数据 (命题3: 体检报告)
+            执行结果附带 exam_score 元数据，包含:
+            - execution_time_ms: 执行耗时（毫秒）
+            - success: 是否成功完成
+            - memory_peak_kb: 峰值内存使用（KB, 估算）
+            可通过 self.last_exam_score 访问最近一次执行的成绩。
         """
+        # === M39: 记录执行开始时间 ===
+        start_time = time.perf_counter()
+        success = False
         self._hook.install()
         try:
-            return func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            success = True
+            return result
         finally:
             self._hook.uninstall()
+            # === M39: 计算并存储考试成绩 ===
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+            self.last_exam_score = {
+                "execution_time_ms": round(elapsed_ms, 2),
+                "success": success,
+                "memory_peak_kb": 0,  # 精确值需要tracemalloc，此处为占位
+            }
 
 
 def _make_blocked_builtin(name: str) -> Callable[..., None]:

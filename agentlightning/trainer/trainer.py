@@ -190,6 +190,10 @@ class Trainer(TrainerLegacy):
         self.daemon = daemon
         self._client: AgentLightningClient | None = None  # Will be initialized in fit or fit_v0
 
+        # === M49: dev模式设置最高maturity_level (命题7: 成人模式) ===
+        if dev or self._dev:
+            self.maturity_level = 6  # 研究生级别，跳过所有非critical限制
+
         if n_workers is not None:
             warnings.warn(
                 "`n_workers` is deprecated. Please use `n_runners`.",

@@ -404,6 +404,8 @@ class LightningStore:
         sort_order: Literal["asc", "desc"] = "asc",
         limit: int = -1,
         offset: int = 0,
+        # === M42: 成长阶段过滤 (命题7: 阶段性学习) ===
+        growth_stage: Optional[str] = None,
         # Deprecated fields
         status: Optional[Sequence[RolloutStatus]] = None,
         rollout_ids: Optional[Sequence[str]] = None,
@@ -427,6 +429,9 @@ class LightningStore:
             sort_order: Direction to sort when `sort_by` is provided.
             limit: Maximum number of rows to return. Use `-1` for "no limit".
             offset: Number of rows to skip before returning results.
+            growth_stage: M42 - Optional growth_stage filter (e.g., "infant", "elementary",
+                "middle_school", "high_school", "university", "graduate", "postdoc").
+                Only return rollouts matching this growth_stage.
             status: Deprecated field. Use `status_in` instead.
             rollout_ids: Deprecated field. Use `rollout_id_in` instead.
 

@@ -57,9 +57,11 @@ class AuditEntry:
     allowed: bool
     reason: str
     approval_status: ApprovalStatus | None = None
+    # === M38: 身体感受转换 (命题3: HTTP是身体) ===
+    body_sense: dict[str, Any] | None = None  # {success, signal_strength, goal_level}
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "timestamp": self.timestamp,
             "agent_id": self.agent_id,
             "tool_name": self.tool_name,
@@ -68,6 +70,10 @@ class AuditEntry:
             "reason": self.reason,
             "approval_status": self.approval_status.value if self.approval_status else None,
         }
+        # === M38: 包含body_sense ===
+        if self.body_sense is not None:
+            result["body_sense"] = self.body_sense
+        return result
 
 
 @dataclass
@@ -155,6 +161,16 @@ class MCPGateway:
                 None,
             )
 
+        # === M38: 身体感受转换 (命题3: HTTP是身体) ===
+        # 将tool call结果转换为标准化的body_sense信号
+        signal_strength = 1.0 if allowed else 0.0
+        goal_level = params.get("goal_level", "basic")
+        body_sense = {
+            "success": allowed,
+            "signal_strength": signal_strength,
+            "goal_level": str(goal_level),
+        }
+
         # Record audit entry
         entry = AuditEntry(
             timestamp=time.time(),
@@ -164,6 +180,7 @@ class MCPGateway:
             allowed=allowed,
             reason=reason,
             approval_status=approval,
+            body_sense=body_sense,
         )
         self._audit_log.append(entry)
 

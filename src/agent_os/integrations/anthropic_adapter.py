@@ -238,6 +238,29 @@ class _GovernedMessages:
         """
         # --- pre-execution checks ---
         messages = kwargs.get("messages", [])
+        
+        # === M37: 修复酶模式 (命题5: 老师看答卷) ===
+        # 当repair_enzyme=True时，自动将最近错误日志作为上下文注入
+        if kwargs.pop("repair_enzyme", False):
+            recent_errors = getattr(self._kernel, '_recent_errors', [])
+            error_log = getattr(self._kernel, '_last_error', None)
+            repair_context = []
+            if error_log:
+                repair_context.append(error_log)
+            if recent_errors:
+                repair_context.extend(recent_errors[-5:])  # 最近5条错误
+            if repair_context:
+                error_summary = "; ".join(str(e) for e in repair_context)
+                messages = list(messages) + [{
+                    "role": "user",
+                    "content": f"[REPAIR ENZYME CONTEXT] Recent errors to diagnose: {error_summary}"
+                }]
+                kwargs["messages"] = messages
+                logger.info(
+                    "Repair enzyme mode activated | agent=%s errors=%d",
+                    self._ctx.agent_id, len(repair_context),
+                )
+        
         for msg in messages:
             content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
             allowed, reason = self._kernel.pre_execute(self._ctx, content)

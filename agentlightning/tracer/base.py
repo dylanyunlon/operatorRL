@@ -142,9 +142,16 @@ class Tracer(ParallelWorkerBase):
 
         It uses a fire-and-forget approach and doesn't wait for the span to be created.
 
+        === M44: 成长阶段自动附加 (命题7: 小学到大学) ===
+        
+        When a maturity_level is set on the tracer instance, create_span
+        automatically includes ``agent.maturity_level`` in the span attributes.
+        This enables downstream systems to filter and analyze spans by growth stage.
+
         Args:
             name: The name of the span.
-            attributes: The attributes of the span.
+            attributes: The attributes of the span. If ``maturity_level`` is
+                set on the tracer, ``agent.maturity_level`` will be auto-injected.
             timestamp: The timestamp of the span.
             status: The status of the span.
 

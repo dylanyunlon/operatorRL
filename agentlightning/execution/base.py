@@ -51,10 +51,10 @@ class ExecutionStrategy:
       - 分布式训练使用NxD Training (neuronx-distributed)
     - **CPU**: 回退模式，用于开发和测试
 
-    设备检测优先级:
-    1. 检测 /dev/neuron* 或 NEURON_RT_VISIBLE_CORES 环境变量 → Trainium2
-    2. 检测 torch.cuda.is_available() → NVIDIA GPU  
-    3. 回退 → CPU
+    Device detection priority (设备检测优先级):
+    1. Detect /dev/neuron* or NEURON_RT_VISIBLE_CORES env var → Trainium2
+    2. Detect torch.cuda.is_available() → NVIDIA GPU  
+    3. Fallback → CPU
 
     !!! note
         Implementations must honor the [execute()][agentlightning.ExecutionStrategy.execute]

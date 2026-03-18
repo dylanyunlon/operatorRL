@@ -254,10 +254,22 @@ def _add_arguments_for_class(
 
 def _create_argument_parser() -> argparse.ArgumentParser:
     """Creates and returns the main ArgumentParser with default settings."""
-    return argparse.ArgumentParser(
+    parser = argparse.ArgumentParser(
         description="CLI configurator for application components.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,  # Automatically shows default values in help
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+    # === M50: 成长阶段CLI参数 (命题7: 小学到大学) ===
+    parser.add_argument(
+        "--maturity-level", type=int, default=0,
+        dest="maturity_level",
+        help="Initial maturity level (0=infant, 6=graduate). Controls policy strictness.",
+    )
+    parser.add_argument(
+        "--growth-stage", type=str, default="infant",
+        dest="growth_stage",
+        help="Growth stage name (infant/toddler/elementary/middle/high/college/graduate).",
+    )
+    return parser
 
 
 def _instantiate_classes(
