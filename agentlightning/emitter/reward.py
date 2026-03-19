@@ -1,6 +1,10 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-"""Helpers for emitting reward spans and integrating with AgentOps telemetry."""
+"""Helpers for emitting reward spans and integrating with AgentOps telemetry.
+
+Supports evolution_stage and maturity_level attributes for AgentRL
+self-evolution tracking (M55: evolution stage attribute passthrough).
+"""
 
 import asyncio
 import inspect

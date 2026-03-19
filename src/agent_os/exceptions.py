@@ -3,7 +3,8 @@ Agent OS Exception Hierarchy
 
 Standardized exceptions with error codes for all Agent OS components.
 Each exception carries an error_code, optional details dict, and timestamp
-for structured error handling and logging.
+for structured error handling and logging. Supports maturity_level context
+in policy violation details for growth-stage awareness (M64).
 """
 
 from datetime import datetime, timezone

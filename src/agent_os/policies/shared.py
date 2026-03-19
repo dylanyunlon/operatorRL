@@ -4,6 +4,7 @@ Cross-project shared policy language for Agent-OS and Agent-Mesh.
 Provides a unified governance schema (SharedPolicySchema) with rules,
 conditions, and an evaluator that works across both projects. Includes
 YAML serialization and a bridge to the existing PolicyDocument format.
+Supports maturity_level and growth_stage metadata for self-evolution (M63).
 """
 
 from __future__ import annotations

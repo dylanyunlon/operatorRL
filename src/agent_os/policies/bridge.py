@@ -2,7 +2,8 @@
 Bridge between legacy GovernancePolicy and declarative PolicyDocument.
 
 Provides bidirectional conversion so existing code continues to work while
-new code can use the declarative policy format.
+new code can use the declarative policy format. Preserves maturity_level
+and maturity_gates context during conversion (M62).
 """
 
 from __future__ import annotations

@@ -1,6 +1,10 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-"""Helpers for emitting annotation/operation spans."""
+"""Helpers for emitting annotation/operation spans.
+
+Supports agent_os.maturity_level and growth_stage attribute injection
+for AgentRL self-evolution tracking (M56: maturity annotation support).
+"""
 
 import asyncio
 import functools

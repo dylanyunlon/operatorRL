@@ -3,11 +3,13 @@ Declarative policy language for Agent-OS governance.
 
 Separates policy rules (YAML/JSON data) from evaluation logic,
 enabling policies to be authored, versioned, and shared as plain files.
+Supports maturity-gated growth stages for self-evolution (M61).
 """
 
 from .bridge import document_to_governance, governance_to_document
 from .evaluator import PolicyDecision, PolicyEvaluator
 from .schema import (
+    MaturityGate,
     PolicyAction,
     PolicyCondition,
     PolicyDefaults,
@@ -27,6 +29,7 @@ from .shared import (
 
 __all__ = [
     "Condition",
+    "MaturityGate",
     "PolicyAction",
     "PolicyCondition",
     "PolicyDecision",

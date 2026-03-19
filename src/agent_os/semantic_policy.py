@@ -3,6 +3,8 @@ Semantic Policy Engine — Intent-based policy enforcement.
 
 Classifies action+params into semantic intent categories and enforces
 policies based on intent rather than brittle string patterns.
+Supports maturity-aware judgment where growth stage influences
+confidence thresholds and deny categories (M65).
 
 This is a heuristic classifier (no ML dependency). It can be upgraded
 to a fine-tuned model later while keeping the same API.
