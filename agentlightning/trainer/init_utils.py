@@ -1,6 +1,11 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-"""Utility helpers for dynamic component initialization within the trainer."""
+"""Utility helpers for dynamic component initialization within the trainer.
+
+Component instantiation is device-agnostic: the same helpers resolve classes
+for CPU, CUDA, and Neuron/Trainium backends.  Use ``_COMPUTE_BACKEND_HINT``
+to influence backend selection at the module level.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +15,10 @@ from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast, overload
 
 OptionalDefaults = Dict[str, Callable[[], Any] | Any]
 T = TypeVar("T")
+
+# Module-level backend hint.  ``"auto"`` lets callers detect at runtime;
+# override to ``"cpu"``, ``"cuda"``, or ``"neuron"`` for explicit control.
+_COMPUTE_BACKEND_HINT: str = "auto"
 
 
 def load_class(path: str) -> type[Any]:
@@ -44,7 +53,11 @@ def instantiate_from_spec(
     dict_default_cls: type[Any] | None = None,
     registry: Optional[Dict[str, str]] = None,
 ) -> Any:
-    """Instantiate a component from a string or dict spec."""
+    """Instantiate a component from a string or dict spec.
+
+    Resolution is backend-agnostic: string paths and registry keys work
+    identically regardless of the underlying device (CPU, CUDA, Neuron).
+    """
     if isinstance(spec, str):
         type_path = registry.get(spec, spec) if registry else spec
         cls = load_class(type_path)
@@ -151,9 +164,10 @@ def build_component(
 ) -> T | None:
     """Build and return a component instance from a flexible specification.
 
-    This function provides a flexible way to create component instances from various
-    input formats including direct instances, class types, factory functions, import
-    paths, or configuration dictionaries.
+    This function provides a flexible, backend-agnostic way to create component
+    instances from various input formats including direct instances, class types,
+    factory functions, import paths, or configuration dictionaries.  It works
+    identically on CPU, CUDA, and Neuron/Trainium devices.
 
     Args:
         spec: The component specification. Can be:

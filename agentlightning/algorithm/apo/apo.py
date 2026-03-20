@@ -64,6 +64,7 @@ class VersionedPromptTemplate:
     version: str
     prompt_template: PromptTemplate
     score: Optional[float] = None
+    evolution_generation: int = 0
 
 
 GRADIENT_PROMPT_FILES = [
@@ -85,6 +86,10 @@ class APO(Algorithm, Generic[T_task]):
     to improve prompts through a beam search process. It evaluates prompts on rollouts,
     computes critiques based on the results, and applies edits to generate improved prompts.
 
+    The algorithm is device-agnostic and API-based: it communicates with LLMs via
+    HTTP/API calls rather than performing local tensor computation, making it
+    compatible with any backend (CPU, CUDA, Neuron/Trainium).
+
     The algorithm operates in rounds, where each round:
 
     1. Samples parent prompts from the current beam
@@ -97,6 +102,9 @@ class APO(Algorithm, Generic[T_task]):
     - [ProTeGi](https://aclanthology.org/2023.emnlp-main.494.pdf)
     - [TextGrad](https://github.com/zou-group/textgrad)
     """
+
+    _compute_backend: str = "api"
+    _evolution_generation: int = 0
 
     def __init__(
         self,

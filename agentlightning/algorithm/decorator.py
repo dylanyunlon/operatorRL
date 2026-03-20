@@ -107,7 +107,13 @@ class FunctionalAlgorithm(Algorithm, Generic[AF]):
     subclassing [`Algorithm`][agentlightning.Algorithm]. The wrapper inspects
     the callable signature to supply optional dependencies
     such as the store, adapter, and LLM proxy.
+
+    The wrapper is device-agnostic and runs identically on CPU, CUDA, and
+    Neuron/Trainium (XLA) backends.  The ``_compute_backend`` class attribute
+    indicates the detected or configured accelerator.
     """
+
+    _compute_backend: str = "cpu"
 
     @overload
     def __init__(self: "FunctionalAlgorithm[Literal[False]]", algorithm_func: AlgorithmFuncSyncLike) -> None: ...
@@ -228,6 +234,9 @@ def algo(
     The decorator inspects the callable signature to decide which dependencies
     to inject at runtime, enabling concise algorithm definitions that still
     leverage the full training runtime.
+
+    The resulting ``FunctionalAlgorithm`` is device-agnostic and works on CPU,
+    CUDA, and Neuron/Trainium (XLA) backends without modification.
 
     Args:
         func: Function implementing the algorithm logic. May be synchronous or

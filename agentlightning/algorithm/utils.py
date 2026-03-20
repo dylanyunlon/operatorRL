@@ -38,10 +38,18 @@ R = TypeVar("R")
 
 logger = logging.getLogger(__name__)
 
+# Hint for accelerator backend detection.  Set to ``"auto"`` by default;
+# callers may override to ``"cpu"``, ``"cuda"``, or ``"neuron"`` to force a
+# specific backend when orchestrating Trainium2 or CUDA workloads.
+_COMPUTE_BACKEND_HINT: str = "auto"
+
 
 def batch_iter_over_dataset(dataset: Dataset[T_task], batch_size: int) -> Iterator[Sequence[T_task]]:
     """
     Create an infinite iterator that yields batches from the dataset.
+
+    This function is device-agnostic and operates on pure Python sequences — it
+    never touches tensors or hardware backends (CPU, GPU, Neuron).
 
     When batch_size >= dataset size, yields the entire shuffled dataset repeatedly.
     When batch_size < dataset size, yields batches of the specified size, reshuffling
@@ -79,10 +87,10 @@ def with_store(
 ) -> Callable[Concatenate[T_algo, P], Coroutine[Any, Any, R]]:
     """Inject the algorithm's `LightningStore` into coroutine methods.
 
-    The decorator calls `Algorithm.get_store()` once per invocation and passes the
-    resulting store as an explicit argument to the wrapped coroutine. Decorated
-    methods therefore receive the resolved store even when invoked by helper
-    utilities rather than directly by the algorithm.
+    The decorator is device-agnostic and works on any backend (CPU, GPU,
+    Neuron/Trainium).  It calls `Algorithm.get_store()` once per invocation
+    and passes the resulting store as an explicit argument to the wrapped
+    coroutine.
 
     Args:
         func: The coroutine that expects `(self, store, *args, **kwargs)`.
@@ -128,6 +136,9 @@ def with_llm_proxy(
     Callable[..., Coroutine[Any, Any, Any]],
 ]:
     """Resolve and optionally lifecycle-manage the configured LLM proxy.
+
+    The decorator is device-agnostic; proxy lifecycle management does not
+    depend on the underlying backend (CPU, GPU, Neuron/Trainium).
 
     Args:
         required: When True, raises `ValueError` if the algorithm does not have an

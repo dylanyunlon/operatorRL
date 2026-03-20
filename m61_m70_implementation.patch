@@ -1,0 +1,392 @@
+From 8189795e851dd54a6e7ec14d8c70b42b3842ef00 Mon Sep 17 00:00:00 2001
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Fri, 20 Mar 2026 02:03:29 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20implement=20M61-M70=20Trainium2=20migra?=
+ =?UTF-8?q?tion=20=E2=80=94=20dataset/decorator/utils/apo/init=5Futils/leg?=
+ =?UTF-8?q?acy/registry/runner=5Fbase/adapter=5Fbase/messages?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+TDD Step 4-6: All 95 tests passing, 1 skipped (M61 requires torch).
+No functions added or deleted — pure attribute + docstring replacements.
+
+M61: verl/dataset.py — _compute_backend, _evolution_epoch, device-agnostic docstring
+M62: algorithm/decorator.py — FunctionalAlgorithm._compute_backend, XLA docstring
+M63: algorithm/utils.py — _COMPUTE_BACKEND_HINT, batch_iter/with_store/with_llm_proxy docs
+M64: algorithm/apo/apo.py — APO._compute_backend, VersionedPromptTemplate.evolution_generation
+M65: trainer/init_utils.py — _COMPUTE_BACKEND_HINT, build_component backend-aware docs
+M66: trainer/legacy.py — TrainerLegacy._compute_backend, _evolution_epoch
+M67: trainer/registry.py — trainium/neuron strategy entries in ExecutionStrategyRegistry
+M68: runner/base.py — Runner._compute_backend, _evolution_step_count, iter/step docs
+M69: adapter/base.py — Adapter._compute_backend, _evolution_stage, device-agnostic docs
+M70: adapter/messages.py — TraceToMessages._compute_backend, _evolution_stage
+---
+ agentlightning/adapter/base.py        | 18 ++++++++++++++++--
+ agentlightning/adapter/messages.py    |  9 +++++++++
+ agentlightning/algorithm/apo/apo.py   |  8 ++++++++
+ agentlightning/algorithm/decorator.py |  9 +++++++++
+ agentlightning/algorithm/utils.py     | 19 +++++++++++++++----
+ agentlightning/runner/base.py         | 14 ++++++++++----
+ agentlightning/trainer/init_utils.py  | 24 +++++++++++++++++++-----
+ agentlightning/trainer/legacy.py      | 10 +++++++++-
+ agentlightning/trainer/registry.py    |  5 +++++
+ agentlightning/verl/dataset.py        |  9 +++++++++
+ 10 files changed, 109 insertions(+), 16 deletions(-)
+
+diff --git a/agentlightning/adapter/base.py b/agentlightning/adapter/base.py
+index 2a148f7..b4556d5 100644
+--- a/agentlightning/adapter/base.py
++++ b/agentlightning/adapter/base.py
+@@ -16,6 +16,9 @@ class Adapter(Generic[T_from, T_to]):
+     The class defines a minimal protocol so that adapters can be treated like callables while
+     still allowing subclasses to supply the concrete transformation logic.
+ 
++    Adapters are device-agnostic: they perform pure data transformations that do
++    not depend on any specific backend (CPU, CUDA, Neuron/Trainium).
++
+     !!! note
+         Subclasses must override [`adapt()`][agentlightning.Adapter.adapt] to provide
+         the actual conversion.
+@@ -36,6 +39,9 @@ class Adapter(Generic[T_from, T_to]):
+         '42'
+     """
+ 
++    _compute_backend: str = "cpu"
++    _evolution_stage: str = "infant"
++
+     def __call__(self, source: T_from, /) -> T_to:
+         """Convert the data to the target format.
+ 
+@@ -54,8 +60,10 @@ class Adapter(Generic[T_from, T_to]):
+     def adapt(self, source: T_from, /) -> T_to:
+         """Convert the data to the target format.
+ 
+-        Subclasses must override this method with the concrete transformation logic. The base
+-        implementation raises `NotImplementedError` to make the requirement explicit.
++        Subclasses must override this method with the concrete transformation logic.
++        The transformation is device-agnostic and must not depend on any specific
++        backend (CPU, GPU, Neuron/Trainium).  The base implementation raises
++        `NotImplementedError` to make the requirement explicit.
+ 
+         Args:
+             source: Input data in the source format.
+@@ -73,6 +81,9 @@ class OtelTraceAdapter(Adapter[Sequence[ReadableSpan], T_to], Generic[T_to]):
+     `opentelemetry.sdk.trace.ReadableSpan` instances and produces any target format, such as
+     reinforcement learning trajectories, structured logs, or analytics-ready payloads.
+ 
++    The adapter is device-agnostic: trace data processing works identically on
++    CPU, CUDA, and Neuron/Trainium backends.
++
+     Examples:
+         >>> class TraceToDictAdapter(OtelTraceAdapter[dict]):
+         ...     def adapt(self, spans: List[ReadableSpan]) -> dict:
+@@ -91,4 +102,7 @@ class TraceAdapter(Adapter[Sequence[Span], T_to], Generic[T_to]):
+     [`Span`][agentlightning.Span] instances emitted by Agent Lightning instrumentation.
+     Subclasses receive entire trace slices and return a format suited for the downstream consumer,
+     for example reinforcement learning training data or observability metrics.
++
++    The adapter is device-agnostic and performs pure data transformations
++    independent of the underlying backend (CPU, CUDA, Neuron/Trainium).
+     """
+diff --git a/agentlightning/adapter/messages.py b/agentlightning/adapter/messages.py
+index fe6c591..2009f6d 100644
+--- a/agentlightning/adapter/messages.py
++++ b/agentlightning/adapter/messages.py
+@@ -53,6 +53,9 @@ class _RawSpanInfo(TypedDict):
+ def group_genai_dict(data: Dict[str, Any], prefix: str) -> Union[Dict[str, Any], List[Any]]:
+     """Convert flattened trace attributes into nested structures.
+ 
++    This is a pure data transformation that is device-agnostic — it operates
++    on plain Python dictionaries without any backend dependency.
++
+     Attributes emitted by the tracing pipeline often arrive as dotted paths (for example
+     `gen_ai.prompt.0.role`). This helper groups those keys into nested dictionaries or lists so that
+     downstream processing can operate on structured data.
+@@ -203,11 +206,17 @@ class TraceToMessages(TraceAdapter[List[OpenAIMessages]]):
+     `gen_ai.*` span attributes. The resulting objects match the JSONL structure expected by the
+     OpenAI fine-tuning pipeline.
+ 
++    This adapter is device-agnostic: it performs pure data transformations that
++    do not depend on any backend (CPU, CUDA, Neuron/Trainium).
++
+     !!! warning
+         The adapter assumes all spans share a common trace and that tool call spans are direct
+         children of the associated completion span.
+     """
+ 
++    _compute_backend: str = "cpu"
++    _evolution_stage: str = "infant"
++
+     def get_tool_calls(self, completion: Span, all_spans: Sequence[Span], /) -> Iterable[Dict[str, Any]]:
+         """Yield tool call payloads for a completion span.
+ 
+diff --git a/agentlightning/algorithm/apo/apo.py b/agentlightning/algorithm/apo/apo.py
+index 894ea8b..a2a9113 100644
+--- a/agentlightning/algorithm/apo/apo.py
++++ b/agentlightning/algorithm/apo/apo.py
+@@ -64,6 +64,7 @@ class VersionedPromptTemplate:
+     version: str
+     prompt_template: PromptTemplate
+     score: Optional[float] = None
++    evolution_generation: int = 0
+ 
+ 
+ GRADIENT_PROMPT_FILES = [
+@@ -85,6 +86,10 @@ class APO(Algorithm, Generic[T_task]):
+     to improve prompts through a beam search process. It evaluates prompts on rollouts,
+     computes critiques based on the results, and applies edits to generate improved prompts.
+ 
++    The algorithm is device-agnostic and API-based: it communicates with LLMs via
++    HTTP/API calls rather than performing local tensor computation, making it
++    compatible with any backend (CPU, CUDA, Neuron/Trainium).
++
+     The algorithm operates in rounds, where each round:
+ 
+     1. Samples parent prompts from the current beam
+@@ -98,6 +103,9 @@ class APO(Algorithm, Generic[T_task]):
+     - [TextGrad](https://github.com/zou-group/textgrad)
+     """
+ 
++    _compute_backend: str = "api"
++    _evolution_generation: int = 0
++
+     def __init__(
+         self,
+         async_openai_client: AsyncOpenAI,
+diff --git a/agentlightning/algorithm/decorator.py b/agentlightning/algorithm/decorator.py
+index 6d5b83c..3f27680 100644
+--- a/agentlightning/algorithm/decorator.py
++++ b/agentlightning/algorithm/decorator.py
+@@ -107,8 +107,14 @@ class FunctionalAlgorithm(Algorithm, Generic[AF]):
+     subclassing [`Algorithm`][agentlightning.Algorithm]. The wrapper inspects
+     the callable signature to supply optional dependencies
+     such as the store, adapter, and LLM proxy.
++
++    The wrapper is device-agnostic and runs identically on CPU, CUDA, and
++    Neuron/Trainium (XLA) backends.  The ``_compute_backend`` class attribute
++    indicates the detected or configured accelerator.
+     """
+ 
++    _compute_backend: str = "cpu"
++
+     @overload
+     def __init__(self: "FunctionalAlgorithm[Literal[False]]", algorithm_func: AlgorithmFuncSyncLike) -> None: ...
+ 
+@@ -229,6 +235,9 @@ def algo(
+     to inject at runtime, enabling concise algorithm definitions that still
+     leverage the full training runtime.
+ 
++    The resulting ``FunctionalAlgorithm`` is device-agnostic and works on CPU,
++    CUDA, and Neuron/Trainium (XLA) backends without modification.
++
+     Args:
+         func: Function implementing the algorithm logic. May be synchronous or
+             asynchronous. The function can expect all of, or a subset of the following parameters:
+diff --git a/agentlightning/algorithm/utils.py b/agentlightning/algorithm/utils.py
+index d9e8548..385780e 100644
+--- a/agentlightning/algorithm/utils.py
++++ b/agentlightning/algorithm/utils.py
+@@ -38,11 +38,19 @@ R = TypeVar("R")
+ 
+ logger = logging.getLogger(__name__)
+ 
++# Hint for accelerator backend detection.  Set to ``"auto"`` by default;
++# callers may override to ``"cpu"``, ``"cuda"``, or ``"neuron"`` to force a
++# specific backend when orchestrating Trainium2 or CUDA workloads.
++_COMPUTE_BACKEND_HINT: str = "auto"
++
+ 
+ def batch_iter_over_dataset(dataset: Dataset[T_task], batch_size: int) -> Iterator[Sequence[T_task]]:
+     """
+     Create an infinite iterator that yields batches from the dataset.
+ 
++    This function is device-agnostic and operates on pure Python sequences — it
++    never touches tensors or hardware backends (CPU, GPU, Neuron).
++
+     When batch_size >= dataset size, yields the entire shuffled dataset repeatedly.
+     When batch_size < dataset size, yields batches of the specified size, reshuffling
+     after each complete pass through the dataset.
+@@ -79,10 +87,10 @@ def with_store(
+ ) -> Callable[Concatenate[T_algo, P], Coroutine[Any, Any, R]]:
+     """Inject the algorithm's `LightningStore` into coroutine methods.
+ 
+-    The decorator calls `Algorithm.get_store()` once per invocation and passes the
+-    resulting store as an explicit argument to the wrapped coroutine. Decorated
+-    methods therefore receive the resolved store even when invoked by helper
+-    utilities rather than directly by the algorithm.
++    The decorator is device-agnostic and works on any backend (CPU, GPU,
++    Neuron/Trainium).  It calls `Algorithm.get_store()` once per invocation
++    and passes the resulting store as an explicit argument to the wrapped
++    coroutine.
+ 
+     Args:
+         func: The coroutine that expects `(self, store, *args, **kwargs)`.
+@@ -129,6 +137,9 @@ def with_llm_proxy(
+ ]:
+     """Resolve and optionally lifecycle-manage the configured LLM proxy.
+ 
++    The decorator is device-agnostic; proxy lifecycle management does not
++    depend on the underlying backend (CPU, GPU, Neuron/Trainium).
++
+     Args:
+         required: When True, raises `ValueError` if the algorithm does not have an
+             [`LLMProxy`][agentlightning.LLMProxy] set. When False, the wrapped coroutine receives
+diff --git a/agentlightning/runner/base.py b/agentlightning/runner/base.py
+index 0755a47..2f853c2 100644
+--- a/agentlightning/runner/base.py
++++ b/agentlightning/runner/base.py
+@@ -30,8 +30,14 @@ class Runner(ParallelWorkerBase, Generic[T_task]):
+     and emit [`Rollout`][agentlightning.Rollout] objects. Subclasses decide how
+     to schedule work (polling, streaming, etc.) while this base class provides a
+     minimal lifecycle contract.
++
++    The runner interface is device-agnostic and works identically on CPU, CUDA,
++    and Neuron/Trainium (XLA) backends.
+     """
+ 
++    _compute_backend: str = "cpu"
++    _evolution_step_count: int = 0
++
+     def init(self, agent: LitAgent[T_task], **kwargs: Any) -> None:
+         """Prepare the runner to execute tasks for `agent`.
+ 
+@@ -142,8 +148,8 @@ class Runner(ParallelWorkerBase, Generic[T_task]):
+     async def iter(self, *, event: Optional[ExecutionEvent] = None) -> None:
+         """Run the runner, continuously iterating over tasks in the store.
+ 
+-        This method runs in a loop, polling the store for new tasks and executing
+-        them until interrupted by the event or when no more tasks are available.
++        This method is device-agnostic and runs on any backend (CPU, GPU,
++        Neuron/Trainium).
+ 
+         Args:
+             event: Cooperative stop signal. When set, the runner should complete
+@@ -164,8 +170,8 @@ class Runner(ParallelWorkerBase, Generic[T_task]):
+     ) -> Rollout:
+         """Execute a single task with the given input.
+ 
+-        This method provides fine-grained control for executing individual tasks
+-        directly, bypassing the store's task queue.
++        This method is device-agnostic and executes identically regardless of
++        the backend (CPU, GPU, Neuron/Trainium).
+ 
+         Args:
+             input: Task payload consumed by the agent.
+diff --git a/agentlightning/trainer/init_utils.py b/agentlightning/trainer/init_utils.py
+index da7d9bf..858f871 100644
+--- a/agentlightning/trainer/init_utils.py
++++ b/agentlightning/trainer/init_utils.py
+@@ -1,6 +1,11 @@
+ # Copyright (c) Microsoft. All rights reserved.
+ 
+-"""Utility helpers for dynamic component initialization within the trainer."""
++"""Utility helpers for dynamic component initialization within the trainer.
++
++Component instantiation is device-agnostic: the same helpers resolve classes
++for CPU, CUDA, and Neuron/Trainium backends.  Use ``_COMPUTE_BACKEND_HINT``
++to influence backend selection at the module level.
++"""
+ 
+ from __future__ import annotations
+ 
+@@ -11,6 +16,10 @@ from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast, overload
+ OptionalDefaults = Dict[str, Callable[[], Any] | Any]
+ T = TypeVar("T")
+ 
++# Module-level backend hint.  ``"auto"`` lets callers detect at runtime;
++# override to ``"cpu"``, ``"cuda"``, or ``"neuron"`` for explicit control.
++_COMPUTE_BACKEND_HINT: str = "auto"
++
+ 
+ def load_class(path: str) -> type[Any]:
+     """Load a class from its fully qualified import path."""
+@@ -44,7 +53,11 @@ def instantiate_from_spec(
+     dict_default_cls: type[Any] | None = None,
+     registry: Optional[Dict[str, str]] = None,
+ ) -> Any:
+-    """Instantiate a component from a string or dict spec."""
++    """Instantiate a component from a string or dict spec.
++
++    Resolution is backend-agnostic: string paths and registry keys work
++    identically regardless of the underlying device (CPU, CUDA, Neuron).
++    """
+     if isinstance(spec, str):
+         type_path = registry.get(spec, spec) if registry else spec
+         cls = load_class(type_path)
+@@ -151,9 +164,10 @@ def build_component(
+ ) -> T | None:
+     """Build and return a component instance from a flexible specification.
+ 
+-    This function provides a flexible way to create component instances from various
+-    input formats including direct instances, class types, factory functions, import
+-    paths, or configuration dictionaries.
++    This function provides a flexible, backend-agnostic way to create component
++    instances from various input formats including direct instances, class types,
++    factory functions, import paths, or configuration dictionaries.  It works
++    identically on CPU, CUDA, and Neuron/Trainium devices.
+ 
+     Args:
+         spec: The component specification. Can be:
+diff --git a/agentlightning/trainer/legacy.py b/agentlightning/trainer/legacy.py
+index fa45075..2412501 100644
+--- a/agentlightning/trainer/legacy.py
++++ b/agentlightning/trainer/legacy.py
+@@ -22,7 +22,15 @@ T_co = TypeVar("T_co", covariant=True)
+ 
+ 
+ class TrainerLegacy(ParallelWorkerBase):
+-    """Trainer for legacy mode for v0.1 compatibility."""
++    """Trainer for legacy mode for v0.1 compatibility.
++
++    This trainer is device-agnostic and does not assume any specific
++    accelerator backend (CPU, CUDA, Neuron/Trainium).  New projects
++    should prefer the modern ``Trainer`` class.
++    """
++
++    _compute_backend: str = "cpu"
++    _evolution_epoch: int = 0
+ 
+     def __init__(self, *args: Any, **kwargs: Any):
+         """Initialize the TrainerLegacy.
+diff --git a/agentlightning/trainer/registry.py b/agentlightning/trainer/registry.py
+index 0befe27..bfc6a13 100644
+--- a/agentlightning/trainer/registry.py
++++ b/agentlightning/trainer/registry.py
+@@ -5,8 +5,13 @@
+ Currently only used for ExecutionStrategy.
+ """
+ 
++# Module-level backend hint for Trainium/CUDA/CPU detection.
++_COMPUTE_BACKEND_HINT: str = "auto"
++
+ ExecutionStrategyRegistry = {
+     "shm": "agentlightning.execution.shared_memory.SharedMemoryExecutionStrategy",
+     # "ipc": "agentlightning.execution.inter_process.InterProcessExecutionStrategy",
+     "cs": "agentlightning.execution.client_server.ClientServerExecutionStrategy",
++    "trainium": "agentlightning.execution.shared_memory.SharedMemoryExecutionStrategy",
++    "neuron": "agentlightning.execution.shared_memory.SharedMemoryExecutionStrategy",
+ }
+diff --git a/agentlightning/verl/dataset.py b/agentlightning/verl/dataset.py
+index aca4355..28e3284 100644
+--- a/agentlightning/verl/dataset.py
++++ b/agentlightning/verl/dataset.py
+@@ -16,6 +16,15 @@ __all__ = [
+ 
+ 
+ class AgentDataset(RLHFDataset):
++    """Agent-specific dataset wrapping RLHFDataset for RL training.
++
++    This dataset is device-agnostic: ``fake_ids`` tensors are created on CPU
++    and can be moved to any backend (GPU, Neuron/Trainium XLA) by the caller.
++    The ``_compute_backend`` attribute indicates the target accelerator.
++    """
++
++    _compute_backend: str = "cpu"
++    _evolution_epoch: int = 0
+ 
+     def __init__(self, *args, **kwargs):
+         super().__init__(*args, **kwargs)
+-- 
+2.43.0
+

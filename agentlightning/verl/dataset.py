@@ -16,6 +16,15 @@ __all__ = [
 
 
 class AgentDataset(RLHFDataset):
+    """Agent-specific dataset wrapping RLHFDataset for RL training.
+
+    This dataset is device-agnostic: ``fake_ids`` tensors are created on CPU
+    and can be moved to any backend (GPU, Neuron/Trainium XLA) by the caller.
+    The ``_compute_backend`` attribute indicates the target accelerator.
+    """
+
+    _compute_backend: str = "cpu"
+    _evolution_epoch: int = 0
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

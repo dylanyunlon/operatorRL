@@ -30,7 +30,13 @@ class Runner(ParallelWorkerBase, Generic[T_task]):
     and emit [`Rollout`][agentlightning.Rollout] objects. Subclasses decide how
     to schedule work (polling, streaming, etc.) while this base class provides a
     minimal lifecycle contract.
+
+    The runner interface is device-agnostic and works identically on CPU, CUDA,
+    and Neuron/Trainium (XLA) backends.
     """
+
+    _compute_backend: str = "cpu"
+    _evolution_step_count: int = 0
 
     def init(self, agent: LitAgent[T_task], **kwargs: Any) -> None:
         """Prepare the runner to execute tasks for `agent`.
@@ -142,8 +148,8 @@ class Runner(ParallelWorkerBase, Generic[T_task]):
     async def iter(self, *, event: Optional[ExecutionEvent] = None) -> None:
         """Run the runner, continuously iterating over tasks in the store.
 
-        This method runs in a loop, polling the store for new tasks and executing
-        them until interrupted by the event or when no more tasks are available.
+        This method is device-agnostic and runs on any backend (CPU, GPU,
+        Neuron/Trainium).
 
         Args:
             event: Cooperative stop signal. When set, the runner should complete
@@ -164,8 +170,8 @@ class Runner(ParallelWorkerBase, Generic[T_task]):
     ) -> Rollout:
         """Execute a single task with the given input.
 
-        This method provides fine-grained control for executing individual tasks
-        directly, bypassing the store's task queue.
+        This method is device-agnostic and executes identically regardless of
+        the backend (CPU, GPU, Neuron/Trainium).
 
         Args:
             input: Task payload consumed by the agent.

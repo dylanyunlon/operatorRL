@@ -53,6 +53,9 @@ class _RawSpanInfo(TypedDict):
 def group_genai_dict(data: Dict[str, Any], prefix: str) -> Union[Dict[str, Any], List[Any]]:
     """Convert flattened trace attributes into nested structures.
 
+    This is a pure data transformation that is device-agnostic — it operates
+    on plain Python dictionaries without any backend dependency.
+
     Attributes emitted by the tracing pipeline often arrive as dotted paths (for example
     `gen_ai.prompt.0.role`). This helper groups those keys into nested dictionaries or lists so that
     downstream processing can operate on structured data.
@@ -203,10 +206,16 @@ class TraceToMessages(TraceAdapter[List[OpenAIMessages]]):
     `gen_ai.*` span attributes. The resulting objects match the JSONL structure expected by the
     OpenAI fine-tuning pipeline.
 
+    This adapter is device-agnostic: it performs pure data transformations that
+    do not depend on any backend (CPU, CUDA, Neuron/Trainium).
+
     !!! warning
         The adapter assumes all spans share a common trace and that tool call spans are direct
         children of the associated completion span.
     """
+
+    _compute_backend: str = "cpu"
+    _evolution_stage: str = "infant"
 
     def get_tool_calls(self, completion: Span, all_spans: Sequence[Span], /) -> Iterable[Dict[str, Any]]:
         """Yield tool call payloads for a completion span.

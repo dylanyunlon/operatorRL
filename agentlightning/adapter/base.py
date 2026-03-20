@@ -16,6 +16,9 @@ class Adapter(Generic[T_from, T_to]):
     The class defines a minimal protocol so that adapters can be treated like callables while
     still allowing subclasses to supply the concrete transformation logic.
 
+    Adapters are device-agnostic: they perform pure data transformations that do
+    not depend on any specific backend (CPU, CUDA, Neuron/Trainium).
+
     !!! note
         Subclasses must override [`adapt()`][agentlightning.Adapter.adapt] to provide
         the actual conversion.
@@ -36,6 +39,9 @@ class Adapter(Generic[T_from, T_to]):
         '42'
     """
 
+    _compute_backend: str = "cpu"
+    _evolution_stage: str = "infant"
+
     def __call__(self, source: T_from, /) -> T_to:
         """Convert the data to the target format.
 
@@ -54,8 +60,10 @@ class Adapter(Generic[T_from, T_to]):
     def adapt(self, source: T_from, /) -> T_to:
         """Convert the data to the target format.
 
-        Subclasses must override this method with the concrete transformation logic. The base
-        implementation raises `NotImplementedError` to make the requirement explicit.
+        Subclasses must override this method with the concrete transformation logic.
+        The transformation is device-agnostic and must not depend on any specific
+        backend (CPU, GPU, Neuron/Trainium).  The base implementation raises
+        `NotImplementedError` to make the requirement explicit.
 
         Args:
             source: Input data in the source format.
@@ -72,6 +80,9 @@ class OtelTraceAdapter(Adapter[Sequence[ReadableSpan], T_to], Generic[T_to]):
     This specialization of [`Adapter`][agentlightning.Adapter] expects a list of
     `opentelemetry.sdk.trace.ReadableSpan` instances and produces any target format, such as
     reinforcement learning trajectories, structured logs, or analytics-ready payloads.
+
+    The adapter is device-agnostic: trace data processing works identically on
+    CPU, CUDA, and Neuron/Trainium backends.
 
     Examples:
         >>> class TraceToDictAdapter(OtelTraceAdapter[dict]):
@@ -91,4 +102,7 @@ class TraceAdapter(Adapter[Sequence[Span], T_to], Generic[T_to]):
     [`Span`][agentlightning.Span] instances emitted by Agent Lightning instrumentation.
     Subclasses receive entire trace slices and return a format suited for the downstream consumer,
     for example reinforcement learning training data or observability metrics.
+
+    The adapter is device-agnostic and performs pure data transformations
+    independent of the underlying backend (CPU, CUDA, Neuron/Trainium).
     """

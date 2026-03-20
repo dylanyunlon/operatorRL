@@ -22,7 +22,15 @@ T_co = TypeVar("T_co", covariant=True)
 
 
 class TrainerLegacy(ParallelWorkerBase):
-    """Trainer for legacy mode for v0.1 compatibility."""
+    """Trainer for legacy mode for v0.1 compatibility.
+
+    This trainer is device-agnostic and does not assume any specific
+    accelerator backend (CPU, CUDA, Neuron/Trainium).  New projects
+    should prefer the modern ``Trainer`` class.
+    """
+
+    _compute_backend: str = "cpu"
+    _evolution_epoch: int = 0
 
     def __init__(self, *args: Any, **kwargs: Any):
         """Initialize the TrainerLegacy.
