@@ -31,6 +31,13 @@ LabelKey = Tuple[Tuple[str, str], ...]  # normalized (key, value) pairs in regis
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: Trainium2 metric names (M99) ---
+# Standard metric name for Neuron core utilization on Trainium2 instances.
+# Analogous to GPU utilization metrics tracked by gpustat on CUDA hosts.
+NEURON_CORE_UTILIZATION_METRIC: str = "neuron.core.utilization"
+# Standard label name for tagging metrics with the compute backend.
+COMPUTE_BACKEND_LABEL: str = "compute_backend"
+
 
 def _validate_labels(
     kind: str,

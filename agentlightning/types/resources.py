@@ -39,6 +39,13 @@ class Resource(BaseModel):
     resource_type: Any
     """Alias of the resource type."""
 
+    # --- AgentRL self-evolution: accelerator awareness (M102) ---
+    # Optional field indicating which compute accelerator this resource targets.
+    # Values: "cpu" (default), "cuda" (NVIDIA GPU), "neuron" (AWS Trainium2).
+    # Used by the training pipeline to route resources to the correct device.
+    accelerator_type: Optional[str] = None
+    """Optional compute accelerator type (cpu/cuda/neuron)."""
+
 
 class LLM(Resource):
     """Resource that identifies an LLM endpoint and its configuration."""

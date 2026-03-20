@@ -22,6 +22,13 @@ from typing import Any
 
 from agent_os.integrations.base import GovernancePolicy
 
+# --- AgentRL self-evolution: compute backend attestation (M109) ---
+# Key for including compute backend information in the trust attestation chain.
+# The trust root can verify that an agent's claimed compute backend matches
+# the actual hardware environment, preventing spoofing attacks where an agent
+# claims to run on Trainium2 but actually runs on CPU.
+_COMPUTE_BACKEND_ATTESTATION: str = "compute_backend"
+
 
 @dataclass
 class TrustDecision:

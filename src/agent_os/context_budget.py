@@ -104,6 +104,17 @@ class BudgetExceeded(Exception):
 # Context Budget Scheduler
 # ---------------------------------------------------------------------------
 
+# --- AgentRL self-evolution: maturity-aware budget scaling (M107) ---
+# Mature agents have proven reliability and earn larger context budgets.
+# Infant agents (newly evolved) get restricted budgets as a safety measure.
+# This implements the "成长阶段" (growth stage) concept from the plan.
+_MATURITY_BUDGET_MULTIPLIERS: dict[str, float] = {
+    "infant": 0.5,       # Newly born agent — restricted budget
+    "adolescent": 0.75,  # Growing competence — moderate budget
+    "adult": 1.0,        # Fully proven — standard budget
+    "elder": 1.25,       # Expert agent — bonus budget for complex tasks
+}
+
 # Default minimum context sizes per priority (tokens)
 _MIN_CONTEXT: dict[ContextPriority, int] = {
     ContextPriority.CRITICAL: 4000,

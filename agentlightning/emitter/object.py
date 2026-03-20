@@ -13,6 +13,12 @@ from agentlightning.utils.otel import flatten_attributes, full_qualified_name, s
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: maturity level in object spans (M104) ---
+# Attribute key for tagging object spans with the agent's current maturity level.
+# Enables the training pipeline to weight object emissions by growth stage
+# (infant/adolescent/adult/elder) during PPO reward computation.
+_MATURITY_LEVEL_KEY: str = "agentlightning.maturity.level"
+
 
 def emit_object(object: Any, attributes: Optional[Dict[str, Any]] = None, propagate: bool = True) -> SpanCoreFields:
     """Emit an object's serialized representation as an OpenTelemetry span.

@@ -33,6 +33,12 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: evolution generation in memory audit (M108) ---
+# Key for tagging memory audit records with the evolution generation that
+# produced them. Enables cross-generation poisoning analysis: did a
+# previous generation's memory entries corrupt the current generation?
+_EVOLUTION_GENERATION_KEY: str = "evolution_generation"
+
 
 # ---------------------------------------------------------------------------
 # Data models

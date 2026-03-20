@@ -72,6 +72,15 @@ class LitAgent(Generic[T]):
         self._trainer_ref: weakref.ReferenceType[Trainer] | None = None
         self._runner_ref: weakref.ReferenceType[Runner[T]] | None = None
 
+        # --- AgentRL self-evolution tracking (M91) ---
+        # Counts how many times this agent has been through the A → A' cycle.
+        # Mirrors the biological concept: each generation is a full evolution step
+        # where the agent was updated via the PPO/GRPO training loop.
+        self._evolution_generation: int = 0
+        # Compute backend identifier for Trainium2/CUDA/CPU awareness.
+        # On Trainium2 clusters this would be set to "neuron" by the runner.
+        self._compute_backend: str = "cpu"
+
     def is_async(self) -> bool:
         """Return `True` when the agent overrides any asynchronous rollout methods.
 

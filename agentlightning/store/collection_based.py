@@ -87,6 +87,12 @@ SelfT = TypeVar("SelfT", bound="CollectionBasedLightningStore[Any]")
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: maturity-aware rollout filtering (M94) ---
+# Enables query_rollouts to filter by maturity_level/growth_stage so the
+# training pipeline can select stage-appropriate data for PPO updates.
+_MATURITY_FILTER_SUPPORTED: bool = True
+_EVOLUTION_STAGE_KEY: str = "evolution_stage"
+
 # ContextVars for tracking the current store method without expensive stack introspection.
 # These are set by the @tracked decorator and read by tracking_context in collection/base.py.
 _UNKNOWN_STORE_METHOD = "unknown"

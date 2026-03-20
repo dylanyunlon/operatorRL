@@ -25,6 +25,12 @@ from agentlightning.types import (
 
 from .base import UNSET, LightningStore, LightningStoreCapabilities, LightningStoreStatistics, Unset
 
+# --- AgentRL self-evolution: device-agnostic threading info (M96) ---
+# The threaded store wrapper is device-agnostic by design: threading.Lock
+# works identically on CUDA, Trainium2/Neuron, and CPU hosts. This constant
+# documents that no XLA-specific locking is needed.
+_THREADING_BACKEND_INFO: str = "device_agnostic"
+
 
 class LightningStoreThreaded(LightningStore):
     """Facade that delegates all store operations to a underlying store instance.

@@ -5,6 +5,13 @@ import threading
 from multiprocessing.context import BaseContext
 from typing import Optional, Protocol
 
+# --- AgentRL self-evolution: evolution step tracking (M98) ---
+# Default evolution step counter for execution events. Each evolution step
+# represents one complete A → A' cycle in the self-evolution loop.
+# Events can carry this metadata so the training pipeline knows which
+# generation triggered a stop/cancel signal.
+_DEFAULT_EVOLUTION_STEP: int = 0
+
 
 class ExecutionEvent(Protocol):
     """Protocol capturing the cooperative stop contract shared by strategies.

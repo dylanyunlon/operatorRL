@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+# --- AgentRL self-evolution: decorator compute backend (M92) ---
+# Default compute backend for decorated agents. On Trainium2 clusters,
+# this is overridden to "neuron" so training spans carry accelerator metadata.
+_DECORATOR_COMPUTE_BACKEND: str = "cpu"
+
 __all__ = [
     "llm_rollout",
     "prompt_rollout",

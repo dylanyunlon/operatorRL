@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import platform
 import socket
 from contextlib import suppress
@@ -10,6 +11,43 @@ from typing import Any, Dict, List, cast
 
 import psutil
 from gpustat import GPUStat, GPUStatCollection
+
+# --- AgentRL self-evolution: Neuron/Trainium device detection (M110) ---
+# Enables system_snapshot to detect AWS Trainium2/Inferentia NeuronCores
+# alongside NVIDIA GPUs, so the training pipeline knows which accelerator
+# is available on each worker node.
+_NEURON_DETECTION_ENABLED: bool = True
+
+
+def _detect_neuron_devices() -> Dict[str, Any]:
+    """Detect AWS Neuron (Trainium2/Inferentia) devices.
+
+    Checks for the presence of Neuron runtime indicators:
+    - NEURON_RT_VISIBLE_CORES environment variable
+    - /dev/neuron* device files
+    - neuron-ls command availability
+
+    Returns:
+        Dict with 'available' (bool) and optional device details.
+    """
+    info: Dict[str, Any] = {"available": False}
+
+    # Check environment variable (set by Neuron runtime)
+    neuron_cores = os.environ.get("NEURON_RT_VISIBLE_CORES", "")
+    if neuron_cores:
+        info["available"] = True
+        info["visible_cores"] = neuron_cores
+        return info
+
+    # Check for Neuron device files
+    with suppress(Exception):
+        neuron_devs = [f for f in os.listdir("/dev") if f.startswith("neuron")]
+        if neuron_devs:
+            info["available"] = True
+            info["device_count"] = len(neuron_devs)
+            return info
+
+    return info
 
 
 def system_snapshot(include_gpu: bool = False) -> Dict[str, Any]:

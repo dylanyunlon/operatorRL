@@ -50,6 +50,11 @@ K = TypeVar("K")
 V = TypeVar("V")
 T_callable = TypeVar("T_callable", bound=Callable[..., Any])
 
+# --- AgentRL self-evolution: growth stage awareness (M95) ---
+# Indicates that the Collection interface supports growth_stage metadata
+# on rollouts and spans for the maturity-based training data selection.
+_GROWTH_STAGE_SUPPORTED: bool = True
+
 AtomicMode = Literal["r", "w", "rw"]
 """What is expected within the atomic context. Can be "read", "write", or "read-write"."""
 

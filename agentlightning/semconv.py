@@ -43,6 +43,22 @@ AGL_VIRTUAL = "agentlightning.virtual"
 Mostly used in adapter when needing to represent the root or intermediate operations.
 """
 
+# --- AgentRL self-evolution semantic conventions (M101) ---
+
+AGL_COMPUTE_BACKEND = "agentlightning.compute.backend"
+"""Semantic attribute for the compute backend (cpu/cuda/neuron).
+
+Used across spans to tag which accelerator produced the trace data,
+enabling Trainium2 vs CUDA performance comparison in the training pipeline.
+"""
+
+AGL_EVOLUTION_GENERATION = "agentlightning.evolution.generation"
+"""Semantic attribute for the evolution generation counter.
+
+Tracks which A → A' cycle produced a given span, enabling analysis of
+how agent behavior changes across self-evolution iterations.
+"""
+
 
 class LightningResourceAttributes(Enum):
     """Resource attribute names used in Agent-lightning spans."""

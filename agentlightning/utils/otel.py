@@ -25,6 +25,11 @@ from agentlightning.utils.otlp import LightningStoreOTLPExporter
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: compute backend semantic attribute (M100) ---
+# Standard OTel attribute name for the compute backend (cpu/cuda/neuron).
+# Injected into spans so training traces carry accelerator provenance.
+COMPUTE_BACKEND_ATTR: str = "compute.backend"
+
 __all__ = [
     "full_qualified_name",
     "get_tracer_provider",

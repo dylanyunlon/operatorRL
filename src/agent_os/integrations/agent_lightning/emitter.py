@@ -17,6 +17,14 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: body sense signals in flight recorder (M105) ---
+# Key for converting audit events into somatic/body-sense reward signals.
+# Maps the "进化思想" concept: the agent's "body" (runtime environment)
+# produces innate signals (success/error) that drive self-evolution.
+_BODY_SENSE_SIGNAL_KEY: str = "body_sense.signal"
+# Key for tagging flight recorder spans with the current evolution stage.
+_EVOLUTION_STAGE_KEY: str = "evolution.stage"
+
 
 @dataclass
 class LightningSpan:

@@ -18,6 +18,11 @@ from .events import ExecutionEvent, MultiprocessingEvent
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: execution compute backend (M97) ---
+# Default compute backend for client-server execution strategy.
+# On Trainium2 clusters, set to "neuron" via NEURON_RT_VISIBLE_CORES.
+_EXECUTION_COMPUTE_BACKEND: str = "cpu"
+
 
 class ClientServerExecutionStrategy(ExecutionStrategy):
     """Run algorithm and runner bundles as separate processes over HTTP.
@@ -36,6 +41,12 @@ class ClientServerExecutionStrategy(ExecutionStrategy):
     via `main_process`. The runner-on-main option is limited to
     `n_runners == 1` because each additional runner requires its own event
     loop and process.
+
+    Trainium2 / Neuron Support:
+        On AWS Trainium2 instances, each runner process should be pinned to a
+        NeuronCore group via ``NEURON_RT_VISIBLE_CORES``. The strategy itself
+        is device-agnostic — it relies on the underlying store and algorithm
+        bundles to handle XLA compilation and Neuron collective communication.
 
     !!! warning
         When `main_process == "runner"` the algorithm and HTTP server execute

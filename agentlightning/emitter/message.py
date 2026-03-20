@@ -11,6 +11,12 @@ from agentlightning.utils.otel import flatten_attributes, sanitize_attributes
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution: evolution context in message spans (M103) ---
+# Attribute key for tagging message spans with evolution context (e.g.,
+# which generation/cycle produced the message). Enables filtering training
+# logs by evolution stage in the self-evolution pipeline.
+_EVOLUTION_CONTEXT_KEY: str = "agentlightning.evolution.context"
+
 
 def emit_message(message: str, attributes: Optional[Dict[str, Any]] = None, propagate: bool = True) -> None:
     """Emit a textual message as an OpenTelemetry span.

@@ -70,6 +70,11 @@ from .utils import LATENCY_BUCKETS
 server_logger = logging.getLogger("agentlightning.store.server")
 client_logger = logging.getLogger("agentlightning.store.client")
 
+# --- AgentRL self-evolution: cluster-wide compute backend awareness (M93) ---
+# Included in health endpoint responses as X-Compute-Backend header so
+# distributed Trainium2/CUDA/CPU workers can discover the cluster topology.
+_DEFAULT_COMPUTE_BACKEND: str = "cpu"
+
 API_V1_PREFIX = "/v1"
 API_AGL_PREFIX = "/agl"
 API_V1_AGL_PREFIX = API_V1_PREFIX + API_AGL_PREFIX

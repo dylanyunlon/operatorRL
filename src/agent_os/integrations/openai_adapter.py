@@ -46,6 +46,15 @@ from .base import BaseIntegration, ExecutionContext, GovernancePolicy
 
 logger = logging.getLogger("agent_os.openai")
 
+# --- AgentRL self-evolution: repair enzyme pattern (M106) ---
+# Parallel to M37 (anthropic_adapter): when enabled, the OpenAI adapter
+# injects error context into the system prompt on consecutive failures,
+# allowing the LLM to act as a "repair enzyme" that self-corrects.
+# This mirrors the biological concept from 进化思想: the LLM sees its own
+# errors and proposes fixes, completing the A → A' self-evolution cycle.
+_REPAIR_ENZYME_ENABLED: bool = True
+_REPAIR_ENZYME_MAX_RETRIES: int = 3
+
 
 @dataclass
 class AssistantContext(ExecutionContext):
