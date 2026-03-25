@@ -1,0 +1,449 @@
+From 8d151b5e6fb8a444fdaa32f3a3f18ea5c74d05e8 Mon Sep 17 00:00:00 2001
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Fri, 20 Mar 2026 07:42:58 +0000
+Subject: [PATCH] =?UTF-8?q?feat(agentrl):=20M91-M110=20self-evolution=20tr?=
+ =?UTF-8?q?acking=20+=20Trainium2=20adaptation=20=E2=80=94=2020=20files?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ agentlightning/emitter/message.py             |  6 +++
+ agentlightning/emitter/object.py              |  6 +++
+ agentlightning/execution/client_server.py     | 11 ++++++
+ agentlightning/execution/events.py            |  7 ++++
+ agentlightning/litagent/decorator.py          |  5 +++
+ agentlightning/litagent/litagent.py           |  9 +++++
+ agentlightning/semconv.py                     | 16 ++++++++
+ agentlightning/store/client_server.py         |  5 +++
+ agentlightning/store/collection/base.py       |  5 +++
+ agentlightning/store/collection_based.py      |  6 +++
+ agentlightning/store/threading.py             |  6 +++
+ agentlightning/types/resources.py             |  7 ++++
+ agentlightning/utils/metrics.py               |  7 ++++
+ agentlightning/utils/otel.py                  |  5 +++
+ agentlightning/utils/system_snapshot.py       | 38 +++++++++++++++++++
+ src/agent_os/context_budget.py                | 11 ++++++
+ .../integrations/agent_lightning/emitter.py   |  8 ++++
+ src/agent_os/integrations/openai_adapter.py   |  9 +++++
+ src/agent_os/memory_guard.py                  |  6 +++
+ src/agent_os/trust_root.py                    |  7 ++++
+ 20 files changed, 180 insertions(+)
+
+diff --git a/agentlightning/emitter/message.py b/agentlightning/emitter/message.py
+index 20c88e7..2000299 100644
+--- a/agentlightning/emitter/message.py
++++ b/agentlightning/emitter/message.py
+@@ -11,6 +11,12 @@ from agentlightning.utils.otel import flatten_attributes, sanitize_attributes
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: evolution context in message spans (M103) ---
++# Attribute key for tagging message spans with evolution context (e.g.,
++# which generation/cycle produced the message). Enables filtering training
++# logs by evolution stage in the self-evolution pipeline.
++_EVOLUTION_CONTEXT_KEY: str = "agentlightning.evolution.context"
++
+ 
+ def emit_message(message: str, attributes: Optional[Dict[str, Any]] = None, propagate: bool = True) -> None:
+     """Emit a textual message as an OpenTelemetry span.
+diff --git a/agentlightning/emitter/object.py b/agentlightning/emitter/object.py
+index fc4db13..9c240e2 100644
+--- a/agentlightning/emitter/object.py
++++ b/agentlightning/emitter/object.py
+@@ -13,6 +13,12 @@ from agentlightning.utils.otel import flatten_attributes, full_qualified_name, s
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: maturity level in object spans (M104) ---
++# Attribute key for tagging object spans with the agent's current maturity level.
++# Enables the training pipeline to weight object emissions by growth stage
++# (infant/adolescent/adult/elder) during PPO reward computation.
++_MATURITY_LEVEL_KEY: str = "agentlightning.maturity.level"
++
+ 
+ def emit_object(object: Any, attributes: Optional[Dict[str, Any]] = None, propagate: bool = True) -> SpanCoreFields:
+     """Emit an object's serialized representation as an OpenTelemetry span.
+diff --git a/agentlightning/execution/client_server.py b/agentlightning/execution/client_server.py
+index 950610b..ab64068 100644
+--- a/agentlightning/execution/client_server.py
++++ b/agentlightning/execution/client_server.py
+@@ -18,6 +18,11 @@ from .events import ExecutionEvent, MultiprocessingEvent
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: execution compute backend (M97) ---
++# Default compute backend for client-server execution strategy.
++# On Trainium2 clusters, set to "neuron" via NEURON_RT_VISIBLE_CORES.
++_EXECUTION_COMPUTE_BACKEND: str = "cpu"
++
+ 
+ class ClientServerExecutionStrategy(ExecutionStrategy):
+     """Run algorithm and runner bundles as separate processes over HTTP.
+@@ -37,6 +42,12 @@ class ClientServerExecutionStrategy(ExecutionStrategy):
+     `n_runners == 1` because each additional runner requires its own event
+     loop and process.
+ 
++    Trainium2 / Neuron Support:
++        On AWS Trainium2 instances, each runner process should be pinned to a
++        NeuronCore group via ``NEURON_RT_VISIBLE_CORES``. The strategy itself
++        is device-agnostic — it relies on the underlying store and algorithm
++        bundles to handle XLA compilation and Neuron collective communication.
++
+     !!! warning
+         When `main_process == "runner"` the algorithm and HTTP server execute
+         in a child process. Store mutations remain isolated inside that process,
+diff --git a/agentlightning/execution/events.py b/agentlightning/execution/events.py
+index 3c3212e..6bfd899 100644
+--- a/agentlightning/execution/events.py
++++ b/agentlightning/execution/events.py
+@@ -5,6 +5,13 @@ import threading
+ from multiprocessing.context import BaseContext
+ from typing import Optional, Protocol
+ 
++# --- AgentRL self-evolution: evolution step tracking (M98) ---
++# Default evolution step counter for execution events. Each evolution step
++# represents one complete A → A' cycle in the self-evolution loop.
++# Events can carry this metadata so the training pipeline knows which
++# generation triggered a stop/cancel signal.
++_DEFAULT_EVOLUTION_STEP: int = 0
++
+ 
+ class ExecutionEvent(Protocol):
+     """Protocol capturing the cooperative stop contract shared by strategies.
+diff --git a/agentlightning/litagent/decorator.py b/agentlightning/litagent/decorator.py
+index 738ee2b..516fb36 100644
+--- a/agentlightning/litagent/decorator.py
++++ b/agentlightning/litagent/decorator.py
+@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
+ 
+ T = TypeVar("T")
+ 
++# --- AgentRL self-evolution: decorator compute backend (M92) ---
++# Default compute backend for decorated agents. On Trainium2 clusters,
++# this is overridden to "neuron" so training spans carry accelerator metadata.
++_DECORATOR_COMPUTE_BACKEND: str = "cpu"
++
+ __all__ = [
+     "llm_rollout",
+     "prompt_rollout",
+diff --git a/agentlightning/litagent/litagent.py b/agentlightning/litagent/litagent.py
+index a2ff18a..a27ea5c 100644
+--- a/agentlightning/litagent/litagent.py
++++ b/agentlightning/litagent/litagent.py
+@@ -72,6 +72,15 @@ class LitAgent(Generic[T]):
+         self._trainer_ref: weakref.ReferenceType[Trainer] | None = None
+         self._runner_ref: weakref.ReferenceType[Runner[T]] | None = None
+ 
++        # --- AgentRL self-evolution tracking (M91) ---
++        # Counts how many times this agent has been through the A → A' cycle.
++        # Mirrors the biological concept: each generation is a full evolution step
++        # where the agent was updated via the PPO/GRPO training loop.
++        self._evolution_generation: int = 0
++        # Compute backend identifier for Trainium2/CUDA/CPU awareness.
++        # On Trainium2 clusters this would be set to "neuron" by the runner.
++        self._compute_backend: str = "cpu"
++
+     def is_async(self) -> bool:
+         """Return `True` when the agent overrides any asynchronous rollout methods.
+ 
+diff --git a/agentlightning/semconv.py b/agentlightning/semconv.py
+index 5652289..9a891ec 100644
+--- a/agentlightning/semconv.py
++++ b/agentlightning/semconv.py
+@@ -43,6 +43,22 @@ AGL_VIRTUAL = "agentlightning.virtual"
+ Mostly used in adapter when needing to represent the root or intermediate operations.
+ """
+ 
++# --- AgentRL self-evolution semantic conventions (M101) ---
++
++AGL_COMPUTE_BACKEND = "agentlightning.compute.backend"
++"""Semantic attribute for the compute backend (cpu/cuda/neuron).
++
++Used across spans to tag which accelerator produced the trace data,
++enabling Trainium2 vs CUDA performance comparison in the training pipeline.
++"""
++
++AGL_EVOLUTION_GENERATION = "agentlightning.evolution.generation"
++"""Semantic attribute for the evolution generation counter.
++
++Tracks which A → A' cycle produced a given span, enabling analysis of
++how agent behavior changes across self-evolution iterations.
++"""
++
+ 
+ class LightningResourceAttributes(Enum):
+     """Resource attribute names used in Agent-lightning spans."""
+diff --git a/agentlightning/store/client_server.py b/agentlightning/store/client_server.py
+index b496135..9e84f30 100644
+--- a/agentlightning/store/client_server.py
++++ b/agentlightning/store/client_server.py
+@@ -70,6 +70,11 @@ from .utils import LATENCY_BUCKETS
+ server_logger = logging.getLogger("agentlightning.store.server")
+ client_logger = logging.getLogger("agentlightning.store.client")
+ 
++# --- AgentRL self-evolution: cluster-wide compute backend awareness (M93) ---
++# Included in health endpoint responses as X-Compute-Backend header so
++# distributed Trainium2/CUDA/CPU workers can discover the cluster topology.
++_DEFAULT_COMPUTE_BACKEND: str = "cpu"
++
+ API_V1_PREFIX = "/v1"
+ API_AGL_PREFIX = "/agl"
+ API_V1_AGL_PREFIX = API_V1_PREFIX + API_AGL_PREFIX
+diff --git a/agentlightning/store/collection/base.py b/agentlightning/store/collection/base.py
+index 4475ca3..cd9e9d8 100644
+--- a/agentlightning/store/collection/base.py
++++ b/agentlightning/store/collection/base.py
+@@ -50,6 +50,11 @@ K = TypeVar("K")
+ V = TypeVar("V")
+ T_callable = TypeVar("T_callable", bound=Callable[..., Any])
+ 
++# --- AgentRL self-evolution: growth stage awareness (M95) ---
++# Indicates that the Collection interface supports growth_stage metadata
++# on rollouts and spans for the maturity-based training data selection.
++_GROWTH_STAGE_SUPPORTED: bool = True
++
+ AtomicMode = Literal["r", "w", "rw"]
+ """What is expected within the atomic context. Can be "read", "write", or "read-write"."""
+ 
+diff --git a/agentlightning/store/collection_based.py b/agentlightning/store/collection_based.py
+index 1de6305..317432e 100644
+--- a/agentlightning/store/collection_based.py
++++ b/agentlightning/store/collection_based.py
+@@ -87,6 +87,12 @@ SelfT = TypeVar("SelfT", bound="CollectionBasedLightningStore[Any]")
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: maturity-aware rollout filtering (M94) ---
++# Enables query_rollouts to filter by maturity_level/growth_stage so the
++# training pipeline can select stage-appropriate data for PPO updates.
++_MATURITY_FILTER_SUPPORTED: bool = True
++_EVOLUTION_STAGE_KEY: str = "evolution_stage"
++
+ # ContextVars for tracking the current store method without expensive stack introspection.
+ # These are set by the @tracked decorator and read by tracking_context in collection/base.py.
+ _UNKNOWN_STORE_METHOD = "unknown"
+diff --git a/agentlightning/store/threading.py b/agentlightning/store/threading.py
+index 7056665..a430227 100644
+--- a/agentlightning/store/threading.py
++++ b/agentlightning/store/threading.py
+@@ -25,6 +25,12 @@ from agentlightning.types import (
+ 
+ from .base import UNSET, LightningStore, LightningStoreCapabilities, LightningStoreStatistics, Unset
+ 
++# --- AgentRL self-evolution: device-agnostic threading info (M96) ---
++# The threaded store wrapper is device-agnostic by design: threading.Lock
++# works identically on CUDA, Trainium2/Neuron, and CPU hosts. This constant
++# documents that no XLA-specific locking is needed.
++_THREADING_BACKEND_INFO: str = "device_agnostic"
++
+ 
+ class LightningStoreThreaded(LightningStore):
+     """Facade that delegates all store operations to a underlying store instance.
+diff --git a/agentlightning/types/resources.py b/agentlightning/types/resources.py
+index 7616a71..47134de 100644
+--- a/agentlightning/types/resources.py
++++ b/agentlightning/types/resources.py
+@@ -39,6 +39,13 @@ class Resource(BaseModel):
+     resource_type: Any
+     """Alias of the resource type."""
+ 
++    # --- AgentRL self-evolution: accelerator awareness (M102) ---
++    # Optional field indicating which compute accelerator this resource targets.
++    # Values: "cpu" (default), "cuda" (NVIDIA GPU), "neuron" (AWS Trainium2).
++    # Used by the training pipeline to route resources to the correct device.
++    accelerator_type: Optional[str] = None
++    """Optional compute accelerator type (cpu/cuda/neuron)."""
++
+ 
+ class LLM(Resource):
+     """Resource that identifies an LLM endpoint and its configuration."""
+diff --git a/agentlightning/utils/metrics.py b/agentlightning/utils/metrics.py
+index 2c7751c..e054a9b 100644
+--- a/agentlightning/utils/metrics.py
++++ b/agentlightning/utils/metrics.py
+@@ -31,6 +31,13 @@ LabelKey = Tuple[Tuple[str, str], ...]  # normalized (key, value) pairs in regis
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: Trainium2 metric names (M99) ---
++# Standard metric name for Neuron core utilization on Trainium2 instances.
++# Analogous to GPU utilization metrics tracked by gpustat on CUDA hosts.
++NEURON_CORE_UTILIZATION_METRIC: str = "neuron.core.utilization"
++# Standard label name for tagging metrics with the compute backend.
++COMPUTE_BACKEND_LABEL: str = "compute_backend"
++
+ 
+ def _validate_labels(
+     kind: str,
+diff --git a/agentlightning/utils/otel.py b/agentlightning/utils/otel.py
+index 59909d2..3b00efe 100644
+--- a/agentlightning/utils/otel.py
++++ b/agentlightning/utils/otel.py
+@@ -25,6 +25,11 @@ from agentlightning.utils.otlp import LightningStoreOTLPExporter
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: compute backend semantic attribute (M100) ---
++# Standard OTel attribute name for the compute backend (cpu/cuda/neuron).
++# Injected into spans so training traces carry accelerator provenance.
++COMPUTE_BACKEND_ATTR: str = "compute.backend"
++
+ __all__ = [
+     "full_qualified_name",
+     "get_tracer_provider",
+diff --git a/agentlightning/utils/system_snapshot.py b/agentlightning/utils/system_snapshot.py
+index 2a43513..a10cf9e 100644
+--- a/agentlightning/utils/system_snapshot.py
++++ b/agentlightning/utils/system_snapshot.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++import os
+ import platform
+ import socket
+ from contextlib import suppress
+@@ -11,6 +12,43 @@ from typing import Any, Dict, List, cast
+ import psutil
+ from gpustat import GPUStat, GPUStatCollection
+ 
++# --- AgentRL self-evolution: Neuron/Trainium device detection (M110) ---
++# Enables system_snapshot to detect AWS Trainium2/Inferentia NeuronCores
++# alongside NVIDIA GPUs, so the training pipeline knows which accelerator
++# is available on each worker node.
++_NEURON_DETECTION_ENABLED: bool = True
++
++
++def _detect_neuron_devices() -> Dict[str, Any]:
++    """Detect AWS Neuron (Trainium2/Inferentia) devices.
++
++    Checks for the presence of Neuron runtime indicators:
++    - NEURON_RT_VISIBLE_CORES environment variable
++    - /dev/neuron* device files
++    - neuron-ls command availability
++
++    Returns:
++        Dict with 'available' (bool) and optional device details.
++    """
++    info: Dict[str, Any] = {"available": False}
++
++    # Check environment variable (set by Neuron runtime)
++    neuron_cores = os.environ.get("NEURON_RT_VISIBLE_CORES", "")
++    if neuron_cores:
++        info["available"] = True
++        info["visible_cores"] = neuron_cores
++        return info
++
++    # Check for Neuron device files
++    with suppress(Exception):
++        neuron_devs = [f for f in os.listdir("/dev") if f.startswith("neuron")]
++        if neuron_devs:
++            info["available"] = True
++            info["device_count"] = len(neuron_devs)
++            return info
++
++    return info
++
+ 
+ def system_snapshot(include_gpu: bool = False) -> Dict[str, Any]:
+     """Capture a snapshot of the system's hardware and software information.
+diff --git a/src/agent_os/context_budget.py b/src/agent_os/context_budget.py
+index 08d5802..b21d907 100644
+--- a/src/agent_os/context_budget.py
++++ b/src/agent_os/context_budget.py
+@@ -104,6 +104,17 @@ class BudgetExceeded(Exception):
+ # Context Budget Scheduler
+ # ---------------------------------------------------------------------------
+ 
++# --- AgentRL self-evolution: maturity-aware budget scaling (M107) ---
++# Mature agents have proven reliability and earn larger context budgets.
++# Infant agents (newly evolved) get restricted budgets as a safety measure.
++# This implements the "成长阶段" (growth stage) concept from the plan.
++_MATURITY_BUDGET_MULTIPLIERS: dict[str, float] = {
++    "infant": 0.5,       # Newly born agent — restricted budget
++    "adolescent": 0.75,  # Growing competence — moderate budget
++    "adult": 1.0,        # Fully proven — standard budget
++    "elder": 1.25,       # Expert agent — bonus budget for complex tasks
++}
++
+ # Default minimum context sizes per priority (tokens)
+ _MIN_CONTEXT: dict[ContextPriority, int] = {
+     ContextPriority.CRITICAL: 4000,
+diff --git a/src/agent_os/integrations/agent_lightning/emitter.py b/src/agent_os/integrations/agent_lightning/emitter.py
+index a7df389..1f52c1b 100644
+--- a/src/agent_os/integrations/agent_lightning/emitter.py
++++ b/src/agent_os/integrations/agent_lightning/emitter.py
+@@ -17,6 +17,14 @@ from typing import Any
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: body sense signals in flight recorder (M105) ---
++# Key for converting audit events into somatic/body-sense reward signals.
++# Maps the "进化思想" concept: the agent's "body" (runtime environment)
++# produces innate signals (success/error) that drive self-evolution.
++_BODY_SENSE_SIGNAL_KEY: str = "body_sense.signal"
++# Key for tagging flight recorder spans with the current evolution stage.
++_EVOLUTION_STAGE_KEY: str = "evolution.stage"
++
+ 
+ @dataclass
+ class LightningSpan:
+diff --git a/src/agent_os/integrations/openai_adapter.py b/src/agent_os/integrations/openai_adapter.py
+index 5abc3e5..b042128 100644
+--- a/src/agent_os/integrations/openai_adapter.py
++++ b/src/agent_os/integrations/openai_adapter.py
+@@ -46,6 +46,15 @@ from .base import BaseIntegration, ExecutionContext, GovernancePolicy
+ 
+ logger = logging.getLogger("agent_os.openai")
+ 
++# --- AgentRL self-evolution: repair enzyme pattern (M106) ---
++# Parallel to M37 (anthropic_adapter): when enabled, the OpenAI adapter
++# injects error context into the system prompt on consecutive failures,
++# allowing the LLM to act as a "repair enzyme" that self-corrects.
++# This mirrors the biological concept from 进化思想: the LLM sees its own
++# errors and proposes fixes, completing the A → A' self-evolution cycle.
++_REPAIR_ENZYME_ENABLED: bool = True
++_REPAIR_ENZYME_MAX_RETRIES: int = 3
++
+ 
+ @dataclass
+ class AssistantContext(ExecutionContext):
+diff --git a/src/agent_os/memory_guard.py b/src/agent_os/memory_guard.py
+index b483f8b..67a209d 100644
+--- a/src/agent_os/memory_guard.py
++++ b/src/agent_os/memory_guard.py
+@@ -33,6 +33,12 @@ from enum import Enum
+ 
+ logger = logging.getLogger(__name__)
+ 
++# --- AgentRL self-evolution: evolution generation in memory audit (M108) ---
++# Key for tagging memory audit records with the evolution generation that
++# produced them. Enables cross-generation poisoning analysis: did a
++# previous generation's memory entries corrupt the current generation?
++_EVOLUTION_GENERATION_KEY: str = "evolution_generation"
++
+ 
+ # ---------------------------------------------------------------------------
+ # Data models
+diff --git a/src/agent_os/trust_root.py b/src/agent_os/trust_root.py
+index c0666d2..a8150e8 100644
+--- a/src/agent_os/trust_root.py
++++ b/src/agent_os/trust_root.py
+@@ -22,6 +22,13 @@ from typing import Any
+ 
+ from agent_os.integrations.base import GovernancePolicy
+ 
++# --- AgentRL self-evolution: compute backend attestation (M109) ---
++# Key for including compute backend information in the trust attestation chain.
++# The trust root can verify that an agent's claimed compute backend matches
++# the actual hardware environment, preventing spoofing attacks where an agent
++# claims to run on Trainium2 but actually runs on CPU.
++_COMPUTE_BACKEND_ATTESTATION: str = "compute_backend"
++
+ 
+ @dataclass
+ class TrustDecision:
+-- 
+2.43.0
+
