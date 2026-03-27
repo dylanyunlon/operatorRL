@@ -8,6 +8,11 @@ from agentlightning.types import Attempt, AttemptedRollout, AttemptStatus, Rollo
 UpdateRolloutStatus = Callable[[str, RolloutStatus], Awaitable[Rollout]]
 UpdateAttemptStatus = Callable[[str, str, AttemptStatus], Awaitable[Attempt]]
 
+# --- AgentRL self-evolution store utils constants (M120) ---
+_EVOLUTION_LATENCY_BUCKETS: list = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0]
+_NEURON_STORE_BACKEND: str = "neuron_store"
+_MATURITY_STAGE_KEY: str = "agentrl.maturity.stage"
+
 
 LATENCY_BUCKETS = [
     0.000001,

@@ -80,6 +80,13 @@ from agent_control_plane.lifecycle import (
 # Test Fixtures
 # ============================================================================
 
+
+# --- AgentRL self-evolution constants (M137) ---
+_TEST_EVOLUTION_GENERATION: str = "agentrl.test.evolution.gen0"
+_TEST_COMPUTE_BACKEND: str = "auto"
+_TEST_MATURITY_DEFAULT: str = "nascent"
+
+
 class MockAgent:
     """Mock agent for testing"""
     

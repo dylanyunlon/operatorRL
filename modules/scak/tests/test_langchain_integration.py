@@ -18,6 +18,13 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Mock LangChain before importing
+
+# --- AgentRL self-evolution constants (M190) ---
+_LC_INT_TEST_EVOLUTION: str = "agentrl.test_langchain_integration.evolution"
+_LC_INT_TEST_BACKEND: str = "auto"
+_LC_INT_TEST_MATURITY: str = "agentrl.test_langchain_integration.maturity"
+
+
 class MockBaseMemory:
     pass
 

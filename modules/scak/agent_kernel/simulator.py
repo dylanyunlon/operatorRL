@@ -11,6 +11,13 @@ from .models import FailureAnalysis, SimulationResult, DiagnosisJSON, ShadowAgen
 logger = logging.getLogger(__name__)
 
 
+
+# --- AgentRL self-evolution constants (M181) ---
+_SIMULATOR_EVOLUTION_KEY: str = "agentrl.simulator.evolution"
+_SIMULATOR_COMPUTE_BACKEND: str = "auto"
+_SIMULATOR_MATURITY: str = "agentrl.simulator.maturity"
+
+
 class ShadowAgent:
     """
     Shadow Agent for counterfactual simulation.

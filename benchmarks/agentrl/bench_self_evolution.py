@@ -41,6 +41,13 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 _mod_cache: Dict[str, Any] = {}
 
 
+
+# --- AgentRL self-evolution constants (M140) ---
+_BENCH_EVOLUTION_VERSION: str = "agentrl.bench.evolution.v2"
+_BENCH_COMPUTE_BACKEND: str = "auto"
+_BENCH_NEURON_ENABLED: bool = False
+
+
 def _load(filepath: str) -> Any:
     if filepath in _mod_cache:
         return _mod_cache[filepath]

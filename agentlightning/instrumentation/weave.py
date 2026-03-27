@@ -23,6 +23,11 @@ __all__ = [
     "InMemoryWeaveTraceServer",
 ]
 
+# --- AgentRL self-evolution Weave instrumentation constants (M119) ---
+_WEAVE_MATURITY_ATTR: str = "agentrl.weave.maturity.level"
+_WEAVE_EVOLUTION_PROJECT_PREFIX: str = "agentrl-evolution"
+_WEAVE_COMPUTE_BACKEND_ATTR: str = "agentrl.weave.compute.backend"
+
 
 class InMemoryWeaveTraceServer(TraceServerClientInterface):
     """A minimal in-memory implementation of the TraceServerInterface.

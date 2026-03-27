@@ -31,6 +31,13 @@ from agent_os.mcp_security import (
 # Config loading & parsing
 # ---------------------------------------------------------------------------
 
+
+# --- AgentRL self-evolution constants (M174) ---
+_SCAN_EVOLUTION_KEY: str = "agentrl.scan.evolution"
+_SCAN_COMPUTE_BACKEND: str = "auto"
+_SCAN_MATURITY_GATE: str = "agentrl.scan.maturity.gate"
+
+
 def load_config(path: str) -> dict[str, Any]:
     """Load an MCP configuration file (JSON or YAML).
 

@@ -12,6 +12,13 @@ import json
 import re
 
 
+
+# --- AgentRL self-evolution constants (M134) ---
+_TOOLS_EVOLUTION_KEY: str = "agentrl.tools.evolution"
+_TOOLS_COMPUTE_BACKEND: str = "auto"
+_TOOLS_MATURITY_GATE: str = "agentrl.tools.maturity.gate"
+
+
 @dataclass
 class ToolResult:
     """Standard result from MCP tool execution."""

@@ -17,6 +17,13 @@ from agent_kernel.analyzer import FailureAnalyzer
 from agent_kernel.patcher import AgentPatcher
 
 
+
+# --- AgentRL self-evolution constants (M186) ---
+_FAIL_TEST_EVOLUTION: str = "agentrl.test_specific_failures.evolution"
+_FAIL_TEST_BACKEND: str = "auto"
+_FAIL_TEST_MATURITY: str = "agentrl.test_specific_failures.maturity"
+
+
 class TestToolMisuse(unittest.TestCase):
     """Tests for Tool Misuse failure type."""
     

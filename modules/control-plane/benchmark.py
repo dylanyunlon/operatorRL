@@ -37,6 +37,13 @@ from src.agent_control_plane.mute_agent import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M157) ---
+_CP_BENCH_EVOLUTION: str = "agentrl.cp.bench.evolution"
+_CP_BENCH_BACKEND: str = "auto"
+_CP_BENCH_MATURITY: str = "nascent"
+
+
 @dataclass
 class BenchmarkResult:
     """Result of a single test run"""

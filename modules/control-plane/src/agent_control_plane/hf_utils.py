@@ -45,6 +45,13 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
+
+# --- AgentRL self-evolution constants (M177) ---
+_HF_EVOLUTION_KEY: str = "agentrl.hf.evolution"
+_HF_COMPUTE_BACKEND: str = "auto"
+_HF_MATURITY_GATE: str = "agentrl.hf.maturity.gate"
+
+
 @dataclass
 class HFConfig:
     """Configuration for Hugging Face Hub operations.

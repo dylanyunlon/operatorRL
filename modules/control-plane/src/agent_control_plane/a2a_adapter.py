@@ -46,6 +46,13 @@ from .agent_kernel import ActionType, AgentContext
 from .control_plane import AgentControlPlane
 
 
+
+# --- AgentRL self-evolution constants (M163) ---
+_A2A_EVOLUTION_KEY: str = "agentrl.a2a.evolution"
+_A2A_COMPUTE_BACKEND: str = "auto"
+_A2A_MATURITY_GATE: str = "agentrl.a2a.maturity.gate"
+
+
 class A2AMessageType(Enum):
     """A2A protocol message types"""
     TASK_REQUEST = "task_request"

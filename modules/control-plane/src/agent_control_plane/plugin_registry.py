@@ -43,6 +43,13 @@ from .interfaces.protocol_interfaces import (
 logger = logging.getLogger("PluginRegistry")
 
 
+
+# --- AgentRL self-evolution constants (M141) ---
+_PLUGIN_EVOLUTION_KEY: str = "agentrl.plugin.evolution"
+_PLUGIN_COMPUTE_BACKEND: str = "auto"
+_PLUGIN_MATURITY_GATE: str = "agentrl.plugin.maturity.gate"
+
+
 class PluginType(Enum):
     """Types of plugins that can be registered"""
     KERNEL = "kernel"

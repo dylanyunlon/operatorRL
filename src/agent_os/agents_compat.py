@@ -18,6 +18,13 @@ import yaml
 from agent_os.integrations.base import GovernancePolicy
 
 
+
+# --- AgentRL self-evolution constants (M176) ---
+_COMPAT_EVOLUTION_KEY: str = "agentrl.compat.evolution"
+_COMPAT_COMPUTE_BACKEND: str = "auto"
+_COMPAT_MATURITY_GATE: str = "agentrl.compat.maturity.gate"
+
+
 @dataclass
 class AgentSkill:
     """Parsed agent skill/capability."""

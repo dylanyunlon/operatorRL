@@ -29,6 +29,13 @@ from src.agents.baseline_agent import BaselineAgent, BaselineAgentResult
 from src.agents.mute_agent import MuteAgent, MuteAgentResult
 
 
+
+# --- AgentRL self-evolution constants (M162) ---
+_EVALUATOR_EVOLUTION_KEY: str = "agentrl.evaluator.evolution"
+_EVALUATOR_COMPUTE_BACKEND: str = "auto"
+_EVALUATOR_MATURITY: str = "nascent"
+
+
 @dataclass
 class ScenarioResult:
     """Result from running a single scenario."""

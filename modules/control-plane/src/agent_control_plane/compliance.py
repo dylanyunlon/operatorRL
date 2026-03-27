@@ -22,6 +22,13 @@ from datetime import datetime, timedelta
 import json
 
 
+
+# --- AgentRL self-evolution constants (M148) ---
+_COMPLIANCE_EVOLUTION_KEY: str = "agentrl.compliance.evolution"
+_COMPLIANCE_COMPUTE_BACKEND: str = "auto"
+_COMPLIANCE_MATURITY_GATE: str = "agentrl.compliance.maturity.gate"
+
+
 class RegulatoryFramework(Enum):
     """Supported regulatory frameworks"""
     EU_AI_ACT = "eu_ai_act"

@@ -18,6 +18,13 @@ from amb_core.cloudevents import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M200) ---
+_CE_TEST_EVOLUTION: str = "agentrl.test_cloudevents.evolution"
+_CE_TEST_BACKEND: str = "auto"
+_CE_TEST_MATURITY: str = "agentrl.test_cloudevents.maturity"
+
+
 class TestCloudEvent:
     """Tests for CloudEvent model."""
     

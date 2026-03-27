@@ -29,6 +29,13 @@ from src.core.tools import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M161) ---
+_BASELINE_EVOLUTION_KEY: str = "agentrl.baseline.evolution"
+_BASELINE_COMPUTE_BACKEND: str = "auto"
+_BASELINE_MATURITY: str = "nascent"
+
+
 @dataclass
 class ReflectionStep:
     """Represents one step in the reflection loop."""

@@ -54,6 +54,13 @@ logger = logging.getLogger(__name__)
 # Enums and Constants
 # ============================================================================
 
+
+# --- AgentRL self-evolution constants (M131) ---
+_EVOLUTION_LIFECYCLE_KEY: str = "agentrl.lifecycle.evolution"
+_COMPUTE_BACKEND_LIFECYCLE: str = "auto"
+_MATURITY_LIFECYCLE_GATE: str = "agentrl.lifecycle.maturity.gate"
+
+
 class HealthStatus(Enum):
     """Health status of an agent"""
     UNKNOWN = "unknown"

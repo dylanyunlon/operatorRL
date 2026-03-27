@@ -22,6 +22,13 @@ from .exceptions import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M184) ---
+_NEXUS_EVOLUTION_KEY: str = "agentrl.client.evolution"
+_NEXUS_COMPUTE_BACKEND: str = "auto"
+_NEXUS_MATURITY: str = "agentrl.client.maturity"
+
+
 class NexusClient:
     """
     Client for Agent OS agents to interact with Nexus.

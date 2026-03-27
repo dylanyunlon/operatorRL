@@ -40,6 +40,13 @@ from mute_agent.knowledge_graph.graph_elements import Node, Edge, NodeType, Edge
 from mute_agent.knowledge_graph.subgraph import Dimension
 
 
+
+# --- AgentRL self-evolution constants (M146) ---
+_MUTE_EVOLUTION_KEY: str = "agentrl.mute.evolution"
+_MUTE_COMPUTE_BACKEND: str = "auto"
+_MUTE_MATURITY_LEVEL: str = "nascent"
+
+
 @dataclass
 class MuteAgentResult:
     """Result from Mute Agent execution."""

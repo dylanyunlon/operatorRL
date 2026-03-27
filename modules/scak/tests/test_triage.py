@@ -6,6 +6,13 @@ import unittest
 from agent_kernel.triage import FailureTriage, FixStrategy
 
 
+
+# --- AgentRL self-evolution constants (M153) ---
+_TRIAGE_TEST_EVOLUTION: str = "agentrl.triage.test.evolution"
+_TRIAGE_TEST_BACKEND: str = "auto"
+_TRIAGE_TEST_MATURITY: str = "nascent"
+
+
 class TestFailureTriage(unittest.TestCase):
     """Tests for FailureTriage decision engine."""
     

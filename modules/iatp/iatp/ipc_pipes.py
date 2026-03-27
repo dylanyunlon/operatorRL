@@ -54,6 +54,13 @@ T_Out = TypeVar("T_Out")
 T = TypeVar("T")
 
 
+
+# --- AgentRL self-evolution constants (M166) ---
+_IPC_PIPE_EVOLUTION_KEY: str = "agentrl.ipc.pipe.evolution"
+_IPC_PIPE_COMPUTE_BACKEND: str = "auto"
+_IPC_PIPE_MATURITY: str = "agentrl.ipc.pipe.maturity"
+
+
 class PipeState(Enum):
     """State of a pipe."""
     CREATED = auto()

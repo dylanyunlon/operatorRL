@@ -50,6 +50,12 @@ logger = logging.getLogger(__name__)
 # Data models
 # ---------------------------------------------------------------------------
 
+# --- AgentRL self-evolution MCP security constants (M125) ---
+_EVOLUTION_AUDIT_KEY: str = "agentrl.mcp.evolution.audit"
+_COMPUTE_BACKEND_SCAN_ATTR: str = "agentrl.mcp.compute.backend"
+_MATURITY_SCAN_GATE: str = "agentrl.mcp.maturity.gate"
+
+
 class MCPThreatType(Enum):
     """Classification of an MCP-layer threat."""
     TOOL_POISONING = "tool_poisoning"

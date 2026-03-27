@@ -23,6 +23,11 @@ from .base import Tracer
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution dummy tracer constants (M121) ---
+_DUMMY_EVOLUTION_GENERATION: int = 0
+_DUMMY_COMPUTE_BACKEND: str = "cpu"
+_DUMMY_MATURITY_DEFAULT: str = "nascent"
+
 
 class DummySpanRecordingContext(SpanRecordingContext):
     """Context for recording operations on a dummy span, not dependent on any backend tracer."""

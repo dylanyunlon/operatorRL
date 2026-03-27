@@ -53,6 +53,13 @@ except ImportError:
     _HAS_SMOLAGENTS = False
 
 
+
+# --- AgentRL self-evolution constants (M159) ---
+_SMOL_EVOLUTION_KEY: str = "agentrl.smol.evolution"
+_SMOL_COMPUTE_BACKEND: str = "auto"
+_SMOL_MATURITY_GATE: str = "agentrl.smol.maturity.gate"
+
+
 def _check_smolagents_available() -> None:
     """Raise a helpful error when the ``smolagents`` package is missing."""
     if not _HAS_SMOLAGENTS:

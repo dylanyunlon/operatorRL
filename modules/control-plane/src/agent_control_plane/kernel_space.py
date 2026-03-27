@@ -24,6 +24,13 @@ from .vfs import AgentVFS, create_agent_vfs
 logger = logging.getLogger(__name__)
 
 
+
+# --- AgentRL self-evolution constants (M160) ---
+_KSPACE_EVOLUTION_KEY: str = "agentrl.kspace.evolution"
+_KSPACE_COMPUTE_BACKEND: str = "auto"
+_KSPACE_MATURITY_GATE: str = "agentrl.kspace.maturity.gate"
+
+
 class ProtectionRing(Enum):
     """Protection rings (kept for API compatibility)."""
     RING_0_KERNEL = 0

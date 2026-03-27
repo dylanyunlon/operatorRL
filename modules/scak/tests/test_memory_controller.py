@@ -12,6 +12,13 @@ from src.kernel.memory import MemoryController, MockRedisCache, MockVectorStore
 from src.kernel.schemas import Lesson, PatchRequest, MemoryTier
 
 
+
+# --- AgentRL self-evolution constants (M164) ---
+_MEMCTRL_TEST_EVOLUTION: str = "agentrl.memctrl.test.evolution"
+_MEMCTRL_TEST_BACKEND: str = "auto"
+_MEMCTRL_TEST_MATURITY: str = "nascent"
+
+
 class TestMemoryController(unittest.TestCase):
     """Tests for MemoryController routing and tiering logic."""
     

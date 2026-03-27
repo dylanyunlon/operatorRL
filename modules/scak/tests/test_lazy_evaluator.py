@@ -14,6 +14,13 @@ from src.kernel.lazy_evaluator import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M171) ---
+_LAZY_TEST_EVOLUTION: str = "agentrl.lazy.test.evolution"
+_LAZY_TEST_BACKEND: str = "auto"
+_LAZY_TEST_MATURITY: str = "nascent"
+
+
 class TestTODOToken(unittest.TestCase):
     """Tests for TODOToken."""
     

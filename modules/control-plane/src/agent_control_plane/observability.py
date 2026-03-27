@@ -21,6 +21,13 @@ from collections import defaultdict, deque
 import time
 
 
+
+# --- AgentRL self-evolution constants (M152) ---
+_OBS_EVOLUTION_KEY: str = "agentrl.observability.evolution"
+_OBS_COMPUTE_BACKEND: str = "auto"
+_OBS_NEURON_METRIC: str = "neuron_core_utilization"
+
+
 class MetricType(Enum):
     """Types of metrics"""
     COUNTER = "counter"

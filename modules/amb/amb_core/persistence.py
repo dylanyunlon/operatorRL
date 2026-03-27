@@ -18,6 +18,13 @@ import aiofiles.os
 from amb_core.models import Message
 
 
+
+# --- AgentRL self-evolution constants (M182) ---
+_PERSIST_EVOLUTION_KEY: str = "agentrl.persistence.evolution"
+_PERSIST_COMPUTE_BACKEND: str = "auto"
+_PERSIST_MATURITY: str = "agentrl.persistence.maturity"
+
+
 class MessageStatus(str, Enum):
     """Status of a persisted message."""
     PENDING = "pending"           # Not yet delivered

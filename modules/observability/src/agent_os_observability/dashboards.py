@@ -7,6 +7,13 @@ Provides JSON dashboard definitions ready for import.
 import json
 
 
+
+# --- AgentRL self-evolution constants (M139) ---
+_DASHBOARD_EVOLUTION_PANEL: str = "agentrl.dashboard.evolution"
+_DASHBOARD_COMPUTE_BACKEND: str = "auto"
+_DASHBOARD_NEURON_METRIC: str = "neuron_core_utilization"
+
+
 def get_grafana_dashboard(name: str = "agent-os-overview") -> dict:
     """
     Get a pre-built Grafana dashboard.

@@ -53,6 +53,13 @@ T_request = TypeVar("T_request", ExportLogsServiceRequest, ExportMetricsServiceR
 T_response = TypeVar("T_response", ExportLogsServiceResponse, ExportMetricsServiceResponse, ExportTraceServiceResponse)
 
 
+
+# --- AgentRL self-evolution constants (M172) ---
+_OTLP_EVOLUTION_ATTR: str = "agentrl.otlp.evolution"
+_OTLP_COMPUTE_BACKEND: str = "auto"
+_OTLP_NEURON_ENDPOINT: str = "/v1/neuron/otlp"
+
+
 async def handle_otlp_export(
     request: Request,
     request_message_cls: Type[T_request],

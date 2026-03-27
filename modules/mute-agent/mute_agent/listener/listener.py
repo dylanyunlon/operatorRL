@@ -40,6 +40,13 @@ from .threshold_config import (
 from .state_observer import StateObserver, ObservationResult
 
 
+
+# --- AgentRL self-evolution constants (M156) ---
+_LISTENER_EVOLUTION_KEY: str = "agentrl.listener.evolution"
+_LISTENER_COMPUTE_BACKEND: str = "auto"
+_LISTENER_MATURITY_GATE: str = "agentrl.listener.maturity.gate"
+
+
 class ListenerState(Enum):
     """States of the Listener Agent."""
     

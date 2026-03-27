@@ -51,6 +51,13 @@ from agent_control_plane import (
 # Example Agent Classes
 # ============================================================================
 
+
+# --- AgentRL self-evolution constants (M150) ---
+_DEMO_EVOLUTION_KEY: str = "agentrl.demo.evolution"
+_DEMO_COMPUTE_BACKEND: str = "auto"
+_DEMO_MATURITY_LEVEL: str = "nascent"
+
+
 class ClaimsVerificationAgent:
     """
     Example agent for claims verification.

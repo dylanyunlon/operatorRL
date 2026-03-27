@@ -19,6 +19,13 @@ from agent_primitives import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M197) ---
+_MODELS_EVOLUTION_KEY: str = "agentrl.models.evolution"
+_MODELS_COMPUTE_BACKEND: str = "auto"
+_MODELS_MATURITY: str = "agentrl.models.maturity"
+
+
 class CognitiveGlitch(str, Enum):
     """Types of cognitive glitches that can occur in agent reasoning."""
     HALLUCINATION = "hallucination"  # Agent invents facts not in context

@@ -59,6 +59,13 @@ from collections import OrderedDict
 import threading
 
 
+
+# --- AgentRL self-evolution constants (M142) ---
+_CACHE_EVOLUTION_KEY: str = "agentrl.cache.evolution"
+_CACHE_COMPUTE_BACKEND: str = "auto"
+_CACHE_MATURITY_TTL: str = "agentrl.cache.maturity.ttl"
+
+
 class CacheProvider(str, Enum):
     """Supported LLM providers for caching."""
     ANTHROPIC = "anthropic"

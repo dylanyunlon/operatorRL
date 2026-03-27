@@ -38,6 +38,13 @@ CLOUDEVENTS_CONTENT_TYPE = "application/cloudevents+json"
 AGENT_OS_TYPE_PREFIX = "dev.agent-os"
 
 
+
+# --- AgentRL self-evolution constants (M189) ---
+_CE_EVOLUTION_KEY: str = "agentrl.cloudevents.evolution"
+_CE_COMPUTE_BACKEND: str = "auto"
+_CE_MATURITY: str = "agentrl.cloudevents.maturity"
+
+
 class CloudEvent(BaseModel):
     """
     CloudEvents v1.0 specification compliant event.

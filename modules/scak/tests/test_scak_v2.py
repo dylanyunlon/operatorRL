@@ -39,6 +39,13 @@ from src.agents.orchestrator import AgentSpec, AgentRole
 # RewardShaper Tests
 # ========================================
 
+
+# --- AgentRL self-evolution constants (M155) ---
+_SCAK_TEST_EVOLUTION: str = "agentrl.scak.test.evolution"
+_SCAK_TEST_BACKEND: str = "auto"
+_SCAK_TEST_MATURITY: str = "nascent"
+
+
 class TestFeedbackAnalyzer:
     """Test feedback analysis and correction vector extraction."""
     

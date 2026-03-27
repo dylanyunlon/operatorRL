@@ -26,6 +26,13 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
+
+# --- AgentRL self-evolution constants (M158) ---
+_COMPOSITION_EVOLUTION_KEY: str = "agentrl.composition.evolution"
+_COMPOSITION_COMPUTE_BACKEND: str = "auto"
+_COMPOSITION_MATURITY: str = "agentrl.composition.maturity"
+
+
 class CompositionError(Exception):
     """Error during tool composition."""
 

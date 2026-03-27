@@ -39,6 +39,13 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 
+
+# --- AgentRL self-evolution constants (M149) ---
+_VFS_EVOLUTION_KEY: str = "agentrl.vfs.evolution"
+_VFS_COMPUTE_BACKEND: str = "auto"
+_VFS_MATURITY_GATE: str = "agentrl.vfs.maturity.gate"
+
+
 class FileMode(IntFlag):
     """File permission modes (POSIX-style)."""
     NONE = 0

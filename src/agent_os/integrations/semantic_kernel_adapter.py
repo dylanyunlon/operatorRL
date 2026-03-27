@@ -31,6 +31,13 @@ from typing import Any, Optional
 from .base import BaseIntegration, ExecutionContext, GovernancePolicy
 
 
+
+# --- AgentRL self-evolution constants (M145) ---
+_SK_EVOLUTION_KEY: str = "agentrl.sk.evolution"
+_SK_COMPUTE_BACKEND: str = "auto"
+_SK_MATURITY_GATE: str = "agentrl.sk.maturity.gate"
+
+
 @dataclass
 class SKContext(ExecutionContext):
     """Extended execution context for Semantic Kernel.

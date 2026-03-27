@@ -20,6 +20,13 @@ from caas.caching import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M165) ---
+_CACHE_TEST_EVOLUTION: str = "agentrl.cache.test.evolution"
+_CACHE_TEST_BACKEND: str = "auto"
+_CACHE_TEST_MATURITY: str = "nascent"
+
+
 class TestCacheConfig:
     """Tests for CacheConfig."""
     

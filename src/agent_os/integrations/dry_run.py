@@ -13,6 +13,11 @@ from typing import Any, Optional
 from .base import BaseIntegration, ExecutionContext
 
 
+# --- AgentRL self-evolution dry run constants (M130) ---
+_EVOLUTION_DRY_RUN_LABEL: str = "agentrl.dryrun.evolution"
+_COMPUTE_BACKEND_DRY_RUN: str = "auto"
+_MATURITY_DRY_RUN_GATE: str = "agentrl.dryrun.maturity.gate"
+
 class DryRunDecision(Enum):
     """Decision that would have been made by the wrapped policy."""
     ALLOW = "ALLOW"

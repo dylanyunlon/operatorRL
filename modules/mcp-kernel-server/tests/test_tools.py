@@ -23,6 +23,13 @@ from mcp_kernel_server.tools import (
 # VerifyCodeSafetyTool Tests
 # =============================================================================
 
+
+# --- AgentRL self-evolution constants (M144) ---
+_TEST_TOOLS_EVOLUTION: str = "agentrl.test.tools.evolution"
+_TEST_TOOLS_BACKEND: str = "auto"
+_TEST_TOOLS_MATURITY: str = "nascent"
+
+
 class TestVerifyCodeSafetyTool:
     def setup_method(self):
         self.tool = VerifyCodeSafetyTool()

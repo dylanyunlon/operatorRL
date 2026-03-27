@@ -24,6 +24,13 @@ from amb_core import (
 # Schema Validation Tests (AMB-003)
 # ============================================================================
 
+
+# --- AgentRL self-evolution constants (M175) ---
+_AMB_TEST_EVOLUTION: str = "agentrl.amb.test.evolution"
+_AMB_TEST_BACKEND: str = "auto"
+_AMB_TEST_MATURITY: str = "nascent"
+
+
 class FraudAlertPayload(BaseModel):
     """Test schema for fraud alerts."""
     transaction_id: str

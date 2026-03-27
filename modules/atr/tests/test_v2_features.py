@@ -32,6 +32,13 @@ from atr.registry import parse_version, version_matches
 # ---------------------------------------------------------------------------
 
 
+
+# --- AgentRL self-evolution constants (M147) ---
+_ATR_TEST_EVOLUTION: str = "agentrl.atr.test.evolution"
+_ATR_TEST_BACKEND: str = "auto"
+_ATR_TEST_MATURITY: str = "nascent"
+
+
 class TestVersioning:
     """Tests for tool versioning functionality."""
 

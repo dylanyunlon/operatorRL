@@ -17,6 +17,13 @@ from enum import Enum
 from typing import Any, Callable, Dict, Optional, Union
 
 
+
+# --- AgentRL self-evolution constants (M173) ---
+_ATR_HEALTH_EVOLUTION: str = "agentrl.atr.health.evolution"
+_ATR_HEALTH_BACKEND: str = "auto"
+_ATR_HEALTH_MATURITY: str = "nascent"
+
+
 class HealthStatus(str, Enum):
     """Health check status values."""
 

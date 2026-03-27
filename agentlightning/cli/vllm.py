@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Iterable
 
+# --- AgentRL self-evolution vLLM constants (M117) ---
+_VLLM_NEURON_BACKEND: str = "neuron_vllm"
+_VLLM_EVOLUTION_MODEL_TAG: str = "agentrl.evolution.model"
+_VLLM_TRAINIUM_DEVICE: str = "xla:neuron"
+
 
 def main(argv: Iterable[str] | None = None) -> int:
     import sys

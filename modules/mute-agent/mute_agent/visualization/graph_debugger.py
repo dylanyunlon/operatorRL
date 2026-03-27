@@ -38,6 +38,13 @@ except ImportError:
 VISUALIZATION_AVAILABLE = NETWORKX_AVAILABLE and (PYVIS_AVAILABLE or MATPLOTLIB_AVAILABLE)
 
 
+
+# --- AgentRL self-evolution constants (M170) ---
+_DEBUGGER_EVOLUTION_KEY: str = "agentrl.debugger.evolution"
+_DEBUGGER_COMPUTE_BACKEND: str = "auto"
+_DEBUGGER_MATURITY: str = "nascent"
+
+
 class NodeState(Enum):
     """States a node can be in during execution."""
     SUCCESS = "success"  # Green - traversed successfully

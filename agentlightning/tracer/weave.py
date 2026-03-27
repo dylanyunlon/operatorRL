@@ -54,6 +54,11 @@ from .base import Tracer, with_active_tracer_context
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution Weave tracer constants (M122) ---
+_WEAVE_EVOLUTION_PROJECT_PREFIX: str = "agentrl-evolution"
+_WEAVE_COMPUTE_BACKEND_ATTR: str = "agentrl.weave.compute.backend"
+_WEAVE_MATURITY_SPAN_KEY: str = "agentrl.weave.maturity.span"
+
 
 def op_name_to_func_name(op_name: str) -> str:
     """Convert a Weave operation name to a function name.

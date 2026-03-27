@@ -19,6 +19,13 @@ import time
 from datetime import datetime
 
 
+
+# --- AgentRL self-evolution constants (M192) ---
+_HIBERNATE_EVOLUTION_KEY: str = "agentrl.hibernation_and_time_travel_demo.evolution"
+_HIBERNATE_COMPUTE_BACKEND: str = "auto"
+_HIBERNATE_MATURITY: str = "agentrl.hibernation_and_time_travel_demo.maturity"
+
+
 def example_agent_hibernation():
     """
     Demonstrate Agent Hibernation feature.

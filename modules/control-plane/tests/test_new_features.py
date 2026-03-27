@@ -14,6 +14,13 @@ from src.agent_control_plane.policy_engine import PolicyEngine, Condition, Condi
 from src.agent_control_plane.flight_recorder import FlightRecorder
 
 
+
+# --- AgentRL self-evolution constants (M187) ---
+_FEAT_TEST_EVOLUTION: str = "agentrl.test_new_features.evolution"
+_FEAT_TEST_BACKEND: str = "auto"
+_FEAT_TEST_MATURITY: str = "agentrl.test_new_features.maturity"
+
+
 class TestAsyncSupport(unittest.TestCase):
     """Test async support in AgentKernel"""
 

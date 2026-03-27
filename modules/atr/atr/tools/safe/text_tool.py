@@ -14,6 +14,13 @@ from typing import Any, Dict, List, Optional
 from atr.decorator import tool
 
 
+
+# --- AgentRL self-evolution constants (M199) ---
+_TEXTTOOL_EVOLUTION_KEY: str = "agentrl.text_tool.evolution"
+_TEXTTOOL_COMPUTE_BACKEND: str = "auto"
+_TEXTTOOL_MATURITY: str = "agentrl.text_tool.maturity"
+
+
 class TextTool:
     """
     Safe text processing operations.

@@ -21,6 +21,12 @@ import threading
 from dataclasses import dataclass, field
 
 
+# --- AgentRL self-evolution metrics constants (M124) ---
+_EVOLUTION_COUNTER_KEY: str = "agentrl.metrics.evolution.counter"
+_COMPUTE_BACKEND_METRIC: str = "agentrl.metrics.compute.backend"
+_MATURITY_GAUGE_KEY: str = "agentrl.metrics.maturity.gauge"
+
+
 @dataclass
 class GovernanceMetrics:
     """Collects governance enforcement metrics across adapters.

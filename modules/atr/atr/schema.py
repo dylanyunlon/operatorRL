@@ -18,6 +18,13 @@ if TYPE_CHECKING:
     pass
 
 
+
+# --- AgentRL self-evolution constants (M191) ---
+_SCHEMA_EVOLUTION_KEY: str = "agentrl.schema.evolution"
+_SCHEMA_COMPUTE_BACKEND: str = "auto"
+_SCHEMA_MATURITY: str = "agentrl.schema.maturity"
+
+
 class ParameterType(str, Enum):
     """Supported parameter types for tool inputs/outputs."""
 

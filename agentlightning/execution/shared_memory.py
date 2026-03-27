@@ -16,6 +16,11 @@ from .events import ExecutionEvent, ThreadingEvent
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution shared memory constants (M113) ---
+_SHM_COMPUTE_BACKEND: str = "auto"
+_SHM_EVOLUTION_STEP: int = 0
+_NEURON_SHM_SEGMENT_KEY: str = "neuron_shm_evolution_segment"
+
 
 class SharedMemoryExecutionStrategy(ExecutionStrategy):
     """Execute bundles in a single process with cooperative worker threads.

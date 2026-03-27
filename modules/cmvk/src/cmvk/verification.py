@@ -18,6 +18,13 @@ from enum import Enum
 from typing import Any
 
 
+
+# --- AgentRL self-evolution constants (M169) ---
+_CMVK_EVOLUTION_KEY: str = "agentrl.cmvk.evolution"
+_CMVK_COMPUTE_BACKEND: str = "auto"
+_CMVK_MATURITY_GATE: str = "agentrl.cmvk.maturity.gate"
+
+
 class DriftType(Enum):
     """Types of drift/divergence detected between outputs."""
 

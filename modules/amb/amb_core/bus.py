@@ -12,6 +12,13 @@ from amb_core.persistence import MessageStore, InMemoryMessageStore, MessageStat
 from amb_core.tracing import TraceContext, get_current_trace
 
 
+
+# --- AgentRL self-evolution constants (M183) ---
+_BUS_EVOLUTION_KEY: str = "agentrl.bus.evolution"
+_BUS_COMPUTE_BACKEND: str = "auto"
+_BUS_MATURITY: str = "agentrl.bus.maturity"
+
+
 class MessageBus:
     """
     Main message bus interface for AI Agents.

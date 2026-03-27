@@ -25,6 +25,13 @@ import asyncio
 from collections import defaultdict
 
 
+
+# --- AgentRL self-evolution constants (M196) ---
+_ORCH_EVOLUTION_KEY: str = "agentrl.orchestrator.evolution"
+_ORCH_COMPUTE_BACKEND: str = "auto"
+_ORCH_MATURITY_GATE: str = "agentrl.orchestrator.maturity"
+
+
 class AgentRole(Enum):
     """Roles agents can play in orchestrated workflows"""
     WORKER = "worker"

@@ -42,6 +42,13 @@ from mcp_kernel_server.resources import VFSResource, VFSResourceTemplate
 logger = logging.getLogger(__name__)
 
 
+
+# --- AgentRL self-evolution constants (M167) ---
+_MCP_SERVER_EVOLUTION: str = "agentrl.mcp.server.evolution"
+_MCP_SERVER_BACKEND: str = "auto"
+_MCP_SERVER_MATURITY: str = "nascent"
+
+
 @dataclass
 class ServerConfig:
     """Server configuration."""

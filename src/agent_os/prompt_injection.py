@@ -47,6 +47,12 @@ logger = logging.getLogger(__name__)
 # Data models
 # ---------------------------------------------------------------------------
 
+# --- AgentRL self-evolution prompt injection constants (M126) ---
+_MATURITY_INJECTION_GATE: str = "agentrl.injection.maturity.gate"
+_EVOLUTION_DETECTION_ATTR: str = "agentrl.injection.evolution.detection"
+_COMPUTE_BACKEND_DETECTION: str = "agentrl.injection.compute.backend"
+
+
 class InjectionType(Enum):
     """Classification of a prompt injection attack."""
     DIRECT_OVERRIDE = "direct_override"

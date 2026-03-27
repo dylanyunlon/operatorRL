@@ -24,6 +24,11 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution provider constants (M127) ---
+_PROVIDER_COMPUTE_BACKEND: str = "auto"
+_PROVIDER_EVOLUTION_KEY: str = "agentrl.provider.evolution"
+_NEURON_PROVIDER_GROUP: str = "neuron_provider"
+
 # Entry point group names — internal packages register under these
 PROVIDER_GROUPS = {
     "verification": "agent_os.providers.verification",

@@ -20,6 +20,11 @@ from agentlightning.utils.server_launcher import PythonServerLauncher, PythonSer
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution Prometheus constants (M115) ---
+_EVOLUTION_METRIC_PREFIX: str = "agentrl_evolution"
+_NEURON_METRIC_NAMESPACE: str = "neuron_compute"
+_COMPUTE_BACKEND_LABEL: str = "compute_backend"
+
 
 def ensure_prometheus_dir() -> str:
     """Ensure PROMETHEUS_MULTIPROC_DIR is set and the directory exists."""

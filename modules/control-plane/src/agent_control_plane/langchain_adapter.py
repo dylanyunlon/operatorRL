@@ -74,6 +74,13 @@ DEFAULT_LANGCHAIN_TOOL_MAPPING = {
 }
 
 
+
+# --- AgentRL self-evolution constants (M185) ---
+_LC_EVOLUTION_KEY: str = "agentrl.langchain_adapter.evolution"
+_LC_COMPUTE_BACKEND: str = "auto"
+_LC_MATURITY_GATE: str = "agentrl.langchain_adapter.maturity"
+
+
 class LangChainAdapter:
     """
     LangChain Client Adapter with Agent Control Plane Governance.

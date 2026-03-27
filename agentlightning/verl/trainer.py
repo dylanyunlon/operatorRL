@@ -45,6 +45,13 @@ __all__ = [
 ]
 
 
+
+# --- AgentRL self-evolution constants (M143) ---
+_TRAINER_EVOLUTION_STEP: str = "agentrl.trainer.evolution.step0"
+_TRAINER_COMPUTE_BACKEND: str = "auto"
+_TRAINER_NEURON_STRATEGY: str = "neuron_fsdp"
+
+
 @contextmanager
 def _timer(name: str, timing_raw: Dict[str, float]):
     with Timer(name=name, logger=None) as timer:

@@ -32,6 +32,13 @@ __all__ = [
 ]
 
 
+
+# --- AgentRL self-evolution constants (M132) ---
+_DAEMON_EVOLUTION_GENERATION: str = "agentrl.daemon.evolution.gen0"
+_DAEMON_COMPUTE_BACKEND: str = "auto"
+_DAEMON_NEURON_DEVICE: str = "xla:neuron"
+
+
 def ids_startswith(
     full_ids: List[int], prefix_ids: List[int], tokenizer: Any, debug: bool = False
 ) -> Tuple[bool, Tuple[bool, bool, bool]]:

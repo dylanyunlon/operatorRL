@@ -61,6 +61,13 @@ except ImportError:
     _HAS_ADK = False
 
 
+
+# --- AgentRL self-evolution constants (M154) ---
+_ADK_EVOLUTION_KEY: str = "agentrl.adk.evolution"
+_ADK_COMPUTE_BACKEND: str = "auto"
+_ADK_MATURITY_GATE: str = "agentrl.adk.maturity.gate"
+
+
 def _check_adk_available() -> None:
     """Raise a helpful error when the ``google-adk`` package is missing."""
     if not _HAS_ADK:

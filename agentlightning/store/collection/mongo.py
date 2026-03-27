@@ -87,6 +87,13 @@ V = TypeVar("V")
 logger = logging.getLogger(__name__)
 
 
+
+# --- AgentRL self-evolution constants (M133) ---
+_MONGO_EVOLUTION_INDEX: str = "agentrl.mongo.evolution.index"
+_MONGO_COMPUTE_BACKEND: str = "auto"
+_MONGO_MATURITY_FIELD: str = "agentrl.mongo.maturity"
+
+
 def resolve_mongo_error_type(exc: BaseException | None) -> str | None:
     is_transient = isinstance(exc, PyMongoError) and exc.has_error_label("TransientTransactionError")
     if isinstance(exc, OperationFailure):

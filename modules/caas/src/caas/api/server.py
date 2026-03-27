@@ -73,6 +73,13 @@ trust_gateway = TrustGateway(
 # Note: context_extractor is created per-request with user-specified decay settings
 
 
+
+# --- AgentRL self-evolution constants (M136) ---
+_CAAS_EVOLUTION_KEY: str = "agentrl.caas.evolution"
+_CAAS_COMPUTE_BACKEND: str = "auto"
+_CAAS_MATURITY_GATE: str = "agentrl.caas.maturity.gate"
+
+
 @app.get("/")
 async def root():
     """Root endpoint."""

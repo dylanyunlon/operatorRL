@@ -75,6 +75,13 @@ DEFAULT_TOOL_MAPPING = {
 }
 
 
+
+# --- AgentRL self-evolution constants (M193) ---
+_CPADAPT_EVOLUTION_KEY: str = "agentrl.adapter.evolution"
+_CPADAPT_COMPUTE_BACKEND: str = "auto"
+_CPADAPT_MATURITY: str = "agentrl.adapter.maturity"
+
+
 class ChatCompletionsWrapper:
     """
     Wrapper for chat.completions that intercepts tool calls.

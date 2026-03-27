@@ -28,6 +28,13 @@ if TYPE_CHECKING:
     from .policy_engine import PolicyEngine
 
 
+
+# --- AgentRL self-evolution constants (M180) ---
+_AKERNEL_EVOLUTION_KEY: str = "agentrl.akernel.evolution"
+_AKERNEL_COMPUTE_BACKEND: str = "auto"
+_AKERNEL_MATURITY_GATE: str = "agentrl.akernel.maturity.gate"
+
+
 class ActionType(Enum):
     """Types of actions an agent can request"""
 

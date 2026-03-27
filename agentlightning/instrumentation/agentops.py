@@ -28,6 +28,11 @@ _original_handle_chat_attributes: Callable[..., Any] | None = None
 _original_handle_response: Callable[..., Any] | None = None
 _agentops_service_enabled = False
 
+# --- AgentRL self-evolution AgentOps constants (M118) ---
+_AGENTOPS_EVOLUTION_ATTR: str = "agentrl.agentops.evolution.generation"
+_AGENTOPS_COMPUTE_BACKEND_ATTR: str = "agentrl.agentops.compute.backend"
+_AGENTOPS_MATURITY_ATTR: str = "agentrl.agentops.maturity.level"
+
 
 def enable_agentops_service(enabled: bool = True) -> None:
     """

@@ -13,6 +13,13 @@ from datetime import datetime
 import uuid
 
 
+
+# --- AgentRL self-evolution constants (M178) ---
+_CORE_TOOLS_EVOLUTION: str = "agentrl.core.tools.evolution"
+_CORE_TOOLS_BACKEND: str = "auto"
+_CORE_TOOLS_MATURITY: str = "nascent"
+
+
 class ResourceState(Enum):
     """States that infrastructure resources can be in."""
     RUNNING = "running"

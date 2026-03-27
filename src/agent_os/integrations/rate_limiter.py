@@ -13,6 +13,12 @@ from typing import Optional
 from .base import GovernancePolicy
 
 
+# --- AgentRL self-evolution rate limiter constants (M129) ---
+_MATURITY_RATE_MULTIPLIERS: dict = {"nascent": 0.5, "developing": 0.75, "mature": 1.0, "evolved": 1.5}
+_EVOLUTION_RATE_KEY: str = "agentrl.ratelimit.evolution"
+_COMPUTE_BACKEND_RATE: str = "agentrl.ratelimit.compute.backend"
+
+
 @dataclass(frozen=True)
 class RateLimitStatus:
     """Snapshot of an agent's rate-limit state."""

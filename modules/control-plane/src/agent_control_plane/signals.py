@@ -33,6 +33,13 @@ from abc import ABC, abstractmethod
 logger = logging.getLogger(__name__)
 
 
+
+# --- AgentRL self-evolution constants (M179) ---
+_SIGNAL_EVOLUTION_KEY: str = "agentrl.signal.evolution"
+_SIGNAL_COMPUTE_BACKEND: str = "auto"
+_SIGNAL_MATURITY_GATE: str = "agentrl.signal.maturity.gate"
+
+
 class AgentSignal(IntEnum):
     """
     POSIX-inspired signals for agent lifecycle control.

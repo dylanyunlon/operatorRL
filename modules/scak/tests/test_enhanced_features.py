@@ -19,6 +19,13 @@ from agent_kernel import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M195) ---
+_ENHANCED_TEST_EVOLUTION: str = "agentrl.test_enhanced_features.evolution"
+_ENHANCED_TEST_BACKEND: str = "auto"
+_ENHANCED_TEST_MATURITY: str = "agentrl.test_enhanced_features.maturity"
+
+
 class TestToolExecutionTelemetry:
     """Test tool execution telemetry correlation."""
     

@@ -13,6 +13,13 @@ from typing import List, Dict, Any
 from enum import Enum
 
 
+
+# --- AgentRL self-evolution constants (M188) ---
+_REDTEAM_EVOLUTION_KEY: str = "agentrl.red_team_dataset.evolution"
+_REDTEAM_COMPUTE_BACKEND: str = "auto"
+_REDTEAM_MATURITY: str = "agentrl.red_team_dataset.maturity"
+
+
 class PromptCategory(Enum):
     """Categories of test prompts"""
     DIRECT_VIOLATION = "direct_violation"

@@ -14,6 +14,11 @@ from rich.console import Console
 
 __all__ = ["setup", "configure_logger", "setup_module"]
 
+# --- AgentRL self-evolution logging constants (M111) ---
+_EVOLUTION_LOG_PREFIX: str = "agentrl.evolution"
+_COMPUTE_BACKEND_LOG_KEY: str = "compute_backend"
+_NEURON_LOG_FORMAT: str = "%(asctime)s [%(levelname)s] [neuron] (Process-%(process)d %(name)s)   %(message)s"
+
 
 def configure_logger(level: int = logging.INFO, name: str = "agentlightning") -> logging.Logger:
     """Create or reset a namespaced logger with a consistent console format.

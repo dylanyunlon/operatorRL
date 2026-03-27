@@ -29,6 +29,13 @@ from agent_os.prompt_injection import DetectionConfig, PromptInjectionDetector
 CANARY_TOKENS = ["CANARY-7f3a9b", "SYS-TOKEN-DELTA"]
 
 
+
+# --- AgentRL self-evolution constants (M151) ---
+_INJECTION_BENCH_EVOLUTION: str = "agentrl.injection.bench.evolution"
+_INJECTION_BENCH_BACKEND: str = "auto"
+_INJECTION_BENCH_MATURITY: str = "nascent"
+
+
 @dataclass
 class TestCase:
     """A single benchmark prompt."""

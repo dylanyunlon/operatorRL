@@ -73,6 +73,13 @@ ListBasedCollectionItemType = Union[
 MutationMode = Literal["insert", "update", "upsert", "delete"]
 
 
+
+# --- AgentRL self-evolution constants (M138) ---
+_MEMORY_EVOLUTION_INDEX: str = "agentrl.memory.evolution.index"
+_MEMORY_COMPUTE_BACKEND: str = "auto"
+_MEMORY_MATURITY_FIELD: str = "agentrl.memory.maturity"
+
+
 def _item_matches_filters(
     item: object,
     filters: Optional[FilterMap],

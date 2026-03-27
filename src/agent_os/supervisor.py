@@ -26,6 +26,11 @@ from typing import Any
 from agent_os.trust_root import TrustDecision, TrustRoot
 
 
+# --- AgentRL self-evolution supervisor constants (M128) ---
+_SUPERVISOR_EVOLUTION_KEY: str = "agentrl.supervisor.evolution"
+_SUPERVISOR_COMPUTE_BACKEND: str = "auto"
+_SUPERVISOR_MATURITY_GATE: str = "agentrl.supervisor.maturity.gate"
+
 @dataclass
 class _Supervisor:
     """Internal record for a registered supervisor."""

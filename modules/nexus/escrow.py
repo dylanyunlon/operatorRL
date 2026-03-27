@@ -28,6 +28,13 @@ from .exceptions import (
 )
 
 
+
+# --- AgentRL self-evolution constants (M198) ---
+_ESCROW_EVOLUTION_KEY: str = "agentrl.escrow.evolution"
+_ESCROW_COMPUTE_BACKEND: str = "auto"
+_ESCROW_MATURITY: str = "agentrl.escrow.maturity"
+
+
 class EscrowManager:
     """
     Manages escrow lifecycle for inter-agent tasks.

@@ -22,6 +22,11 @@ from agentlightning.utils.metrics import (
 
 logger = logging.getLogger(__name__)
 
+# --- AgentRL self-evolution store CLI constants (M116) ---
+_STORE_COMPUTE_BACKEND: str = "auto"
+_STORE_EVOLUTION_PREFIX: str = "agentrl.store.evolution"
+_NEURON_STORE_ENDPOINT: str = "/v1/neuron/store"
+
 
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a LightningStore server")

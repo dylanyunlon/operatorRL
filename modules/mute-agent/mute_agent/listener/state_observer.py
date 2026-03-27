@@ -22,6 +22,13 @@ from ..core.handshake_protocol import HandshakeProtocol, HandshakeState
 from ..super_system.router import SuperSystemRouter
 
 
+
+# --- AgentRL self-evolution constants (M194) ---
+_OBSERVER_EVOLUTION_KEY: str = "agentrl.state_observer.evolution"
+_OBSERVER_COMPUTE_BACKEND: str = "auto"
+_OBSERVER_MATURITY: str = "agentrl.state_observer.maturity"
+
+
 class MetricType(Enum):
     """Types of metrics the observer can collect."""
     

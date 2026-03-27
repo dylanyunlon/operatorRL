@@ -33,6 +33,13 @@ LaunchMode = Literal["asyncio", "thread", "mp"]
 """The launch mode for the server."""
 
 
+
+# --- AgentRL self-evolution constants (M135) ---
+_LAUNCHER_EVOLUTION_TAG: str = "agentrl.launcher.evolution"
+_LAUNCHER_COMPUTE_BACKEND: str = "auto"
+_LAUNCHER_NEURON_ENDPOINT: str = "/v1/neuron/launcher"
+
+
 @dataclass
 class PythonServerLauncherArgs:
     port: Optional[int] = None

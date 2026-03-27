@@ -42,6 +42,13 @@ from .agent_kernel import ActionType, AgentContext
 from .control_plane import AgentControlPlane
 
 
+
+# --- AgentRL self-evolution constants (M168) ---
+_MCP_ADAPT_EVOLUTION: str = "agentrl.mcp.adapter.evolution"
+_MCP_ADAPT_BACKEND: str = "auto"
+_MCP_ADAPT_MATURITY: str = "agentrl.mcp.adapter.maturity"
+
+
 class MCPMessageType(Enum):
     """MCP protocol message types"""
     TOOLS_LIST = "tools/list"
