@@ -1,0 +1,45 @@
+# LoL Fiddler Agent Configuration
+# Copy this file to settings.yaml and update with your values
+
+fiddler:
+  host: localhost
+  port: 8868
+  api_key: YOUR_FIDDLER_API_KEY_HERE  # Get from Fiddler > Settings > MCP Server
+  timeout: 30.0
+  retry_attempts: 3
+  retry_delay: 1.0
+
+agent:
+  agent_id: lol-strategy-agent
+  poll_interval_seconds: 2.0      # How often to poll for game state
+  advice_cooldown_seconds: 10.0   # Minimum time between same advice type
+  
+  # Feature flags
+  enable_win_prediction: true
+  enable_objective_tracking: true
+  enable_teamfight_analysis: true
+  
+  # AgentOS policies
+  policies:
+    - read_only
+    - no_pii
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ML model thresholds (from leagueoflegends-optimizer)
+# These are derived from 427,984 match dataset
+ml_thresholds:
+  f1:  # deaths per minute
+    median: 0.194691
+    q1: 0.126134
+    q3: 0.267318
+  f2:  # (kills + assists) per minute
+    median: 0.466420
+    q1: 0.306988
+    q3: 0.639247
+  f3:  # level per minute
+    median: 0.505454
+    q1: 0.462111
+    q3: 0.555198
