@@ -1,0 +1,47 @@
+# Fiddler Bridge MCP Configuration
+# Location: extensions/fiddler-bridge/config/fiddler_mcp.yaml
+#
+# This config is loaded by FiddlerBridgeConfig and passed to the MCP client.
+# Modify for your deployment environment.
+
+server:
+  host: "localhost"
+  port: 8868
+  timeout: 30.0
+
+retry:
+  max_retries: 3
+  retry_delay: 0.5   # seconds, exponential backoff applied
+
+rate_limit:
+  rps: 0              # 0 = unlimited; set to 100 for production
+
+capture:
+  buffer_threshold: 100
+  flush_interval_s: 5.0
+  url_filter: ""       # glob pattern, e.g. "*liveclientdata*" for LoL
+
+sanitization:
+  redact_headers:
+    - "Authorization"
+    - "Cookie"
+    - "Set-Cookie"
+    - "X-API-Key"
+    - "X-Auth-Token"
+    - "Proxy-Authorization"
+  redact_url_params:
+    - "api_key"
+    - "apikey"
+    - "token"
+    - "secret"
+    - "password"
+    - "access_token"
+  redact_body_patterns: []
+
+reverse_proxy:
+  enabled: false
+  rules: []
+  # Example rule:
+  # - local_port: 18080
+  #   remote_host: "127.0.0.1"
+  #   remote_port: 2999     # LoL Live Client Data API

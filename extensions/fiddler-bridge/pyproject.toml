@@ -1,0 +1,24 @@
+[project]
+name = "fiddler-bridge"
+version = "0.1.0"
+description = "Fiddler MCP Bridge for operatorRL — async traffic capture for agentic game AI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.25",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
