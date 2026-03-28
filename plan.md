@@ -1088,3 +1088,164 @@ Agent的"身体"不是物理机器人，而是它能触达的所有HTTP端点。
 - git diff验证：纯增量行（0删除行）
 - 命名约定一致：`_UPPERCASE_WITH_UNDERSCORES` + 类型注解
 - 三维常量覆盖：`_EVOLUTION_*`（自演化追踪）、`_COMPUTE_BACKEND_*`（Trainium2/CUDA/Neuron后端）、`_MATURITY_*`（成长阶段门控）
+
+---
+
+## 四、Agentic 游戏AI 项目集成 — 前100文件阅读与迁移规划
+
+> **核心命题**：将 TOP 5 GitHub Agentic 游戏AI项目的关键架构模式迁移到 operatorRL，
+> 实现 Fiddler协议捕获 → AgentOS治理 → 自演化训练 的完整闭环。
+
+### 4.0 TOP 5 参考项目（已 git clone 验证）
+
+| # | 项目 | 仓库 | 文件数 | Stars | 核心价值 |
+|---|---|---|---|---|---|
+| 1 | Unity ML-Agents | `Unity-Technologies/ml-agents` | 2,352 | ~17k | PPO/Self-Play/多Agent |
+| 2 | DeepMind OpenSpiel | `google-deepmind/open_spiel` | 1,794 | ~4.8k | 60+游戏/CFR/AlphaZero |
+| 3 | Baidu PARL | `PaddlePaddle/PARL` | 1,021 | ~3.2k | 分布式RL/绝悟(Honor of Kings) |
+| 4 | Facebook ELF | `facebookresearch/ELF` | 857 | ~2.1k | RTS引擎/AlphaGoZero |
+| 5a | Akagi | `shinkuan/Akagi` | 115 | ~694 | **MITM协议捕获架构（核心参考）** |
+| 5b | Mortal | `Equim-chan/Mortal` | 436 | ~1.2k | Rust日麻DRL引擎 |
+| 5c | DI-star | `opendilab/DI-star` | 307 | ~1.5k | StarCraft2大师级AI |
+
+**缓存位置**: `.cache/vendor-repos/{ml-agents,open_spiel,PARL,ELF,Akagi,Mortal,DI-star}/`
+
+### 4.1 架构决策：Fiddler协议捕获 vs 视觉转化
+
+**结论：协议捕获是正确选择** ✅
+
+| 维度 | 协议捕获 (Fiddler/Proxifier) | 视觉 (YOLO/OCR) |
+|---|---|---|
+| 信息保真度 | 100%（原始JSON/Protobuf） | 95-98%（OCR误差） |
+| 延迟 | μs级（协议解析） | ~100ms/帧（截屏+推理） |
+| MOBA适用性 | 14帧操作频率下0帧延迟 | 落后1.4帧 |
+| 维护成本 | 协议变化时更新schema | UI变化需重标注数据集 |
+| GPU占用 | 0（CPU协议解析） | 需要GPU运行YOLO |
+| 技术方向 | 逆向工程（核心竞争力） | CV方向 |
+
+**协议捕获数据流**:
+```
+游戏客户端(.exe/.so) → TCP/UDP → 系统网络栈
+    → Proxifier (按进程名路由)
+        → Fiddler (127.0.0.1:8888, HTTPS解密/WebSocket解析)
+            → Fiddler MCP Server (localhost:8868/mcp)
+                → extensions/fiddler-bridge/client.py
+                    → extensions/protocol-decoder/codec.py
+                        → integrations/{mahjong,lol-fiddler-agent}/
+                            → AgentOS GovernedEnvironment.step()
+```
+
+### 4.2 新增文件清单（M201+ 阶段，100个文件）
+
+#### 阶段 G: Fiddler Bridge 扩展（M201-M210）
+
+| # | 文件路径 | 级别 | 功能 | 来源 |
+|---|---|---|---|---|
+| M201 | `extensions/fiddler-bridge/src/fiddler_bridge/__init__.py` | 🟢 | 模块入口 | 新建 ✅ |
+| M202 | `extensions/fiddler-bridge/src/fiddler_bridge/client.py` | 🔴 | **Fiddler MCP异步客户端** | 新建 ✅ |
+| M203 | `extensions/fiddler-bridge/pyproject.toml` | ⚪ | 包配置 | 新建 ✅ |
+| M204 | `extensions/fiddler-bridge/tests/__init__.py` | ⚪ | 测试包 | 新建 ✅ |
+| M205 | `extensions/fiddler-bridge/tests/test_client.py` | 🟡 | MCP客户端单元测试 | 待建 |
+| M206 | `extensions/fiddler-bridge/src/fiddler_bridge/session_capture.py` | 🟡 | 会话捕获流水线 | 待建 |
+| M207 | `extensions/fiddler-bridge/src/fiddler_bridge/reverse_proxy.py` | 🟡 | 反向代理管理器 | 待建 |
+| M208 | `extensions/fiddler-bridge/src/fiddler_bridge/sanitizer.py` | 🟢 | 数据脱敏 | 待建 |
+| M209 | `extensions/fiddler-bridge/config/fiddler_mcp.yaml` | ⚪ | MCP配置模板 | 待建 |
+| M210 | `extensions/fiddler-bridge/README.md` | ⚪ | 扩展文档 | 待建 |
+
+#### 阶段 H: Protocol Decoder 扩展（M211-M225）
+
+| # | 文件路径 | 级别 | 功能 | 来源 |
+|---|---|---|---|---|
+| M211 | `extensions/protocol-decoder/src/protocol_decoder/__init__.py` | 🟢 | 模块入口 | 新建 ✅ |
+| M212 | `extensions/protocol-decoder/src/protocol_decoder/codec.py` | 🔴 | **GameCodec协议+Liqi/LoL实现** | 新建 ✅ |
+| M213 | `extensions/protocol-decoder/src/protocol_decoder/codecs/__init__.py` | ⚪ | 编解码器子包 | 新建 ✅ |
+| M214 | `extensions/protocol-decoder/src/protocol_decoder/codecs/liqi.json` | 🔴 | **雀魂Protobuf协议定义** | Akagi拿来 |
+| M215 | `extensions/protocol-decoder/src/protocol_decoder/codecs/liqi.proto` | 🔴 | **雀魂Proto源文件** | Akagi拿来 |
+| M216 | `extensions/protocol-decoder/pyproject.toml` | ⚪ | 包配置 | 新建 ✅ |
+| M217 | `extensions/protocol-decoder/tests/__init__.py` | ⚪ | 测试包 | 新建 ✅ |
+| M218 | `extensions/protocol-decoder/tests/test_liqi_codec.py` | 🟡 | liqi解码测试 | 待建 |
+| M219 | `extensions/protocol-decoder/tests/test_lol_codec.py` | 🟡 | LoL Live Client解码测试 | 待建 |
+| M220 | `extensions/protocol-decoder/src/protocol_decoder/codecs/dota2.py` | 🟡 | Dota2 Bot API解码器 | 待建 |
+| M221 | `extensions/protocol-decoder/src/protocol_decoder/websocket.py` | 🟡 | WebSocket帧解析 | 待建 |
+| M222 | `extensions/protocol-decoder/src/protocol_decoder/protobuf_dynamic.py` | 🟡 | 动态Protobuf加载 | 待建 |
+| M223 | `extensions/protocol-decoder/README.md` | ⚪ | 扩展文档 | 待建 |
+| M224 | `extensions/protocol-decoder/src/protocol_decoder/codecs/tenhou.py` | 🟢 | 天凤协议解码器 | 待建 |
+| M225 | `extensions/protocol-decoder/src/protocol_decoder/codecs/riichi_city.py` | 🟢 | 一番街解码器 | 待建 |
+
+#### 阶段 I: Mahjong Agent 集成（M226-M250）
+
+| # | 文件路径 | 级别 | 功能 | 来源 |
+|---|---|---|---|---|
+| M226 | `integrations/mahjong/src/mahjong_agent/__init__.py` | 🟢 | 模块入口 | 新建 ✅ |
+| M227 | `integrations/mahjong/src/mahjong_agent/agent.py` | 🔴 | **麻将AI Agent编排器** | 新建 ✅ |
+| M228 | `integrations/mahjong/pyproject.toml` | ⚪ | 包配置 | 新建 ✅ |
+| M229 | `integrations/mahjong/src/mahjong_agent/bridge/__init__.py` | ⚪ | 桥接子包 | 新建 ✅ |
+| M230 | `integrations/mahjong/src/mahjong_agent/bridge/bridge_base.py` | 🔴 | **MITM桥接抽象基类** | Akagi拿来 |
+| M231 | `integrations/mahjong/src/mahjong_agent/bridge/majsoul_bridge.py` | 🔴 | **雀魂桥接实现** | Akagi拿来 |
+| M232 | `integrations/mahjong/src/mahjong_agent/bridge/liqi_parser.py` | 🔴 | **liqi协议解析器** | Akagi拿来 |
+| M233 | `integrations/mahjong/src/mahjong_agent/bridge/mitm_abc.py` | 🟡 | MITM抽象入口 | Akagi拿来 |
+| M234 | `integrations/mahjong/src/mahjong_agent/bridge/mitm_majsoul.py` | 🟡 | 雀魂MITM入口 | Akagi拿来 |
+| M235 | `integrations/mahjong/src/mahjong_agent/models/__init__.py` | ⚪ | 模型子包 | 新建 ✅ |
+| M236 | `integrations/mahjong/src/mahjong_agent/models/mjai_bot_base.py` | 🔴 | **mjai Bot基类** | Akagi拿来 |
+| M237 | `integrations/mahjong/tests/__init__.py` | ⚪ | 测试包 | 新建 ✅ |
+| M238 | `integrations/mahjong/tests/test_agent.py` | 🟡 | Agent决策测试 | 待建 |
+| M239 | `integrations/mahjong/tests/test_bridge.py` | 🟡 | MITM桥接测试 | 待建 |
+| M240 | `integrations/mahjong/src/mahjong_agent/models/mortal_adapter.py` | 🟡 | Mortal模型适配器 | 待建 |
+| M241 | `integrations/mahjong/src/mahjong_agent/training_collector.py` | 🟡 | 训练数据收集器 | 待建 |
+| M242 | `integrations/mahjong/src/mahjong_agent/reward.py` | 🟡 | 麻将奖励函数 | 待建 |
+| M243 | `integrations/mahjong/config/majsoul.yaml` | ⚪ | 雀魂配置 | 待建 |
+| M244 | `integrations/mahjong/config/tenhou.yaml` | ⚪ | 天凤配置 | 待建 |
+| M245 | `integrations/mahjong/README.md` | ⚪ | 集成文档 | 待建 |
+| M246 | `integrations/mahjong/src/mahjong_agent/bridge/tenhou_bridge.py` | 🟢 | 天凤桥接 | 待建 |
+| M247 | `integrations/mahjong/src/mahjong_agent/bridge/riichi_city_bridge.py` | 🟢 | 一番街桥接 | 待建 |
+| M248 | `integrations/mahjong/src/mahjong_agent/agentos_integration.py` | 🔴 | AgentOS治理集成 | 待建 |
+| M249 | `integrations/mahjong/src/mahjong_agent/evolution_loop.py` | 🔴 | **自演化闭环** | 待建 |
+| M250 | `integrations/mahjong/src/mahjong_agent/autoplay.py` | 🟢 | 自动对局 | 待建 |
+
+#### 阶段 J: LoL Fiddler Agent 精读（M251-M295，已存在63文件）
+
+| # | 文件路径 | 级别 | 阅读目标 |
+|---|---|---|---|
+| M251 | `.../orchestrator.py` | 🔴 | 全局编排器→对接fiddler-bridge |
+| M252 | `.../network/fiddler_client.py` | 🔴 | 旧Fiddler客户端→迁移到fiddler-bridge |
+| M253 | `.../network/live_client_data.py` | 🔴 | LoL Live API→验证与protocol-decoder一致 |
+| M254 | `.../network/packet_analyzer.py` | 🟡 | 包分析器→确认迁移到protocol-decoder |
+| M255 | `.../network/websocket_bridge.py` | 🟡 | WebSocket桥接→对齐Akagi方案 |
+| M256-M258 | `.../network/{session,traffic,connection}` | 🟡 | 网络层→确认与fiddler-bridge不冲突 |
+| M259 | `.../agents/strategy_agent.py` | 🔴 | 策略Agent→核心决策逻辑精读 |
+| M260 | `.../integrations/agentos_bridge.py` | 🔴 | AgentOS桥接→确认GovernedEnvironment对接 |
+| M261 | `.../integrations/riot_api.py` | 🟡 | Riot API集成→离线数据获取 |
+| M262-M265 | `.../ml/{prediction,feature,model,training}` | 🔴 | ML层→对接AgentLightning自演化 |
+| M266-M269 | `.../data/{pipeline,event,report,export}` | 🟡 | 数据层→审查训练集格式 |
+| M270-M271 | `.../feedback/{aggregator,tracker}` | 🟡 | 反馈层→奖励信号汇聚 |
+| M272-M280 | `.../strategies/{power_spike,...,pre_game}` | 🟢 | 9个策略模块精读 |
+| M281-M284 | `.../models/{game_snapshot,...,rune}` | 🟢 | 数据模型审查 |
+| M285-M289 | `.../replay/ + .../utils/` | 🟢 | 回放+工具审查 |
+| M290-M295 | `exceptions + config + tests + README` | ⚪ | 支撑文件审查 |
+
+#### 阶段 K: leagueoflegends-optimizer 精读（M296-M300）
+
+| # | 文件路径 | 级别 | 阅读目标 |
+|---|---|---|---|
+| M296 | `leagueoflegends-optimizer/src/live_client/live_client_producer.py` | 🔴 | 实时数据生产者→架构迁移 |
+| M297 | `leagueoflegends-optimizer/src/live_client/ws_producer.py` | 🟡 | WebSocket生产者→消息队列模式 |
+| M298 | `leagueoflegends-optimizer/src/league.py` | 🟡 | 核心逻辑→Riot API数据提取 |
+| M299 | `leagueoflegends-optimizer/articles/article5.md` | 🟢 | Live Client实时预测教程 |
+| M300 | `leagueoflegends-optimizer/src/live_client/run_new_live_model.py` | 🟡 | 实时模型推理→对接AgentLightning |
+
+### 4.3 生产级质量审查（Knuth标准）
+
+**用户角度 — 是否引起 bug？**
+
+1. **Fiddler未运行时的静默失败**: `FiddlerMCPClient.__aenter__` 调用 `health_check()`，`self._healthy=False` 且 logger.warning。后续调用抛 `httpx.HTTPError`。**不会静默数据丢失**。
+2. **协议版本不匹配**: `liqi.json` 来自 Akagi 某一时点。雀魂更新后 `decode()` 抛 `CodecError`。**不会幻觉**，但需手动更新 schema。
+3. **麻将Agent超时回退**: 4s超时→tsumogiri（打摸牌）。安全但弱。频繁超时说明需优化模型或硬件。**不会游戏超时**。
+4. **LoL Live Client HTTPS证书**: 自签名证书(127.0.0.1:2999)，首次需配置Fiddler信任。**一次性设置**。
+5. **多开隔离**: 多表麻将/多局LoL，每个实例独立状态。通过 `apply_filters` 按URL隔离。**无跨实例污染**。
+
+**系统角度 — 结构完整性**
+
+1. **依赖方向**: `integrations/` → `extensions/protocol-decoder` → `extensions/fiddler-bridge`。单向，符合4层架构。
+2. **热替换安全**: 模型权重加载需原子操作（write-to-temp + os.rename），否则 daemon.py 热替换期间可能加载损坏权重。
+3. **内存管理**: `auto_manage_sessions()` 在 5000 会话时自动清理。30分钟LoL ~10K-15K请求，约15分钟清理一次。
+4. **并发安全**: Agent 实例级属性，无共享可变状态。异步Fiddler调用无线程竞争。
