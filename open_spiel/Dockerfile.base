@@ -1,0 +1,86 @@
+
+ARG UBUNTU_VERSION=24.04
+ARG PYTHON_VERSION=3.12
+
+FROM ubuntu:${UBUNTU_VERSION} as base
+
+#re-declaring it locally
+ARG PYTHON_VERSION=3.12
+
+ARG DEBIAN_FRONTEND=noninteractive
+# using all processes by devault
+ARG NPROC=12
+
+#for some regions, it's useful
+ENV LANG=C.UTF-8
+
+RUN apt-get update && \
+    apt-get -qq -y install \
+    software-properties-common \
+    build-essential \
+    clang \
+    curl \
+    git \
+    vim \
+    tmux \
+    sudo \
+    tzdata \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# installing the python we need
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN apt-get update && apt-get install -y -qq python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python${PYTHON_VERSION}-venv
+
+# installing the newest pip
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 1
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1
+
+RUN python -m venv /opt/venv
+# Ensure the container uses the venv's python and pip automatically
+ENV PATH="/opt/venv/bin:$PATH"
+
+
+RUN mkdir repo
+WORKDIR /repo
+
+RUN pip --no-cache-dir install matplotlib
+
+# install
+COPY . .
+RUN ./install.sh
+RUN pip install --no-cache-dir --upgrade -r requirements.txt 
+
+# build and test
+RUN mkdir -p build
+WORKDIR /repo/build
+RUN cmake -DPython3_EXECUTABLE=`which python` -DCMAKE_CXX_COMPILER=`which clang++` ../open_spiel
+RUN make -j${NPROC}
+
+ENV PYTHONPATH=${PYTHONPATH}:/repo
+ENV PYTHONPATH=${PYTHONPATH}:/repo/build/python
+RUN ctest -j${NPROC}
+WORKDIR /repo/open_spiel
+
+# minimal image for development in Python
+FROM python:${PYTHON_VERSION}-slim as python-slim
+
+RUN mkdir repo
+WORKDIR /repo
+COPY --from=base /repo .
+
+RUN pip install --upgrade -r requirements.txt
+RUN pip install matplotlib
+
+ENV PYTHONPATH=${PYTHONPATH}:/repo
+ENV PYTHONPATH=${PYTHONPATH}:/repo/build/python
+WORKDIR /repo/open_spiel
+
+# jupyterlab Environment
+FROM base as jupyterlab
+
+RUN pip install jupyter -U && pip install jupyterlab
+EXPOSE 8888
+ENTRYPOINT ["jupyter", "lab", "--ip=0.0.0.0", "--allow-root"]

@@ -1,0 +1,142 @@
+<p align="center">
+<img src=".github/PARL-logo.png" alt="PARL" width="500"/>
+</p>
+
+English | [简体中文](./README.cn.md)
+
+[![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](https://parl.readthedocs.io/en/latest/index.html) [![Documentation Status](https://img.shields.io/badge/中文文档-最新-brightgreen.svg)](https://parl.readthedocs.io/zh_CN/latest/) [![Documentation Status](https://img.shields.io/badge/手册-中文-brightgreen.svg)](./docs/zh_CN/Overview.md) [![Release](https://img.shields.io/badge/release-v2.2.1-blue.svg)](https://github.com/PaddlePaddle/PARL/releases)
+
+> PARL is a flexible and high-efficient reinforcement learning framework.
+
+<!-- toc -->
+
+- [About PARL](#about-parl)
+  - [Features](#features)
+  - [Abstractions](#abstractions)
+    - [Model](#model)
+    - [Algorithm](#algorithm)
+    - [Agent](#agent)
+  - [Parallelization](#parallelization)
+- [Install:](#install)
+    - [Dependencies](#dependencies)
+- [Getting Started](#getting-started)
+- [Examples](#examples)
+- [Waymax-RL(2025 Update, GPU-RL Autonomous Driving)](#waymax-rl2025-update-gpu-rl-autonomous-driving)
+- [xparl Security](#xparl-security)
+  - [Security Considerations](#security-considerations)
+
+# About PARL
+## Features
+**Reproducible**. We provide algorithms that stably reproduce the result of many influential reinforcement learning algorithms.
+
+**Large Scale**. Ability to support high-performance parallelization of training with thousands of CPUs and multi-GPUs.
+
+**Reusable**.  Algorithms provided in the repository could be directly adapted to a new task by defining a forward network and training mechanism will be built automatically.
+
+**Extensible**. Build new algorithms quickly by inheriting the abstract class in the framework.
+
+
+## Abstractions
+<img src=".github/abstractions.png" alt="abstractions" width="400"/>
+PARL aims to build an agent for training algorithms to perform complex tasks.   
+The main abstractions introduced by PARL that are used to build an agent recursively are the following:
+
+### Model
+`Model` is abstracted to construct the forward network which defines a policy network or critic network given state as input.
+
+### Algorithm
+`Algorithm` describes the mechanism to update parameters in `Model` and often contains at least one model.
+
+### Agent
+`Agent`, a data bridge between the environment and the algorithm, is responsible for data I/O with the outside environment and describes data preprocessing before feeding data into the training process.  
+
+Note: For more information about base classes, please visit our [tutorial](https://parl.readthedocs.io/en/latest/tutorial/getting_started.html) and [API documentation](https://parl.readthedocs.io/en/latest/apis/model.html).
+
+## Parallelization
+PARL provides a compact API for distributed training, allowing users to transfer the code into a parallelized version by simply adding a decorator. For more information about our APIs for parallel training, please visit our [documentation](https://parl.readthedocs.io/en/latest/parallel_training/setup.html).  
+Here is a `Hello World` example to demonstrate how easy it is to leverage outer computation resources.
+```python
+#============Agent.py=================
+@parl.remote_class
+class Agent(object):
+
+    def say_hello(self):
+        print("Hello World!")
+
+    def sum(self, a, b):
+        return a+b
+
+parl.connect('localhost:8037')
+agent = Agent()
+agent.say_hello()
+ans = agent.sum(1,5) # it runs remotely, without consuming any local computation resources
+```
+Two steps to use outer computation resources:
+1. use the `parl.remote_class` to decorate a class at first, after which it is transferred to be a new class that can run in other CPUs or machines.
+2. call `parl.connect` to initialize parallel communication before creating an object. Calling any function of the objects **does not** consume local computation resources since they are executed elsewhere.
+
+<img src=".github/decorator.png" alt="PARL" width="450"/>
+As shown in the above figure, real actors (orange circle) are running at the cpu cluster, while the learner (blue circle) is running at the local gpu with several remote actors (yellow circle with dotted edge).  
+
+For users, they can write code in a simple way, just like writing multi-thread code, but with actors consuming remote resources. We have also provided examples of parallized algorithms like [IMPALA](benchmark/fluid/IMPALA/), [A2C](examples/A2C/). For more details in usage please refer to these examples.  
+
+
+# Install:
+### Dependencies
+- Python 3.6+(Python 3.8+ is preferable for distributed training). 
+- [paddlepaddle>=2.3.1](https://github.com/PaddlePaddle/Paddle) (**Optional**, if you only want to use APIs related to parallelization alone)  
+
+
+```
+pip install parl
+```
+
+[Detailed Installation Guide (Continuously Updated)](docs/installation_guide.md)
+
+# Getting Started
+Several-points to get you started:
+- [Tutorial](https://parl.readthedocs.io/en/latest/tutorial/getting_started.html) : How to solve cartpole problem.
+- [Xparl Usage](https://parl.readthedocs.io/en/latest/parallel_training/setup.html) : How to set up a cluster with `xparl` and compute in parallel.
+- [Advanced Tutorial](https://parl.readthedocs.io/en/latest/implementations/new_alg.html) : Create customized algorithms.
+- [API documentation](https://parl.readthedocs.io/en/latest/apis/model.html)
+
+For beginners who know little about reinforcement learning, we also provide an introductory course: ( [Video](https://www.bilibili.com/video/BV1yv411i7xd) | [Code](examples/tutorials/) )
+
+# Examples
+- [QuickStart](examples/QuickStart/)
+- [DQN](examples/DQN/)
+- [ES](examples/ES/)
+- [DDPG](examples/DDPG/)
+- [A2C](examples/A2C/)
+- [TD3](examples/TD3/)
+- [SAC](examples/SAC/)
+- [QMIX](examples/QMIX/)
+- [MADDPG](examples/MADDPG/)
+- [PPO](examples/PPO/)
+- [CQL](examples/CQL/)
+- [IMPALA](examples/IMPALA)
+- [Winning Solution for NIPS2018: AI for Prosthetics Challenge](examples/NeurIPS2018-AI-for-Prosthetics-Challenge/)
+- [Winning Solution for NIPS2019: Learn to Move Challenge](examples/NeurIPS2019-Learn-to-Move-Challenge/)
+- [Winning Solution for NIPS2020: Learning to Run a Power Network Challenge](examples/NeurIPS2020-Learning-to-Run-a-Power-Network-Challenge/)
+
+<img src="examples/NeurIPS2019-Learn-to-Move-Challenge/image/performance.gif" width = "280" height ="200" alt="NeurlIPS2018"/> <img src=".github/Half-Cheetah.gif" width = "280" height ="200" alt="Half-Cheetah"/> <img src=".github/Breakout.gif" width = "195" height ="200" alt="Breakout"/>
+<br>
+<img src=".github/Aircraft.gif"  width = "762" height ="300"  alt="NeurlIPS2018"/>
+
+# Waymax-RL(2025 Update, GPU-RL Autonomous Driving)
+- End-to-End GPU Reinforcement Learning for Waymax Autonomous Driving Simulation.  
+  Full documentation and instructions: [waymax_rl/README.md](./waymax_rl/README.md)
+
+# xparl Security
+
+`xparl` provides multi-process parallelism across a multi-machine cluster, similar to Python's built-in single-machine multiprocessing. This means that after writing code on a client, you can execute arbitrary code on any machine within the cluster, such as retrieving data from other machines, adding or deleting files, etc. 
+
+This behavior is by design, as reinforcement learning environments are diverse, and `env_wrapper` needs the ability to perform any possible operation. `xparl` achieves this functionality using `pickle` (similar to `ray`). Unlike in most cases where `pickle` may be considered a vulnerability, here it is an essential feature.
+
+## Security Considerations
+
+Since arbitrary code execution is possible, users must ensure the cluster is secure:
+
+- **Do not allow untrusted machines to join the cluster.**  
+- **Do not expose the `xparl` ports to the public internet or allow untrusted users to access the cluster.**  
+- **Do not execute untrusted code on the cluster.**
