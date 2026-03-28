@@ -1612,3 +1612,132 @@ M246-M265 完成了三大模块的建设:
 | M283 | `integrations/lol-fiddler-agent/src/.../replay/recorder.py` | 🟡 | **回放录制器** — 对局录制 + 标注 |
 | M284 | `integrations/lol-fiddler-agent/src/.../models/game_snapshot.py` | 🟡 | **游戏快照** — 注入演化元数据字段 |
 | M285 | `integrations/lol-fiddler-agent/src/.../models/champion_db.py` | 🟢 | **英雄数据库** — 对接champion_meta |
+
+## 十一、M266-M285 完成报告
+
+> 完成时间: 2026-03-28
+> 作者: dylanyunlong
+> TDD测试: 200测试, 200/200通过 (100%)
+
+M266-M285 完成了两大阶段的建设:
+
+1. **Phase P (M266-M275): 策略模块演化注入** — 9个策略模块 + 编排器全部注入自演化回调
+2. **Phase Q (M276-M285): 数据/反馈/回放层演化集成** — 数据管线训练标注 + 多维奖励 + 经验回放 + 演化元数据
+
+### M266-M285 文件清单
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M266 | `integrations/lol-fiddler-agent/src/.../strategies/power_spike.py` | ✅ | **EvolvablePowerSpikeDetector** — 演化回调 + 训练标注 |
+| M267 | `integrations/lol-fiddler-agent/src/.../strategies/gold_efficiency.py` | ✅ | **EvolvableGoldEfficiencyEvaluator** — 演化回调 |
+| M268 | `integrations/lol-fiddler-agent/src/.../strategies/map_awareness.py` | ✅ | **EvolvableMapAwarenessEvaluator** — 演化回调 |
+| M269 | `integrations/lol-fiddler-agent/src/.../strategies/objective_timer.py` | ✅ | **EvolvableObjectiveTracker** — 演化回调 |
+| M270 | `integrations/lol-fiddler-agent/src/.../strategies/death_analyzer.py` | ✅ | **EvolvableDeathAnalyzerEngine** — 演化回调 |
+| M271 | `integrations/lol-fiddler-agent/src/.../strategies/wave_management.py` | ✅ | **EvolvableWaveManagementEvaluator** — 演化回调 |
+| M272 | `integrations/lol-fiddler-agent/src/.../strategies/summoner_tracker.py` | ✅ | **EvolvableSummonerSpellTracker** — 演化回调 |
+| M273 | `integrations/lol-fiddler-agent/src/.../strategies/team_comp.py` | ✅ | **EvolvableTeamCompAnalyzer** — 演化回调 |
+| M274 | `integrations/lol-fiddler-agent/src/.../strategies/pre_game.py` | ✅ | **EvolvablePreGameAnalyzer** — pregame_scout对接 |
+| M275 | `integrations/lol-fiddler-agent/src/.../orchestrator.py` | ✅ | **EvolutionCoordinator** — 全局演化协调 + 训练批次导出 |
+| M276 | `integrations/lol-fiddler-agent/src/.../data/pipeline.py` | ✅ | **TrainingAnnotationStage** — 管线训练标注阶段 |
+| M277 | `integrations/lol-fiddler-agent/src/.../data/event_processor.py` | ✅ | **EvolvableEventProcessor** — 事件→训练span |
+| M278 | `integrations/lol-fiddler-agent/src/.../data/performance_report.py` | ✅ | **EvolvableReportGenerator** — 演化回调 |
+| M279 | `integrations/lol-fiddler-agent/src/.../data/exporter.py` | ✅ | **EvolvableDataExporter** — AgentLightning格式导出 |
+| M280 | `integrations/lol-fiddler-agent/src/.../feedback/aggregator.py` | ✅ | **EvolvableFeedbackAggregator** — 多维奖励计算 |
+| M281 | `integrations/lol-fiddler-agent/src/.../feedback/tracker.py` | ✅ | **EvolvableFeedbackTracker** — 演化回调 |
+| M282 | `integrations/lol-fiddler-agent/src/.../replay/buffer.py` | ✅ | **EvolvableReplayBuffer** — 代际标签 + 训练批次 |
+| M283 | `integrations/lol-fiddler-agent/src/.../replay/recorder.py` | ✅ | **EvolvableReplayRecorder** — 演化事件录制 |
+| M284 | `integrations/lol-fiddler-agent/src/.../models/game_snapshot.py` | ✅ | **EvolutionMetadata** — 代际/模型版本/奖励信号 |
+| M285 | `integrations/lol-fiddler-agent/src/.../models/champion_db.py` | ✅ | **EvolvableChampionDatabase** — champion_meta对接 |
+
+### 修改的已有文件 (鲁迅拿来主义 — 不增不删函数，文件末尾追加)
+
+| 文件 | 原始函数数 | 追加函数数 | diff验证 |
+|---|---|---|---|
+| power_spike.py | 9 | +6 | ✅ 原有9个完整 |
+| gold_efficiency.py | 4 | +6 | ✅ 原有4个完整 |
+| map_awareness.py | 12 | +6 | ✅ 原有12个完整 |
+| objective_timer.py | 18 | +6 | ✅ 原有18个完整 |
+| death_analyzer.py | 14 | +6 | ✅ 原有14个完整 |
+| wave_management.py | 7 | +6 | ✅ 原有7个完整 |
+| summoner_tracker.py | 15 | +6 | ✅ 原有15个完整 |
+| team_comp.py | 12 | +6 | ✅ 原有12个完整 |
+| pre_game.py | 10 | +8 | ✅ 原有10个完整 |
+| orchestrator.py | 7 | +10 | ✅ 原有7个完整 |
+| pipeline.py | 18 | +5 | ✅ 原有18个完整 |
+| event_processor.py | 14 | +7 | ✅ 原有14个完整 |
+| performance_report.py | 10 | +6 | ✅ 原有10个完整 |
+| exporter.py | 12 | +7 | ✅ 原有12个完整 |
+| aggregator.py | 18 | +7 | ✅ 原有18个完整 |
+| tracker.py | 22 | +6 | ✅ 原有22个完整 |
+| buffer.py | 24 | +8 | ✅ 原有24个完整 |
+| recorder.py | 28 | +7 | ✅ 原有28个完整 |
+| game_snapshot.py | 12 | +4 | ✅ 原有12个完整 |
+| champion_db.py | 29 | +8 | ✅ 原有29个完整 |
+
+### ✅ M01-M285 全部完成 — 总进度
+
+| 阶段 | 文件数 | 测试数 | 通过率 |
+|---|---|---|---|
+| M01-M100 | 100 | 1000 | 1000/1000 ✅ |
+| M101-M180 | 80 | 467 | 467/467 ✅ |
+| M181-M200 | 20 | 116 | 116/116 ✅ |
+| M201-M220 | 20+10 | 116 | 116/116 ✅ |
+| M226-M245 | 20+8 | 135 | 135/135 ✅ |
+| M246-M265 | 20+20 | 206 | 206/206 ✅ |
+| M266-M285 | 20 | 200 | 200/200 ✅ |
+| **合计** | **318** | **2240** | **2240/2240 ✅** |
+
+### 生产级质量审查（Knuth标准）
+
+**从用户角度：**
+1. EvolvableXxx 包装器继承原始类，用户无需改动现有代码 — 零破坏性
+2. evolution_callback 默认 None，不设置时完全无开销
+3. _fire_evolution 内 try/except 确保回调异常不会中断主流程
+4. pregame_scout 和 champion_meta_connector 为可选插槽，不影响独立运行
+
+**从系统角度：**
+1. 所有追加代码在文件末尾，git diff 完全清晰
+2. EvolutionCoordinator 作为单例协调器，避免多模块回调串联时的状态混乱
+3. compute_multidim_reward 使用加权线性组合，gold_delta 做了 [-1,1] 归一化避免溢出
+4. TrainingAnnotationStage 是无副作用的管线阶段，不阻塞数据流
+5. EvolutionMetadata 使用 __slots__ 减少内存开销
+
+---
+
+## 十二、M286-M305 新增任务规划
+
+### 阶段 R: Seraphine 历史战斗数据集成（M286-M295）
+
+> 从 Seraphine (github.com/ljszx/Seraphine) 拿来历史数据获取能力，
+> 对接到 lol-history + 自演化训练循环
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M286 | `integrations/lol-history/src/lol_history/seraphine_bridge.py` | 🔴 | **Seraphine桥接器** — HTTP API对接 + 历史对局数据拉取 |
+| M287 | `integrations/lol-history/src/lol_history/match_history_fetcher.py` | 🔴 | **对局历史获取器** — 批量获取 + 速率限制 + 缓存 |
+| M288 | `integrations/lol-history/src/lol_history/match_detail_parser.py` | 🟡 | **对局详情解析器** — JSON→结构化数据 + 时间线提取 |
+| M289 | `integrations/lol-history/src/lol_history/opponent_profiler.py` | 🔴 | **对手画像生成器** — 历史数据→对手习惯/弱点分析 |
+| M290 | `integrations/lol-history/src/lol_history/historical_training_exporter.py` | 🟡 | **历史训练数据导出** — 历史对局→AgentLightning span格式 |
+| M291 | `integrations/lol-history/src/lol_history/patch_timeline.py` | 🟢 | **版本时间线** — 追踪英雄/装备跨版本变化 |
+| M292 | `integrations/lol-history/src/lol_history/winrate_tracker.py` | 🟡 | **胜率追踪器** — 个人英雄池胜率漂移 + 趋势检测 |
+| M293 | `integrations/lol-history/src/lol_history/matchup_database.py` | 🟡 | **对位数据库** — 历史对位胜率 + 置信度 |
+| M294 | `integrations/lol-history/src/lol_history/game_timeline_analyzer.py` | 🟢 | **对局时间线分析** — 关键转折点检测 + 回放标注 |
+| M295 | `integrations/lol-history/src/lol_history/history_evolution_bridge.py` | 🔴 | **历史→演化桥接** — 历史数据注入演化训练闭环 |
+
+### 阶段 S: Fiddler MCP Server 深度集成 + 协议层增强（M296-M305）
+
+> 参考 Fiddler MCP Server 文档，深度集成Fiddler协议捕获能力
+> 实现 Proxifier 全局代理 + 实时协议解码
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M296 | `extensions/fiddler-bridge/src/fiddler_mcp_connector.py` | 🔴 | **Fiddler MCP连接器** — MCP协议对接 + 工具注册 |
+| M297 | `extensions/fiddler-bridge/src/proxifier_config.py` | 🟡 | **Proxifier配置器** — 自动配置全局代理规则 |
+| M298 | `extensions/fiddler-bridge/src/lol_protocol_decoder.py` | 🔴 | **LoL协议解码器** — 游戏私有协议解析(参考Akagi MITM) |
+| M299 | `extensions/fiddler-bridge/src/realtime_stream.py` | 🔴 | **实时流处理器** — 捕获→解码→事件流 (14帧/秒级) |
+| M300 | `extensions/fiddler-bridge/src/combat_calculator.py` | 🟡 | **战斗计算器** — 服务器判定的精确战斗结果解析 |
+| M301 | `extensions/fiddler-bridge/src/minimap_signal_extractor.py` | 🟡 | **小地图信号提取** — minimap实时信号解码 |
+| M302 | `extensions/fiddler-bridge/src/opponent_timing_tracker.py` | 🟡 | **对手操作时序** — 精确操作时间戳捕获 |
+| M303 | `extensions/fiddler-bridge/src/voice_advisor.py` | 🔴 | **语音指导器** — 策略建议→TTS实时语音输出 |
+| M304 | `extensions/fiddler-bridge/src/session_30min_manager.py` | 🟡 | **30分钟会话管理** — 长时间系统稳定性 + 内存管控 |
+| M305 | `extensions/fiddler-bridge/src/fiddler_evolution_bridge.py` | 🔴 | **Fiddler→演化桥接** — 协议数据→训练span闭环 |
