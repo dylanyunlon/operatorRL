@@ -291,3 +291,59 @@ def list_replays(replay_dir: str = "./replays") -> list[dict[str, Any]]:
         except Exception as e:
             logger.debug("Could not read replay %s: %s", filepath, e)
     return replays
+
+
+# ── Evolution Integration (M283 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'replay_recorder'
+
+
+class EvolvableReplayRecorder(ReplayRecorder):
+    """ReplayRecorder with self-evolution event recording.
+
+    Extends the base recorder to capture evolution-specific events
+    (model updates, generation transitions, reward signals) alongside
+    standard game events for post-hoc analysis.
+    """
+
+    def __init__(self, replay_dir: str = "./replays") -> None:
+        super().__init__(replay_dir)
+        self._evolution_callback = None
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def record_evolution_event(
+        self, event_type: str, generation: int = 0,
+        metrics: dict = None, game_time: float = 0.0,
+    ) -> None:
+        """Record an evolution-specific event in the replay stream."""
+        data = {
+            'evolution_event': event_type,
+            'generation': generation,
+            'metrics': metrics or {},
+        }
+        self.record_event(
+            event_type=f'evolution_{event_type}',
+            data=data,
+            game_time=game_time,
+        )
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation

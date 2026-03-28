@@ -295,3 +295,51 @@ class ChampionDatabase:
                 logger.warning("Failed to load champion %s: %s", key, e)
         self._loaded = True
         return count
+
+
+# ── Evolution Integration (M285 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'champion_db'
+
+
+class EvolvableChampionDatabase(ChampionDatabase):
+    """ChampionDatabase with evolution callback + champion_meta connector.
+
+    Links to the lol-history champion_meta module for win-rate drift
+    tracking across patches, feeding patch-aware data into training.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._evolution_callback = None
+        self._champion_meta_connector = None
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    @property
+    def champion_meta_connector(self):
+        return self._champion_meta_connector
+
+    @champion_meta_connector.setter
+    def champion_meta_connector(self, connector):
+        self._champion_meta_connector = connector
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation

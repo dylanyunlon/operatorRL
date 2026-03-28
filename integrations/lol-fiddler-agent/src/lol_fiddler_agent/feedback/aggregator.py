@@ -230,3 +230,70 @@ class FeedbackAggregator:
         self._all_records.clear()
         self._gold_by_action.clear()
         self._reward_by_action.clear()
+
+
+# ── Evolution Integration (M280 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'feedback_aggregator'
+
+
+class EvolvableFeedbackAggregator(FeedbackAggregator):
+    """FeedbackAggregator with multi-dimensional reward computation.
+
+    Extends the base aggregator to compute composite reward signals
+    from compliance, effectiveness, and gold delta dimensions,
+    feeding directly into AgentLightning's PolicyReward.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._evolution_callback = None
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def compute_multidim_reward(
+        self, compliance: float = 0.0, effectiveness: float = 0.0,
+        gold_delta: float = 0.0, weights: dict = None,
+    ) -> dict:
+        """Compute multi-dimensional reward signal.
+
+        Returns composite reward from weighted dimensions:
+        - compliance: how often advice was followed (0-1)
+        - effectiveness: positive outcome rate (0-1)
+        - gold_delta: gold change normalized to [-1, 1]
+        """
+        w = weights or {'compliance': 0.3, 'effectiveness': 0.5, 'gold': 0.2}
+        gold_norm = max(min(gold_delta / 5000.0, 1.0), -1.0)
+        composite = (
+            w.get('compliance', 0.3) * compliance
+            + w.get('effectiveness', 0.5) * effectiveness
+            + w.get('gold', 0.2) * gold_norm
+        )
+        return {
+            'compliance': compliance,
+            'effectiveness': effectiveness,
+            'gold_delta': gold_delta,
+            'gold_normalized': gold_norm,
+            'composite': composite,
+            'weights': w,
+        }
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation

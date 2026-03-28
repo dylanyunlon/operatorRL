@@ -287,3 +287,55 @@ def _build_team_snapshot(state: LiveGameState, team: Team) -> TeamSnapshot:
         dragon_count=state.get_dragon_count(team),
         has_baron=state.has_baron_buff(team),
     )
+
+
+# ── Evolution Integration (M284 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'game_snapshot'
+
+
+class EvolutionMetadata:
+    """Metadata attached to snapshots for evolution tracking.
+
+    Carries generation, model version, and reward signal so that
+    every snapshot in the training pipeline knows which model
+    generation produced/evaluated it.
+    """
+
+    __slots__ = ('generation', 'model_version', 'reward_signal',
+                 'policy_version', 'timestamp')
+
+    def __init__(
+        self, generation: int = 0, model_version: str = 'v0',
+        reward_signal: float = 0.0, policy_version: str = '',
+    ) -> None:
+        import time as _time
+        self.generation = generation
+        self.model_version = model_version
+        self.reward_signal = reward_signal
+        self.policy_version = policy_version
+        self.timestamp = _time.time()
+
+    def to_dict(self) -> dict:
+        return {
+            'generation': self.generation,
+            'model_version': self.model_version,
+            'reward_signal': self.reward_signal,
+            'policy_version': self.policy_version,
+            'timestamp': self.timestamp,
+        }
+
+
+def attach_evolution_metadata(
+    snapshot: 'GameSnapshot', metadata: EvolutionMetadata,
+) -> dict:
+    """Attach evolution metadata to a snapshot for training export.
+
+    Returns a dict combining snapshot data with evolution tracking info.
+    Does NOT modify the original snapshot object (immutable pattern).
+    """
+    result = {
+        'snapshot_id': snapshot.snapshot_id,
+        'game_time': snapshot.game_time,
+        'evolution': metadata.to_dict(),
+    }
+    return result

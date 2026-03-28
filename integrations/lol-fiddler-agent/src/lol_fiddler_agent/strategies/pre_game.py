@@ -196,3 +196,47 @@ class PreGameAnalyzer:
         if champ:
             return any(r.value == role for r in champ.roles)
         return False
+
+
+# ── Evolution Integration (M274 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'pre_game'
+
+
+class EvolvablePreGameAnalyzer(PreGameAnalyzer):
+    """PreGameAnalyzer with self-evolution callback + pregame_scout connector."""
+
+    def __init__(self, champion_db=None, pregame_scout=None) -> None:
+        super().__init__(champion_db=champion_db)
+        self._evolution_callback = None
+        self._pregame_scout = pregame_scout
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    @property
+    def pregame_scout(self):
+        return self._pregame_scout
+
+    @pregame_scout.setter
+    def pregame_scout(self, scout):
+        self._pregame_scout = scout
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation

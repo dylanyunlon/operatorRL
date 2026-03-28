@@ -226,3 +226,55 @@ def create_standard_pipeline() -> DataPipeline:
     pipeline.add_stage(SnapshotStage())
     pipeline.add_stage(DeduplicateStage())
     return pipeline
+
+
+# ── Evolution Integration (M276 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'data_pipeline'
+
+
+class TrainingAnnotationStage(PipelineStage):
+    """Pipeline stage that emits training annotations for each snapshot.
+
+    Passthrough stage: returns the snapshot unchanged but fires
+    an annotation callback with feature summary for AgentLightning.
+    """
+
+    def __init__(self) -> None:
+        self._on_annotation = None
+        self._annotation_count = 0
+
+    @property
+    def on_annotation(self):
+        return self._on_annotation
+
+    @on_annotation.setter
+    def on_annotation(self, cb):
+        self._on_annotation = cb
+
+    async def process(self, data):
+        """Pass snapshot through, emitting annotation."""
+        self._annotation_count += 1
+        annotation = {
+            'module': _EVOLUTION_KEY,
+            'stage': 'training_annotation',
+            'annotation_index': self._annotation_count,
+            'game_time': getattr(data, 'game_time', 0.0),
+            'timestamp': time.time(),
+        }
+        if self._on_annotation:
+            try:
+                self._on_annotation(annotation)
+            except Exception:
+                pass
+        return data
+
+
+def create_evolution_pipeline() -> DataPipeline:
+    """Create pipeline with training annotation stage appended."""
+    pipeline = DataPipeline()
+    pipeline.add_stage(ParseStage())
+    pipeline.add_stage(ValidateStage())
+    pipeline.add_stage(SnapshotStage())
+    pipeline.add_stage(DeduplicateStage())
+    pipeline.add_stage(TrainingAnnotationStage())
+    return pipeline

@@ -163,3 +163,44 @@ class DataExporter:
             "format": self._config.format,
             "output_dir": self._config.output_dir,
         }
+
+
+# ── Evolution Integration (M279 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'exporter'
+
+
+class EvolvableDataExporter(DataExporter):
+    """DataExporter with self-evolution callback + AgentLightning format."""
+
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+        self._evolution_callback = None
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def to_agentlightning_format(self, **kwargs) -> dict:
+        """Convert snapshot data to AgentLightning training format."""
+        row = {'format': 'agentlightning', 'module': _EVOLUTION_KEY}
+        row.update(kwargs)
+        return row
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation

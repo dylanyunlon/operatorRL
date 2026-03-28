@@ -294,3 +294,67 @@ class Orchestrator:
     @property
     def last_snapshot(self) -> Optional[GameSnapshot]:
         return self._last_snapshot
+
+
+# ── Evolution Integration (M275 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'orchestrator'
+
+
+class EvolutionCoordinator:
+    """Global evolution coordinator for all strategy modules.
+
+    Collects training annotations from all Evolvable* modules,
+    batches them for AgentLightning training spans, and manages
+    cross-module evolution state.
+
+    Example::
+
+        coord = EvolutionCoordinator()
+        coord.register_module('power_spike', power_spike_detector)
+        coord.record_annotation({'module': 'power_spike', 'spike': 'level6'})
+        batch = coord.export_training_batch()
+    """
+
+    def __init__(self) -> None:
+        self._registered: dict[str, Any] = {}
+        self._annotations: list[dict] = []
+        self._generation: int = 0
+
+    def register_module(self, name: str, module_ref: Any) -> None:
+        """Register a strategy module for evolution tracking."""
+        self._registered[name] = module_ref
+
+    @property
+    def registered_modules(self) -> dict[str, Any]:
+        return dict(self._registered)
+
+    def record_annotation(self, annotation: dict) -> None:
+        """Record a training annotation from any module."""
+        annotation.setdefault('generation', self._generation)
+        annotation.setdefault('recorded_at', time.time())
+        self._annotations.append(annotation)
+
+    @property
+    def annotations(self) -> list[dict]:
+        return list(self._annotations)
+
+    def export_training_batch(self) -> list[dict]:
+        """Export all collected annotations as a training batch."""
+        batch = list(self._annotations)
+        return batch
+
+    def reset(self) -> None:
+        """Clear all collected annotations."""
+        self._annotations.clear()
+
+    def advance_generation(self) -> int:
+        """Advance the evolution generation counter."""
+        self._generation += 1
+        return self._generation
+
+    def get_stats(self) -> dict[str, Any]:
+        return {
+            'total_annotations': len(self._annotations),
+            'registered_modules': list(self._registered.keys()),
+            'generation': self._generation,
+        }

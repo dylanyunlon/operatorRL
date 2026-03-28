@@ -312,3 +312,38 @@ class MapAwarenessEvaluator(StrategyEvaluator):
                 WardSuggestion(MapRegion.BARON_PIT, "Baron pit - critical objective", 10, GamePhase.LATE),
                 WardSuggestion(MapRegion.BASE_ENEMY, "Enemy base approach", 8, GamePhase.LATE),
             ]
+
+
+# ── Evolution Integration (M268 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'map_awareness'
+
+
+class EvolvableMapAwarenessEvaluator(MapAwarenessEvaluator):
+    """MapAwarenessEvaluator with self-evolution callback hooks."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._evolution_callback = None
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation

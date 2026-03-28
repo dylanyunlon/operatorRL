@@ -263,3 +263,56 @@ class PrioritizedReplayBuffer:
             "max_priority": self._max_priority,
             "avg_priority": sum(active_priorities) / len(active_priorities),
         }
+
+
+# ── Evolution Integration (M282 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'replay_buffer'
+
+
+class EvolvableReplayBuffer(ReplayBuffer):
+    """ReplayBuffer with self-evolution metadata + training batch export.
+
+    Extends the base buffer to tag transitions with evolution
+    generation metadata and export AgentLightning-compatible batches.
+    """
+
+    def __init__(self, capacity: int = 10000) -> None:
+        super().__init__(capacity)
+        self._evolution_callback = None
+        self._generation_tags: dict[int, int] = {}  # index -> generation
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def add_with_evolution(
+        self, state, action, reward, next_state, done=False,
+        game_time=0.0, generation=0,
+    ) -> None:
+        """Add transition with evolution generation tag."""
+        self.add(state, action, reward, next_state, done, game_time)
+        idx = (self.total_added - 1) % self.capacity
+        self._generation_tags[idx] = generation
+
+    def to_training_batch(self, batch_size: int = 32):
+        """Sample a batch formatted for AgentLightning training."""
+        return self.sample(batch_size)
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation

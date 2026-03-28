@@ -138,3 +138,38 @@ class GoldEfficiencyEvaluator(StrategyEvaluator):
             recall_recommended=gold >= 1300,
             benchmarks=benchmarks,
         )
+
+
+# ── Evolution Integration (M267 — appended, 不增不删原有函数) ─────────────
+_EVOLUTION_KEY = 'gold_efficiency'
+
+
+class EvolvableGoldEfficiencyEvaluator(GoldEfficiencyEvaluator):
+    """GoldEfficiencyEvaluator with self-evolution callback hooks."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._evolution_callback = None
+
+    @property
+    def evolution_callback(self):
+        return self._evolution_callback
+
+    @evolution_callback.setter
+    def evolution_callback(self, cb):
+        self._evolution_callback = cb
+
+    def _fire_evolution(self, data: dict) -> None:
+        import time as _time
+        data.setdefault('module', _EVOLUTION_KEY)
+        data.setdefault('timestamp', _time.time())
+        if self._evolution_callback:
+            try:
+                self._evolution_callback(data)
+            except Exception:
+                pass
+
+    def to_training_annotation(self, **kwargs) -> dict:
+        annotation = {'module': _EVOLUTION_KEY}
+        annotation.update(kwargs)
+        return annotation
