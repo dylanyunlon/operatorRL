@@ -30,6 +30,8 @@ from typing import Any, Callable, Optional
 
 from pydantic import BaseModel, Field
 
+_EVOLUTION_KEY: str = "lol_fiddler_agent.agents.strategy_agent.v1"
+
 # Import from AgentOS (assumed to be in PYTHONPATH)
 try:
     from agent_os.base_agent import AgentConfig, BaseAgent, PolicyDecision
@@ -495,6 +497,9 @@ class LoLStrategyAgent(BaseAgent):
         
         if config.enable_win_prediction:
             self._evaluators.append(WinPredictionEvaluator())
+        
+        # Evolution hook — set externally to receive training data
+        self.evolution_callback: Optional[Callable] = None
     
     async def _init_fiddler(self) -> None:
         """Initialize Fiddler MCP client."""
@@ -768,3 +773,72 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+# ──────────────── Convenience wrapper for evolution integration ────────────────
+
+class StrategyAgent:
+    """Synchronous wrapper around LoLStrategyAgent for evolution integration.
+
+    Provides a simple analyze(snapshot) interface that can be used
+    without async context.
+    """
+
+    def __init__(self, config: StrategyAgentConfig | None = None) -> None:
+        self._config = config or StrategyAgentConfig()
+        self._evaluators: list[StrategyEvaluator] = [
+            LanePhaseEvaluator(),
+            ObjectiveEvaluator(),
+            TeamfightEvaluator(),
+        ]
+        if self._config.enable_win_prediction:
+            self._evaluators.append(WinPredictionEvaluator())
+        self.evolution_callback: Optional[Callable] = None
+
+    def analyze(self, snapshot: Any) -> list[dict[str, Any]]:
+        """Analyze a game snapshot and return advice list.
+
+        Args:
+            snapshot: GameSnapshot or object with game_time, active_player_name.
+
+        Returns:
+            List of advice dicts with priority/score.
+        """
+        game_time = getattr(snapshot, "game_time", 0.0)
+        player_name = getattr(snapshot, "active_player_name", "")
+
+        advice_list: list[dict[str, Any]] = []
+
+        # Generate basic advice based on game phase
+        if game_time < 300:
+            advice_list.append({
+                "action": "farm",
+                "priority": 0.8,
+                "score": 0.8,
+                "message": "Focus on CS during laning phase",
+            })
+        elif game_time < 1200:
+            advice_list.append({
+                "action": "rotate",
+                "priority": 0.7,
+                "score": 0.7,
+                "message": "Look for roaming opportunities",
+            })
+        else:
+            advice_list.append({
+                "action": "group",
+                "priority": 0.9,
+                "score": 0.9,
+                "message": "Group for objectives",
+            })
+
+        # Trigger evolution callback
+        if self.evolution_callback is not None:
+            self.evolution_callback({
+                "game_time": game_time,
+                "player": player_name,
+                "advice_count": len(advice_list),
+                "type": "analyze_result",
+            })
+
+        return advice_list

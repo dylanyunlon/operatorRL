@@ -22,6 +22,8 @@ from lol_fiddler_agent.models.game_snapshot import GameSnapshot
 
 logger = logging.getLogger(__name__)
 
+_EVOLUTION_KEY: str = "lol_fiddler_agent.ml.feature_extractor.v1"
+
 
 @dataclass
 class FeatureSpec:
@@ -232,3 +234,94 @@ class FeatureHistory:
     @property
     def entry_count(self) -> int:
         return len(self.timestamps)
+
+
+# ──────────────── Pipeline Export Functions (M258) ────────────────
+
+def features_to_triplet(
+    features: dict[str, float],
+    action: str = "",
+    reward: float = 0.0,
+) -> dict[str, Any]:
+    """Convert features to AgentLightning-compatible triplet format.
+
+    Args:
+        features: Feature dict from extract_features().
+        action: Action taken (e.g., "farm", "fight", "retreat").
+        reward: Reward signal.
+
+    Returns:
+        Triplet dict with state, action, reward keys.
+    """
+    state = [features.get(n, 0.0) for n in FEATURE_NAMES]
+    return {
+        "state": state,
+        "action": action,
+        "reward": reward,
+    }
+
+
+def batch_features_to_dataset(
+    batch: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Convert a batch of triplets to a training dataset.
+
+    Args:
+        batch: List of triplet dicts from features_to_triplet().
+
+    Returns:
+        Dataset dict with states, actions, rewards arrays.
+    """
+    states = [item.get("state", []) for item in batch]
+    actions = [item.get("action", "") for item in batch]
+    rewards = [item.get("reward", 0.0) for item in batch]
+    return {
+        "states": states,
+        "actions": actions,
+        "rewards": rewards,
+        "size": len(batch),
+    }
+
+
+class IncrementalFeatureTracker:
+    """Tracks features incrementally from raw game stats.
+
+    Accepts raw stat updates (kills, deaths, assists, level, cs)
+    and computes features on the fly.
+    """
+
+    def __init__(self) -> None:
+        self._kills: int = 0
+        self._deaths: int = 0
+        self._assists: int = 0
+        self._level: int = 0
+        self._cs: int = 0
+        self._game_time: float = 0.0
+
+    def update(self, stats: dict[str, Any], game_time: float) -> None:
+        """Update with latest raw stats."""
+        self._kills = stats.get("kills", self._kills)
+        self._deaths = stats.get("deaths", self._deaths)
+        self._assists = stats.get("assists", self._assists)
+        self._level = stats.get("level", self._level)
+        self._cs = stats.get("cs", self._cs)
+        self._game_time = game_time
+
+    def current_features(self) -> dict[str, float]:
+        """Compute current features from accumulated stats."""
+        minutes = max(self._game_time / 60.0, 0.001)
+        return {
+            "f1_deaths_per_min": self._deaths / minutes,
+            "f2_ka_per_min": (self._kills + self._assists) / minutes,
+            "f3_level_per_min": self._level / minutes,
+            "cs_per_min": self._cs / minutes,
+        }
+
+    def reset(self) -> None:
+        """Reset all tracked stats."""
+        self._kills = 0
+        self._deaths = 0
+        self._assists = 0
+        self._level = 0
+        self._cs = 0
+        self._game_time = 0.0
