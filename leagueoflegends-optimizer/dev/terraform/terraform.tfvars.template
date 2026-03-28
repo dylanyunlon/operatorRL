@@ -1,0 +1,7 @@
+config_file_profile    = "DEFAULT"
+region                 = "REGION_NAME"
+tenancy_ocid           = "TENANCY_OCID"
+compartment_ocid       = "COMPARTMENT_OCID"
+desired_number_cpus    = "DESIRED_NUMBER_CPU"
+riotgames_api_key      = "RIOT_GAMES_API_KEY" # https://developer.riotgames.com/
+ssh_public_key         = "SSH_PUBLIC_KEY"
