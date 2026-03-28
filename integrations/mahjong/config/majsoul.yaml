@@ -1,0 +1,44 @@
+# Majsoul (雀魂) configuration for mahjong-agent
+# Location: integrations/mahjong/config/majsoul.yaml
+
+connection:
+  # WebSocket URL patterns for Majsoul game traffic
+  ws_patterns:
+    - "*.maj-soul.com"
+    - "*.mahjongsoul.com"
+    - "*.majsoul.*"
+  
+  # Fiddler Bridge settings for traffic capture
+  fiddler_bridge:
+    host: "localhost"
+    port: 8868
+    capture_mode: "reverse_proxy"
+
+agent:
+  # Player configuration
+  player_name: "operatorRL"
+  max_think_time_ms: 10000
+  auto_play: false
+  
+  # Bot backend
+  bot_type: "mortal"  # mortal | rule_based | custom
+  mortal:
+    model_path: ""  # Path to Mortal weights (empty = stub mode)
+    device: "cpu"   # cpu | cuda
+    is_3p: false
+    online: false
+
+training:
+  # Training data collection
+  collect_data: true
+  max_buffer_size: 10000
+  
+  # AgentLightning integration
+  agent_lightning:
+    enabled: true
+    export_format: "triplet"  # triplet | trajectory
+
+# Evolution settings
+evolution:
+  maturity_level: 0
+  evolution_key: "mahjong_agent.bridge.v1"

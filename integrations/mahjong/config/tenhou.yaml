@@ -1,0 +1,30 @@
+# Tenhou (天凤) configuration for mahjong-agent
+# Location: integrations/mahjong/config/tenhou.yaml
+
+connection:
+  # Tenhou server settings
+  server_host: "133.242.10.78"
+  server_port: 10080
+  ws_url: "wss://b-wss.mjv.jp/"
+  
+  # Protocol: XML over WebSocket
+  protocol: "tenhou_xml"
+
+agent:
+  player_name: "operatorRL"
+  max_think_time_ms: 8000
+  auto_play: false
+  
+  bot_type: "mortal"
+  mortal:
+    model_path: ""
+    device: "cpu"
+    is_3p: false
+
+training:
+  collect_data: true
+  max_buffer_size: 10000
+
+evolution:
+  maturity_level: 0
+  evolution_key: "mahjong_agent.bridge.v1"
