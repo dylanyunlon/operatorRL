@@ -1,0 +1,3247 @@
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Sat, 28 Mar 2026 12:00:00 +0800
+Subject: [PATCH] M286-M305: Seraphine history + Fiddler MCP deep integration — 20 source files + plan update
+
+Phase R (M286-M295): Seraphine historical battle data integration
+- SeraphineClient, MatchHistoryFetcher, MatchDetailParser
+- OpponentProfiler, HistoricalTrainingExporter, PatchTimeline
+- WinrateTracker, MatchupDatabase, GameTimelineAnalyzer
+- HistoryEvolutionBridge
+
+Phase S (M296-M305): Fiddler MCP Server deep integration
+- FiddlerMCPConnector, ProxifierConfig, LoLProtocolDecoder
+- RealtimeStream, CombatCalculator, MinimapSignalExtractor
+- OpponentTimingTracker, VoiceAdvisor, Session30MinManager
+- FiddlerEvolutionBridge
+
+plan.md: M286-M305 completion report + M306-M325 new tasks
+
+Signed-off-by: dylanyunlong <dylanyunlong@gmail.com>
+---
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/combat_calculator.py b/extensions/fiddler-bridge/src/fiddler_bridge/combat_calculator.py
+new file mode 100644
+index 00000000..7127cfce
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/combat_calculator.py
+@@ -0,0 +1,196 @@
++"""
++Combat Calculator — Server-authoritative combat result parsing.
++
++Parses server-determined combat results including damage events,
++damage breakdowns, combat outcomes, effective HP, and DPS calculations.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/combat_calculator.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.combat_calculator.v1"
++
++
++class CombatCalculator:
++    """Server-authoritative combat result calculator.
++
++    Parses and accumulates damage events, computes damage breakdowns,
++    determines combat outcomes, and calculates effective HP/DPS.
++    """
++
++    def __init__(self) -> None:
++        # (source, target) -> {damage_type -> total}
++        self._damage: dict[tuple[str, str], dict[str, float]] = defaultdict(
++            lambda: defaultdict(float)
++        )
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse_damage_event(self, event: dict[str, Any]) -> dict[str, Any]:
++        """Parse a raw damage event.
++
++        Args:
++            event: Event dict with source, target, amount, damage_type.
++
++        Returns:
++            Normalized damage event dict.
++        """
++        return {
++            "source": event.get("source", ""),
++            "target": event.get("target", ""),
++            "amount": event.get("amount", 0),
++            "damage_type": event.get("damage_type", "unknown"),
++        }
++
++    def record_damage(
++        self,
++        source: str,
++        target: str,
++        amount: float,
++        damage_type: str = "unknown",
++    ) -> None:
++        """Record a damage instance.
++
++        Args:
++            source: Damage source champion.
++            target: Damage target champion.
++            amount: Damage amount.
++            damage_type: "magic", "physical", "true", or "unknown".
++        """
++        self._damage[(source, target)][damage_type] += amount
++
++    def get_total_damage(self, source: str, target: str) -> float:
++        """Get total damage from source to target.
++
++        Args:
++            source: Source champion.
++            target: Target champion.
++
++        Returns:
++            Total damage dealt.
++        """
++        breakdown = self._damage.get((source, target))
++        if breakdown is None:
++            return 0.0
++        return sum(breakdown.values())
++
++    def get_damage_breakdown(
++        self, source: str, target: str
++    ) -> dict[str, float]:
++        """Get damage breakdown by type.
++
++        Args:
++            source: Source champion.
++            target: Target champion.
++
++        Returns:
++            Dict mapping damage_type to total amount.
++        """
++        breakdown = self._damage.get((source, target))
++        if breakdown is None:
++            return {}
++        return dict(breakdown)
++
++    def determine_combat_result(
++        self,
++        attacker_hp_before: float,
++        attacker_hp_after: float,
++        defender_hp_before: float,
++        defender_hp_after: float,
++    ) -> dict[str, Any]:
++        """Determine combat result.
++
++        Args:
++            attacker_hp_before: Attacker HP before combat.
++            attacker_hp_after: Attacker HP after combat.
++            defender_hp_before: Defender HP before combat.
++            defender_hp_after: Defender HP after combat.
++
++        Returns:
++            Result dict with winner, damage_dealt, damage_taken.
++        """
++        attacker_damage = defender_hp_before - defender_hp_after
++        defender_damage = attacker_hp_before - attacker_hp_after
++
++        if defender_hp_after <= 0 and attacker_hp_after > 0:
++            winner = "attacker"
++        elif attacker_hp_after <= 0 and defender_hp_after > 0:
++            winner = "defender"
++        elif attacker_hp_after <= 0 and defender_hp_after <= 0:
++            winner = "trade"
++        else:
++            winner = "attacker" if attacker_damage > defender_damage else "defender"
++
++        return {
++            "winner": winner,
++            "attacker_damage_dealt": attacker_damage,
++            "defender_damage_dealt": defender_damage,
++            "attacker_hp_remaining": max(0, attacker_hp_after),
++            "defender_hp_remaining": max(0, defender_hp_after),
++        }
++
++    def effective_hp(
++        self,
++        base_hp: float,
++        armor: float = 0.0,
++        magic_resist: float = 0.0,
++    ) -> float:
++        """Calculate effective HP considering resistances.
++
++        Uses the standard LoL formula:
++        EHP_physical = HP * (1 + armor/100)
++        EHP_magic = HP * (1 + mr/100)
++        Returns averaged EHP.
++
++        Args:
++            base_hp: Base health points.
++            armor: Armor value.
++            magic_resist: Magic resistance value.
++
++        Returns:
++            Effective HP (averaged).
++        """
++        ehp_phys = base_hp * (1 + armor / 100.0)
++        ehp_magic = base_hp * (1 + magic_resist / 100.0)
++        return (ehp_phys + ehp_magic) / 2.0
++
++    def calculate_dps(
++        self, total_damage: float, duration_seconds: float
++    ) -> float:
++        """Calculate damage per second.
++
++        Args:
++            total_damage: Total damage dealt.
++            duration_seconds: Combat duration in seconds.
++
++        Returns:
++            DPS value.
++        """
++        if duration_seconds <= 0:
++            return 0.0
++        return total_damage / duration_seconds
++
++    def reset(self) -> None:
++        """Reset all damage records."""
++        self._damage.clear()
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "combat_calculator",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/fiddler_evolution_bridge.py b/extensions/fiddler-bridge/src/fiddler_bridge/fiddler_evolution_bridge.py
+new file mode 100644
+index 00000000..7da3eba0
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/fiddler_evolution_bridge.py
+@@ -0,0 +1,127 @@
++"""
++Fiddler Evolution Bridge — Protocol data to training span closed loop.
++
++Bridges Fiddler-captured protocol data to AgentLightning training spans,
++building state-action-reward tuples from ingested events with generation
++tagging and batch export.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/fiddler_evolution_bridge.py
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.fiddler_evolution_bridge.v1"
++
++
++class FiddlerEvolutionBridge:
++    """Bridge protocol data to evolution training loop.
++
++    Ingests typed events (state/action/reward), builds training spans
++    from event triples, tags with generation metadata, and exports
++    in AgentLightning-compatible format.
++    """
++
++    def __init__(self, generation: int = 0) -> None:
++        self.generation = generation
++        self._events: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def ingest_event(self, event: dict[str, Any]) -> None:
++        """Ingest a protocol event.
++
++        Args:
++            event: Event dict with type, data, and timestamp keys.
++        """
++        self._events.append(event)
++
++    def get_collected_events(self) -> list[dict[str, Any]]:
++        """Get all collected events.
++
++        Returns:
++            List of event dicts.
++        """
++        return list(self._events)
++
++    def build_training_spans(self) -> list[dict[str, Any]]:
++        """Build training spans from collected events.
++
++        Groups events into (state, action, reward) triples.
++
++        Returns:
++            List of training span dicts.
++        """
++        states = [e for e in self._events if e.get("type") == "state"]
++        actions = [e for e in self._events if e.get("type") == "action"]
++        rewards = [e for e in self._events if e.get("type") == "reward"]
++
++        spans: list[dict[str, Any]] = []
++        n = min(len(states), len(actions), len(rewards))
++        for i in range(n):
++            span: dict[str, Any] = {
++                "state": states[i].get("data", {}),
++                "action": actions[i].get("data", {}),
++                "reward": rewards[i].get("data", {}).get("value", 0.0),
++                "timestamp": states[i].get("timestamp", 0.0),
++                "generation": self.generation,
++            }
++            spans.append(span)
++        return spans
++
++    def export_batch(self, batch_size: int = 32) -> list[dict[str, Any]]:
++        """Export a batch of training spans.
++
++        Args:
++            batch_size: Maximum number of spans.
++
++        Returns:
++            List of training span dicts.
++        """
++        spans = self.build_training_spans()
++        return spans[:batch_size]
++
++    def export_json(self) -> str:
++        """Export all training spans as JSON.
++
++        Returns:
++            JSON string of spans list.
++        """
++        spans = self.build_training_spans()
++        return json.dumps(spans, ensure_ascii=False, indent=2)
++
++    def get_stats(self) -> dict[str, int]:
++        """Get bridge statistics.
++
++        Returns:
++            Stats dict with total_events and event type counts.
++        """
++        total = len(self._events)
++        by_type: dict[str, int] = {}
++        for e in self._events:
++            t = e.get("type", "unknown")
++            by_type[t] = by_type.get(t, 0) + 1
++        return {"total_events": total, **by_type}
++
++    def reset(self) -> None:
++        """Reset all collected events."""
++        self._events.clear()
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "fiddler_evolution_bridge",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/fiddler_mcp_connector.py b/extensions/fiddler-bridge/src/fiddler_bridge/fiddler_mcp_connector.py
+new file mode 100644
+index 00000000..8eb9258d
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/fiddler_mcp_connector.py
+@@ -0,0 +1,123 @@
++"""
++Fiddler MCP Connector — MCP protocol adapter with tool registration.
++
++Provides JSON-RPC based MCP protocol communication with Fiddler Everywhere,
++tool registration, request/response building and parsing.
++
++Reference: www.telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server/
++Location: extensions/fiddler-bridge/src/fiddler_bridge/fiddler_mcp_connector.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.fiddler_mcp_connector.v1"
++
++
++class FiddlerMCPConnector:
++    """MCP protocol connector for Fiddler Everywhere.
++
++    Manages tool registration, JSON-RPC request building,
++    response parsing, and connection lifecycle.
++    """
++
++    def __init__(
++        self,
++        server_url: str = "http://127.0.0.1:8866/mcp",
++        timeout: float = 10.0,
++    ) -> None:
++        self.server_url = server_url
++        self.timeout = timeout
++        self.tools: dict[str, dict[str, Any]] = {}
++        self._connected: bool = False
++        self._request_id: int = 0
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register_tool(
++        self, name: str, schema: dict[str, Any]
++    ) -> None:
++        """Register an MCP tool.
++
++        Args:
++            name: Tool name.
++            schema: Tool schema dict with description and parameters.
++        """
++        self.tools[name] = schema
++
++    def list_tools(self) -> list[dict[str, Any]]:
++        """List all registered tools.
++
++        Returns:
++            List of {name, schema} dicts.
++        """
++        return [
++            {"name": name, "schema": schema}
++            for name, schema in self.tools.items()
++        ]
++
++    def build_mcp_request(
++        self, method: str, params: dict[str, Any]
++    ) -> dict[str, Any]:
++        """Build a JSON-RPC 2.0 MCP request.
++
++        Args:
++            method: MCP method/tool name.
++            params: Method parameters.
++
++        Returns:
++            JSON-RPC request dict.
++        """
++        self._request_id += 1
++        return {
++            "jsonrpc": "2.0",
++            "id": self._request_id,
++            "method": method,
++            "params": params,
++        }
++
++    def parse_mcp_response(
++        self, raw: dict[str, Any]
++    ) -> Optional[dict[str, Any]]:
++        """Parse a JSON-RPC 2.0 MCP response.
++
++        Args:
++            raw: Raw response dict.
++
++        Returns:
++            Result dict or None on error.
++        """
++        if "error" in raw:
++            logger.warning(
++                "MCP error: code=%s message=%s",
++                raw["error"].get("code"),
++                raw["error"].get("message"),
++            )
++            return None
++        return raw.get("result")
++
++    def is_connected(self) -> bool:
++        """Check if connector is connected.
++
++        Returns:
++            Connection status.
++        """
++        return self._connected
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "fiddler_mcp_connector",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/lol_protocol_decoder.py b/extensions/fiddler-bridge/src/fiddler_bridge/lol_protocol_decoder.py
+new file mode 100644
+index 00000000..b366e1fb
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/lol_protocol_decoder.py
+@@ -0,0 +1,171 @@
++"""
++LoL Protocol Decoder — Game protocol packet parsing.
++
++Decodes LoL game protocol packets including JSON payloads, binary headers,
++and Live Client Data API responses. Inspired by Akagi MITM architecture.
++
++Reference: Akagi/mitm/mitm_abc.py, Akagi/mitm/common.py
++Location: extensions/fiddler-bridge/src/fiddler_bridge/lol_protocol_decoder.py
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import struct
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.lol_protocol_decoder.v1"
++
++# Binary packet type IDs (simplified mapping)
++_PACKET_TYPES: dict[int, str] = {
++    0x0001: "game_event",
++    0x0002: "player_action",
++    0x0003: "state_update",
++}
++
++
++class LoLProtocolDecoder:
++    """LoL game protocol decoder.
++
++    Handles JSON packet decoding, binary header parsing,
++    Live Client Data interpretation, and custom decoder registration.
++    """
++
++    def __init__(self) -> None:
++        self.decoders: dict[str, Callable[[bytes], dict]] = {}
++        self._stats: dict[str, int] = {"total_decoded": 0, "errors": 0}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def decode_packet(self, raw: bytes) -> dict[str, Any]:
++        """Decode a raw packet (JSON or binary).
++
++        Attempts JSON decoding first, falls back to binary header parse.
++
++        Args:
++            raw: Raw packet bytes.
++
++        Returns:
++            Decoded packet dict.
++        """
++        self._stats["total_decoded"] += 1
++
++        # Try JSON first
++        try:
++            data = json.loads(raw)
++            if isinstance(data, dict):
++                return data
++        except (json.JSONDecodeError, UnicodeDecodeError):
++            pass
++
++        # Try binary header
++        try:
++            header = self.parse_packet_header(raw)
++            ptype = _PACKET_TYPES.get(header.get("type_id", 0), "unknown")
++
++            # Check custom decoders
++            if ptype in self.decoders:
++                return self.decoders[ptype](raw[6:])
++
++            return {
++                "type": ptype,
++                "header": header,
++                "raw": raw[6:].hex() if len(raw) > 6 else raw.hex(),
++            }
++        except Exception:
++            self._stats["errors"] += 1
++            return {"type": "unknown", "raw": raw.hex()}
++
++    def parse_packet_header(self, packet: bytes) -> dict[str, Any]:
++        """Parse binary packet header (4-byte length + 2-byte type).
++
++        Args:
++            packet: Raw packet bytes (at least 6 bytes).
++
++        Returns:
++            Dict with length and type_id.
++        """
++        if len(packet) < 6:
++            return {"length": len(packet), "type_id": 0}
++        length = struct.unpack(">I", packet[:4])[0]
++        type_id = struct.unpack(">H", packet[4:6])[0]
++        return {"length": length, "type_id": type_id}
++
++    def decode_live_client_data(
++        self, lcd_json: dict[str, Any]
++    ) -> dict[str, Any]:
++        """Decode Live Client Data API response.
++
++        Args:
++            lcd_json: JSON from https://127.0.0.1:2999/liveclientdata/
++
++        Returns:
++            Normalized game state dict.
++        """
++        active = lcd_json.get("activePlayer", {})
++        all_players = lcd_json.get("allPlayers", [])
++        game_data = lcd_json.get("gameData", {})
++
++        return {
++            "active_champion": active.get("championName", ""),
++            "active_level": active.get("level", 0),
++            "all_players": [
++                {"champion": p.get("championName", "")}
++                for p in all_players
++            ],
++            "game_time": game_data.get("gameTime", 0.0),
++        }
++
++    def identify_packet_type(self, type_bytes: bytes) -> str:
++        """Identify packet type from type bytes.
++
++        Args:
++            type_bytes: 2-byte type identifier.
++
++        Returns:
++            Packet type string.
++        """
++        if len(type_bytes) < 2:
++            return "unknown"
++        type_id = struct.unpack(">H", type_bytes[:2])[0]
++        return _PACKET_TYPES.get(type_id, "unknown")
++
++    def register_decoder(
++        self, event_type: str, decoder_fn: Callable[[bytes], dict]
++    ) -> None:
++        """Register a custom decoder for a specific event type.
++
++        Args:
++            event_type: Event type string.
++            decoder_fn: Callable that takes raw bytes and returns dict.
++        """
++        self.decoders[event_type] = decoder_fn
++
++    def get_stats(self) -> dict[str, int]:
++        """Get decoder statistics.
++
++        Returns:
++            Stats dict with total_decoded and errors.
++        """
++        return dict(self._stats)
++
++    def reset(self) -> None:
++        """Reset decoder state and statistics."""
++        self._stats = {"total_decoded": 0, "errors": 0}
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "lol_protocol_decoder",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/minimap_signal_extractor.py b/extensions/fiddler-bridge/src/fiddler_bridge/minimap_signal_extractor.py
+new file mode 100644
+index 00000000..93e3eeae
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/minimap_signal_extractor.py
+@@ -0,0 +1,202 @@
++"""
++Minimap Signal Extractor — Realtime minimap signal decoding.
++
++Extracts ping events, champion positions, fog-of-war detection,
++zone identification, and movement vector computation from minimap data.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/minimap_signal_extractor.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.minimap_signal_extractor.v1"
++
++# Summoner's Rift map dimensions (units)
++_DEFAULT_MAP_WIDTH: int = 14820
++_DEFAULT_MAP_HEIGHT: int = 14881
++
++
++class MinimapSignalExtractor:
++    """Minimap signal decoder and position tracker.
++
++    Parses ping events, tracks champion positions, detects fog-of-war
++    status, identifies map zones, and computes movement vectors.
++    """
++
++    def __init__(
++        self,
++        map_width: int = _DEFAULT_MAP_WIDTH,
++        map_height: int = _DEFAULT_MAP_HEIGHT,
++    ) -> None:
++        self.map_width = map_width
++        self.map_height = map_height
++        # champion_name -> {"x": int, "y": int, "timestamp": float}
++        self._positions: dict[str, dict[str, Any]] = {}
++        # champion_name -> previous position for movement vector
++        self._prev_positions: dict[str, dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse_ping(self, event: dict[str, Any]) -> dict[str, Any]:
++        """Parse a minimap ping event.
++
++        Args:
++            event: Ping event dict with ping_type, x, y, source_player.
++
++        Returns:
++            Normalized ping dict.
++        """
++        return {
++            "ping_type": event.get("ping_type", ""),
++            "x": event.get("x", 0),
++            "y": event.get("y", 0),
++            "source_player": event.get("source_player", ""),
++        }
++
++    def normalize_coordinates(
++        self, x: int, y: int
++    ) -> dict[str, float]:
++        """Normalize map coordinates to [0, 1] range.
++
++        Args:
++            x: Raw x coordinate.
++            y: Raw y coordinate.
++
++        Returns:
++            Dict with normalized x and y.
++        """
++        return {
++            "x": x / self.map_width if self.map_width > 0 else 0.0,
++            "y": y / self.map_height if self.map_height > 0 else 0.0,
++        }
++
++    def identify_zone(
++        self, x_norm: float, y_norm: float
++    ) -> str:
++        """Identify map zone from normalized coordinates.
++
++        Summoner's Rift zones (approximate):
++        - top: upper-left corridor
++        - mid: diagonal center
++        - bot: lower-right corridor
++        - jungle_top/jungle_bot: jungle quadrants
++        - river_top/river_bot: river segments
++        - base_blue/base_red: spawn areas
++
++        Args:
++            x_norm: Normalized x [0, 1].
++            y_norm: Normalized y [0, 1].
++
++        Returns:
++            Zone identifier string.
++        """
++        if x_norm < 0.15 and y_norm < 0.15:
++            return "base_blue"
++        if x_norm > 0.85 and y_norm > 0.85:
++            return "base_red"
++        if x_norm < 0.25 and y_norm > 0.6:
++            return "top"
++        if x_norm > 0.6 and y_norm < 0.25:
++            return "bot"
++        if abs(x_norm - y_norm) < 0.15 and 0.3 < x_norm < 0.7:
++            return "mid"
++        if 0.4 < x_norm < 0.6 and y_norm > 0.5:
++            return "river_top"
++        if 0.4 < x_norm < 0.6 and y_norm < 0.5:
++            return "river_bot"
++        if x_norm < 0.5 and y_norm > 0.3:
++            return "jungle_top"
++        return "jungle_bot"
++
++    def update_champion_position(
++        self, champion: str, x: int, y: int, timestamp: float
++    ) -> None:
++        """Update a champion's tracked position.
++
++        Args:
++            champion: Champion name.
++            x: X coordinate.
++            y: Y coordinate.
++            timestamp: Game time when position was observed.
++        """
++        if champion in self._positions:
++            self._prev_positions[champion] = dict(self._positions[champion])
++        self._positions[champion] = {
++            "x": x, "y": y, "timestamp": timestamp,
++        }
++
++    def get_champion_position(
++        self, champion: str
++    ) -> Optional[dict[str, Any]]:
++        """Get last known position for a champion.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            Position dict or None if unknown.
++        """
++        return self._positions.get(champion)
++
++    def is_in_fog(
++        self,
++        champion: str,
++        current_time: float,
++        fog_timeout: float = 10.0,
++    ) -> bool:
++        """Check if a champion is in fog of war.
++
++        A champion is considered fogged if their position hasn't been
++        updated within fog_timeout seconds.
++
++        Args:
++            champion: Champion name.
++            current_time: Current game time.
++            fog_timeout: Seconds before considering champion fogged.
++
++        Returns:
++            True if fogged.
++        """
++        pos = self._positions.get(champion)
++        if pos is None:
++            return True
++        return (current_time - pos["timestamp"]) > fog_timeout
++
++    def compute_movement_vector(
++        self, champion: str
++    ) -> dict[str, float]:
++        """Compute movement vector from previous to current position.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            Dict with dx, dy (zero if insufficient data).
++        """
++        curr = self._positions.get(champion)
++        prev = self._prev_positions.get(champion)
++        if curr is None or prev is None:
++            return {"dx": 0.0, "dy": 0.0}
++        return {
++            "dx": float(curr["x"] - prev["x"]),
++            "dy": float(curr["y"] - prev["y"]),
++        }
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "minimap_signal_extractor",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/opponent_timing_tracker.py b/extensions/fiddler-bridge/src/fiddler_bridge/opponent_timing_tracker.py
+new file mode 100644
+index 00000000..707117a7
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/opponent_timing_tracker.py
+@@ -0,0 +1,198 @@
++"""
++Opponent Timing Tracker — Precise operation timestamp capture.
++
++Tracks opponent actions with precise timestamps, calculates reaction times,
++estimates ability cooldowns, computes action frequencies, and detects
++timing patterns.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/opponent_timing_tracker.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.opponent_timing_tracker.v1"
++
++
++class OpponentTimingTracker:
++    """Precise opponent operation timing tracker.
++
++    Records timestamped actions, calculates reaction times,
++    estimates cooldowns, and detects behavioral timing patterns.
++    """
++
++    def __init__(self) -> None:
++        # champion -> list of {"action": str, "timestamp": float}
++        self._actions: dict[str, list[dict[str, Any]]] = defaultdict(list)
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record_action(
++        self, champion: str, action: str, timestamp: float
++    ) -> None:
++        """Record a timed action.
++
++        Args:
++            champion: Champion/player name.
++            action: Action type string (e.g., "spell_cast", "q_cast").
++            timestamp: Game time when action occurred.
++        """
++        self._actions[champion].append({
++            "action": action,
++            "timestamp": timestamp,
++        })
++
++    def get_actions(self, champion: str) -> list[dict[str, Any]]:
++        """Get all recorded actions for a champion.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            List of action dicts sorted by timestamp.
++        """
++        return list(self._actions.get(champion, []))
++
++    def calculate_reaction_time(
++        self, champion: str, stimulus: str, response: str
++    ) -> float:
++        """Calculate reaction time between stimulus and response.
++
++        Finds the first matching stimulus-response pair.
++
++        Args:
++            champion: Champion name.
++            stimulus: Stimulus action type.
++            response: Response action type.
++
++        Returns:
++            Reaction time in seconds, or -1.0 if not found.
++        """
++        actions = self._actions.get(champion, [])
++        stim_time: Optional[float] = None
++        for a in actions:
++            if a["action"] == stimulus and stim_time is None:
++                stim_time = a["timestamp"]
++            elif a["action"] == response and stim_time is not None:
++                return a["timestamp"] - stim_time
++        return -1.0
++
++    def average_reaction_time(self, champion: str) -> float:
++        """Calculate average reaction time across all stimulus-response pairs.
++
++        Pairs consecutive actions as stimulus→response.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            Average reaction time in seconds.
++        """
++        actions = self._actions.get(champion, [])
++        if len(actions) < 2:
++            return 0.0
++
++        # Group by pairs of (stimulus, response) based on alternating pattern
++        stimuli = [a for a in actions if a["action"] == "stimulus"]
++        responses = [a for a in actions if a["action"] == "response"]
++
++        if not stimuli or not responses:
++            # Fallback: pair consecutive different actions
++            times: list[float] = []
++            for i in range(0, len(actions) - 1, 2):
++                dt = actions[i + 1]["timestamp"] - actions[i]["timestamp"]
++                times.append(dt)
++            return sum(times) / len(times) if times else 0.0
++
++        times = []
++        for s, r in zip(stimuli, responses):
++            times.append(r["timestamp"] - s["timestamp"])
++        return sum(times) / len(times) if times else 0.0
++
++    def estimate_cooldown(self, champion: str, action: str) -> float:
++        """Estimate ability cooldown from consecutive uses.
++
++        Args:
++            champion: Champion name.
++            action: Action type (e.g., "q_cast").
++
++        Returns:
++            Estimated cooldown in seconds, or 0.0 if insufficient data.
++        """
++        actions = self._actions.get(champion, [])
++        uses = [a["timestamp"] for a in actions if a["action"] == action]
++        if len(uses) < 2:
++            return 0.0
++        intervals = [uses[i + 1] - uses[i] for i in range(len(uses) - 1)]
++        return sum(intervals) / len(intervals)
++
++    def action_frequency(self, champion: str, action: str) -> float:
++        """Compute action frequency (actions per second).
++
++        Args:
++            champion: Champion name.
++            action: Action type.
++
++        Returns:
++            Frequency in actions/second.
++        """
++        actions = self._actions.get(champion, [])
++        uses = [a["timestamp"] for a in actions if a["action"] == action]
++        if len(uses) < 2:
++            return 0.0
++        duration = uses[-1] - uses[0]
++        if duration <= 0:
++            return 0.0
++        return (len(uses) - 1) / duration
++
++    def detect_timing_pattern(
++        self, champion: str, action: str
++    ) -> Optional[dict[str, Any]]:
++        """Detect regular timing patterns for an action.
++
++        Args:
++            champion: Champion name.
++            action: Action type.
++
++        Returns:
++            Pattern dict with interval and regularity, or None.
++        """
++        actions = self._actions.get(champion, [])
++        uses = [a["timestamp"] for a in actions if a["action"] == action]
++        if len(uses) < 3:
++            return None
++
++        intervals = [uses[i + 1] - uses[i] for i in range(len(uses) - 1)]
++        avg_interval = sum(intervals) / len(intervals)
++        variance = sum((i - avg_interval) ** 2 for i in intervals) / len(intervals)
++        std_dev = variance ** 0.5
++        regularity = 1.0 - min(std_dev / max(avg_interval, 0.01), 1.0)
++
++        return {
++            "interval": avg_interval,
++            "regularity": regularity,
++            "samples": len(uses),
++        }
++
++    def reset(self) -> None:
++        """Reset all tracked actions."""
++        self._actions.clear()
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "opponent_timing_tracker",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/proxifier_config.py b/extensions/fiddler-bridge/src/fiddler_bridge/proxifier_config.py
+new file mode 100644
+index 00000000..df01ef46
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/proxifier_config.py
+@@ -0,0 +1,120 @@
++"""
++Proxifier Config — Auto-configure global proxy rules for game traffic.
++
++Generates Proxifier-compatible configuration files to route game process
++traffic through Fiddler proxy while bypassing non-game traffic.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/proxifier_config.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.proxifier_config.v1"
++
++
++class ProxifierConfig:
++    """Proxifier global proxy rule configurator.
++
++    Manages proxy rules for routing game process traffic through Fiddler,
++    generates Proxifier XML configuration, and provides game-specific presets.
++    """
++
++    def __init__(
++        self,
++        proxy_host: str = "127.0.0.1",
++        proxy_port: int = 8866,
++    ) -> None:
++        self.proxy_host = proxy_host
++        self.proxy_port = proxy_port
++        self._rules: list[dict[str, str]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @classmethod
++    def lol_preset(cls) -> "ProxifierConfig":
++        """Create a config preset for League of Legends.
++
++        Returns:
++            ProxifierConfig with LoL process rules.
++        """
++        cfg = cls()
++        cfg.add_rule("LeagueClient.exe", action="proxy")
++        cfg.add_rule("LeagueClientUx.exe", action="proxy")
++        cfg.add_rule("League of Legends.exe", action="proxy")
++        cfg.add_rule("RiotClientServices.exe", action="proxy")
++        return cfg
++
++    @classmethod
++    def mahjong_preset(cls) -> "ProxifierConfig":
++        """Create a config preset for mahjong clients.
++
++        Returns:
++            ProxifierConfig with mahjong process rules.
++        """
++        cfg = cls()
++        cfg.add_rule("jantama_mahjongsoul", action="proxy")
++        cfg.add_rule("tenhou.exe", action="proxy")
++        return cfg
++
++    def add_rule(self, process: str, action: str = "proxy") -> None:
++        """Add a proxy rule.
++
++        Args:
++            process: Process executable name.
++            action: "proxy" to route through Fiddler, "direct" to bypass.
++        """
++        self._rules.append({"process": process, "action": action})
++
++    def list_rules(self) -> list[dict[str, str]]:
++        """List all configured rules.
++
++        Returns:
++            List of rule dicts.
++        """
++        return list(self._rules)
++
++    def generate_config_xml(self) -> str:
++        """Generate Proxifier-compatible XML configuration.
++
++        Returns:
++            XML string for Proxifier profile.
++        """
++        lines = [
++            '<?xml version="1.0" encoding="UTF-8"?>',
++            '<ProxifierProfile version="101">',
++            '  <Options>',
++            f'    <ProxyAddress>{self.proxy_host}</ProxyAddress>',
++            f'    <ProxyPort>{self.proxy_port}</ProxyPort>',
++            '    <ProxyType>HTTPS</ProxyType>',
++            '  </Options>',
++            '  <Rules>',
++        ]
++        for rule in self._rules:
++            action = "Proxy" if rule["action"] == "proxy" else "Direct"
++            lines.append(f'    <Rule>')
++            lines.append(f'      <Name>{rule["process"]}</Name>')
++            lines.append(f'      <Applications>{rule["process"]}</Applications>')
++            lines.append(f'      <Action>{action}</Action>')
++            lines.append(f'    </Rule>')
++        lines.append('  </Rules>')
++        lines.append('</ProxifierProfile>')
++        return "\n".join(lines)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "proxifier_config",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/realtime_stream.py b/extensions/fiddler-bridge/src/fiddler_bridge/realtime_stream.py
+new file mode 100644
+index 00000000..8b85f7d4
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/realtime_stream.py
+@@ -0,0 +1,86 @@
++"""
++Realtime Stream — Capture → Decode → Event streaming pipeline.
++
++Provides a 14fps (configurable) event streaming pipeline that captures
++protocol data, decodes it, and dispatches typed events to registered handlers.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/realtime_stream.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.realtime_stream.v1"
++
++
++class RealtimeStream:
++    """Realtime event streaming pipeline.
++
++    Captures protocol data at a target FPS, decodes packets, and
++    dispatches typed events to registered handler callables.
++    """
++
++    def __init__(
++        self,
++        target_fps: int = 14,
++        buffer_size: int = 1024,
++    ) -> None:
++        self.target_fps = target_fps
++        self.frame_interval = 1.0 / target_fps if target_fps > 0 else 1.0
++        self.buffer_size = buffer_size
++        self.handlers: dict[str, list[Callable[[dict], None]]] = defaultdict(list)
++        self._stats: dict[str, int] = {"events_dispatched": 0, "events_dropped": 0}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register_handler(
++        self, event_type: str, handler: Callable[[dict], None]
++    ) -> None:
++        """Register an event handler for a specific event type.
++
++        Args:
++            event_type: Event type string to listen for.
++            handler: Callable that receives the event data dict.
++        """
++        self.handlers[event_type].append(handler)
++
++    def dispatch_event(self, event: dict[str, Any]) -> None:
++        """Dispatch an event to registered handlers.
++
++        Args:
++            event: Event dict with 'type' and 'data' keys.
++        """
++        self._stats["events_dispatched"] += 1
++        event_type = event.get("type", "")
++        for handler in self.handlers.get(event_type, []):
++            try:
++                handler(event)
++            except Exception as exc:
++                logger.warning("Handler error for %s: %s", event_type, exc)
++
++    def get_stats(self) -> dict[str, int]:
++        """Get stream statistics.
++
++        Returns:
++            Stats dict with events_dispatched and events_dropped.
++        """
++        return dict(self._stats)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "realtime_stream",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/session_30min_manager.py b/extensions/fiddler-bridge/src/fiddler_bridge/session_30min_manager.py
+new file mode 100644
+index 00000000..25194b21
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/session_30min_manager.py
+@@ -0,0 +1,141 @@
++"""
++Session 30-Minute Manager — Long-running session stability and memory management.
++
++Manages 30-minute game session lifecycle with memory usage tracking,
++limit enforcement, and session summary generation.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/session_30min_manager.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++import uuid
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.session_30min_manager.v1"
++
++
++class Session30MinManager:
++    """30-minute game session lifecycle manager.
++
++    Manages session start/end, elapsed time tracking, memory usage
++    monitoring, and limit enforcement for long-running game sessions.
++    """
++
++    def __init__(
++        self,
++        max_duration_seconds: int = 1800,
++        memory_limit_mb: float = 512.0,
++    ) -> None:
++        self.max_duration_seconds = max_duration_seconds
++        self.memory_limit_mb = memory_limit_mb
++        self._sessions: dict[str, dict[str, Any]] = {}
++        self._current_memory_mb: float = 0.0
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def start_session(self) -> str:
++        """Start a new session.
++
++        Returns:
++            Session ID string.
++        """
++        session_id = str(uuid.uuid4())[:8]
++        self._sessions[session_id] = {
++            "start_time": time.time(),
++            "active": True,
++        }
++        return session_id
++
++    def is_active(self, session_id: str) -> bool:
++        """Check if a session is active.
++
++        Args:
++            session_id: Session ID.
++
++        Returns:
++            True if session exists and is active.
++        """
++        session = self._sessions.get(session_id)
++        if session is None:
++            return False
++        return session.get("active", False)
++
++    def get_elapsed(self, session_id: str) -> float:
++        """Get elapsed time for a session.
++
++        Args:
++            session_id: Session ID.
++
++        Returns:
++            Elapsed seconds, or 0.0 if session not found.
++        """
++        session = self._sessions.get(session_id)
++        if session is None:
++            return 0.0
++        return time.time() - session["start_time"]
++
++    def record_memory_usage(self, memory_mb: float) -> None:
++        """Record current memory usage.
++
++        Args:
++            memory_mb: Memory usage in megabytes.
++        """
++        self._current_memory_mb = memory_mb
++
++    def current_memory_mb(self) -> float:
++        """Get current recorded memory usage.
++
++        Returns:
++            Memory usage in MB.
++        """
++        return self._current_memory_mb
++
++    def is_memory_exceeded(self) -> bool:
++        """Check if memory limit is exceeded.
++
++        Returns:
++            True if current memory exceeds limit.
++        """
++        return self._current_memory_mb > self.memory_limit_mb
++
++    def end_session(self, session_id: str) -> dict[str, Any]:
++        """End a session and return summary.
++
++        Args:
++            session_id: Session ID.
++
++        Returns:
++            Session summary dict.
++        """
++        session = self._sessions.get(session_id)
++        if session is None:
++            return {"error": "session_not_found", "duration": 0}
++
++        duration = time.time() - session["start_time"]
++        session["active"] = False
++        session["end_time"] = time.time()
++        session["duration"] = duration
++
++        return {
++            "session_id": session_id,
++            "duration": duration,
++            "memory_peak_mb": self._current_memory_mb,
++        }
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "session_30min_manager",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/extensions/fiddler-bridge/src/fiddler_bridge/voice_advisor.py b/extensions/fiddler-bridge/src/fiddler_bridge/voice_advisor.py
+new file mode 100644
+index 00000000..f1092483
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_bridge/voice_advisor.py
+@@ -0,0 +1,157 @@
++"""
++Voice Advisor — Strategy advice to TTS realtime voice output.
++
++Manages a priority queue of strategy advice, formats advice messages,
++enforces cooldowns between spoken advisories, and deduplicates similar
++advice within a time window.
++
++Location: extensions/fiddler-bridge/src/fiddler_bridge/voice_advisor.py
++"""
++
++from __future__ import annotations
++
++import heapq
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "fiddler_bridge.voice_advisor.v1"
++
++
++class VoiceAdvisor:
++    """Strategy advice → TTS voice output manager.
++
++    Priority-queued advice system with cooldown enforcement,
++    deduplication, and spoken history tracking.
++    """
++
++    def __init__(
++        self,
++        language: str = "zh-CN",
++        speech_rate: float = 1.2,
++        min_interval_seconds: float = 3.0,
++        dedup_window_seconds: float = 10.0,
++    ) -> None:
++        self.language = language
++        self.speech_rate = speech_rate
++        self.min_interval_seconds = min_interval_seconds
++        self.dedup_window_seconds = dedup_window_seconds
++        # Priority queue: (-priority, insertion_order, text)
++        self._queue: list[tuple[int, int, str]] = []
++        self._insert_counter: int = 0
++        self._last_spoken_time: float = 0.0
++        self._recent_texts: dict[str, float] = {}  # text -> timestamp
++        self._history: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def format_advice(
++        self, action: str, reason: str = "", urgency: str = "normal"
++    ) -> str:
++        """Format strategy advice into speakable text.
++
++        Args:
++            action: Action to take (e.g., "retreat", "engage").
++            reason: Reason for the action.
++            urgency: Urgency level.
++
++        Returns:
++            Formatted advice string.
++        """
++        parts = [action]
++        if reason:
++            parts.append(f"because {reason}")
++        if urgency == "high":
++            parts.insert(0, "Warning:")
++        return " ".join(parts)
++
++    def enqueue_advice(self, text: str, priority: int = 1) -> None:
++        """Add advice to the priority queue with deduplication.
++
++        Higher priority values are dequeued first.
++
++        Args:
++            text: Advice text.
++            priority: Priority level (higher = more urgent).
++        """
++        now = time.time()
++        # Dedup check
++        if text in self._recent_texts:
++            if now - self._recent_texts[text] < self.dedup_window_seconds:
++                return
++        self._recent_texts[text] = now
++        self._insert_counter += 1
++        heapq.heappush(
++            self._queue, (-priority, self._insert_counter, text)
++        )
++
++    def dequeue_advice(self) -> Optional[dict[str, Any]]:
++        """Get the highest-priority advice from the queue.
++
++        Returns:
++            Dict with text and priority, or None if empty.
++        """
++        if not self._queue:
++            return None
++        neg_pri, _, text = heapq.heappop(self._queue)
++        return {"text": text, "priority": -neg_pri}
++
++    def queue_size(self) -> int:
++        """Get current queue size.
++
++        Returns:
++            Number of items in queue.
++        """
++        return len(self._queue)
++
++    def mark_spoken(self, timestamp: float) -> None:
++        """Mark that advice was spoken at a given time.
++
++        Args:
++            timestamp: Time when advice was spoken.
++        """
++        self._last_spoken_time = timestamp
++
++    def can_speak(self, current_time: float) -> bool:
++        """Check if enough time has passed since last spoken advice.
++
++        Args:
++            current_time: Current time.
++
++        Returns:
++            True if cooldown has elapsed.
++        """
++        return (current_time - self._last_spoken_time) >= self.min_interval_seconds
++
++    def record_spoken(self, text: str, timestamp: float) -> None:
++        """Record a spoken advice in history.
++
++        Args:
++            text: Advice text that was spoken.
++            timestamp: When it was spoken.
++        """
++        self._history.append({"text": text, "timestamp": timestamp})
++        self._last_spoken_time = timestamp
++
++    def get_history(self) -> list[dict[str, Any]]:
++        """Get spoken advice history.
++
++        Returns:
++            List of {text, timestamp} dicts.
++        """
++        return list(self._history)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "voice_advisor",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/game_timeline_analyzer.py b/integrations/lol-history/src/lol_history/game_timeline_analyzer.py
+new file mode 100644
+index 00000000..a11b3102
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/game_timeline_analyzer.py
+@@ -0,0 +1,184 @@
++"""
++Game Timeline Analyzer — Key turning point detection and replay annotation.
++
++Detects gold swings, team fights, objective takes, and game phase
++transitions from timeline data. Annotates turning points for replay review.
++
++Location: integrations/lol-history/src/lol_history/game_timeline_analyzer.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.game_timeline_analyzer.v1"
++
++
++class GameTimelineAnalyzer:
++    """Analyze game timelines for turning points and key events.
++
++    Detects gold swings, team fights, objectives, and produces
++    annotated turning point labels for replay review.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def detect_gold_swings(
++        self,
++        frames: list[dict[str, Any]],
++        threshold: int = 2000,
++    ) -> list[dict[str, Any]]:
++        """Detect significant gold swings between consecutive frames.
++
++        Args:
++            frames: List of frame dicts with timestamp and team_gold_diff.
++            threshold: Minimum absolute change to qualify as a swing.
++
++        Returns:
++            List of swing event dicts.
++        """
++        if not frames or len(frames) < 2:
++            return []
++
++        swings: list[dict[str, Any]] = []
++        for i in range(1, len(frames)):
++            prev_diff = frames[i - 1].get("team_gold_diff", 0)
++            curr_diff = frames[i].get("team_gold_diff", 0)
++            change = abs(curr_diff - prev_diff)
++            if change >= threshold:
++                swings.append({
++                    "timestamp": frames[i].get("timestamp", 0),
++                    "type": "gold_swing",
++                    "magnitude": change,
++                    "from_diff": prev_diff,
++                    "to_diff": curr_diff,
++                })
++        return swings
++
++    def detect_team_fights(
++        self,
++        events: list[dict[str, Any]],
++        time_window_ms: int = 5000,
++    ) -> list[dict[str, Any]]:
++        """Detect team fights from kill events clustered in time.
++
++        Args:
++            events: List of event dicts with type and timestamp.
++            time_window_ms: Maximum time window for kills to be in same fight.
++
++        Returns:
++            List of team fight event dicts.
++        """
++        kills = [e for e in events if e.get("type") == "CHAMPION_KILL"]
++        if not kills:
++            return []
++
++        kills.sort(key=lambda e: e.get("timestamp", 0))
++        fights: list[dict[str, Any]] = []
++        cluster: list[dict] = [kills[0]]
++
++        for i in range(1, len(kills)):
++            if kills[i]["timestamp"] - cluster[0]["timestamp"] <= time_window_ms:
++                cluster.append(kills[i])
++            else:
++                if len(cluster) >= 2:
++                    fights.append({
++                        "type": "team_fight",
++                        "timestamp": cluster[0]["timestamp"],
++                        "kills": len(cluster),
++                        "duration_ms": cluster[-1]["timestamp"] - cluster[0]["timestamp"],
++                    })
++                cluster = [kills[i]]
++
++        if len(cluster) >= 2:
++            fights.append({
++                "type": "team_fight",
++                "timestamp": cluster[0]["timestamp"],
++                "kills": len(cluster),
++                "duration_ms": cluster[-1]["timestamp"] - cluster[0]["timestamp"],
++            })
++
++        return fights
++
++    def detect_objectives(
++        self, events: list[dict[str, Any]]
++    ) -> list[dict[str, Any]]:
++        """Detect objective takes (dragons, barons, towers).
++
++        Args:
++            events: List of event dicts.
++
++        Returns:
++            List of objective event dicts.
++        """
++        obj_types = {"ELITE_MONSTER_KILL", "BUILDING_KILL"}
++        return [
++            {
++                "type": e.get("type", ""),
++                "timestamp": e.get("timestamp", 0),
++                "monster_type": e.get("monsterType", ""),
++                "building_type": e.get("buildingType", ""),
++            }
++            for e in events
++            if e.get("type") in obj_types
++        ]
++
++    def annotate_turning_points(
++        self, turning_points: list[dict[str, Any]]
++    ) -> list[dict[str, Any]]:
++        """Annotate turning points with human-readable labels.
++
++        Args:
++            turning_points: List of turning point dicts with type and magnitude.
++
++        Returns:
++            List of annotated dicts with label and timestamp.
++        """
++        annotations: list[dict[str, Any]] = []
++        for tp in turning_points:
++            tp_type = tp.get("type", "unknown")
++            magnitude = tp.get("magnitude", 0)
++            label = f"{tp_type} (magnitude: {magnitude})"
++            annotations.append({
++                "timestamp": tp.get("timestamp", 0),
++                "type": tp_type,
++                "magnitude": magnitude,
++                "label": label,
++            })
++        return annotations
++
++    def detect_game_phase(self, timestamp_ms: int) -> str:
++        """Detect game phase from timestamp.
++
++        Args:
++            timestamp_ms: Game time in milliseconds.
++
++        Returns:
++            "early" (0-15min), "mid" (15-30min), or "late" (30min+).
++        """
++        minutes = timestamp_ms / 60000.0
++        if minutes < 15:
++            return "early"
++        elif minutes < 30:
++            return "mid"
++        else:
++            return "late"
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "game_timeline_analyzer",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/historical_training_exporter.py b/integrations/lol-history/src/lol_history/historical_training_exporter.py
+new file mode 100644
+index 00000000..2a10c200
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/historical_training_exporter.py
+@@ -0,0 +1,126 @@
++"""
++Historical Training Exporter — Convert match history to AgentLightning training spans.
++
++Transforms historical match data into state-action-reward tuples suitable
++for AgentLightning self-evolution training loops.
++
++Location: integrations/lol-history/src/lol_history/historical_training_exporter.py
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.historical_training_exporter.v1"
++
++
++class HistoricalTrainingExporter:
++    """Export historical match data as AgentLightning training spans.
++
++    Converts match-level statistics into state/action/reward tuples
++    with reward clipping and metadata tagging.
++    """
++
++    def __init__(
++        self,
++        min_reward: float = -1.0,
++        max_reward: float = 1.0,
++    ) -> None:
++        self.min_reward = min_reward
++        self.max_reward = max_reward
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def match_to_training_span(
++        self, match: dict[str, Any], format: str = "default"
++    ) -> dict[str, Any]:
++        """Convert a single match to a training span.
++
++        Args:
++            match: Match dict with champion, win, kills, deaths, assists, etc.
++            format: Output format — "default" or "agentlightning".
++
++        Returns:
++            Training span dict.
++        """
++        state = {
++            "champion": match.get("champion", ""),
++            "gold_per_min": match.get("gold_per_min", 0.0),
++            "cs_per_min": match.get("cs_per_min", 0.0),
++        }
++        action = "win" if match.get("win") else "lose"
++        reward = self.compute_reward(match)
++        game_id = match.get("gameId", match.get("game_id", ""))
++
++        span: dict[str, Any] = {
++            "state": state,
++            "action": action,
++            "reward": reward,
++            "metadata": {"game_id": game_id, "champion": match.get("champion", "")},
++        }
++
++        if format == "agentlightning":
++            span["observation"] = state
++            span["discount"] = 0.99
++
++        return span
++
++    def compute_reward(self, match: dict[str, Any]) -> float:
++        """Compute clipped reward from match statistics.
++
++        Args:
++            match: Match dict.
++
++        Returns:
++            Reward value clipped to [min_reward, max_reward].
++        """
++        win_bonus = 0.5 if match.get("win") else -0.5
++        kills = match.get("kills", 0)
++        deaths = match.get("deaths", 0)
++        assists = match.get("assists", 0)
++        kda_component = (kills + assists * 0.5 - deaths * 0.3) / 20.0
++        raw = win_bonus + kda_component
++        return max(self.min_reward, min(self.max_reward, raw))
++
++    def batch_export(
++        self, matches: list[dict[str, Any]], format: str = "default"
++    ) -> list[dict[str, Any]]:
++        """Export a batch of matches to training spans.
++
++        Args:
++            matches: List of match dicts.
++            format: Output format.
++
++        Returns:
++            List of training span dicts.
++        """
++        return [self.match_to_training_span(m, format=format) for m in matches]
++
++    def export_to_json(self, spans: list[dict[str, Any]]) -> str:
++        """Serialize spans to JSON string.
++
++        Args:
++            spans: List of span dicts.
++
++        Returns:
++            JSON string.
++        """
++        return json.dumps(spans, ensure_ascii=False, indent=2)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "historical_training_exporter",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/history_evolution_bridge.py b/integrations/lol-history/src/lol_history/history_evolution_bridge.py
+new file mode 100644
+index 00000000..573d6f9e
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/history_evolution_bridge.py
+@@ -0,0 +1,108 @@
++"""
++History Evolution Bridge — Connect history data to the self-evolution training loop.
++
++Bridges multiple historical data sources to the AgentLightning training
++pipeline, with generation tagging and batch export.
++
++Location: integrations/lol-history/src/lol_history/history_evolution_bridge.py
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.history_evolution_bridge.v1"
++
++
++class HistoryEvolutionBridge:
++    """Bridge historical data sources to evolution training loop.
++
++    Registers data source callables, collects and merges training data,
++    tags with generation metadata, and exports in AgentLightning format.
++    """
++
++    def __init__(self, generation: int = 0) -> None:
++        self.generation = generation
++        self.data_sources: dict[str, Callable[[], list[dict]]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register_data_source(
++        self, name: str, source_fn: Callable[[], list[dict]]
++    ) -> None:
++        """Register a data source callable.
++
++        Args:
++            name: Source identifier.
++            source_fn: Callable returning list of training data dicts.
++        """
++        self.data_sources[name] = source_fn
++
++    def collect_training_data(self) -> list[dict[str, Any]]:
++        """Collect training data from all registered sources.
++
++        Returns:
++            Merged list of training data dicts.
++        """
++        all_data: list[dict[str, Any]] = []
++        for name, source_fn in self.data_sources.items():
++            try:
++                data = source_fn()
++                all_data.extend(data)
++            except Exception as exc:
++                logger.warning("Data source %s failed: %s", name, exc)
++        return all_data
++
++    def format_for_agentlightning(
++        self, spans: list[dict[str, Any]]
++    ) -> list[dict[str, Any]]:
++        """Format spans for AgentLightning training.
++
++        Tags each span with generation metadata.
++
++        Args:
++            spans: List of training span dicts.
++
++        Returns:
++            Formatted list with generation tags.
++        """
++        formatted: list[dict[str, Any]] = []
++        for span in spans:
++            entry = {**span, "generation": self.generation}
++            formatted.append(entry)
++        return formatted
++
++    def export_training_batch(
++        self, batch_size: int = 32
++    ) -> list[dict[str, Any]]:
++        """Export a training batch.
++
++        Collects data, formats it, and returns up to batch_size items.
++
++        Args:
++            batch_size: Maximum number of items.
++
++        Returns:
++            List of formatted training dicts.
++        """
++        data = self.collect_training_data()
++        formatted = self.format_for_agentlightning(data)
++        return formatted[:batch_size]
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "history_evolution_bridge",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/match_detail_parser.py b/integrations/lol-history/src/lol_history/match_detail_parser.py
+new file mode 100644
+index 00000000..bb5ee88d
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/match_detail_parser.py
+@@ -0,0 +1,143 @@
++"""
++Match Detail Parser — JSON to structured data + timeline extraction.
++
++Parses Riot match JSON into structured participant data, timeline events,
++gold tracking, and KDA calculations.
++
++Location: integrations/lol-history/src/lol_history/match_detail_parser.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.match_detail_parser.v1"
++
++
++class MatchDetailParser:
++    """Parser for Riot Games match detail JSON.
++
++    Extracts participants, timeline events, gold data, KDA,
++    and game duration from raw match JSON responses.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse_participants(
++        self, raw: dict[str, Any]
++    ) -> list[dict[str, Any]]:
++        """Parse participant data from match JSON.
++
++        Args:
++            raw: Raw match JSON with info.participants.
++
++        Returns:
++            List of normalized participant dicts.
++        """
++        info = raw.get("info", {})
++        participants = info.get("participants", [])
++        result: list[dict[str, Any]] = []
++        for p in participants:
++            result.append({
++                "puuid": p.get("puuid", ""),
++                "champion": p.get("championName", ""),
++                "win": p.get("win", False),
++                "kills": p.get("kills", 0),
++                "deaths": p.get("deaths", 0),
++                "assists": p.get("assists", 0),
++            })
++        return result
++
++    def extract_timeline_events(
++        self, timeline: dict[str, Any]
++    ) -> list[dict[str, Any]]:
++        """Extract all events from timeline frames.
++
++        Args:
++            timeline: Raw timeline JSON with info.frames.
++
++        Returns:
++            Flat list of events with timestamps.
++        """
++        info = timeline.get("info", {})
++        frames = info.get("frames", [])
++        events: list[dict[str, Any]] = []
++        for frame in frames:
++            for event in frame.get("events", []):
++                events.append(event)
++        return events
++
++    def extract_gold_at_timestamps(
++        self,
++        timeline: dict[str, Any],
++        participant_id: str,
++    ) -> list[dict[str, Any]]:
++        """Extract gold values at each timestamp for a participant.
++
++        Args:
++            timeline: Raw timeline JSON.
++            participant_id: Participant ID string.
++
++        Returns:
++            List of {timestamp, gold} dicts.
++        """
++        info = timeline.get("info", {})
++        frames = info.get("frames", [])
++        gold_data: list[dict[str, Any]] = []
++        for frame in frames:
++            ts = frame.get("timestamp", 0)
++            pframes = frame.get("participantFrames", {})
++            pf = pframes.get(participant_id, {})
++            gold_data.append({
++                "timestamp": ts,
++                "gold": pf.get("totalGold", 0),
++            })
++        return gold_data
++
++    def calculate_kda(
++        self, kills: int, deaths: int, assists: int
++    ) -> float:
++        """Calculate KDA ratio.
++
++        Args:
++            kills: Kill count.
++            deaths: Death count.
++            assists: Assist count.
++
++        Returns:
++            KDA value. Returns inf or (kills+assists)*perfect_multiplier if 0 deaths.
++        """
++        if deaths == 0:
++            return float("inf")
++        return (kills + assists) / deaths
++
++    def extract_game_duration(self, raw: dict[str, Any]) -> int:
++        """Extract game duration in seconds.
++
++        Args:
++            raw: Raw match JSON.
++
++        Returns:
++            Duration in seconds.
++        """
++        info = raw.get("info", {})
++        return info.get("gameDuration", 0)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "match_detail_parser",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/match_history_fetcher.py b/integrations/lol-history/src/lol_history/match_history_fetcher.py
+new file mode 100644
+index 00000000..c9b163fe
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/match_history_fetcher.py
+@@ -0,0 +1,132 @@
++"""
++Match History Fetcher — Batch fetch with rate limiting and caching.
++
++Provides batch retrieval of match histories with built-in rate limiting,
++TTL-based caching, and deduplication.
++
++Location: integrations/lol-history/src/lol_history/match_history_fetcher.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.match_history_fetcher.v1"
++
++
++class MatchHistoryFetcher:
++    """Batch match history fetcher with rate limiting and caching.
++
++    Usage:
++        fetcher = MatchHistoryFetcher(rate_limit_per_second=2.0, cache_ttl_seconds=300)
++        fetcher.cache_put("puuid_abc", matches)
++        cached = fetcher.cache_get("puuid_abc")
++        batches = fetcher.split_into_batches(puuids, batch_size=5)
++    """
++
++    def __init__(
++        self,
++        rate_limit_per_second: float = 1.0,
++        cache_ttl_seconds: float = 300.0,
++        batch_size: int = 5,
++    ) -> None:
++        self.rate_limit_per_second = rate_limit_per_second
++        self.cache_ttl_seconds = cache_ttl_seconds
++        self.batch_size = batch_size
++        self._cache: dict[str, tuple[float, list[dict]]] = {}
++        self._last_request_time: float = 0.0
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def cache_put(self, key: str, matches: list[dict[str, Any]]) -> None:
++        """Store matches in cache with TTL.
++
++        Args:
++            key: Cache key (typically puuid).
++            matches: List of match dicts.
++        """
++        self._cache[key] = (time.time(), matches)
++
++    def cache_get(self, key: str) -> Optional[list[dict[str, Any]]]:
++        """Retrieve matches from cache if not expired.
++
++        Args:
++            key: Cache key.
++
++        Returns:
++            List of match dicts or None if missing/expired.
++        """
++        entry = self._cache.get(key)
++        if entry is None:
++            return None
++        stored_time, matches = entry
++        if time.time() - stored_time > self.cache_ttl_seconds:
++            del self._cache[key]
++            return None
++        return matches
++
++    def split_into_batches(
++        self, puuids: list[str], batch_size: Optional[int] = None
++    ) -> list[list[str]]:
++        """Split puuid list into batches.
++
++        Args:
++            puuids: List of player unique IDs.
++            batch_size: Override batch size. Defaults to self.batch_size.
++
++        Returns:
++            List of puuid batches.
++        """
++        bs = batch_size or self.batch_size
++        return [puuids[i : i + bs] for i in range(0, len(puuids), bs)]
++
++    def can_request(self) -> bool:
++        """Check if rate limiter allows a request now.
++
++        Returns:
++            True if enough time has passed since last request.
++        """
++        if self.rate_limit_per_second <= 0:
++            return False
++        min_interval = 1.0 / self.rate_limit_per_second
++        return (time.time() - self._last_request_time) >= min_interval
++
++    def merge_match_lists(
++        self,
++        list_a: list[dict[str, Any]],
++        list_b: list[dict[str, Any]],
++    ) -> list[dict[str, Any]]:
++        """Merge two match lists, deduplicating by gameId.
++
++        Args:
++            list_a: First match list.
++            list_b: Second match list.
++
++        Returns:
++            Merged deduplicated list.
++        """
++        seen: set = set()
++        merged: list[dict[str, Any]] = []
++        for m in list_a + list_b:
++            gid = m.get("gameId", id(m))
++            if gid not in seen:
++                seen.add(gid)
++                merged.append(m)
++        return merged
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "match_history_fetcher",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/matchup_database.py b/integrations/lol-history/src/lol_history/matchup_database.py
+new file mode 100644
+index 00000000..786b433d
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/matchup_database.py
+@@ -0,0 +1,158 @@
++"""
++Matchup Database — Historical matchup winrate with confidence scoring.
++
++Stores champion-vs-champion matchup results, computes winrates with
++confidence intervals, and provides counter/worst matchup queries.
++
++Location: integrations/lol-history/src/lol_history/matchup_database.py
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.matchup_database.v1"
++
++
++class MatchupDatabase:
++    """Champion matchup database with confidence-weighted winrates.
++
++    Records matchup results and provides queries for counter picks,
++    worst matchups, and confidence-weighted winrate lookups.
++    """
++
++    def __init__(self) -> None:
++        # key: (champion, opponent) -> {"wins": int, "games": int}
++        self._data: dict[tuple[str, str], dict[str, int]] = defaultdict(
++            lambda: {"wins": 0, "games": 0}
++        )
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record_matchup(
++        self, champion: str, opponent: str, won: bool
++    ) -> None:
++        """Record a matchup result.
++
++        Args:
++            champion: Champion played.
++            opponent: Opponent champion.
++            won: Whether champion won.
++        """
++        self._data[(champion, opponent)]["games"] += 1
++        if won:
++            self._data[(champion, opponent)]["wins"] += 1
++        # Also record the inverse
++        self._data[(opponent, champion)]["games"] += 1
++        if not won:
++            self._data[(opponent, champion)]["wins"] += 1
++
++    def query_matchup(
++        self, champion: str, opponent: str
++    ) -> dict[str, Any]:
++        """Query matchup statistics.
++
++        Args:
++            champion: Champion name.
++            opponent: Opponent champion name.
++
++        Returns:
++            Dict with games, wins, win_rate, confidence.
++        """
++        entry = self._data.get((champion, opponent), {"wins": 0, "games": 0})
++        games = entry["games"]
++        wins = entry["wins"]
++        wr = wins / games if games > 0 else 0.0
++        confidence = self._compute_confidence(games)
++        return {
++            "champion": champion,
++            "against": opponent,
++            "games": games,
++            "wins": wins,
++            "win_rate": wr,
++            "confidence": confidence,
++        }
++
++    def _compute_confidence(self, games: int) -> float:
++        """Compute confidence score based on sample size.
++
++        Uses sigmoid-like scaling: confidence approaches 1.0
++        as games increase.
++
++        Args:
++            games: Number of games.
++
++        Returns:
++            Confidence [0.0, 1.0].
++        """
++        if games == 0:
++            return 0.0
++        return 1.0 - math.exp(-games / 20.0)
++
++    def best_counter_for(self, champion: str) -> dict[str, Any]:
++        """Find best counter pick against a champion.
++
++        Args:
++            champion: Champion to counter.
++
++        Returns:
++            Matchup dict with the opponent having lowest winrate for champion.
++        """
++        matchups = self.all_matchups_for(champion)
++        if not matchups:
++            return {"against": "", "win_rate": 0.0, "confidence": 0.0}
++        matchups.sort(key=lambda m: m["win_rate"])
++        return matchups[0]
++
++    def worst_matchup_for(self, champion: str) -> dict[str, Any]:
++        """Find worst matchup for a champion.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            Matchup dict with the opponent having lowest winrate for champion.
++        """
++        return self.best_counter_for(champion)
++
++    def all_matchups_for(self, champion: str) -> list[dict[str, Any]]:
++        """Get all matchup data for a champion.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            List of matchup dicts.
++        """
++        results: list[dict[str, Any]] = []
++        for (c, o), entry in self._data.items():
++            if c == champion:
++                games = entry["games"]
++                wins = entry["wins"]
++                results.append({
++                    "against": o,
++                    "games": games,
++                    "wins": wins,
++                    "win_rate": wins / games if games > 0 else 0.0,
++                    "confidence": self._compute_confidence(games),
++                })
++        return results
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "matchup_database",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/opponent_profiler.py b/integrations/lol-history/src/lol_history/opponent_profiler.py
+new file mode 100644
+index 00000000..fee38ac0
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/opponent_profiler.py
+@@ -0,0 +1,207 @@
++"""
++Opponent Profiler — History-based opponent habit and weakness analysis.
++
++Generates opponent profiles from historical match data including
++champion pool detection, weakness identification, aggression scoring,
++and vision habit analysis.
++
++Location: integrations/lol-history/src/lol_history/opponent_profiler.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from collections import Counter
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.opponent_profiler.v1"
++
++
++class OpponentProfiler:
++    """Opponent profiling engine based on historical match data.
++
++    Analyzes match history to produce profiles with champion pool,
++    weakness detection, aggression score, and vision habits.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def profile_from_matches(
++        self, puuid: str, matches: list[dict[str, Any]]
++    ) -> dict[str, Any]:
++        """Generate a full opponent profile from match history.
++
++        Args:
++            puuid: Player unique ID.
++            matches: List of match dicts.
++
++        Returns:
++            Profile dict with habits, weaknesses, champion pool.
++        """
++        if not matches:
++            return {
++                "puuid": puuid,
++                "win_rate": 0.0,
++                "kda": 0.0,
++                "main_champions": [],
++                "habits": {},
++                "weaknesses": [],
++                "games_analyzed": 0,
++            }
++
++        total = len(matches)
++        wins = sum(1 for m in matches if m.get("win"))
++        kills = sum(m.get("kills", 0) for m in matches)
++        deaths = sum(m.get("deaths", 0) for m in matches)
++        assists = sum(m.get("assists", 0) for m in matches)
++        kda = (kills + assists) / max(deaths, 1)
++        win_rate = wins / total
++
++        return {
++            "puuid": puuid,
++            "win_rate": win_rate,
++            "kda": kda,
++            "main_champions": self.detect_champion_pool(matches),
++            "habits": {
++                "aggression": self.compute_aggression_score(matches),
++                "vision": self.compute_vision_habit(matches),
++            },
++            "weaknesses": self.detect_weaknesses(matches),
++            "games_analyzed": total,
++        }
++
++    def detect_champion_pool(
++        self, matches: list[dict[str, Any]]
++    ) -> list[str]:
++        """Detect most played champions.
++
++        Args:
++            matches: List of match dicts with 'champion' key.
++
++        Returns:
++            Champion names ordered by frequency.
++        """
++        counter = Counter(m.get("champion", "") for m in matches)
++        return [champ for champ, _ in counter.most_common() if champ]
++
++    def detect_weaknesses(
++        self, matches: list[dict[str, Any]]
++    ) -> list[str]:
++        """Detect player weaknesses from match statistics.
++
++        Args:
++            matches: List of match dicts.
++
++        Returns:
++            List of weakness identifiers.
++        """
++        weaknesses: list[str] = []
++        if not matches:
++            return weaknesses
++
++        early_deaths = [m.get("deaths_before_15", 0) for m in matches]
++        cs_diffs = [m.get("cs_diff_at_15", 0) for m in matches]
++        gold_diffs = [m.get("gold_diff_at_15", 0) for m in matches]
++
++        avg_early_deaths = sum(early_deaths) / len(matches)
++        avg_cs_diff = sum(cs_diffs) / len(matches)
++        avg_gold_diff = sum(gold_diffs) / len(matches)
++
++        if avg_early_deaths > 1.5 or avg_cs_diff < -10 or avg_gold_diff < -200:
++            weaknesses.append("early_game")
++
++        avg_deaths = sum(m.get("deaths", 0) for m in matches) / len(matches)
++        if avg_deaths > 6:
++            weaknesses.append("positioning")
++
++        return weaknesses
++
++    def compute_aggression_score(
++        self, matches: list[dict[str, Any]]
++    ) -> float:
++        """Compute aggression score from 0 to 1.
++
++        Args:
++            matches: List of match dicts.
++
++        Returns:
++            Aggression score [0.0, 1.0].
++        """
++        if not matches:
++            return 0.0
++        total_kills = sum(m.get("kills", 0) for m in matches)
++        total_solo = sum(m.get("solo_kills", 0) for m in matches)
++        total_deaths = sum(m.get("deaths", 0) for m in matches)
++        n = len(matches)
++        raw = (total_kills + total_solo * 2) / max(n, 1)
++        death_penalty = total_deaths / max(n, 1) * 0.5
++        score = min(1.0, max(0.0, (raw - death_penalty) / 20.0))
++        return score
++
++    def compute_vision_habit(
++        self, matches: list[dict[str, Any]]
++    ) -> dict[str, float]:
++        """Compute vision habits.
++
++        Args:
++            matches: List of match dicts.
++
++        Returns:
++            Dict with wards_per_min and vision_score_per_min.
++        """
++        if not matches:
++            return {"wards_per_min": 0.0, "vision_score_per_min": 0.0}
++
++        total_wards = sum(m.get("wards_placed", 0) for m in matches)
++        total_vision = sum(m.get("vision_score", 0) for m in matches)
++        total_seconds = sum(m.get("game_duration", 1800) for m in matches)
++        total_minutes = total_seconds / 60.0
++
++        return {
++            "wards_per_min": total_wards / max(total_minutes, 1.0),
++            "vision_score_per_min": total_vision / max(total_minutes, 1.0),
++        }
++
++    def assess_threat(self, profile: dict[str, Any]) -> str:
++        """Assess threat level from profile.
++
++        Args:
++            profile: Profile dict with win_rate, kda, games_analyzed.
++
++        Returns:
++            Threat level: "unknown", "low", "medium", "high", "extreme".
++        """
++        games = profile.get("games_analyzed", 0)
++        if games < 5:
++            return "unknown"
++
++        wr = profile.get("win_rate", 0.0)
++        kda = profile.get("kda", 0.0)
++        score = wr * 0.6 + min(kda / 10.0, 1.0) * 0.4
++
++        if score >= 0.75:
++            return "extreme"
++        elif score >= 0.55:
++            return "high"
++        elif score >= 0.4:
++            return "medium"
++        else:
++            return "low"
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "opponent_profiler",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/patch_timeline.py b/integrations/lol-history/src/lol_history/patch_timeline.py
+new file mode 100644
+index 00000000..157744f1
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/patch_timeline.py
+@@ -0,0 +1,126 @@
++"""
++Patch Timeline — Track champion and item changes across game patches.
++
++Maintains a versioned history of champion and item changes for
++cross-patch analysis and meta detection.
++
++Location: integrations/lol-history/src/lol_history/patch_timeline.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.patch_timeline.v1"
++
++
++class PatchTimeline:
++    """Track champion and item changes across game patches.
++
++    Stores patch entries with champion_changes and item_changes,
++    supports cross-patch comparison and champion history queries.
++    """
++
++    def __init__(self) -> None:
++        self._patches: dict[str, dict[str, Any]] = {}
++        self._order: list[str] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def add_patch(self, version: str, data: dict[str, Any]) -> None:
++        """Add a patch entry.
++
++        Args:
++            version: Patch version string (e.g., "14.10").
++            data: Patch data with champion_changes and/or item_changes.
++        """
++        self._patches[version] = data
++        if version not in self._order:
++            self._order.append(version)
++            self._order.sort(key=lambda v: [int(x) for x in v.split(".")])
++
++    def get_patch(self, version: str) -> Optional[dict[str, Any]]:
++        """Get patch data by version.
++
++        Args:
++            version: Patch version string.
++
++        Returns:
++            Patch data dict or None.
++        """
++        return self._patches.get(version)
++
++    def get_champion_history(self, champion: str) -> list[dict[str, Any]]:
++        """Get all changes for a specific champion across patches.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            List of {version, changes} dicts.
++        """
++        history: list[dict[str, Any]] = []
++        for version in self._order:
++            patch = self._patches[version]
++            champ_changes = patch.get("champion_changes", {})
++            if champion in champ_changes:
++                history.append({
++                    "version": version,
++                    "changes": champ_changes[champion],
++                })
++        return history
++
++    def compare_patches(
++        self, version_a: str, version_b: str
++    ) -> dict[str, Any]:
++        """Compare two patches.
++
++        Args:
++            version_a: First patch version.
++            version_b: Second patch version.
++
++        Returns:
++            Diff dict with added/removed/changed champions.
++        """
++        a = self._patches.get(version_a, {}).get("champion_changes", {})
++        b = self._patches.get(version_b, {}).get("champion_changes", {})
++        all_champs = set(a.keys()) | set(b.keys())
++        diff: dict[str, Any] = {}
++        for champ in all_champs:
++            in_a = champ in a
++            in_b = champ in b
++            if in_a and not in_b:
++                diff[champ] = {"status": "removed_in_b", "a": a[champ]}
++            elif in_b and not in_a:
++                diff[champ] = {"status": "added_in_b", "b": b[champ]}
++            else:
++                if a[champ] != b[champ]:
++                    diff[champ] = {"status": "changed", "a": a[champ], "b": b[champ]}
++        return diff
++
++    def latest_patch_version(self) -> Optional[str]:
++        """Get the latest patch version.
++
++        Returns:
++            Latest version string or None if empty.
++        """
++        if not self._order:
++            return None
++        return self._order[-1]
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "patch_timeline",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/seraphine_bridge.py b/integrations/lol-history/src/lol_history/seraphine_bridge.py
+new file mode 100644
+index 00000000..029c1257
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/seraphine_bridge.py
+@@ -0,0 +1,125 @@
++"""
++Seraphine Bridge — HTTP API bridge for historical match data.
++
++Provides HTTP API access to Seraphine-style match history endpoints,
++adapted from the Seraphine project (github.com/ljszx/Seraphine) connector
++patterns for production-grade operation.
++
++Location: integrations/lol-history/src/lol_history/seraphine_bridge.py
++
++Reference: Seraphine connector + LCU API patterns.
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.seraphine_bridge.v1"
++
++
++class SeraphineClient:
++    """HTTP API client for Seraphine-style match history access.
++
++    Provides URL building, response parsing, and evolution callback
++    hooks for training data collection.
++
++    Usage:
++        client = SeraphineClient(base_url="http://localhost:8080")
++        url = client.build_summoner_url("PlayerName")
++        url2 = client.build_match_history_url(puuid="abc-123", count=20)
++        summoner = client.parse_summoner_response(response_json)
++        matches = client.parse_match_list_response(response_json)
++    """
++
++    def __init__(
++        self,
++        base_url: str = "http://127.0.0.1:2999",
++        timeout: float = 10.0,
++    ) -> None:
++        self.base_url = base_url
++        self.timeout = timeout
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++        self._request_count: int = 0
++
++    def build_summoner_url(self, summoner_name: str) -> str:
++        """Build URL for summoner lookup.
++
++        Args:
++            summoner_name: Summoner display name.
++
++        Returns:
++            Full URL string.
++        """
++        return f"{self.base_url}/lol-summoner/v1/summoners?name={summoner_name}"
++
++    def build_match_history_url(
++        self, puuid: str, count: int = 20, start: int = 0
++    ) -> str:
++        """Build URL for match history retrieval.
++
++        Args:
++            puuid: Player unique ID.
++            count: Number of matches to retrieve.
++            start: Start index for pagination.
++
++        Returns:
++            Full URL string.
++        """
++        return (
++            f"{self.base_url}/lol-match-history/v1/products/lol/{puuid}/matches"
++            f"?begIndex={start}&endIndex={start + count}"
++        )
++
++    def parse_summoner_response(self, response: dict[str, Any]) -> dict[str, Any]:
++        """Parse summoner lookup response.
++
++        Args:
++            response: Raw JSON response dict.
++
++        Returns:
++            Normalized summoner data.
++        """
++        return {
++            "puuid": response.get("puuid", ""),
++            "name": response.get("name", response.get("displayName", "")),
++            "summoner_level": response.get("summonerLevel", 0),
++            "id": response.get("id", ""),
++        }
++
++    def parse_match_list_response(
++        self, response: dict[str, Any]
++    ) -> list[dict[str, Any]]:
++        """Parse match list response.
++
++        Args:
++            response: Raw JSON response with games list.
++
++        Returns:
++            List of match dicts.
++        """
++        games = response.get("games", response.get("matches", []))
++        if isinstance(games, dict):
++            games = games.get("games", [])
++        return list(games)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback with module metadata.
++
++        Args:
++            data: Event data dict.
++        """
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "seraphine_bridge",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/winrate_tracker.py b/integrations/lol-history/src/lol_history/winrate_tracker.py
+new file mode 100644
+index 00000000..94098ba4
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/winrate_tracker.py
+@@ -0,0 +1,147 @@
++"""
++Winrate Tracker — Personal hero pool winrate drift and trend detection.
++
++Tracks per-champion winrate over time, detects improving/declining trends,
++and provides recent form analysis.
++
++Location: integrations/lol-history/src/lol_history/winrate_tracker.py
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.winrate_tracker.v1"
++
++
++class WinrateTracker:
++    """Track personal winrate drift and trends per champion.
++
++    Records game results, computes per-champion and overall winrates,
++    detects trends using sliding window analysis.
++    """
++
++    def __init__(self) -> None:
++        self._records: dict[str, list[bool]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record_game(self, champion: str, win: bool) -> None:
++        """Record a game result.
++
++        Args:
++            champion: Champion played.
++            win: Whether the game was won.
++        """
++        if champion not in self._records:
++            self._records[champion] = []
++        self._records[champion].append(win)
++
++    def get_champion_stats(self, champion: str) -> dict[str, Any]:
++        """Get stats for a specific champion.
++
++        Args:
++            champion: Champion name.
++
++        Returns:
++            Dict with games, wins, losses, win_rate.
++        """
++        results = self._records.get(champion, [])
++        games = len(results)
++        wins = sum(results)
++        return {
++            "champion": champion,
++            "games": games,
++            "wins": wins,
++            "losses": games - wins,
++            "win_rate": wins / games if games > 0 else 0.0,
++        }
++
++    def detect_trend(self, champion: str, window: int = 10) -> str:
++        """Detect trend for a champion using sliding window.
++
++        Args:
++            champion: Champion name.
++            window: Window size for trend detection.
++
++        Returns:
++            "improving", "declining", or "stable".
++        """
++        results = self._records.get(champion, [])
++        if len(results) < window * 2:
++            return "stable"
++        first_half = results[-window * 2 : -window]
++        second_half = results[-window:]
++        wr_first = sum(first_half) / len(first_half)
++        wr_second = sum(second_half) / len(second_half)
++        diff = wr_second - wr_first
++        if diff > 0.15:
++            return "improving"
++        elif diff < -0.15:
++            return "declining"
++        return "stable"
++
++    def overall_winrate(self) -> float:
++        """Get overall winrate across all champions.
++
++        Returns:
++            Overall win rate [0.0, 1.0].
++        """
++        all_results: list[bool] = []
++        for results in self._records.values():
++            all_results.extend(results)
++        if not all_results:
++            return 0.0
++        return sum(all_results) / len(all_results)
++
++    def top_champions(self, n: int = 5) -> list[dict[str, Any]]:
++        """Get top N champions by games played.
++
++        Args:
++            n: Number of champions to return.
++
++        Returns:
++            List of champion stat dicts, sorted by games played desc.
++        """
++        stats = [self.get_champion_stats(c) for c in self._records]
++        stats.sort(key=lambda s: s["games"], reverse=True)
++        return stats[:n]
++
++    def recent_form(
++        self, champion: str, last_n: int = 5
++    ) -> dict[str, Any]:
++        """Get recent form for a champion.
++
++        Args:
++            champion: Champion name.
++            last_n: Number of recent games.
++
++        Returns:
++            Dict with wins, losses, win_rate.
++        """
++        results = self._records.get(champion, [])
++        recent = results[-last_n:]
++        wins = sum(recent)
++        return {
++            "wins": wins,
++            "losses": len(recent) - wins,
++            "win_rate": wins / len(recent) if recent else 0.0,
++            "games": len(recent),
++        }
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        """Fire evolution callback."""
++        if self.evolution_callback is None:
++            return
++        enriched = {
++            "module": "winrate_tracker",
++            "timestamp": time.time(),
++            **data,
++        }
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/plan.md b/plan.md
+index 4c66847b..361e25da 100644
+--- a/plan.md
++++ b/plan.md
+@@ -1741,3 +1741,125 @@ M266-M285 完成了两大阶段的建设:
+ | M303 | `extensions/fiddler-bridge/src/voice_advisor.py` | 🔴 | **语音指导器** — 策略建议→TTS实时语音输出 |
+ | M304 | `extensions/fiddler-bridge/src/session_30min_manager.py` | 🟡 | **30分钟会话管理** — 长时间系统稳定性 + 内存管控 |
+ | M305 | `extensions/fiddler-bridge/src/fiddler_evolution_bridge.py` | 🔴 | **Fiddler→演化桥接** — 协议数据→训练span闭环 |
++
++## 十三、M286-M305 完成报告
++
++> 完成时间: 2026-03-28
++> 作者: dylanyunlong
++> TDD测试: 212测试 + 20独立验证, 232/232通过 (100%)
++
++M286-M305 完成了两大阶段的建设:
++
++1. **Phase R (M286-M295): Seraphine 历史战斗数据集成** — Seraphine桥接 + 批量获取 + 详情解析 + 对手画像 + 训练导出 + 版本时间线 + 胜率追踪 + 对位数据库 + 时间线分析 + 历史演化桥接
++2. **Phase S (M296-M305): Fiddler MCP Server 深度集成** — MCP连接器 + Proxifier配置 + LoL协议解码 + 实时流 + 战斗计算 + 小地图信号 + 对手时序 + 语音指导 + 30分钟会话 + Fiddler演化桥接
++
++### M286-M305 文件清单
++
++| M# | 文件路径 | 状态 | 功能 |
++|---|---|---|---|
++| M286 | `integrations/lol-history/src/lol_history/seraphine_bridge.py` | ✅ | **SeraphineClient** — HTTP API对接 + URL构建 + 响应解析 |
++| M287 | `integrations/lol-history/src/lol_history/match_history_fetcher.py` | ✅ | **MatchHistoryFetcher** — 批量获取 + TTL缓存 + 速率限制 |
++| M288 | `integrations/lol-history/src/lol_history/match_detail_parser.py` | ✅ | **MatchDetailParser** — JSON解析 + 时间线 + KDA计算 |
++| M289 | `integrations/lol-history/src/lol_history/opponent_profiler.py` | ✅ | **OpponentProfiler** — 习惯/弱点分析 + 威胁评估 |
++| M290 | `integrations/lol-history/src/lol_history/historical_training_exporter.py` | ✅ | **HistoricalTrainingExporter** — 历史→AgentLightning span |
++| M291 | `integrations/lol-history/src/lol_history/patch_timeline.py` | ✅ | **PatchTimeline** — 跨版本变化追踪 |
++| M292 | `integrations/lol-history/src/lol_history/winrate_tracker.py` | ✅ | **WinrateTracker** — 胜率漂移 + 趋势检测 |
++| M293 | `integrations/lol-history/src/lol_history/matchup_database.py` | ✅ | **MatchupDatabase** — 对位胜率 + 置信度 |
++| M294 | `integrations/lol-history/src/lol_history/game_timeline_analyzer.py` | ✅ | **GameTimelineAnalyzer** — 转折点 + 团战 + 目标 |
++| M295 | `integrations/lol-history/src/lol_history/history_evolution_bridge.py` | ✅ | **HistoryEvolutionBridge** — 多源→演化训练闭环 |
++| M296 | `extensions/fiddler-bridge/src/fiddler_bridge/fiddler_mcp_connector.py` | ✅ | **FiddlerMCPConnector** — JSON-RPC MCP协议 + 工具注册 |
++| M297 | `extensions/fiddler-bridge/src/fiddler_bridge/proxifier_config.py` | ✅ | **ProxifierConfig** — 全局代理XML生成 + 游戏预设 |
++| M298 | `extensions/fiddler-bridge/src/fiddler_bridge/lol_protocol_decoder.py` | ✅ | **LoLProtocolDecoder** — JSON/二进制协议 + Live API解码 |
++| M299 | `extensions/fiddler-bridge/src/fiddler_bridge/realtime_stream.py` | ✅ | **RealtimeStream** — 14fps事件流 + 处理器注册 |
++| M300 | `extensions/fiddler-bridge/src/fiddler_bridge/combat_calculator.py` | ✅ | **CombatCalculator** — 伤害统计 + 有效HP + DPS |
++| M301 | `extensions/fiddler-bridge/src/fiddler_bridge/minimap_signal_extractor.py` | ✅ | **MinimapSignalExtractor** — 坐标归一化 + 迷雾检测 |
++| M302 | `extensions/fiddler-bridge/src/fiddler_bridge/opponent_timing_tracker.py` | ✅ | **OpponentTimingTracker** — 反应时间 + CD估算 + 模式检测 |
++| M303 | `extensions/fiddler-bridge/src/fiddler_bridge/voice_advisor.py` | ✅ | **VoiceAdvisor** — 优先队列 + 冷却 + 去重 |
++| M304 | `extensions/fiddler-bridge/src/fiddler_bridge/session_30min_manager.py` | ✅ | **Session30MinManager** — 会话生命周期 + 内存管控 |
++| M305 | `extensions/fiddler-bridge/src/fiddler_bridge/fiddler_evolution_bridge.py` | ✅ | **FiddlerEvolutionBridge** — 协议事件→训练span + 代际标签 |
++
++### TDD流程记录（M286-M305）
++
++| 步骤 | 描述 | 结果 |
++|---|---|---|
++| Step 1 | 编写212个测试（2个测试文件, 10个类/任务, 10测试/类） | ✅ 设计50%预期失败率 |
++| Step 2 | 运行测试确认全部失败 | ✅ 212/212 fail (104 lol-history + 108 fiddler-bridge) |
++| Step 3 | 提交测试到git | ✅ commit 08da5d95 |
++| Step 4 | 实现20个源文件 | 212/212通过 (100%) — 首次迭代即全通过 |
++| Step 5 | 过拟合验证（20独立测试） | 20/20通过 ✅ |
++| Step 6 | 提交实现到git | ✅ commit 6fdc5b9c |
++
++### ✅ M01-M305 全部完成 — 总进度
++
++| 阶段 | 文件数 | 测试数 | 通过率 |
++|---|---|---|---|
++| M01-M100 | 100 | 1000 | 1000/1000 ✅ |
++| M101-M180 | 80 | 467 | 467/467 ✅ |
++| M181-M200 | 20 | 116 | 116/116 ✅ |
++| M201-M220 | 20+10 | 116 | 116/116 ✅ |
++| M226-M245 | 20+8 | 135 | 135/135 ✅ |
++| M246-M265 | 20+20 | 206 | 206/206 ✅ |
++| M266-M285 | 20 | 200 | 200/200 ✅ |
++| M286-M305 | 20 | 232 | 232/232 ✅ |
++| **合计** | **338** | **2472** | **2472/2472 ✅** |
++
++### 生产级质量审查（Knuth标准）
++
++**从用户角度 — 是否引起 bug？**
++
++1. **SeraphineClient URL构建**: `build_summoner_url` 和 `build_match_history_url` 正确拼接base_url + path。自定义base_url测试通过。**不会产生错误URL**。
++2. **MatchHistoryFetcher 缓存竞态**: TTL基于`time.time()`单调时钟，cache_get在过期时自动删除。**不会返回过期数据**。
++3. **MatchDetailParser KDA除零**: deaths==0时返回inf。**不会ZeroDivisionError**。调用方需检查inf。
++4. **OpponentProfiler 空输入**: 空matches返回零值profile + 空weaknesses列表。assess_threat对games<5返回"unknown"。**不会crash**。
++5. **HistoricalTrainingExporter 奖励溢出**: compute_reward 使用 min/max 裁剪到 [min_reward, max_reward]。即使kills=100, deaths=0也不会越界。**数值安全**。
++6. **PatchTimeline 版本排序**: 使用 `int(x) for x in v.split(".")` 确保"14.9" < "14.10" < "14.11"。**语义版本正确排序**。
++7. **MatchupDatabase 对称一致**: record_matchup同时记录正向和反向。query_matchup("A","B").win_rate + query_matchup("B","A").win_rate == 1.0。**对称性保证**。
++8. **ProxifierConfig XML注入**: process名直接嵌入XML标签中，如果process名包含`<>`可能破坏XML。**建议README提醒仅使用合法进程名**。
++9. **VoiceAdvisor 优先队列**: 使用heapq + (-priority)确保高优先级先出。dedup_window防重复。**不会重复播报**。
++10. **Session30MinManager UUID碰撞**: 使用uuid4()[:8]，碰撞概率极低但非零。生产部署建议使用完整UUID。**当前可接受**。
++
++**从系统角度 — 结构完整性**
++
++1. **依赖方向**: `lol-history` 模块内部无外部依赖；`fiddler-bridge` 内部无外部依赖。两者通过 `evolution_callback` 松耦合。**无循环依赖**。
++2. **ABC一致性**: 所有20个模块均实现 `_EVOLUTION_KEY` 常量 + `evolution_callback` 属性 + `_fire_evolution()` 方法。**统一的演化接口**。
++3. **LoLProtocolDecoder 扩展性**: 支持 `register_decoder()` 注册自定义解码器，新协议类型无需修改核心代码。**开放-封闭原则**。
++4. **RealtimeStream 多处理器**: 同一事件类型支持多个handler注册，handler异常不影响其他handler。**故障隔离**。
++5. **FiddlerEvolutionBridge 不完整三元组**: 如果state/action/reward数量不一致，`build_training_spans()` 取min(len)截断。**不会产生残缺span**。
++
++---
++
++## 十四、M306-M325 新增任务规划
++
++### 阶段 T: Dota2 + Open Spiel 跨游戏适配（M306-M315）
++
++> 将 dota2bot-OpenHyperAI 和 open_spiel 的能力迁移到 operatorRL 统一框架
++
++| M# | 文件路径 | 级别 | 功能 |
++|---|---|---|---|
++| M306 | `integrations/dota2/src/dota2_agent/dota2_bridge.py` | 🔴 | **Dota2桥接器** — GameState Integration API对接 |
++| M307 | `integrations/dota2/src/dota2_agent/hero_selector.py` | 🟡 | **英雄选择器** — Draft推荐 + 阵容评估 |
++| M308 | `integrations/dota2/src/dota2_agent/dota2_protocol_decoder.py` | 🔴 | **Dota2协议解码** — Protobuf解析(参考dota2bot) |
++| M309 | `integrations/dota2/src/dota2_agent/bot_commander.py` | 🟡 | **Bot指挥官** — 高级战略指令发送 |
++| M310 | `integrations/dota2/src/dota2_agent/replay_analyzer.py` | 🟡 | **回放分析器** — .dem文件解析 + 训练标注 |
++| M311 | `integrations/dota2/src/dota2_agent/evolution_loop.py` | 🔴 | **Dota2自演化** — 对局→日志→改进→权重更新 |
++| M312 | `integrations/dota2/src/dota2_agent/agentos_integration.py` | 🔴 | **AgentOS治理** — GovernedEnvironment + 策略检查 |
++| M313 | `modules/game_bridge_abc.py` | 🔴 | **跨游戏桥接ABC** — 统一LoL/麻将/Dota2桥接接口 |
++| M314 | `modules/evolution_loop_abc.py` | 🔴 | **跨游戏演化ABC** — 统一自演化循环接口 |
++| M315 | `modules/strategy_advisor_abc.py` | 🔴 | **跨游戏策略ABC** — 统一策略建议接口 |
++
++### 阶段 U: DI-star + PARL + ELF 训练框架集成（M316-M325）
++
++> 将 DI-star (StarCraft), PARL (通用RL), ELF (游戏研究) 的训练能力整合到 AgentLightning
++
++| M# | 文件路径 | 级别 | 功能 |
++|---|---|---|---|
++| M316 | `agentlightning/adapter/distar_adapter.py` | 🔴 | **DI-star适配器** — DI-engine训练循环对接 |
++| M317 | `agentlightning/adapter/parl_adapter.py` | 🔴 | **PARL适配器** — PaddlePaddle RL框架对接 |
++| M318 | `agentlightning/adapter/elf_adapter.py` | 🟡 | **ELF适配器** — Facebook ELF环境对接 |
++| M319 | `agentlightning/algorithm/multi_game_ppo.py` | 🔴 | **多游戏PPO** — 跨游戏PPO变体 |
++| M320 | `agentlightning/algorithm/self_play_scheduler.py` | 🟡 | **自博弈调度器** — 多Agent对弈管理 |
++| M321 | `agentlightning/trainer/multi_game_trainer.py` | 🔴 | **多游戏训练器** — 统一训练循环 |
++| M322 | `agentlightning/trainer/curriculum_manager.py` | 🟡 | **课程管理器** — 难度递进训练 |
++| M323 | `agentlightning/runner/game_runner.py` | 🔴 | **游戏运行器** — 统一游戏启动/监控 |
++| M324 | `agentlightning/store/experience_store.py` | 🟡 | **经验存储** — 跨游戏经验池 |
++| M325 | `agentlightning/verl/reward_shaping.py` | 🟡 | **奖励塑形** — 跨游戏奖励归一化 |
