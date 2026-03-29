@@ -2605,3 +2605,68 @@ M366-M385 完成了两大阶段的建设:
 | M443 | `integrations/mahjong/src/mahjong_agent/mahjong_meta_tracker.py` | 🟢 | **麻将meta追踪** — 段位/规则集meta变化追踪 |
 | M444 | `extensions/protocol-decoder/src/unified_protocol_adapter.py` | 🔴 | **统一协议适配器** — LoL/Dota2/Mahjong协议→统一事件格式 |
 | M445 | `extensions/protocol-decoder/src/protocol_version_negotiator.py` | 🟡 | **协议版本协商** — 多版本协议自动检测 + 降级 |
+
+---
+
+## 二十五、M426-M445 完成报告（第九位Claude）
+
+### 完成状态
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M426 | `integrations/lol/src/lol_agent/pregame_pipeline.py` | ✅ | **赛前管线** — history→profile→BP→matchup端到端 |
+| M427 | `integrations/lol/src/lol_agent/ingame_advisor_pipeline.py` | ✅ | **游戏中顾问** — 实时数据→策略融合→语音播报 |
+| M428 | `integrations/lol/src/lol_agent/postgame_evolution_pipeline.py` | ✅ | **赛后演化** — 反馈→适应度→代际推进 |
+| M429 | `integrations/lol/src/lol_agent/matchup_knowledge_base.py` | ✅ | **对线知识库** — 持久化英雄对线胜率/策略 |
+| M430 | `integrations/lol/src/lol_agent/live_danger_fuser.py` | ✅ | **实时危险融合** — danger_zone+历史死亡热区 |
+| M431 | `agentos/governance/evolution_pipeline_orchestrator.py` | ✅ | **演化编排** — event_bus+persistence+replay统一 |
+| M432 | `agentos/governance/cross_module_health.py` | ✅ | **跨模块健康** — 健康状态聚合+降级策略 |
+| M433 | `agentos/governance/evolution_audit_log.py` | ✅ | **演化审计** — 不可变历史记录+合规追踪 |
+| M434 | `agentos/governance/rollback_manager.py` | ✅ | **回滚管理** — 演化失败自动回滚 |
+| M435 | `agentos/governance/evolution_metrics_exporter.py` | ✅ | **指标导出** — Prometheus/OpenTelemetry输出 |
+| M436 | `integrations/dota2/src/dota2_agent/dota2_history_aggregator.py` | ✅ | **Dota2历史聚合** — OpenDota API数据聚合 |
+| M437 | `integrations/dota2/src/dota2_agent/dota2_hero_tendency.py` | ✅ | **Dota2英雄倾向** — 英雄特定play pattern |
+| M438 | `integrations/dota2/src/dota2_agent/dota2_draft_advisor.py` | ✅ | **Dota2 BP顾问** — 历史+meta英雄推荐 |
+| M439 | `integrations/dota2/src/dota2_agent/dota2_playstyle_classifier.py` | ✅ | **Dota2玩法分类** — 攻击/防守/推进/游走 |
+| M440 | `integrations/dota2/src/dota2_agent/dota2_tilt_detector.py` | ✅ | **Dota2倾斜检测** — 连败/弃局/行为检测 |
+| M441 | `integrations/mahjong/src/mahjong_agent/mahjong_history_aggregator.py` | ✅ | **麻将历史聚合** — 和牌率/放铳率/立直率 |
+| M442 | `integrations/mahjong/src/mahjong_agent/mahjong_opponent_model_v2.py` | ✅ | **麻将对手V2** — 历史打牌倾向预测 |
+| M443 | `integrations/mahjong/src/mahjong_agent/mahjong_meta_tracker.py` | ✅ | **麻将meta追踪** — 段位/规则集meta变化 |
+| M444 | `extensions/protocol-decoder/src/unified_protocol_adapter.py` | ✅ | **统一协议适配** — LoL/Dota2/Mahjong→统一事件 |
+| M445 | `extensions/protocol-decoder/src/protocol_version_negotiator.py` | ✅ | **协议版本协商** — 多版本自动检测+降级 |
+
+### 自测: 20/20模块全部通过功能验证
+
+---
+
+## 二十六、M446-M465 新增任务规划
+
+### 阶段 AH: 训练数据持久化 + RL闭环（M446-M455）
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M446 | `integrations/lol/src/lol_agent/training_data_sqlite.py` | 🔴 | **SQLite训练存储** — 对局→训练样本持久化 |
+| M447 | `integrations/lol/src/lol_agent/reward_shaper.py` | 🔴 | **奖励塑形** — 多维度奖励信号(胜负+KDA+CS+视野) |
+| M448 | `integrations/lol/src/lol_agent/state_encoder.py` | 🔴 | **状态编码器** — 游戏状态→特征向量编码 |
+| M449 | `integrations/lol/src/lol_agent/action_space_mapper.py` | 🟡 | **动作空间映射** — 策略建议→离散动作空间 |
+| M450 | `integrations/lol/src/lol_agent/experience_replay_buffer.py` | 🔴 | **经验回放缓冲** — 优先级经验回放 |
+| M451 | `agentlightning/trainer/lol_trainer.py` | 🔴 | **LoL专用训练器** — PPO/GRPO接入LoL数据 |
+| M452 | `agentlightning/trainer/multi_game_trainer.py` | 🟡 | **多游戏训练器** — 统一训练接口 |
+| M453 | `agentos/governance/training_scheduler.py` | 🟡 | **训练调度** — 自动触发训练+资源管理 |
+| M454 | `agentos/governance/model_ab_test.py` | 🟡 | **模型AB测试** — 新旧模型在线对比 |
+| M455 | `agentos/governance/deployment_gate.py` | 🟢 | **部署门控** — 模型质量门控+自动部署 |
+
+### 阶段 AI: 语音+视觉多模态输出（M456-M465）
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M456 | `integrations/lol/src/lol_agent/voice_tts_engine.py` | 🔴 | **TTS引擎** — 策略建议→语音合成 |
+| M457 | `integrations/lol/src/lol_agent/overlay_renderer.py` | 🔴 | **覆盖层渲染** — 游戏内HUD覆盖信息 |
+| M458 | `integrations/lol/src/lol_agent/minimap_annotator.py` | 🟡 | **小地图标注** — 危险区域/目标标注 |
+| M459 | `integrations/lol/src/lol_agent/timeline_visualizer.py` | 🟡 | **时间线可视化** — 对局时间线回放 |
+| M460 | `integrations/dota2/src/dota2_agent/dota2_voice_advisor.py` | 🔴 | **Dota2语音顾问** — Dota2专用语音播报 |
+| M461 | `integrations/dota2/src/dota2_agent/dota2_minimap_reader.py` | 🟡 | **Dota2小地图读取** — 小地图状态OCR |
+| M462 | `integrations/mahjong/src/mahjong_agent/mahjong_hand_visualizer.py` | 🟡 | **麻将手牌可视化** — 手牌+推荐可视化 |
+| M463 | `extensions/vision-bridge/src/screen_capture_engine.py` | 🔴 | **屏幕捕获引擎** — 14fps游戏画面捕获 |
+| M464 | `extensions/vision-bridge/src/game_state_ocr.py` | 🔴 | **游戏状态OCR** — 屏幕→结构化数据 |
+| M465 | `extensions/vision-bridge/src/visual_feedback_loop.py` | 🟡 | **视觉反馈环** — 屏幕变化→操作反馈 |
