@@ -2489,3 +2489,119 @@ M366-M385 完成了两大阶段的建设:
 | M403 | `agentos/cli/assistant_launcher.py` | 🟡 | **助手启动器** — 统一实时助手启动/管理CLI |
 | M404 | `agentos/governance/assistant_registry.py` | 🟢 | **助手注册表** — 跨游戏实时助手注册/查询/管理 |
 | M405 | `agentos/governance/cross_game_feedback.py` | 🔴 | **跨游戏反馈** — 多游戏反馈数据聚合 + 学习迁移 |
+
+---
+
+## 二十三、M406-M425 任务完成报告 + M426-M445 新增任务
+
+### 阶段 AD: LoL History → Real-Time Strategy Fusion Pipeline（M406-M415）✅ 全部完成
+
+> 将Seraphine历史数据与实时策略深度融合
+> 实现对手弱点检测、队伍协同评估、meta变化追踪
+> 参考: Seraphine match history API + leagueoflegends-optimizer feature engineering
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M406 | `integrations/lol-history/src/lol_history/history_match_aggregator.py` | ✅ | **历史比赛聚合** — 跨英雄池统计 (KDA/WR/GPM/CSPM/英雄分布) |
+| M407 | `integrations/lol-history/src/lol_history/champion_tendency_analyzer.py` | ✅ | **英雄倾向分析** — 每英雄攻击性/农刀/早期/死亡率/一致性评分 |
+| M408 | `integrations/lol-history/src/lol_history/opponent_weakness_detector.py` | ✅ | **对手弱点检测** — 高死亡/低CS/低视野/倾斜模式识别+利用建议 |
+| M409 | `integrations/lol-history/src/lol_history/team_synergy_scorer.py` | ✅ | **队伍协同评分** — 双排/三排历史胜率 + 协同分数 |
+| M410 | `integrations/lol-history/src/lol_history/meta_shift_tracker.py` | ✅ | **版本变化追踪** — 跨版本英雄选择率/胜率变化 + 趋势分析 |
+| M411 | `integrations/lol/src/lol_agent/history_strategy_fuser.py` | ✅ | **历史策略融合** — 实时状态+对手画像+历史倾向 → 策略建议 |
+| M412 | `integrations/lol/src/lol_agent/draft_recommendation_engine.py` | ✅ | **BP推荐引擎** — 基于历史胜率/对线数据/阵容平衡的英雄推荐 |
+| M413 | `integrations/lol/src/lol_agent/lane_matchup_predictor.py` | ✅ | **对线预测器** — 基于历史对线胜率/CS差/击杀差的对线预测 |
+| M414 | `integrations/lol/src/lol_agent/playstyle_classifier.py` | ✅ | **玩法分类器** — 攻击型/被动型/农刀型/辅助型分类 |
+| M415 | `integrations/lol/src/lol_agent/tilt_detector.py` | ✅ | **倾斜检测器** — 连败/死亡递增/短局投降模式识别 |
+
+**TDD验证**: tests/tdd_m406_m425/test_m406_m415_history_fusion.py — 100测试全部通过 ✅
+
+### 阶段 AE: Evolution Event Bus + Persistence Hardening（M416-M425）✅ 全部完成
+
+> 跨模块演化事件总线 + 状态持久化 + 重放调试
+> 协议解码健康监控 + 流量限速 + Fiddler数据导出
+> 参考: DI-star event system + Akagi bridge + PARL training pipeline
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M416 | `agentos/governance/evolution_event_bus.py` | ✅ | **演化事件总线** — 发布/订阅 + 通配符 + 历史记录 + 错误隔离 |
+| M417 | `agentos/governance/evolution_persistence.py` | ✅ | **演化持久化** — 快照保存/加载/删除/列表 + 元数据 |
+| M418 | `agentos/governance/evolution_replay.py` | ✅ | **演化重放** — 按类型/时间范围重放 + 摘要 + 时间线导出 |
+| M419 | `agentos/governance/fitness_aggregator.py` | ✅ | **适应度聚合** — 加权跨模块适应度 + 历史趋势 + 方向检测 |
+| M420 | `agentos/governance/generation_scheduler.py` | ✅ | **代际调度器** — 基于episode数/fitness/冷却的自动进化调度 |
+| M421 | `extensions/protocol-decoder/src/protocol_health_monitor.py` | ✅ | **协议健康监控** — 成功/失败率 + 延迟百分位 + 告警 |
+| M422 | `extensions/protocol-decoder/src/packet_rate_limiter.py` | ✅ | **数据包限速** — 每协议/全局限速 + 突发容忍 + 配额查询 |
+| M423 | `extensions/fiddler-bridge/src/fiddler_snapshot_exporter.py` | ✅ | **Fiddler快照导出** — 捕获→训练数据span转换 + 排序 + 过滤 |
+| M424 | `extensions/fiddler-bridge/src/fiddler_rule_engine.py` | ✅ | **Fiddler规则引擎** — 声明式域名/状态码/方法/URL过滤 |
+| M425 | `extensions/fiddler-bridge/src/fiddler_dashboard_data.py` | ✅ | **Fiddler仪表板** — 流量统计/错误率/延迟/热门端点/会话追踪 |
+
+**TDD验证**: tests/tdd_m406_m425/test_m416_m425_evolution_hardening.py — 100测试全部通过 ✅
+
+### Knuth《计算机程序设计艺术》级别审查
+
+**用户角度 — 潜在Bug分析**:
+
+1. **HistoryMatchAggregator.aggregate()** duration_minutes缺失时使用0导致除零？→ 已处理: `dur > 0`才计算GPM/CSPM。**安全**。
+2. **ChampionTendencyAnalyzer** consistency_score单场时使用0.5默认值。→ 合理: 1场数据不足以判断一致性。**安全**。
+3. **OpponentWeaknessDetector** 强玩家判断(`KDA>5 AND CS>7/min`)会清空所有弱点。→ 设计意图: 高水平玩家的"弱点"不可靠。**合理**。
+4. **TeamSynergyScorer** 使用tuple作为dict key (`("Alice","Bob")`) — 依赖sorted保证顺序一致。→ 已使用`combinations(sorted(team), 2)`。**安全**。
+5. **MetaShiftTracker** trending_up/down使用pickrate阈值0.1 AND 游戏数2倍增长双重判断。→ 避免单英雄池假阳性。**安全**。
+6. **HistoryStrategyFuser** game_time>2400(40min)时不生成early_game建议。→ 合理: 40分钟后早期优势不再相关。**安全**。
+7. **DraftRecommendationEngine** banned集合包含team_comp(已选英雄)。→ 正确: 不推荐已选英雄。**安全**。
+8. **PlaystyleClassifier** 高CS+高助攻的玩家可能在aggressive/farm/supportive之间混淆。→ 已修复: assist_suppress降低farm分数。**安全**。
+9. **TiltDetector** 使用`reversed(matches)`假设时间正序。→ 文档已标注。**注意使用顺序**。
+10. **EvolutionEventBus** 通配符`*`订阅者也收到topic事件 — 重复通知？→ 否: topic和`*`分开投递。**安全**。
+
+**系统角度 — 结构完整性**:
+
+1. **_EVOLUTION_KEY一致性**: 全部20个模块均定义唯一`_EVOLUTION_KEY` + `evolution_callback`。**合约满足**。
+2. **EvolutionEventBus→各模块管线**: event_bus可以作为所有模块evolution_callback的统一接收端。**集成就绪**。
+3. **EvolutionPersistence深拷贝**: `copy.deepcopy`防止外部修改污染快照。**数据完整性保证**。
+4. **PacketRateLimiter时间窗口**: 使用wall-clock `time.time()` — 在高并发下可能有微秒级竞争。生产环境建议加锁。**已知限制**。
+5. **FiddlerRuleEngine规则优先级**: 数字越小优先级越高,blacklist可以覆盖whitelist。**设计正确**。
+6. **GenerationScheduler冷却期**: 通过`time.time() - _last_advance < cooldown`防止过频进化。**安全**。
+7. **FiddlerDashboardData时间序列**: 按秒分桶聚合 — 适合实时仪表板刷新。**合理**。
+8. **EvolutionReplay max_events**: 超限时保留最新事件 `_events[-max:]`。**不会OOM**。
+9. **FitnessAggregator clamp**: `min(max(fitness, 0.0), 1.0)` 防止越界值污染聚合。**安全**。
+10. **ProtocolHealthMonitor隔离**: 每协议独立metrics,一个协议失败不影响其他。**故障隔离正确**。
+
+---
+
+## 二十四、M426-M445 新增任务规划
+
+### 阶段 AF: 端到端实时助手集成测试 + 演化闭环（M426-M435）
+
+> 将Phase AD的历史分析 + Phase AE的演化基础设施
+> 连接为端到端的实时助手闭环
+> 参考: DI-star端到端训练, Akagi实时对弈
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M426 | `integrations/lol/src/lol_agent/pregame_pipeline.py` | 🔴 | **赛前管线** — Seraphine历史→对手画像→BP推荐→对线预测 端到端 |
+| M427 | `integrations/lol/src/lol_agent/ingame_advisor_pipeline.py` | 🔴 | **游戏中顾问管线** — 实时数据→策略融合→语音播报 端到端 |
+| M428 | `integrations/lol/src/lol_agent/postgame_evolution_pipeline.py` | 🔴 | **赛后演化管线** — 反馈记录→适应度→代际推进 端到端 |
+| M429 | `integrations/lol/src/lol_agent/matchup_knowledge_base.py` | 🟡 | **对线知识库** — 持久化英雄对线胜率/策略/经验 |
+| M430 | `integrations/lol/src/lol_agent/live_danger_fuser.py` | 🔴 | **实时危险融合** — danger_zone + 历史死亡热区 → 综合预警 |
+| M431 | `agentos/governance/evolution_pipeline_orchestrator.py` | 🔴 | **演化管线编排** — event_bus + persistence + replay 统一编排 |
+| M432 | `agentos/governance/cross_module_health.py` | 🟡 | **跨模块健康** — 所有模块健康状态聚合 + 降级策略 |
+| M433 | `agentos/governance/evolution_audit_log.py` | 🟢 | **演化审计日志** — 不可变演化历史记录 + 合规追踪 |
+| M434 | `agentos/governance/rollback_manager.py` | 🟡 | **回滚管理器** — 演化失败时自动回滚到上一代 |
+| M435 | `agentos/governance/evolution_metrics_exporter.py` | 🟢 | **演化指标导出** — Prometheus/OpenTelemetry指标输出 |
+
+### 阶段 AG: 多游戏协议统一 + Dota2/麻将深度适配（M436-M445）
+
+> 将LoL的历史分析框架泛化到Dota2和麻将
+> 统一协议解码 + 策略引擎接口
+> 参考: dota2bot-OpenHyperAI, Akagi/Mortal, open_spiel
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M436 | `integrations/dota2/src/dota2_agent/dota2_history_aggregator.py` | 🔴 | **Dota2历史聚合** — OpenDota API历史数据聚合 |
+| M437 | `integrations/dota2/src/dota2_agent/dota2_hero_tendency.py` | 🟡 | **Dota2英雄倾向** — Hero-specific play pattern analysis |
+| M438 | `integrations/dota2/src/dota2_agent/dota2_draft_advisor.py` | 🔴 | **Dota2 BP顾问** — 基于历史+meta的英雄推荐 |
+| M439 | `integrations/dota2/src/dota2_agent/dota2_playstyle_classifier.py` | 🟡 | **Dota2玩法分类** — 攻击/防守/推进/游走分类 |
+| M440 | `integrations/dota2/src/dota2_agent/dota2_tilt_detector.py` | 🟢 | **Dota2倾斜检测** — 连败/弃局/毒瘤聊天检测 |
+| M441 | `integrations/mahjong/src/mahjong_agent/mahjong_history_aggregator.py` | 🔴 | **麻将历史聚合** — 跨对局统计 (和牌率/放铳率/立直率) |
+| M442 | `integrations/mahjong/src/mahjong_agent/mahjong_opponent_model_v2.py` | 🟡 | **麻将对手模型V2** — 基于历史的对手打牌倾向预测 |
+| M443 | `integrations/mahjong/src/mahjong_agent/mahjong_meta_tracker.py` | 🟢 | **麻将meta追踪** — 段位/规则集meta变化追踪 |
+| M444 | `extensions/protocol-decoder/src/unified_protocol_adapter.py` | 🔴 | **统一协议适配器** — LoL/Dota2/Mahjong协议→统一事件格式 |
+| M445 | `extensions/protocol-decoder/src/protocol_version_negotiator.py` | 🟡 | **协议版本协商** — 多版本协议自动检测 + 降级 |
