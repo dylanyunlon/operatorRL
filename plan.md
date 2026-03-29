@@ -2150,3 +2150,172 @@ M326-M345 完成了两大阶段的建设:
 | M363 | `agentos/governance/evolution_orchestrator.py` | 🔴 | **演化编排器** — 跨游戏自演化调度 + 资源分配 |
 | M364 | `agentos/governance/data_pipeline.py` | 🟡 | **数据管线** — 原始数据→清洗→特征→训练span全流程 |
 | M365 | `agentos/governance/notification_service.py` | 🟢 | **通知服务** — 演化事件 + 异常告警 + 性能报告推送 |
+
+## 十九、M346-M365 完成报告
+
+> 完成时间: 2026-03-29
+> 作者: dylanyunlong (Claude #7 — 第六位开发者)
+> TDD测试: 200单元测试 + 15独立过拟合验证, 215/215通过 (100%)
+
+M346-M365 完成了两大阶段的建设:
+
+1. **Phase X (M346-M355): Seraphine历史数据 + Live Client Data API 深度集成** — LiveClientConnector + LiveGameState + SeraphineHistoryClient + OpponentHistoryMerger + ChampionPerformanceAnalyzer + WinProbabilityPredictor + ItemBuildAdvisor + VoiceNarrationEngine + LoLEvolutionLoop + LoLStrategyAdvisor
+2. **Phase Y (M356-M365): 统一AgentOS治理 + 跨游戏部署框架** — GameRegistry + DeploymentManager + ABTestController + TelemetryCollector + PolicyEnforcer + ModelVersioner + CrossGameDashboard + EvolutionOrchestrator + DataPipeline + NotificationService
+
+### M346-M365 文件清单
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M346 | `integrations/lol/src/lol_agent/live_client_connector.py` | ✅ | **LiveClientConnector** — https://127.0.0.1:2999 API接口 + URL构建 + JSON解析 |
+| M347 | `integrations/lol/src/lol_agent/live_game_state.py` | ✅ | **LiveGameState** — allgamedata解析 + 队伍分组 + 金币差计算 + 事件时间线 |
+| M348 | `integrations/lol/src/lol_agent/seraphine_history_client.py` | ✅ | **SeraphineHistoryClient** — LCU match history URL + 排位解析 + 对局详情 |
+| M349 | `integrations/lol/src/lol_agent/opponent_history_merger.py` | ✅ | **OpponentHistoryMerger** — 实时+历史合并 + 威胁评分(KDA/CS/等级/历史加权) |
+| M350 | `integrations/lol/src/lol_agent/champion_performance_analyzer.py` | ✅ | **ChampionPerformanceAnalyzer** — KDA/CS/min/伤害/视野 + 趋势分析 |
+| M351 | `integrations/lol/src/lol_agent/win_probability_predictor.py` | ✅ | **WinProbabilityPredictor** — Logistic模型 + sigmoid预测 + 在线梯度更新 |
+| M352 | `integrations/lol/src/lol_agent/item_build_advisor.py` | ✅ | **ItemBuildAdvisor** — 16件装备池 + 角色/预算/对手感知评分 + top-k推荐 |
+| M353 | `integrations/lol/src/lol_agent/voice_narration_engine.py` | ✅ | **VoiceNarrationEngine** — 优先级堆队列 + TTS格式化 + 队列容量管理 |
+| M354 | `integrations/lol/src/lol_agent/lol_evolution_loop.py` | ✅ | **LoLEvolutionLoop** — EvolutionLoopABC实现 + 代际追踪 + 训练span导出 |
+| M355 | `integrations/lol/src/lol_agent/lol_strategy_advisor.py` | ✅ | **LoLStrategyAdvisor** — StrategyAdvisorABC实现 + 三阶段策略(early/mid/late) + 信心追踪 |
+| M356 | `agentos/governance/game_registry.py` | ✅ | **GameRegistry** — 游戏注册/注销/查询 + 配置管理 |
+| M357 | `agentos/governance/deployment_manager.py` | ✅ | **DeploymentManager** — deploy/stop/rollback + 版本历史 + 健康检查 |
+| M358 | `agentos/governance/ab_test_controller.py` | ✅ | **ABTestController** — 实验创建 + 变体分配(hash) + Welch t-test显著性 |
+| M359 | `agentos/governance/telemetry_collector.py` | ✅ | **TelemetryCollector** — 指标记录(deque) + 最新/平均查询 + 多游戏汇聚 |
+| M360 | `agentos/governance/policy_enforcer.py` | ✅ | **PolicyEnforcer** — 规则增删 + 操作频率/公平性检查 + 违规报告 |
+| M361 | `agentos/governance/model_versioner.py` | ✅ | **ModelVersioner** — save/load/rollback + 版本列表 + diff对比 |
+| M362 | `agentos/governance/cross_game_dashboard.py` | ✅ | **CrossGameDashboard** — 面板注册 + 指标更新 + 全局快照 + 报告导出 |
+| M363 | `agentos/governance/evolution_orchestrator.py` | ✅ | **EvolutionOrchestrator** — 循环调度 + 资源分配(fitness加权) + 适应度报告 |
+| M364 | `agentos/governance/data_pipeline.py` | ✅ | **DataPipeline** — 多阶段流水线 + 阶段组合 + 空数据安全 |
+| M365 | `agentos/governance/notification_service.py` | ✅ | **NotificationService** — 频道订阅/退订 + 广播 + 历史记录 |
+
+### 参考项目迁移记录（拿来主义）
+
+| 源项目 | 迁移内容 | 目标模块 |
+|---|---|---|
+| Seraphine | connector.py retry/PastRequest + getGameDetailByGameId/getRankedStatsByPuuid | M346 live_client_connector + M348 seraphine_history_client |
+| Seraphine | LCU API端点模式 (/lol-match-history/v1/, /lol-summoner/v1/) | M348 seraphine_history_client |
+| leagueoflegends-optimizer | article5.md Riot API数据管线 + 统计分析 | M350 champion_performance_analyzer + M351 win_probability_predictor |
+| operatorRL voice_advisor | 优先级队列 + 消息格式化 | M353 voice_narration_engine |
+| operatorRL evolution_loop_abc | record/fitness/evolve/export/reset合约 | M354 lol_evolution_loop |
+| operatorRL strategy_advisor_abc | advise/evaluate/confidence合约 | M355 lol_strategy_advisor |
+| DI-star | policy_factory注册模式 + checkpoint save/load | M356 game_registry + M361 model_versioner |
+| PARL | agent_base部署生命周期 | M357 deployment_manager |
+| agentlightning | self_play_scheduler Elo对比 + experience_store deque | M358 ab_test_controller + M359 telemetry_collector |
+| dota2bot-OpenHyperAI | mode_*.lua策略决策模式 | M355 lol_strategy_advisor (三阶段策略) |
+| integrations/dota2 | bot_commander (-priority,seq)排序 | M353 voice_narration_engine (堆排序) |
+
+### TDD流程记录（M346-M365）
+
+| 步骤 | 描述 | 结果 |
+|---|---|---|
+| Step 1 | 编写215个测试（3个测试文件, 20模块, 10测试/模块 + 15验证测试） | ✅ 设计50%预期失败率 |
+| Step 2 | 运行测试确认全部失败 | ✅ 215/215 error/fail (100 Phase-X + 100 Phase-Y + 15 overfit) |
+| Step 3 | 提交测试 | ✅ |
+| Step 4 | 实现20个源文件, 迭代至全通过 | 215/215通过 — 1次迭代(首次通过) |
+| Step 5 | 过拟合验证（15独立测试） | 15/15通过 ✅ |
+| Step 6 | 提交实现 | ✅ |
+
+### ✅ M01-M365 全部完成 — 总进度
+
+| 阶段 | 文件数 | 测试数 | 通过率 |
+|---|---|---|---|
+| M01-M100 | 100 | 1000 | 1000/1000 ✅ |
+| M101-M180 | 80 | 467 | 467/467 ✅ |
+| M181-M200 | 20 | 116 | 116/116 ✅ |
+| M201-M220 | 20+10 | 116 | 116/116 ✅ |
+| M226-M245 | 20+8 | 135 | 135/135 ✅ |
+| M246-M265 | 20+20 | 206 | 206/206 ✅ |
+| M266-M285 | 20 | 200 | 200/200 ✅ |
+| M286-M305 | 20 | 232 | 232/232 ✅ |
+| M306-M325 | 20 | 218 | 218/218 ✅ |
+| M326-M345 | 20 | 224 | 224/224 ✅ |
+| M346-M365 | 20 | 215 | 215/215 ✅ |
+| **合计** | **398** | **3129** | **3129/3129 ✅** |
+
+### 生产级质量审查（Knuth标准）
+
+**从用户角度 — 是否引起 bug？**
+
+1. **LiveClientConnector parse_response 非JSON输入**: 返回`{"error": "invalid_json"}`。**不会crash**。
+2. **LiveGameState update({}) 空数据**: game_time保持0.0，all_players保持空。**安全降级**。
+3. **LiveGameState compute_gold_advantage 空玩家列表**: 返回0.0。**不会除零**。
+4. **SeraphineHistoryClient parse_ranked_stats 空queues**: 返回`{"tier": "UNRANKED"}`默认值。**不会crash**。
+5. **OpponentHistoryMerger compute_threat_score deaths=0**: `max(deaths, 1)`确保不除零。**安全**。
+6. **ChampionPerformanceAnalyzer compute_cs_per_minute game_time=0**: 返回0.0。**不会ZeroDivisionError**。
+7. **ChampionPerformanceAnalyzer compute_trend 单条记录**: 返回`{"kda_trend": 0.0}`。**安全**。
+8. **WinProbabilityPredictor predict 极端logit**: `max(-20, min(20, logit))`防止exp溢出。**数值稳定**。
+9. **WinProbabilityPredictor update 梯度爆炸**: learning_rate=0.001，gradient由error*feature限制。**收敛稳定**。
+10. **ItemBuildAdvisor recommend 已拥有装备**: 自动过滤current_items。**不会重复推荐**。
+11. **ItemBuildAdvisor score_item 未知装备**: 返回0.0。**不会KeyError**。
+12. **VoiceNarrationEngine dequeue 空队列**: 返回None。**不会IndexError**。
+13. **VoiceNarrationEngine max_queue 超限**: 排序+截断确保不超容量。**内存受控**。
+14. **LoLEvolutionLoop compute_fitness 空episodes**: 返回0.0。**不会除零**。
+15. **LoLEvolutionLoop reward裁剪**: `max(-10, min(10, reward))`。**不会极值**。
+16. **LoLStrategyAdvisor evaluate_action 未知result**: 返回0.1中性分。**不会crash**。
+
+**从系统角度 — 结构完整性**
+
+1. **ABC合规性**: LoLEvolutionLoop 实现 EvolutionLoopABC全部方法(record/fitness/evolve/export/reset)。LoLStrategyAdvisor 实现 StrategyAdvisorABC全部方法(advise/evaluate/confidence)。**合约满足**。
+2. **Evolution接口一致性**: 所有20个模块均实现 `_EVOLUTION_KEY` + `_fire_evolution()`。**统一的演化接口**。
+3. **依赖方向**: LoL模块无外部package依赖，Governance模块无外部package依赖。**零副作用**。
+4. **GameRegistry→DeploymentManager管线验证**: 过拟合测试`test_registry_to_deployment`确认端到端可用。**集成验证通过**。
+5. **EvolutionOrchestrator→LoLEvolutionLoop管线验证**: 过拟合测试`test_orchestrator_with_real_loops`确认跨模块演化调度正常。**集成验证通过**。
+6. **ABTestController Welch t-test数学正确性**: 当样本量≥5且效应量大时(0.9 vs 0.3)正确报告显著；小样本(n=1)正确报告不显著。**统计正确**。
+7. **DeploymentManager rollback版本链**: 过拟合测试确认v1→v2→v3→rollback→v2链完整。**版本历史正确**。
+8. **DataPipeline 空pipeline直通**: 无阶段时直接返回原始数据。**不会丢数据**。
+9. **PolicyEnforcer check多规则合取**: 任一违规即blocked。**安全策略正确**。
+10. **NotificationService broadcast异常隔离**: try/except确保单个subscriber错误不影响其他。**容错设计**。
+
+### Fiddler vs 视觉方案技术评估
+
+基于M346-M365的实现经验，对 Fiddler网络捕获 vs 视觉识别 的技术路线评估：
+
+| 维度 | Fiddler/协议捕获 | 视觉/屏幕捕获 |
+|---|---|---|
+| **数据精确度** | ✅ 精确到协议字段，零幻觉 | ⚠️ OCR/检测有误差，需后处理 |
+| **延迟** | ✅ 毫秒级（协议解析） | ⚠️ 14fps≈71ms + 推理时间 |
+| **技术栈匹配** | ✅ 符合逆向工程方向 | ⚠️ 需CV模型训练/维护 |
+| **维护成本** | ⚠️ 协议更新需跟进 | ⚠️ 游戏UI更新需重训练 |
+| **覆盖范围** | ⚠️ 仅限协议内数据 | ✅ 视觉信息更丰富 |
+| **最佳实践** | Fiddler MCP Server + Proxifier全局代理 | LeagueAI + Live Client API补充 |
+
+**结论**: 推荐 **Fiddler/协议优先 + 视觉验证补充** 的双通道架构，M339 VisionProtocolFusion已实现此模式。
+
+---
+
+## 二十、M366-M385 新增任务规划
+
+### 阶段 Z: LoL实时助手端到端系统（M366-M375）
+
+> 将Phase X的各个组件整合为完整的30分钟实时助手系统
+> 实现从游戏启动到结束的全流程自动化
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M366 | `integrations/lol/src/lol_agent/game_session_manager.py` | 🔴 | **对局会话管理** — 游戏生命周期(加载/运行/结束)状态机 |
+| M367 | `integrations/lol/src/lol_agent/real_time_poller.py` | 🔴 | **实时轮询器** — 定时拉取Live Client API + 错误重试 |
+| M368 | `integrations/lol/src/lol_agent/decision_engine.py` | 🔴 | **决策引擎** — 聚合状态/历史/威胁→策略输出 |
+| M369 | `integrations/lol/src/lol_agent/feedback_recorder.py` | 🟡 | **反馈记录器** — 用户操作 vs 建议偏差 + 反馈评分 |
+| M370 | `integrations/lol/src/lol_agent/pregame_scout_engine.py` | 🟡 | **赛前侦查** — 加载界面期间全员历史扫描 |
+| M371 | `integrations/lol/src/lol_agent/objective_timer.py` | 🟢 | **野怪计时器** — 龙/男爵/峡谷先锋重生倒计时 |
+| M372 | `integrations/lol/src/lol_agent/team_comp_evaluator.py` | 🟡 | **阵容评估器** — 双方阵容优劣分析 + 团战能力评估 |
+| M373 | `integrations/lol/src/lol_agent/danger_zone_detector.py` | 🟡 | **危险区域检测** — 基于视野/对手位置的安全区域计算 |
+| M374 | `integrations/lol/src/lol_agent/post_game_analyzer.py` | 🔴 | **赛后分析** — 对局回顾 + 关键时刻标注 + 改进建议 |
+| M375 | `integrations/lol/src/lol_agent/lol_agent_orchestrator.py` | 🔴 | **LoL Agent总编排** — 整合M346-M374所有模块 |
+
+### 阶段 AA: 跨游戏统一CLI + 配置系统（M376-M385）
+
+> 提供统一的命令行界面和配置系统
+> 实现一键启动任意游戏的AI助手
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M376 | `agentos/cli/main.py` | 🔴 | **CLI入口** — argparse命令行 + 子命令路由 |
+| M377 | `agentos/cli/config_loader.py` | 🟡 | **配置加载器** — YAML/JSON配置 + 环境变量覆盖 |
+| M378 | `agentos/cli/game_launcher.py` | 🔴 | **游戏启动器** — 统一启动/停止接口 + 进程管理 |
+| M379 | `agentos/cli/status_reporter.py` | 🟢 | **状态报告器** — 实时状态输出 + 进度条 |
+| M380 | `agentos/cli/log_manager.py` | 🟢 | **日志管理器** — 分级日志 + 文件轮转 + 控制台着色 |
+| M381 | `agentos/cli/plugin_loader.py` | 🟡 | **插件加载器** — 动态发现/加载游戏集成插件 |
+| M382 | `agentos/cli/credential_manager.py` | 🟡 | **凭证管理器** — API密钥/Token安全存储 |
+| M383 | `agentos/cli/health_monitor.py` | 🟡 | **健康监控** — 系统资源 + 网络延迟 + API可用性检查 |
+| M384 | `agentos/cli/upgrade_checker.py` | 🟢 | **升级检查器** — 版本对比 + 更新提示 |
+| M385 | `agentos/cli/session_recorder.py` | 🔴 | **会话录制器** — 完整会话保存 + 回放 + 导出 |
