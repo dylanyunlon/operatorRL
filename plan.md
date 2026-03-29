@@ -2734,34 +2734,74 @@ M366-M385 完成了两大阶段的建设:
 
 ---
 
-## 二十八、M466-M485 新增任务规划
+## 二十八、M466-M485 完成报告（第十位Claude — Seraphine深度集成）
 
-### 阶段 AJ: RL管道集成 + 端到端闭环（M466-M475）
+### 阶段 AJ: Seraphine历史数据管线（M466-M475）✅ 全部完成
+
+> 将Seraphine(github.com/ljszx/Seraphine)的LCU connector、tools.py、opgg.py
+> 核心模式迁移到operatorRL的agentic框架
+> 参考: Seraphine/app/lol/connector.py, tools.py, opgg.py, listener.py, aram.py
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M466 | `integrations/lol-history/src/lol_history/lcu_session_parser.py` | ✅ | **LCU会话解析** — gameflow session/champ select解析 |
+| M467 | `integrations/lol-history/src/lol_history/sgp_match_fetcher.py` | ✅ | **SGP对局获取** — SGP API URL构建+响应解析 |
+| M468 | `integrations/lol-history/src/lol_history/game_detail_parser.py` | ✅ | **对局细节解析** — KDA/CS/队伍/胜方深度解析 |
+| M469 | `integrations/lol-history/src/lol_history/teammate_analyzer.py` | ✅ | **队友分析器** — 历史队友检测+共同胜率+双排识别 |
+| M470 | `integrations/lol-history/src/lol_history/champion_pool_tracker.py` | ✅ | **英雄池追踪** — 英雄计数/胜率/多样性/one-trick检测 |
+| M471 | `integrations/lol-history/src/lol_history/rank_tier_resolver.py` | ✅ | **段位解析器** — 单排/灵活段位解析+数值化+比较 |
+| M472 | `integrations/lol-history/src/lol_history/summoner_order_resolver.py` | ✅ | **召唤师排序** — TOP→JG→MID→ADC→SUP标准排序 |
+| M473 | `integrations/lol-history/src/lol_history/ally_game_info_parser.py` | ✅ | **友方信息解析** — 友方/敌方队伍+召唤师技能提取 |
+| M474 | `integrations/lol-history/src/lol_history/opgg_build_fetcher.py` | ✅ | **OPGG出装获取** — 出装/符文/技能加点推荐 |
+| M475 | `integrations/lol-history/src/lol_history/opgg_tier_list_parser.py` | ✅ | **OPGG梯队解析** — 英雄梯队+位置分布+meta强度 |
+
+### 阶段 AK: 英雄选择/符文/战略智能（M476-M485）✅ 全部完成
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M476 | `integrations/lol/src/lol_agent/champ_select_automator.py` | ✅ | **英雄选择自动化** — 选/禁/换英雄建议 |
+| M477 | `integrations/lol/src/lol_agent/rune_page_manager.py` | ✅ | **符文页管理** — 构建/验证/推荐符文页 |
+| M478 | `integrations/lol/src/lol_agent/summoner_spell_advisor.py` | ✅ | **召唤师技能顾问** — 位置+OPGG驱动推荐 |
+| M479 | `integrations/lol/src/lol_agent/game_flow_monitor.py` | ✅ | **游戏流程监控** — 阶段转换+历史+持续时间 |
+| M480 | `integrations/lol/src/lol_agent/team_color_resolver.py` | ✅ | **队伍颜色解析** — 蓝/红方+队伍分离 |
+| M481 | `integrations/lol/src/lol_agent/historical_winrate_predictor.py` | ✅ | **历史胜率预测** — 胜率/段位加权预测 |
+| M482 | `integrations/lol/src/lol_agent/duo_synergy_detector.py` | ✅ | **双排协同检测** — 双排/三排+威胁评分 |
+| M483 | `integrations/lol/src/lol_agent/aram_strategy_advisor.py` | ✅ | **ARAM策略顾问** — 重随/换人/出装/雪球 |
+| M484 | `integrations/lol/src/lol_agent/profile_background_manager.py` | ✅ | **个人资料管理** — 背景/状态/段位LCU接口 |
+| M485 | `integrations/lol/src/lol_agent/seraphine_integration_orchestrator.py` | ✅ | **Seraphine集成编排** — 统一注册/健康/管线 |
+
+**TDD验证**: 200测试全部通过 ✅
+
+---
+
+## 二十九、M486-M505 新增任务规划
+
+### 阶段 AL: Fiddler协议捕获 → 实时训练数据管线（M486-M495）
 
 | M# | 文件路径 | 级别 | 功能 |
 |---|---|---|---|
-| M466 | `integrations/lol/src/lol_agent/rl_pipeline_orchestrator.py` | 🔴 | **RL管道编排** — live_data→encoder→replay→trainer端到端串联 |
-| M467 | `integrations/lol/src/lol_agent/online_policy_server.py` | 🔴 | **在线策略服务** — HTTP/WebSocket策略推理服务 |
-| M468 | `integrations/lol/src/lol_agent/reward_shaper_adaptive.py` | 🟡 | **自适应奖励** — 基于胜率自动调整奖励权重 |
-| M469 | `integrations/lol/src/lol_agent/state_encoder_v2.py` | 🟡 | **状态编码器V2** — 增加物品/技能/冷却/地图控制特征 |
-| M470 | `integrations/lol/src/lol_agent/trajectory_collector.py` | 🔴 | **轨迹收集器** — 在线收集(s,a,r,s')轨迹序列 |
-| M471 | `integrations/dota2/src/dota2_agent/dota2_rl_trainer.py` | 🔴 | **Dota2 RL训练器** — Dota2专用PPO训练接入 |
-| M472 | `integrations/dota2/src/dota2_agent/dota2_state_encoder.py` | 🟡 | **Dota2状态编码** — Dota2游戏状态→特征向量 |
-| M473 | `integrations/mahjong/src/mahjong_agent/mahjong_rl_trainer.py` | 🔴 | **麻将RL训练器** — 麻将专用策略优化 |
-| M474 | `agentos/governance/reward_evolution_tracker.py` | 🟡 | **奖励演化追踪** — 奖励函数版本化+效果对比 |
-| M475 | `agentos/governance/pipeline_health_monitor.py` | 🟢 | **管道健康监控** — 训练管道延迟/吞吐/错误率监控 |
+| M486 | `extensions/fiddler-bridge/src/fiddler_live_capture.py` | 🔴 | **Fiddler实时捕获** — HTTP流捕获+过滤+缓冲 |
+| M487 | `extensions/fiddler-bridge/src/fiddler_lol_decoder.py` | 🔴 | **LoL协议解码** — Live Client Data API解码 |
+| M488 | `extensions/fiddler-bridge/src/fiddler_training_pipeline.py` | 🔴 | **训练数据管线** — 捕获→清洗→标注→训练样本 |
+| M489 | `extensions/fiddler-bridge/src/fiddler_replay_recorder.py` | 🟡 | **回放录制器** — 完整对局协议流录制 |
+| M490 | `extensions/fiddler-bridge/src/fiddler_anomaly_detector.py` | 🟡 | **异常检测器** — 协议异常/延迟峰值检测 |
+| M491 | `extensions/protocol-decoder/src/riot_api_client.py` | 🔴 | **Riot API客户端** — 官方API数据获取 |
+| M492 | `extensions/protocol-decoder/src/live_client_data_poller.py` | 🔴 | **实时数据轮询** — Live Client Data定时轮询 |
+| M493 | `extensions/protocol-decoder/src/protocol_replay_engine.py` | 🟡 | **协议重放引擎** — 协议流回放+加速 |
+| M494 | `extensions/protocol-decoder/src/dual_channel_fuser.py` | 🔴 | **双通道融合** — Fiddler+Live Client融合 |
+| M495 | `extensions/protocol-decoder/src/training_data_validator.py` | 🟢 | **训练数据验证** — 样本完整性校验 |
 
-### 阶段 AK: 实际TTS/OCR后端接入 + 生产化（M476-M485）
+### 阶段 AM: 跨游戏策略知识图谱 + 迁移学习（M496-M505）
 
 | M# | 文件路径 | 级别 | 功能 |
 |---|---|---|---|
-| M476 | `integrations/lol/src/lol_agent/tts_backend_edge.py` | 🔴 | **Edge-TTS后端** — 微软Edge TTS异步语音合成 |
-| M477 | `integrations/lol/src/lol_agent/tts_backend_local.py` | 🟡 | **本地TTS后端** — pyttsx3/espeak本地离线合成 |
-| M478 | `extensions/vision-bridge/src/vision_bridge/ocr_backend_tesseract.py` | 🔴 | **Tesseract OCR后端** — Tesseract集成+区域预处理 |
-| M479 | `extensions/vision-bridge/src/vision_bridge/ocr_backend_paddle.py` | 🟡 | **PaddleOCR后端** — PaddleOCR高精度中英文识别 |
-| M480 | `extensions/vision-bridge/src/vision_bridge/capture_to_ocr_pipeline.py` | 🔴 | **采集→OCR管道** — screen_capture→region_crop→OCR→state |
-| M481 | `extensions/fiddler-bridge/src/fiddler_mcp_connector.py` | 🔴 | **Fiddler MCP连接** — Fiddler MCP Server协议对接 |
-| M482 | `extensions/fiddler-bridge/src/lol_packet_decoder.py` | 🟡 | **LoL封包解码** — LoL网络协议→结构化事件 |
-| M483 | `extensions/fiddler-bridge/src/fiddler_vs_vision_arbiter.py` | 🟡 | **Fiddler/视觉仲裁** — 协议数据vs视觉数据一致性校验 |
-| M484 | `agentos/governance/multimodal_output_router.py` | 🟡 | **多模态输出路由** — 语音/覆盖层/小地图智能路由 |
-| M485 | `agentos/governance/production_readiness_checker.py` | 🟢 | **生产就绪检查** — 依赖/配置/连接/性能全面自检 |
+| M496 | `agentos/governance/strategy_knowledge_graph.py` | 🔴 | **策略知识图谱** — 跨游戏策略节点/边图 |
+| M497 | `agentos/governance/strategy_transfer_engine.py` | 🔴 | **策略迁移引擎** — LoL↔Dota2↔麻将迁移 |
+| M498 | `agentos/governance/unified_decision_framework.py` | 🔴 | **统一决策框架** — 跨游戏通用决策抽象 |
+| M499 | `agentos/governance/cross_game_evaluation.py` | 🟡 | **跨游戏评估** — 统一适应度指标 |
+| M500 | `agentos/governance/evolution_knowledge_distill.py` | 🟡 | **知识蒸馏** — 大模型→小模型蒸馏 |
+| M501 | `integrations/lol/src/lol_agent/lol_knowledge_node.py` | 🟡 | **LoL知识节点** — LoL策略图谱节点 |
+| M502 | `integrations/dota2/src/dota2_agent/dota2_knowledge_node.py` | 🟡 | **Dota2知识节点** — Dota2策略图谱节点 |
+| M503 | `integrations/mahjong/src/mahjong_agent/mahjong_knowledge_node.py` | 🟡 | **麻将知识节点** — 麻将策略图谱节点 |
+| M504 | `agentlightning/trainer/knowledge_graph_trainer.py` | 🔴 | **图谱训练器** — 知识图谱嵌入训练 |
+| M505 | `agentlightning/trainer/transfer_learning_trainer.py` | 🔴 | **迁移学习训练** — 跨游戏策略迁移训练 |
