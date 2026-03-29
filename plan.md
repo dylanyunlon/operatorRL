@@ -2670,3 +2670,98 @@ M366-M385 完成了两大阶段的建设:
 | M463 | `extensions/vision-bridge/src/screen_capture_engine.py` | 🔴 | **屏幕捕获引擎** — 14fps游戏画面捕获 |
 | M464 | `extensions/vision-bridge/src/game_state_ocr.py` | 🔴 | **游戏状态OCR** — 屏幕→结构化数据 |
 | M465 | `extensions/vision-bridge/src/visual_feedback_loop.py` | 🟡 | **视觉反馈环** — 屏幕变化→操作反馈 |
+
+---
+
+## 二十七、M446-M465 完成报告（第十位Claude）
+
+### 开发方法: TDD（测试驱动开发）
+
+采用严格TDD流程: 先写200个测试（每模块10个） → 确认全部失败 → 实现代码 → 迭代修复 → 200/200全部通过。
+
+### 阶段 AH 完成: 训练数据持久化 + RL闭环（M446-M455）
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M446 | `integrations/lol/src/lol_agent/training_data_sqlite.py` | ✅ | **SQLite训练存储** — 表创建/插入/批量/查询/epoch/清理/导出 |
+| M447 | `integrations/lol/src/lol_agent/reward_shaper.py` | ✅ | **奖励塑形** — win/KDA/CS/vision多维度+权重+归一化 |
+| M448 | `integrations/lol/src/lol_agent/state_encoder.py` | ✅ | **状态编码器** — 12维特征向量(时间/血量/金币/等级/队友/敌人/防御塔/龙) |
+| M449 | `integrations/lol/src/lol_agent/action_space_mapper.py` | ✅ | **动作空间映射** — 15个离散动作+one-hot+context mask |
+| M450 | `integrations/lol/src/lol_agent/experience_replay_buffer.py` | ✅ | **经验回放缓冲** — PER优先级采样+IS权重修正 |
+| M451 | `agentlightning/trainer/lol_trainer.py` | ✅ | **LoL训练器** — PPO/GRPO双模式+GAE优势计算+checkpoint |
+| M452 | `agentlightning/trainer/multi_game_trainer.py` | ✅ | **多游戏训练器** — 现有实现通过全部增强测试(未修改) |
+| M453 | `agentos/governance/training_scheduler.py` | ✅ | **训练调度** — 优先级队列+资源检查+完成追踪 |
+| M454 | `agentos/governance/model_ab_test.py` | ✅ | **模型AB测试** — 实验创建/记录/Welch t检验/流量分配 |
+| M455 | `agentos/governance/deployment_gate.py` | ✅ | **部署门控** — 胜率/样本量/回退门控+部署历史+rollback |
+
+### 阶段 AI 完成: 语音+视觉多模态输出（M456-M465）
+
+| M# | 文件路径 | 状态 | 功能 |
+|---|---|---|---|
+| M456 | `integrations/lol/src/lol_agent/voice_tts_engine.py` | ✅ | **TTS引擎** — 优先级队列+语速控制+批量合成 |
+| M457 | `integrations/lol/src/lol_agent/overlay_renderer.py` | ✅ | **覆盖层渲染** — text/rect元素+TTL过期+位置更新 |
+| M458 | `integrations/lol/src/lol_agent/minimap_annotator.py` | ✅ | **小地图标注** — 危险区域/目标标记+坐标转换+TTL |
+| M459 | `integrations/lol/src/lol_agent/timeline_visualizer.py` | ✅ | **时间线可视化** — 有序事件+过滤+快照+段式时间窗口 |
+| M460 | `integrations/dota2/src/dota2_agent/dota2_voice_advisor.py` | ✅ | **Dota2语音顾问** — Roshan/团战/打钱情境建议 |
+| M461 | `integrations/dota2/src/dota2_agent/dota2_minimap_reader.py` | ✅ | **Dota2小地图读取** — 英雄/防御塔/兵线检测+坐标映射 |
+| M462 | `integrations/mahjong/src/mahjong_agent/mahjong_hand_visualizer.py` | ✅ | **麻将手牌可视化** — 排序/高亮/听牌/副露/向听数 |
+| M463 | `extensions/vision-bridge/src/vision_bridge/screen_capture_engine.py` | ✅ | **屏幕捕获引擎** — 14fps+区域+缓冲+多模式 |
+| M464 | `extensions/vision-bridge/src/vision_bridge/game_state_ocr.py` | ✅ | **游戏状态OCR** — 金币/血量/时钟/等级/KDA/CS正则提取 |
+| M465 | `extensions/vision-bridge/src/vision_bridge/visual_feedback_loop.py` | ✅ | **视觉反馈环** — 帧间变化检测+严重度分级+历史追踪 |
+
+### TDD测试统计
+
+- 测试文件: 20个 (`tests/m446_m465/`)
+- 测试用例: 200个
+- 通过率: **200/200 (100%)**
+- TDD迭代次数: 4轮 (import修复→3个逻辑修复→全通过)
+
+### 批判性审查
+
+**用户角度 (Knuth标准):**
+
+1. **training_data_sqlite**: SQLite在高并发写入场景下存在锁竞争风险 — 生产环境应考虑WAL模式或迁移至PostgreSQL。state_vector用JSON序列化存储,大批量训练时反序列化开销不可忽略。
+2. **experience_replay_buffer**: 当前`random.choices`的O(n)采样在buffer容量>100K时性能退化 — 应替换为SumTree数据结构实现O(log n)采样。
+3. **visual_feedback_loop**: change_threshold硬编码对不同游戏可能不适用(LoL金币变化频率与Dota2差异大) — 应支持per-game配置。
+4. **timeline_visualizer**: 段式时间窗口过滤在事件稀疏时可能遗漏尾部事件 — 需要文档说明这一行为。
+
+**系统角度 (Knuth标准):**
+
+1. **RL闭环未完成**: M446-M451构建了数据管道(存储→编码→回放→训练),但缺少连接器将`live_client_connector` → `state_encoder` → `experience_replay_buffer` → `lol_trainer`串联。需要一个`rl_pipeline_orchestrator`。
+2. **TTS引擎纯stub**: `voice_tts_engine`仅计算预估时长,未接入实际TTS后端(如pyttsx3/edge-tts/gTTS)。生产部署需要异步音频流。
+3. **OCR引擎纯regex**: `game_state_ocr`仅处理预提取文本,未集成Tesseract/EasyOCR/PaddleOCR。屏幕捕获→OCR→结构化数据的完整pipeline需要M463+M464协同。
+4. **跨模块一致性**: 所有20个模块遵循operatorRL的`_EVOLUTION_KEY` + `evolution_callback`模式,确保可接入自演化框架。
+
+---
+
+## 二十八、M466-M485 新增任务规划
+
+### 阶段 AJ: RL管道集成 + 端到端闭环（M466-M475）
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M466 | `integrations/lol/src/lol_agent/rl_pipeline_orchestrator.py` | 🔴 | **RL管道编排** — live_data→encoder→replay→trainer端到端串联 |
+| M467 | `integrations/lol/src/lol_agent/online_policy_server.py` | 🔴 | **在线策略服务** — HTTP/WebSocket策略推理服务 |
+| M468 | `integrations/lol/src/lol_agent/reward_shaper_adaptive.py` | 🟡 | **自适应奖励** — 基于胜率自动调整奖励权重 |
+| M469 | `integrations/lol/src/lol_agent/state_encoder_v2.py` | 🟡 | **状态编码器V2** — 增加物品/技能/冷却/地图控制特征 |
+| M470 | `integrations/lol/src/lol_agent/trajectory_collector.py` | 🔴 | **轨迹收集器** — 在线收集(s,a,r,s')轨迹序列 |
+| M471 | `integrations/dota2/src/dota2_agent/dota2_rl_trainer.py` | 🔴 | **Dota2 RL训练器** — Dota2专用PPO训练接入 |
+| M472 | `integrations/dota2/src/dota2_agent/dota2_state_encoder.py` | 🟡 | **Dota2状态编码** — Dota2游戏状态→特征向量 |
+| M473 | `integrations/mahjong/src/mahjong_agent/mahjong_rl_trainer.py` | 🔴 | **麻将RL训练器** — 麻将专用策略优化 |
+| M474 | `agentos/governance/reward_evolution_tracker.py` | 🟡 | **奖励演化追踪** — 奖励函数版本化+效果对比 |
+| M475 | `agentos/governance/pipeline_health_monitor.py` | 🟢 | **管道健康监控** — 训练管道延迟/吞吐/错误率监控 |
+
+### 阶段 AK: 实际TTS/OCR后端接入 + 生产化（M476-M485）
+
+| M# | 文件路径 | 级别 | 功能 |
+|---|---|---|---|
+| M476 | `integrations/lol/src/lol_agent/tts_backend_edge.py` | 🔴 | **Edge-TTS后端** — 微软Edge TTS异步语音合成 |
+| M477 | `integrations/lol/src/lol_agent/tts_backend_local.py` | 🟡 | **本地TTS后端** — pyttsx3/espeak本地离线合成 |
+| M478 | `extensions/vision-bridge/src/vision_bridge/ocr_backend_tesseract.py` | 🔴 | **Tesseract OCR后端** — Tesseract集成+区域预处理 |
+| M479 | `extensions/vision-bridge/src/vision_bridge/ocr_backend_paddle.py` | 🟡 | **PaddleOCR后端** — PaddleOCR高精度中英文识别 |
+| M480 | `extensions/vision-bridge/src/vision_bridge/capture_to_ocr_pipeline.py` | 🔴 | **采集→OCR管道** — screen_capture→region_crop→OCR→state |
+| M481 | `extensions/fiddler-bridge/src/fiddler_mcp_connector.py` | 🔴 | **Fiddler MCP连接** — Fiddler MCP Server协议对接 |
+| M482 | `extensions/fiddler-bridge/src/lol_packet_decoder.py` | 🟡 | **LoL封包解码** — LoL网络协议→结构化事件 |
+| M483 | `extensions/fiddler-bridge/src/fiddler_vs_vision_arbiter.py` | 🟡 | **Fiddler/视觉仲裁** — 协议数据vs视觉数据一致性校验 |
+| M484 | `agentos/governance/multimodal_output_router.py` | 🟡 | **多模态输出路由** — 语音/覆盖层/小地图智能路由 |
+| M485 | `agentos/governance/production_readiness_checker.py` | 🟢 | **生产就绪检查** — 依赖/配置/连接/性能全面自检 |
