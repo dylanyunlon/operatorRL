@@ -3051,3 +3051,259 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 **M545** `agentos/governance/evolution_fitness_landscape.py` — **进化适应度景观**
 
 查看 **agentos** 上现有 **`governance/fitness_aggregator.py` 中 FitnessAggregator 的多模块适应度汇聚方式**的实现方式，理解其模式，特别是per-module fitness report如何通过权重加权聚合为global_fitness，以及get_trend如何从历史数据推断趋势方向。可以从 **`agentos/governance/fitness_aggregator.py`** 这个好例子开始——它的report→aggregate→get_history→get_trend四步展示了适应度数据的完整生命周期。然后，遵循该模式实现一个新的 **EvolutionFitnessLandscape**，让 **evolution_orchestrator** 可以 **将所有模块的适应度数据构建为一个多维景观图**（每个维度代表一个能力：对线、团战、宏观、出装等），并能 **识别适应度局部最优陷阱（plateau检测）、推荐最有潜力的进化方向（梯度最大的维度）、生成进化路径规划建议**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+### 阶段 AP: 实时推理部署管线 — 从训练到实战的全链路（M546-M565） ✅ COMPLETED
+
+本阶段构建从训练模型到实战部署的全链路推理管线，包括实时特征缓存、推理会话管理、
+延迟监控、模型预热、管线编排、批量推理、置信度校准、状态预处理、动作后处理、
+推理缓存、金丝雀部署、灰度发布、健康检查、模型网关、A/B测试、部署清单、
+性能剖析、优雅降级、游戏协议适配和部署总编排。
+
+---
+
+**M546** `agentlightning/inference/online_feature_store.py` — **实时特征缓存** ✅
+
+查看 **agentlightning/store** 上现有 **`experience_store.py` 中 ExperienceStore 的容量管理+game过滤方式**的实现方式，理解其模式，特别是 deque(maxlen=capacity)容量管理如何与sample/filter采样逻辑分离。可以从 **`agentos/governance/model_versioner.py`** 这个好例子开始——它提供了save→load→list_versions→diff的清晰四步契约。然后，遵循该模式实现一个新的 **OnlineFeatureStore**，让 **StateEncoderNetwork（M537）和ActionSampler（M536）** 可以 **在推理时以O(1)延迟获取预计算特征**，并能 **支持特征版本管理（训练集特征v1 vs v2共存）、TTL过期、LRU驱逐、批量读写和快照导入导出**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M547** `agentlightning/inference/inference_session_manager.py` — **推理会话管理器** ✅
+
+查看 **agentlightning/runner** 上现有 **`game_runner.py` 中 GameRunner 的register_game/start_game/stop_game会话管理方式**的实现方式，理解其模式，特别是launcher注册如何与session生命周期（start→monitor→stop）分离。可以从 **`agentos/governance/evolution_orchestrator.py`** 这个好例子开始——它的register_loop→run_cycle→allocate_resources展示了多实体注册+统一调度。然后，遵循该模式实现一个新的 **InferenceSessionManager**，让 **game_runner** 可以 **在启动游戏后自动创建推理会话**（create→start→pause→stop→error状态机），并能 **在会话内维护完整推理上下文（模型版本、特征缓存、决策历史）、强制并发上限和超时清理**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M548** `agentlightning/inference/latency_monitor.py` — **推理延迟监控器** ✅
+
+查看 **agentos/governance** 上现有 **`evolution_metrics_exporter.py` 中指标导出方式**的实现方式，理解其模式，特别是指标采集（evolution_callback事件）如何与指标展示分离。可以从 **`agentos/governance/fitness_aggregator.py`** 这个好例子开始——它的report→aggregate→get_history→get_trend四步展示了指标从采集到汇总到趋势分析的完整链路。然后，遵循该模式实现一个新的 **LatencyMonitor**，让 **推理管线的每个阶段** 可以 **上报延迟数据并计算百分位统计（p50/p95/p99）**，并能 **在延迟超过阈值时自动触发告警回调（带冷却间隔去重）、提供上下文管理器自动计时**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M549** `agentlightning/inference/model_warmup_engine.py` — **模型预热引擎** ✅
+
+查看 **agentos/governance** 上现有 **`model_versioner.py` 中 ModelVersioner 的save/load/rollback方式**的实现方式，理解其模式，特别是model_name→version→weights的三级索引如何与加载逻辑分离。可以从 **`agentlightning/trainer/registry.py`** 这个好例子开始——它展示了name→class的注册表模式。然后，遵循该模式实现一个新的 **ModelWarmupEngine**，让 **InferenceSessionManager（M547）** 可以 **在创建会话前确保模型已预热完毕**（load+dummy forward），并能 **追踪每个模型版本的预热延迟和就绪状态、支持批量预热和卸载**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M550** `agentlightning/inference/inference_pipeline_builder.py` — **推理管线构建器** ✅
+
+查看 **agentos/governance** 上现有 **`data_pipeline.py` 中 DataPipeline 的stage注册和执行方式**的实现方式，理解其模式，特别是add_stage→run→get_results的链式调用如何与各stage的实际逻辑分离。可以从 **`agentlightning/adapter/base.py`** 这个好例子开始——它的Adapter[T_from, T_to]泛型设计展示了如何用统一接口包装不同实现。然后，遵循该模式实现一个新的 **InferencePipelineBuilder**，让 **所有game agent** 可以 **通过fluent builder API组装推理流程**（支持条件阶段、禁用阶段、错误处理器），并能 **在运行时追踪每个阶段的耗时、成功/失败状态**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M551** `agentlightning/inference/batch_inference_scheduler.py` — **批量推理调度器** ✅
+
+查看 **DI-star** 上现有 **`ctools/worker/learner.py` 中 Learner 的batch数据收集方式**的实现方式，理解其模式，特别是数据如何从多个actor汇聚到learner的batch队列中。可以从 **`agentlightning/store/experience_store.py`** 这个好例子开始——它的add/sample/filter展示了数据收集→批量采样的模式。然后，遵循该模式实现一个新的 **BatchInferenceScheduler**，让 **多个并发的推理请求** 可以 **被合并为一个batch forward**（支持优先级队列、超时刷新、队列满丢弃），并能 **将batch结果精确路由回各个请求方**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M552** `agentlightning/inference/confidence_calibrator.py` — **置信度校准器** ✅
+
+查看 **agentlightning/algorithm** 上现有 **`multi_game_ppo.py` 中 MultiGamePPO 的logits处理方式**的实现方式，理解其模式，特别是logits→probability→action_selection的转换链。可以从 **`integrations/lol/src/lol_agent/decision_engine.py`** 这个好例子开始——它的advantage→confidence映射展示了分数到置信度的转换模式。然后，遵循该模式实现一个新的 **ConfidenceCalibrator**，让 **ActionSampler（M536）** 可以 **基于校准后的置信度决定是否使用NN输出或切换到规则兜底**（支持温度缩放、Platt缩放、直方图校准），并能 **通过ECE（Expected Calibration Error）量化校准质量、生成可靠性图**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M553** `agentlightning/inference/game_state_preprocessor.py` — **游戏状态预处理器** ✅
+
+查看 **integrations/lol/src/lol_agent** 上现有 **`state_encoder.py` 中 StateEncoder 的特征归一化方式**的实现方式，理解其模式，特别是_FEATURE_NAMES列表如何定义固定维度输出。可以从 **DI-star的model.py** 这个好例子开始——它的entity_encoder和spatial_encoder分别处理不同类型的特征。然后，遵循该模式实现一个新的 **GameStatePreprocessor**，让 **推理管线（M550）** 可以 **将任何游戏的原始状态数据转换为固定格式**（支持FeatureSpec注册、min-max/z-score/log归一化、类别编码、缺失字段默认值），并能 **验证原始状态是否符合schema、追踪预处理异常**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M554** `agentlightning/inference/action_postprocessor.py` — **动作后处理器** ✅
+
+查看 **dota2bot-OpenHyperAI** 上现有 **`BotLib/hero_*.lua` 中 Consider*Action 的动作验证方式**的实现方式，理解其模式，特别是utility分数计算如何与动作合法性检查分离。可以从 **`integrations/lol/src/lol_agent/decision_engine.py`** 这个好例子开始——它将decide输出为strategy dict，下游负责转换为具体操作。然后，遵循该模式实现一个新的 **ActionPostprocessor**，让 **动作采样器输出的原始动作** 可以 **经过合法性检查、冷却约束、安全过滤后转换为可执行的游戏指令**（支持per-game验证器注册、动作掩码、NaN钳位、游戏格式化器），并能 **追踪拒绝统计帮助诊断策略训练不足**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M555** `agentlightning/inference/inference_cache.py` — **推理结果缓存** ✅
+
+查看 **agentlightning/inference** 上现有 **`online_feature_store.py`（M546）中 OnlineFeatureStore 的TTL/LRU缓存方式**的实现方式，理解其模式，特别是put→get→expire的生命周期如何与OrderedDict LRU驱逐分离。可以从 **`agentlightning/store/experience_store.py`** 这个好例子开始——它的deque(maxlen=capacity)展示了有界存储的基本模式。然后，遵循该模式实现一个新的 **InferenceCache**，让 **推理管线** 可以 **在高频决策场景（如LoL 14fps状态采样）中避免重复推理**（支持MD5哈希+量化相似度匹配、TTL过期、LRU驱逐、get_or_compute模式），并能 **追踪缓存命中率指标**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M556** `agentlightning/deployment/canary_deployer.py` — **金丝雀部署器** ✅
+
+查看 **agentos/governance** 上现有 **`deployment_gate.py` 中 DeploymentGate 的gate条件检查方式**的实现方式，理解其模式，特别是should_deploy→deploy→verify的三步部署契约。可以从 **`agentos/governance/ab_test_controller.py`** 这个好例子开始——它的流量分割和结果收集展示了A/B路由的基本模式。然后，遵循该模式实现一个新的 **CanaryDeployer**，让 **deployment_orchestrator（M565）** 可以 **安全地将新模型版本逐步推向生产**（1%→5%→25%→100%分阶段），并能 **在错误率超过阈值时自动回滚、支持强制晋升和强制回滚**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M557** `agentlightning/deployment/rollout_controller.py` — **灰度发布控制器** ✅
+
+查看 **agentos/governance** 上现有 **`deployment_gate.py` 中 DeploymentGate 的gate条件方式**的实现方式，理解其模式，特别是gate_check如何与deploy动作分离。可以从 **`agentlightning/trainer/curriculum_manager.py`** 这个好例子开始——它的register_level→should_advance→advance展示了阶段晋级的模式。然后，遵循该模式实现一个新的 **RolloutController**，让 **部署管线** 可以 **按阶段推进灰度发布**（支持gate函数门控、暂停/恢复/失败状态机），并能 **追踪每个阶段的进入时间和gate检查次数**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M558** `agentlightning/deployment/health_checker.py` — **部署健康检查器** ✅
+
+查看 **agentos/governance** 上现有 **`cross_module_health.py` 中模块健康检查方式**的实现方式，理解其模式，特别是per-module check如何汇聚为global health score。可以从 **`agentos/governance/fitness_aggregator.py`** 这个好例子开始——它的report→aggregate→get_trend展示了多模块指标汇聚的模式。然后，遵循该模式实现一个新的 **HealthChecker**，让 **deployment_orchestrator（M565）** 可以 **持续监控已部署模型的健康状态**（多信号加权评分、阈值上下限、告警回调），并能 **在多个信号同时恶化时触发自动回滚**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M559** `agentlightning/deployment/model_serving_gateway.py` — **模型服务网关** ✅
+
+查看 **agentlightning/runner** 上现有 **`game_runner.py` 中 GameRunner 的register_game/start_game方式**的实现方式，理解其模式，特别是launcher注册如何与session routing分离。可以从 **`agentlightning/adapter/base.py`** 这个好例子开始——它的统一适配器接口展示了如何将异构后端统一为单一调用方式。然后，遵循该模式实现一个新的 **ModelServingGateway**，让 **所有推理请求** 可以 **通过统一入口路由到正确的模型实例**（支持endpoint注册、per-game路由规则、延迟/错误率追踪），并能 **在endpoint故障时自动切换**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M560** `agentlightning/deployment/live_ab_router.py` — **实时A/B路由器** ✅
+
+查看 **agentos/governance** 上现有 **`ab_test_controller.py` 中 ABTestController 的流量分割方式**的实现方式，理解其模式，特别是variant注册如何与流量路由分离。可以从 **`agentos/governance/model_ab_test.py`** 这个好例子开始——它展示了AB测试的统计显著性判断逻辑。然后，遵循该模式实现一个新的 **LiveABRouter**，让 **部署管线** 可以 **同时运行多个模型变体并实时收集表现数据**（支持加权路由、z-test显著性检验、自动判定赢家），并能 **在结论确定后将所有流量导向最优变体**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M561** `agentlightning/deployment/deployment_manifest.py` — **部署清单管理器** ✅
+
+查看 **agentos/governance** 上现有 **`model_versioner.py` 中 ModelVersioner 的版本元信息管理方式**的实现方式，理解其模式，特别是version→weights→saved_at的结构化存储如何与操作分离。可以从 **`agentos/governance/model_versioner.py`** 的diff方法开始——它展示了两个版本间的差异比较。然后，遵循该模式实现一个新的 **DeploymentManifest**，让 **所有部署操作** 可以 **基于声明式清单定义（models/configs/resources/dependencies）**，并能 **验证清单完整性、计算两个清单间的diff、序列化/反序列化为dict**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M562** `agentlightning/deployment/performance_profiler.py` — **性能剖析器** ✅
+
+查看 **agentlightning/inference** 上现有 **`latency_monitor.py`（M548）中 LatencyMonitor 的per-stage延迟追踪方式**的实现方式，理解其模式，特别是StageStats如何独立于Monitor的告警逻辑。可以从 **`agentos/governance/telemetry_collector.py`** 这个好例子开始——它展示了遥测数据的采集→存储→导出全链路。然后，遵循该模式实现一个新的 **PerformanceProfiler**，让 **开发者** 可以 **精确定位推理管线的性能瓶颈**（per-stage百分位统计、吞吐量追踪、上下文管理器自动计时），并能 **自动识别最慢阶段（bottleneck detection）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M563** `agentlightning/deployment/graceful_degradation.py` — **优雅降级引擎** ✅
+
+查看 **agentlightning/inference** 上现有 **`confidence_calibrator.py`（M552）中置信度阈值判断方式**的实现方式，理解其模式，特别是低置信度时如何触发兜底。可以从 **`integrations/lol/src/lol_agent/decision_engine.py`** 这个好例子开始——它的advantage→action映射展示了多级决策降级模式。然后，遵循该模式实现一个新的 **GracefulDegradation**，让 **推理管线** 可以 **在过载或模型异常时自动降级**（full model→light model→rules engine多级降级），并能 **通过注册trigger自动评估何时降级/恢复、追踪每个级别的服务请求数**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M564** `agentlightning/deployment/game_client_adapter.py` — **游戏客户端适配器** ✅
+
+查看 **agentlightning/adapter** 上现有 **`base.py` 中 Adapter[T_from, T_to] 的泛型适配器接口**的实现方式，理解其模式，特别是adapt方法如何将一种格式转换为另一种。可以从 **`extensions/protocol_decoder/src/dual_channel_fuser.py`** 这个好例子开始——它展示了多数据源格式统一的融合模式。然后，遵循该模式实现一个新的 **GameClientAdapter**，让 **推理管线的输出** 可以 **直接被各游戏客户端消费**（支持per-game encode/decode协议注册、批量编码），并能 **追踪每个适配器的请求量和错误率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M565** `agentlightning/deployment/deployment_orchestrator.py` — **部署总编排器** ✅
+
+查看 **agentos/governance** 上现有 **`evolution_orchestrator.py` 中 EvolutionOrchestrator 的register_loop→run_cycle→allocate_resources方式**的实现方式，理解其模式，特别是多个子系统如何通过统一的orchestrator协调。可以从 **`integrations/lol-history/src/lol_history/seraphine_history_orchestrator.py`** 这个好例子开始——它编排M506-M524所有子模块。然后，遵循该模式实现一个新的 **DeploymentOrchestrator**，让 **整个部署管线** 可以 **通过一个入口完成从准备到上线的全流程**（支持步骤链注册、rollback函数、失败时自动反向回滚已完成步骤），并能 **追踪每步耗时、部署成功/失败/回滚统计**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+### 阶段 AQ: 多游戏推理优化与实时对战集成（M566-M585）
+
+下一阶段将聚焦：推理管线性能优化（算子融合、内存池化、流式推理）、多游戏并行推理调度、
+实时对战系统集成（LoL/Dota2/Mahjong三端统一接入）、以及对战数据实时回流训练管线。
+
+---
+
+**M566** `agentlightning/inference/operator_fusion_optimizer.py` — **算子融合优化器**
+
+查看 **agentlightning/inference** 上现有 **`inference_pipeline_builder.py`（M550）中 InferencePipeline 的多阶段执行方式**的实现方式，理解其模式，特别是各stage如何通过dict传递数据、每个stage独立计时。可以从 **`agentlightning/inference/latency_monitor.py`（M548）** 这个好例子开始——它的per-stage统计展示了阶段间开销的量化方式。然后，遵循该模式实现一个新的 **OperatorFusionOptimizer**，让 **推理管线** 可以 **自动识别可融合的相邻阶段（如preprocess+encode）并将它们合并为单一函数调用**，并能 **通过benchmark对比融合前后的延迟差异、生成融合建议报告**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M567** `agentlightning/inference/memory_pool_allocator.py` — **推理内存池分配器**
+
+查看 **extensions/fiddler_bridge/src** 上现有 **`fiddler_live_capture.py` 中 CaptureBuffer 的ring buffer有界内存管理方式**的实现方式，理解其模式，特别是deque(maxlen)如何控制内存上界、eviction策略如何与数据写入分离。可以从 **`agentlightning/store/experience_store.py`** 这个好例子开始——它的容量管理和采样分离展示了内存池的基本模式。然后，遵循该模式实现一个新的 **MemoryPoolAllocator**，让 **推理管线** 可以 **预分配和复用固定大小的数据缓冲区**（避免频繁malloc/free），并能 **追踪内存池利用率、支持多池隔离（feature pool、action pool、state pool）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M568** `agentlightning/inference/streaming_inference_engine.py` — **流式推理引擎**
+
+查看 **extensions/protocol_decoder/src** 上现有 **`live_client_data_poller.py` 中 LiveClientDataPoller 的周期性数据拉取方式**的实现方式，理解其模式，特别是poll_interval如何控制数据采集频率、回调如何将数据推送给下游。可以从 **`extensions/fiddler_bridge/src/fiddler_live_capture.py`** 这个好例子开始——它的实时捕获+ring buffer展示了高频数据流处理模式。然后，遵循该模式实现一个新的 **StreamingInferenceEngine**，让 **推理管线** 可以 **以固定帧率（如14fps）连续处理游戏状态流**（支持跳帧、滑动窗口聚合、异步result回调），并能 **自适应调整推理频率以匹配当前系统负载**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M569** `agentlightning/inference/multi_game_inference_router.py` — **多游戏推理路由器**
+
+查看 **agentlightning/trainer** 上现有 **`multi_game_trainer.py` 中 MultiGameTrainer 的per-game train_step分发方式**的实现方式，理解其模式，特别是game_id如何映射到不同的trainer实例。可以从 **`agentlightning/deployment/model_serving_gateway.py`（M559）** 这个好例子开始——它的routing_rules展示了per-game路由的基本模式。然后，遵循该模式实现一个新的 **MultiGameInferenceRouter**，让 **多个游戏的推理请求** 可以 **通过统一入口分发到各自的推理管线**（支持per-game管线注册、负载均衡、优先级调度），并能 **在某游戏管线过载时将其请求降级到规则引擎**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M570** `agentlightning/inference/decision_explainer.py` — **决策解释器**
+
+查看 **integrations/lol/src/lol_agent** 上现有 **`decision_engine.py` 中 DecisionEngine 的decide方法如何输出action+phase+confidence+suggestion**的实现方式，理解其模式，特别是决策结果如何附带可读的suggestion文本。可以从 **`integrations/lol/src/lol_agent/reward_shaper.py`** 这个好例子开始——它的多维度reward分解展示了如何将黑箱评分拆解为可解释的分量。然后，遵循该模式实现一个新的 **DecisionExplainer**，让 **推理管线的输出** 可以 **附带人类可读的决策解释**（哪些特征最影响决策、置信度来源、与历史决策的对比），并能 **生成结构化解释报告供赛后复盘使用**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M571** `integrations/lol/src/lol_agent/live_inference_adapter.py` — **LoL实时推理适配器**
+
+查看 **integrations/lol/src/lol_agent** 上现有 **`state_encoder.py`+`decision_engine.py` 的encode→decide推理链路**的实现方式，理解其模式，特别是raw game state如何经过encode转为feature vector再由decide产出action。可以从 **`agentlightning/deployment/game_client_adapter.py`（M564）** 这个好例子开始——它展示了per-game encode/decode适配的注册模式。然后，遵循该模式实现一个新的 **LoLLiveInferenceAdapter**，让 **LoL live game** 可以 **直接对接推理管线（M550）**（将LiveClientData API数据转为pipeline输入格式、将pipeline输出转为LoL可执行指令），并能 **与InferenceSessionManager（M547）集成管理会话生命周期**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M572** `integrations/lol/src/lol_agent/live_reward_tracker.py` — **LoL实时奖励追踪器**
+
+查看 **integrations/lol/src/lol_agent** 上现有 **`reward_shaper.py` 中 RewardShaper 的compute_reward多维度评分方式**的实现方式，理解其模式，特别是win/kda/cs/vision四维如何加权聚合为composite reward。可以从 **`extensions/protocol_decoder/src/dual_channel_fuser.py`** 这个好例子开始——它的双源融合展示了实时数据合并模式。然后，遵循该模式实现一个新的 **LiveRewardTracker**，让 **实时推理过程** 可以 **在游戏进行中持续计算累计奖励**（基于每秒的状态变化增量计算即时奖励），并能 **将奖励流实时回传训练管线用于online learning**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M573** `integrations/lol/src/lol_agent/opponent_model_tracker.py` — **对手模型追踪器**
+
+查看 **agentlightning/algorithm** 上现有 **`self_play_scheduler.py` 中 SelfPlayScheduler 的Elo评分和对手配对方式**的实现方式，理解其模式，特别是Elo更新如何从比赛结果反推对手实力。可以从 **`integrations/lol/src/lol_agent/decision_engine.py`** 这个好例子开始——它的threat评估展示了对手行为建模的基础模式。然后，遵循该模式实现一个新的 **OpponentModelTracker**，让 **实时推理** 可以 **在游戏中动态建模对手行为模式**（追踪对手出装路线、游走频率、技能使用偏好），并能 **将对手模型作为额外特征注入推理管线，提升决策的针对性**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M574** `agentlightning/inference/inference_replay_buffer.py` — **推理回放缓冲区**
+
+查看 **agentlightning/store** 上现有 **`experience_store.py` 中 ExperienceStore 的add/sample/filter回放缓冲方式**的实现方式，理解其模式，特别是game-filtered sampling如何让各游戏的训练数据不相互干扰。可以从 **`extensions/fiddler_bridge/src/fiddler_replay_recorder.py`** 这个好例子开始——它展示了实时数据录制到回放文件的完整链路。然后，遵循该模式实现一个新的 **InferenceReplayBuffer**，让 **推理管线的每次决策** 可以 **被完整录制**（输入状态、模型输出、后处理结果、实际执行动作、后续奖励），并能 **按时间窗口/游戏类型/决策质量采样训练数据，形成online learning的数据闭环**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M575** `agentlightning/inference/model_ensemble_router.py` — **模型集成路由器**
+
+查看 **agentlightning/deployment** 上现有 **`live_ab_router.py`（M560）中 LiveABRouter 的多变体路由方式**的实现方式，理解其模式，特别是variant注册和weighted路由如何支持多个模型并行服务。可以从 **`agentlightning/inference/confidence_calibrator.py`（M552）** 这个好例子开始——它的多种校准方法展示了可切换策略的设计模式。然后，遵循该模式实现一个新的 **ModelEnsembleRouter**，让 **推理管线** 可以 **同时查询多个模型（ensemble inference）并聚合结果**（支持投票、加权平均、最高置信度选择三种聚合策略），并能 **动态调整各模型的集成权重基于实时表现**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M576** `agentlightning/deployment/blue_green_deployer.py` — **蓝绿部署器**
+
+查看 **agentlightning/deployment** 上现有 **`canary_deployer.py`（M556）中 CanaryDeployer 的分阶段部署方式**的实现方式，理解其模式，特别是canary/baseline双版本如何共存和切换。可以从 **`agentlightning/deployment/rollout_controller.py`（M557）** 这个好例子开始——它的phase state machine展示了部署阶段管理。然后，遵循该模式实现一个新的 **BlueGreenDeployer**，让 **部署管线** 可以 **维护两套完整的运行环境（blue/green）**（新版本部署到inactive环境、验证通过后一键切换流量），并能 **在切换失败时秒级回退到上一个环境**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M577** `agentlightning/deployment/deployment_rollback_journal.py` — **部署回滚日志**
+
+查看 **agentos/governance** 上现有 **`model_versioner.py` 中 ModelVersioner 的rollback逻辑**的实现方式，理解其模式，特别是version history如何支持任意版本的回滚和diff。可以从 **`agentlightning/deployment/deployment_orchestrator.py`（M565）** 这个好例子开始——它的step→rollback链展示了部署失败后的反向恢复。然后，遵循该模式实现一个新的 **DeploymentRollbackJournal**，让 **所有部署操作** 可以 **被完整记录到持久化日志**（每个step的输入/输出/状态变化），并能 **支持任意时间点的部署状态回溯和增量回滚**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M578** `agentlightning/deployment/resource_quota_manager.py` — **资源配额管理器**
+
+查看 **agentos/governance** 上现有 **`evolution_orchestrator.py` 中 allocate_resources 的按fitness比例分配方式**的实现方式，理解其模式，特别是total_budget如何按各game的fitness比例分配、minimum 1的保底策略。可以从 **`agentlightning/deployment/health_checker.py`（M558）** 这个好例子开始——它的multi-signal weighted scoring展示了多维度资源评估。然后，遵循该模式实现一个新的 **ResourceQuotaManager**，让 **部署管线** 可以 **为每个游戏/模型分配CPU/内存/推理并发配额**（支持静态配额和动态基于负载的自适应调整），并能 **在配额超限时触发告警或自动降级**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M579** `agentlightning/deployment/traffic_shaping_controller.py` — **流量整形控制器**
+
+查看 **agentlightning/deployment** 上现有 **`canary_deployer.py`（M556）中 route_request 的概率路由方式**的实现方式，理解其模式，特别是traffic_pct如何控制canary和baseline之间的流量分配。可以从 **`agentlightning/inference/batch_inference_scheduler.py`（M551）** 这个好例子开始——它的priority queue和timeout flush展示了流量控制的基本手段。然后，遵循该模式实现一个新的 **TrafficShapingController**，让 **部署管线** 可以 **精确控制每秒请求率（rate limiting）、突发流量平滑（burst smoothing）和按优先级排队**，并能 **在系统过载时自动拒绝低优先级请求保护核心服务**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M580** `agentlightning/deployment/service_mesh_connector.py` — **服务网格连接器**
+
+查看 **agentlightning/deployment** 上现有 **`model_serving_gateway.py`（M559）中 ModelServingGateway 的endpoint注册和路由方式**的实现方式，理解其模式，特别是serve方法如何根据model_name/version/game三维路由。可以从 **`agentlightning/deployment/game_client_adapter.py`（M564）** 这个好例子开始——它的per-game protocol适配展示了多协议统一的模式。然后，遵循该模式实现一个新的 **ServiceMeshConnector**，让 **推理服务** 可以 **注册到服务发现系统中**（支持服务注册、心跳检测、负载均衡策略），并能 **在服务实例故障时自动摘除并重新路由流量**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M581** `integrations/lol/src/lol_agent/seraphine_inference_bridge.py` — **Seraphine推理桥接器**
+
+查看 **integrations/lol-history/src/lol_history** 上现有 **`seraphine_history_orchestrator.py` 中历史数据编排方式**的实现方式，理解其模式，特别是Seraphine历史战绩如何被管线化处理。可以从 **`integrations/lol/src/lol_agent/live_inference_adapter.py`（M571）** 这个好例子开始——它展示了实时数据到推理管线的桥接。然后，遵循该模式实现一个新的 **SeraphineInferenceBridge**，让 **Seraphine提供的历史战绩数据** 可以 **作为推理管线的额外上下文**（当前对手的历史胜率/擅长英雄/弱点分析），并能 **与OnlineFeatureStore（M546）集成缓存历史特征**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M582** `agentlightning/inference/inference_telemetry_exporter.py` — **推理遥测导出器**
+
+查看 **agentos/governance** 上现有 **`evolution_metrics_exporter.py` 中指标导出方式**的实现方式，理解其模式，特别是指标如何从内部数据结构格式化为可导出的JSON/文本。可以从 **`agentlightning/deployment/performance_profiler.py`（M562）** 这个好例子开始——它的full_profile展示了多stage指标的汇总导出。然后，遵循该模式实现一个新的 **InferenceTelemetryExporter**，让 **推理管线运行时的所有指标**（延迟、吞吐、命中率、降级状态、健康评分）可以 **被统一导出为结构化JSON/文本报告**，并能 **支持定时快照、增量导出和告警条件触发导出**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M583** `agentlightning/inference/adaptive_inference_scheduler.py` — **自适应推理调度器**
+
+查看 **agentlightning/inference** 上现有 **`batch_inference_scheduler.py`（M551）中 BatchInferenceScheduler 的batch_size和flush_timeout方式**的实现方式，理解其模式，特别是固定batch_size如何在负载变化时可能导致延迟不稳定。可以从 **`agentlightning/deployment/graceful_degradation.py`（M563）** 这个好例子开始——它的multi-level降级展示了自适应负载调节。然后，遵循该模式实现一个新的 **AdaptiveInferenceScheduler**，让 **推理调度器** 可以 **根据实时负载自动调整batch size和flush interval**（高负载时增大batch提高吞吐、低负载时减小batch降低延迟），并能 **维护延迟-吞吐Pareto前沿，在用户指定的延迟预算内最大化吞吐**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M584** `agentlightning/deployment/canary_metric_evaluator.py` — **金丝雀指标评估器**
+
+查看 **agentlightning/deployment** 上现有 **`canary_deployer.py`（M556）中 evaluate方法的error_rate判断方式**的实现方式，理解其模式，特别是简单的error_rate阈值如何可能遗漏更微妙的性能退化（如延迟增长、胜率下降）。可以从 **`agentlightning/deployment/health_checker.py`（M558）** 这个好例子开始——它的multi-signal weighted scoring展示了多维度评估。然后，遵循该模式实现一个新的 **CanaryMetricEvaluator**，让 **金丝雀部署** 可以 **同时评估多个指标维度**（error_rate、latency_p95、win_rate、reward_mean），并能 **通过configurable权重和阈值给出promote/rollback/continue_monitoring的综合建议**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M585** `agentlightning/deployment/deployment_event_bus.py` — **部署事件总线**
+
+查看 **agentos/governance** 上现有 **evolution_callback模式** 在所有模块中的使用方式，理解其模式，特别是每个模块独立fire event、通过callback单点通知的扇出方式如何限制了多订阅者场景。可以从 **`agentlightning/deployment/deployment_orchestrator.py`（M565）** 这个好例子开始——它的step→evolution event展示了部署事件的基本发射模式。然后，遵循该模式实现一个新的 **DeploymentEventBus**，让 **所有部署相关模块（M556-M565）** 可以 **通过统一的事件总线发布和订阅部署事件**（支持topic过滤、多订阅者、事件持久化队列），并能 **为事件重播、审计日志和自动化触发提供基础设施**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
