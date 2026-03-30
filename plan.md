@@ -3567,3 +3567,72 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 
 查看 **integrations/lol-history/src/lol_history/seraphine_deep_history_pipeline.py（M604）** 上现有 **管线编排方式** 的实现方式，理解其模式。可以从 **`agentlightning/deployment/deployment_orchestrator.py`（M565）** 这个好例子开始——它的step→rollback链展示了全流程编排。然后，遵循该模式实现一个新的 **HistoryFeedbackLoopOrchestrator**，让 **整个历史数据反馈闭环** 可以 **通过一个入口完成从数据采集→分析→特征化→训练导出→效果评估的全流程**（支持步骤链注册、失败重试、部分结果缓存），并能 **追踪每次闭环执行的耗时和成功率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
 
+
+---
+
+### 阶段 AT: 实战部署与Fiddler深度集成（M626-M645）
+
+> **主题**: 将M606-M625的历史情报闭环能力部署到实战环境，Fiddler MCP协议桥接，赛后复盘自动化。
+
+---
+
+**M626** `integrations/lol-history/src/lol_history/history_stream_processor.py` — **历史数据流处理器**
+查看 seraphine_event_stream_processor.py，遵循live_history_fusion_engine.py（M614）模式实现流式增量更新。
+
+**M627** `extensions/fiddler_bridge/src/history_packet_correlator.py` — **Fiddler历史数据包关联器**
+查看 fiddler_replay_recorder.py，遵循live_match_history_correlator.py模式实现数据包与历史关联。
+
+**M628** `integrations/lol-history/src/lol_history/postgame_data_harvester.py` — **赛后数据收割器**
+查看 postgame_evolution_analyzer.py，遵循history_feedback_loop_orchestrator.py（M625）模式实现赛后全量数据收集。
+
+**M629** `integrations/lol-history/src/lol_history/history_data_migrator.py` — **历史数据迁移器**
+查看 model_versioner.py，遵循history_data_quality_checker.py（M624）模式实现跨版本数据迁移。
+
+**M630** `integrations/lol-history/src/lol_history/champion_meta_live_tracker.py` — **英雄Meta实时追踪器**
+查看 meta_shift_tracker.py，遵循patch_adaptation_analyzer.py（M618）模式实现实时meta变化追踪。
+
+**M631** `integrations/lol-history/src/lol_history/pregame_voice_briefer.py` — **赛前语音简报器**
+查看 voice_narration_engine.py，遵循history_driven_coaching_advisor.py（M605）模式实现语音简报。
+
+**M632** `integrations/lol-history/src/lol_history/live_coaching_history_adapter.py` — **实时教练历史适配器**
+查看 real_time_coaching_engine.py，遵循live_history_fusion_engine.py（M614）模式实现教练引擎历史注入。
+
+**M633** `integrations/lol-history/src/lol_history/history_ab_experiment_tracker.py` — **历史情报AB实验追踪器**
+查看 live_ab_router.py（M560），遵循coaching_effectiveness_tracker.py（M613）模式实现AB策略选择。
+
+**M634** `integrations/lol-history/src/lol_history/multi_account_linker.py` — **多账号关联器**
+查看 opponent_behavior_modeler.py，遵循opponent_model_persistence.py（M609）模式实现风格指纹关联。
+
+**M635** `integrations/lol-history/src/lol_history/history_export_formatter.py` — **历史情报导出格式化器**
+查看 evolution_metrics_exporter.py，遵循history_to_training_exporter.py（M606）模式实现多格式导出。
+
+**M636** `extensions/fiddler_bridge/src/history_aware_packet_decoder.py` — **历史感知数据包解码器**
+查看 protocol_decoder.py，遵循history_packet_correlator.py（M627）模式实现历史上下文增强解码。
+
+**M637** `integrations/lol-history/src/lol_history/ban_pick_realtime_advisor.py` — **Ban/Pick实时顾问**
+查看 champ_select_automator.py，遵循champion_pool_recommender.py（M610）模式实现实时Ban/Pick建议。
+
+**M638** `integrations/lol-history/src/lol_history/history_cold_start_handler.py` — **历史数据冷启动处理器**
+查看 model_warmup_engine.py，遵循history_data_quality_checker.py（M624）模式实现冷启动近似画像。
+
+**M639** `integrations/lol-history/src/lol_history/history_privacy_filter.py` — **历史数据隐私过滤器**
+查看 governance模块，遵循history_data_quality_checker.py（M624）模式实现隐私过滤和脱敏。
+
+**M640** `integrations/lol-history/src/lol_history/history_batch_processor.py` — **历史数据批量处理器**
+查看 batch_inference_scheduler.py（M551），遵循history_to_training_exporter.py（M606）模式实现批量处理。
+
+**M641** `integrations/lol-history/src/lol_history/history_feature_importance_ranker.py` — **历史特征重要性排序器**
+查看 confidence_calibrator.py（M552），遵循historical_reward_reshaper.py（M617）模式实现特征重要性排序。
+
+**M642** `integrations/lol-history/src/lol_history/game_phase_strategy_mapper.py` — **游戏阶段策略映射器**
+查看 decision_engine.py，遵循game_event_pattern_library.py（M615）模式实现阶段策略映射。
+
+**M643** `integrations/lol-history/src/lol_history/history_telemetry_dashboard.py` — **历史情报遥测仪表盘**
+查看 inference_telemetry_exporter.py（M582），遵循history_feedback_loop_orchestrator.py（M625）模式实现遥测。
+
+**M644** `integrations/lol-history/src/lol_history/history_regression_test_runner.py` — **历史情报回归测试运行器**
+查看 tests目录，遵循history_data_quality_checker.py（M624）模式实现回归测试框架。
+
+**M645** `integrations/lol-history/src/lol_history/history_intelligence_orchestrator.py` — **历史情报总编排器**
+查看 seraphine_history_orchestrator.py，遵循history_feedback_loop_orchestrator.py（M625）模式实现总编排。
+
