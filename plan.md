@@ -2865,32 +2865,189 @@ M366-M385 完成了两大阶段的建设:
 
 ## 三十一、M506-M525 新增任务规划（子项目逻辑迁移 — 接口/代码分离模板化）
 
-### 阶段 AN: 子项目接口迁移 — 协议层/策略层/训练层（M506-M515）
 
-| M# | 文件路径 | 级别 | 任务模板 |
-|---|---|---|---|
-| M506 | `extensions/fiddler-bridge/src/fiddler_lcu_bridge.py` | 🔴 | 查看 **Seraphine** 上现有 `connector.py` 的实现方式，理解其LCU API接口与业务逻辑分离模式（retry decorator + needLcu guard + PastRequest日志）。从 `listener.py` 这个好例子开始（LolProcessExistenceListener线程轮询+信号总线）。然后实现新的 `fiddler_lcu_bridge.py`，让 FiddlerLiveCapture 可以自动对接LCU WebSocket事件流（gameflow-phase-changed / champ-select-session），并能在游戏启动时自动start_recording、游戏结束时自动stop_recording + export_replay。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M507 | `extensions/protocol-decoder/src/protocol_action_translator.py` | 🔴 | 查看 **Akagi** 上现有 `mitm/bridge/majsoul/liqi.py` 的实现方式，理解其Protobuf解码与mjai协议适配的分离模式（MsgType枚举 + LiqiProto.decode_action → mjai格式）。从 `akagi/mjai/bot/bot.py` 这个好例子开始（mjai标准动作序列处理）。然后实现新的 `protocol_action_translator.py`，让 DualChannelFuser 的融合输出可以转换为标准化的游戏动作序列（LoL/Dota2/麻将统一schema），并能被KnowledgeGraphTrainer直接消费为图谱训练edge。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M508 | `agentos/governance/action_head_registry.py` | 🔴 | 查看 **DI-star** 上现有 `distar/agent/default/model/head/action_type_head.py` 的实现方式，理解其ActionTypeHead与value_head的接口分离模式（cfg驱动 + forward(lstm_output, scalar_context) → logits）。从 `action_arg_head.py` 这个好例子开始（参数化动作头）。然后实现新的 `action_head_registry.py`，让UnifiedDecisionFramework可以动态注册/切换不同游戏的action head实现（LoL:5类动作, Dota2:8类动作, 麻将:4类动作），并能在运行时热插拔新的决策头而不重启系统。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M509 | `agentos/governance/agent_algorithm_bridge.py` | 🔴 | 查看 **PARL** 上现有 `parl/core/agent_base.py` 的实现方式，理解其Agent与Algorithm的接口分离模式（agent.learn() → alg.learn(), agent.predict() → alg.predict()）。从 `algorithm_base.py` 这个好例子开始（get_weights/set_weights抽象）。然后实现新的 `agent_algorithm_bridge.py`，让StrategyTransferEngine可以在不修改Agent代码的前提下切换底层算法（PPO→SAC→DQN），并能通过get_weights/set_weights实现跨游戏的参数热迁移。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M510 | `agentlightning/trainer/mortal_engine_adapter.py` | 🔴 | 查看 **Mortal** 上现有 `mortal/engine.py` 的实现方式，理解其MortalEngine推理接口与训练数据分离模式（react_batch(obs, masks) → action + confidence）。从 `mortal/player.py` 这个好例子开始（Player封装Engine的session管理）。然后实现新的 `mortal_engine_adapter.py`，让KnowledgeGraphTrainer可以接入Mortal的推理输出作为teacher signal进行知识蒸馏，并能将蒸馏后的student模型通过EvolutionKnowledgeDistill反馈到MahjongKnowledgeNode的embedding更新。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M511 | `integrations/lol/src/lol_agent/league_ai_vision_adapter.py` | 🟡 | 查看 **LeagueAI** 上现有 `LeagueAI_helper.py` 的实现方式，理解其屏幕捕获与目标检测的接口分离模式（screenshot → YOLO detect → bounding boxes）。从 `LeagueAI_minimal_example.py` 这个好例子开始（最小化检测pipeline）。然后实现新的 `league_ai_vision_adapter.py`，让LiveClientDataPoller可以在Live Client Data API不可用时降级为视觉识别通道（screen capture → OCR → game state dict），并能将视觉识别结果与Fiddler协议捕获通过DualChannelFuser进行三通道融合。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M512 | `agentlightning/trainer/elf_context_adapter.py` | 🟡 | 查看 **ELF** 上现有 `elf/context_utils.py` 的实现方式，理解其ContextArgs与GameContext的接口分离模式（batch_size/num_games/T配置 → context.start() → game loop）。从 `elf/utils_elf.py` 这个好例子开始（Extractor数据提取接口）。然后实现新的 `elf_context_adapter.py`，让MultiGameTrainer可以复用ELF的batch context管理模式管理多游戏并行训练session（每个游戏一个context slot），并能动态调整batch分配比例根据CrossGameEvaluation的fitness排名。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M513 | `integrations/dota2/src/dota2_agent/dota2bot_commander_adapter.py` | 🟡 | 查看 **dota2bot-OpenHyperAI** 上现有项目根目录的实现方式，理解其Bot指令发送与策略决策的接口分离模式（Commander → GameState → ActionQueue）。从项目的main入口这个好例子开始（game loop + state polling + action dispatch）。然后实现新的 `dota2bot_commander_adapter.py`，让UnifiedDecisionFramework的decide()输出可以直接转换为dota2bot格式的游戏指令序列，并能将指令执行反馈（成功/失败/延迟）通过record_feedback()回传到决策框架用于在线学习。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M514 | `agentos/governance/open_spiel_policy_adapter.py` | 🟡 | 查看 **open_spiel** 上现有 `open_spiel/python/policy.py` 的实现方式，理解其Policy基类与具体算法的接口分离模式（action_probabilities(state) → Dict[action, prob]）。从 `algorithms/tabular_qlearner.py` 这个好例子开始（_epsilon_greedy + step(time_step)）。然后实现新的 `open_spiel_policy_adapter.py`，让StrategyKnowledgeGraph中的每个节点可以关联一个open_spiel兼容的Policy对象用于策略评估，并能将CrossGameEvaluation的fitness值作为policy value estimate回传到图谱节点权重。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M515 | `agentlightning/trainer/ml_agents_curriculum_adapter.py` | 🟡 | 查看 **ml-agents** 上现有 `mlagents/trainers/learn.py` 的实现方式，理解其TrainerController与Curriculum的接口分离模式（lesson → parameters → environment reset）。从 `environment_parameter_manager.py` 这个好例子开始（EnvironmentParameterManager lesson切换）。然后实现新的 `ml_agents_curriculum_adapter.py`，让CurriculumManager可以复用ml-agents的lesson递进模式管理跨游戏难度阶梯（LoL: bot→normal→ranked, 麻将: 四人→三人→比赛），并能根据CrossGameEvaluation的trend自动调整lesson进度（improving→升级, declining→降级）。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
+### 阶段 AN: Seraphine深度集成 — 历史战绩实时智能管线（M506-M525）
 
-### 阶段 AO: 跨项目集成测试验证闭环（M516-M525）
+> **Claude #12** | 2026-03-30 | 190 tests, 190 passed | 20 modules, 11,458+ lines
 
-| M# | 文件路径 | 级别 | 任务模板 |
-|---|---|---|---|
-| M516 | `tests/integration/test_fiddler_to_training_e2e.py` | 🔴 | 查看 **Akagi** 上现有 `autoplay/autoplay.py` 的实现方式，理解其端到端自动化测试的模式（启动MITM → 连接游戏 → 捕获 → 决策 → 验证）。从 `mitm/amatsuki.py` 这个好例子开始（WebSocket全链路测试）。然后实现新的 `test_fiddler_to_training_e2e.py`，让CI可以验证完整的Fiddler→Decoder→Fuser→Validator→TrainingPipeline数据流，并能在无真实游戏环境下通过ProtocolReplayEngine回放录制的协议流完成端到端测试。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M517 | `tests/integration/test_knowledge_graph_lifecycle.py` | 🔴 | 查看 **open_spiel** 上现有 `integration_tests/api_test.py` 的实现方式，理解其跨游戏API一致性测试模式（load_game → new_initial_state → apply_action → 验证）。从 `playthrough_test.py` 这个好例子开始（完整游戏playthrough验证）。然后实现新的 `test_knowledge_graph_lifecycle.py`，让CI可以验证StrategyKnowledgeGraph的完整生命周期（创建→添加三游戏节点→建立跨游戏边→KGTrainer训练→embedding验证→serialize/deserialize一致性），并能检测图谱结构变更导致的回归。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M518 | `tests/integration/test_transfer_learning_pipeline.py` | 🔴 | 查看 **DI-star** 上现有 `distar/ctools/utils/` 的实现方式，理解其训练pipeline集成测试模式（mock data → learner → checkpoint → eval）。从 `data_helper.py` 这个好例子开始（数据加载→预处理→batch验证）。然后实现新的 `test_transfer_learning_pipeline.py`，让CI可以验证完整的迁移学习流水线（source domain训练→alignment loss计算→target domain predict→feedback到CrossGameEvaluation），并能检测source/target域不匹配导致的异常。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M519 | `tests/integration/test_decision_feedback_loop.py` | 🟡 | 查看 **PARL** 上现有 `parl/core/tests/` 的实现方式，理解其Agent → Algorithm → Environment闭环测试模式（agent.predict → env.step → agent.learn → 验证收敛）。从 `test_agent.py` 这个好例子开始（CartPole环境简单闭环）。然后实现新的 `test_decision_feedback_loop.py`，让CI可以验证UnifiedDecisionFramework的完整决策-反馈闭环（decide→record_feedback→fitness更新→约束调整→re-decide），并能通过mock game state序列验证策略自适应收敛性。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M520 | `tests/integration/test_distillation_quality.py` | 🟡 | 查看 **Mortal** 上现有 `mortal/one_vs_three.py` 的实现方式，理解其模型质量对比测试模式（engine_a vs engine_b → win_rate统计）。从 `mortal/common.py` 这个好例子开始（通用测试工具函数）。然后实现新的 `test_distillation_quality.py`，让CI可以验证EvolutionKnowledgeDistill的蒸馏质量（teacher fidelity ≥ 0.7, compression ratio ≥ 5x, student loss单调下降），并能在蒸馏质量退化时自动触发告警。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M521 | `tests/integration/test_cross_game_node_consistency.py` | 🟡 | 查看 **Seraphine** 上现有 `app/lol/tools.py` 的实现方式，理解其数据一致性验证模式（champion数据完整性校验）。从 `app/lol/aram.py` 这个好例子开始（ARAM模式特殊规则验证）。然后实现新的 `test_cross_game_node_consistency.py`，让CI可以验证LoL/Dota2/Mahjong三个KnowledgeNode实现的接口一致性（相同方法签名、相同serialize schema、相同embedding维度），并能在新增游戏节点时自动检测接口违反。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M522 | `tests/integration/test_anomaly_to_evolution.py` | 🟡 | 查看 **ELF** 上现有 `elf/context_utils.py` 的实现方式，理解其context异常处理与恢复模式（game crash → restart → resume）。从 `elf/utils_elf.py` 这个好例子开始（Extractor错误恢复）。然后实现新的 `test_anomaly_to_evolution.py`，让CI可以验证FiddlerAnomalyDetector检测到的异常是否正确触发evolution事件链（anomaly → evolution_callback → EvolutionOrchestrator.advance_generation），并能在连续异常超过阈值时自动暂停数据采集。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M523 | `tests/integration/test_replay_training_roundtrip.py` | 🟡 | 查看 **LeagueAI** 上现有 `generate_dataset/` 的实现方式，理解其数据集生成与验证的闭环模式（capture → label → export → verify integrity）。从 `check_dataset_integrity.py` 这个好例子开始（数据集完整性校验）。然后实现新的 `test_replay_training_roundtrip.py`，让CI可以验证完整的录制-回放-训练往返（FiddlerReplayRecorder.export → ProtocolReplayEngine.load → FiddlerTrainingPipeline.process → TrainingDataValidator.validate → sample完整性100%），并能检测序列化/反序列化过程中的数据丢失。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M524 | `tests/integration/test_multi_game_fitness_ranking.py` | 🔴 | 查看 **ml-agents** 上现有 `mlagents/trainers/agent_processor.py` 的实现方式，理解其多Agent统计聚合与排名模式（AgentProcessor → stats_reporter → summary）。从 `behavior_id_utils.py` 这个好例子开始（behavior分组管理）。然后实现新的 `test_multi_game_fitness_ranking.py`，让CI可以验证CrossGameEvaluation在三游戏并行评估时的排名稳定性（相同输入→相同排名, 单调性:更高win_rate→更高排名），并能检测fitness计算中的数值精度问题(浮点误差<1e-6)。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
-| M525 | `tests/integration/test_full_system_smoke.py` | 🔴 | 查看 **Akagi** 上现有 `akagi/akagi.py` 的实现方式，理解其全系统冒烟测试模式（init所有组件 → health check → single round → 验证输出格式）。从项目的main入口这个好例子开始（命令行参数 → 组件初始化 → 运行验证）。然后实现新的 `test_full_system_smoke.py`，让CI可以在60秒内验证M486-M525所有模块的基本健康（每模块实例化+get_stats()+describe()不抛异常），并能生成系统健康报告JSON用于dashboard展示。从头开始构建，除了代码库中已有的库之外，不要使用其他库。 |
+**核心目标**: 将Seraphine的LCU/SGP历史数据能力深度融入operatorRL的实时决策循环，
+实现"历史战绩→实时情报→策略建议→进化学习"全链路闭环。
+
+**拿来主义参考**:
+- `Seraphine/app/lol/connector.py` (1464行): LCU API、WebSocket、SGP端点
+- `Seraphine/app/lol/tools.py` (1837行): parseGames、parseGameDetailData、autoComplete
+- `Seraphine/app/lol/opgg.py` (448行): OPGG天梯/出装数据
+- `Seraphine/app/lol/aram.py` (120行): ARAM增伤/减伤数据
+- `Seraphine/app/lol/listener.py` (63行): LCU进程监听
+- `Seraphine/app/lol/champions.py` (122行): 英雄别名数据
+
+| M# | 文件路径 | 行数 | 测试 | 功能 |
+|---|---|---|---|---|
+| M506 | `integrations/lol-history/src/lol_history/live_match_history_correlator.py` | 804 | 10/10 ✅ | **实时战绩关联器** — 将当前对局与历史战绩交叉关联 |
+| M507 | `integrations/lol-history/src/lol_history/match_replay_analyzer.py` | 665 | 10/10 ✅ | **对局回放分析器** — 时间线事件/金币曲线/死亡热力图 |
+| M508 | `integrations/lol-history/src/lol_history/opponent_behavior_modeler.py` | 614 | 10/10 ✅ | **对手行为建模器** — 风格分类/倾斜检测/行为预测 |
+| M509 | `integrations/lol-history/src/lol_history/draft_phase_intelligence.py` | 641 | 10/10 ✅ | **BP阶段情报** — 英雄池分析/阵容评分/选禁推荐 |
+| M510 | `integrations/lol-history/src/lol_history/postgame_evolution_analyzer.py` | 589 | 10/10 ✅ | **赛后进化分析器** — 预测准确度/奖励信号/进化优先级 |
+| M511 | `integrations/lol-history/src/lol_history/seraphine_lcu_deep_client.py` | 541 | 9/9 ✅ | **LCU深度客户端** — 全LCU端点覆盖+响应解析 |
+| M512 | `integrations/lol-history/src/lol_history/sgp_match_deep_fetcher.py` | 536 | 8/8 ✅ | **SGP数据深度获取** — 国服SGP协议数据获取+标准化 |
+| M513 | `integrations/lol-history/src/lol_history/champion_mastery_intelligence.py` | 544 | 8/8 ✅ | **英雄精通情报** — 精通度评分/舒适英雄/池深度 |
+| M514 | `integrations/lol-history/src/lol_history/aram_strategy_intelligence.py` | 534 | 8/8 ✅ | **ARAM策略情报** — ARAM增减伤/阵容评分/换人建议 |
+| M515 | `integrations/lol-history/src/lol_history/live_game_state_enricher.py` | 547 | 8/8 ✅ | **实时状态增强器** — 历史数据注入实时游戏状态 |
+| M516 | `integrations/lol-history/src/lol_history/win_condition_analyzer.py` | 545 | 8/8 ✅ | **胜利条件分析器** — 识别/评分/推荐胜利路径 |
+| M517 | `integrations/lol-history/src/lol_history/objective_priority_engine.py` | 555 | 8/8 ✅ | **目标优先级引擎** — 龙/男爵/塔优先级排序 |
+| M518 | `integrations/lol-history/src/lol_history/lane_state_tracker.py` | 552 | 9/9 ✅ | **线路状态追踪器** — 推线/冻线/兵线状态分类 |
+| M519 | `integrations/lol-history/src/lol_history/combat_outcome_predictor.py` | 549 | 8/8 ✅ | **战斗结果预测器** — 1v1/团战/越塔胜率预测 |
+| M520 | `integrations/lol-history/src/lol_history/macro_decision_engine.py` | 574 | 8/8 ✅ | **宏观决策引擎** — 分推/抱团/转线/目标选择 |
+| M521 | `integrations/lol-history/src/lol_history/real_time_coaching_engine.py` | 530 | 9/9 ✅ | **实时教练引擎** — 实时建议生成/语音/Overlay格式化 |
+| M522 | `integrations/lol-history/src/lol_history/history_data_normalizer.py` | 510 | 8/8 ✅ | **数据标准化器** — 跨数据源格式统一/质量评分 |
+| M523 | `integrations/lol-history/src/lol_history/cross_game_pattern_miner.py` | 531 | 8/8 ✅ | **跨局模式挖掘器** — 英雄/时间/出装/对手模式 |
+| M524 | `integrations/lol-history/src/lol_history/seraphine_event_stream_processor.py` | 594 | 10/10 ✅ | **事件流处理器** — LCU WebSocket事件路由/处理 |
+| M525 | `integrations/lol-history/src/lol_history/seraphine_history_orchestrator.py` | 503 | 10/10 ✅ | **总编排器** — 统一调度M506-M524所有子模块 |
+
+**架构关系**:
+```
+SeraphineHistoryOrchestrator (M525) ──── 总编排
+  ├── SeraphineLcuDeepClient (M511) ──── 数据获取层
+  │   └── SgpMatchDeepFetcher (M512)
+  ├── HistoryDataNormalizer (M522) ──── 数据标准化
+  ├── SeraphineEventStreamProcessor (M524) ──── 事件驱动
+  ├── LiveMatchHistoryCorrelator (M506) ──── 核心关联
+  │   ├── MatchReplayAnalyzer (M507) ──── 回放分析
+  │   ├── ChampionMasteryIntelligence (M513) ──── 精通分析
+  │   └── CrossGamePatternMiner (M523) ──── 跨局模式
+  ├── OpponentBehaviorModeler (M508) ──── 对手建模
+  ├── DraftPhaseIntelligence (M509) ──── BP情报
+  │   └── AramStrategyIntelligence (M514) ──── ARAM特化
+  ├── LiveGameStateEnricher (M515) ──── 实时增强
+  │   ├── LaneStateTracker (M518) ──── 线路追踪
+  │   ├── CombatOutcomePredictor (M519) ──── 战斗预测
+  │   └── ObjectivePriorityEngine (M517) ──── 目标优先级
+  ├── WinConditionAnalyzer (M516) ──── 胜利条件
+  │   └── MacroDecisionEngine (M520) ──── 宏观决策
+  ├── RealTimeCoachingEngine (M521) ──── 实时教练
+  └── PostGameEvolutionAnalyzer (M510) ──── 进化闭环
+```
+
+### 阶段 AO: 深度强化学习训练管线（M526-M545）
+
+**设计原则**：每个任务都以「查看子项目现有实现→理解代码/接口分离模式→从好例子出发→实现新模块」的方式展开。新增文件必须500行以上，TDD驱动，除代码库已有的库外不引入新依赖。
+
+---
+
+**M526** `agentlightning/trainer/rl_reward_designer.py` — **奖励函数设计器**
+
+查看 **DI-star** 上现有 **rl_learner.py 中 ReinforcementLoss 的奖励计算方式**的实现方式，理解其模式，特别是奖励信号如何与训练循环分离（loss类独立于learner类）。可以从 **`integrations/lol/src/lol_agent/reward_shaper.py`** 这个好例子开始——它已经实现了多维奖励（win/kda/cs/vision）的加权组合。然后，遵循该模式实现一个新的 **RlRewardDesigner**，让 **agentlightning训练管线** 可以 **在训练过程中动态调整各奖励维度的权重**（根据当前策略的弱点自动偏移），并能 **支持多游戏场景下统一的奖励塑形接口**（LoL/Dota2/Mahjong共用同一套奖励设计器）。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M527** `agentlightning/trainer/experience_replay_manager.py` — **经验回放管理器**
+
+查看 **agentlightning** 上现有 **`store/experience_store.py` 中 ExperienceStore 的经验存储方式**的实现方式，理解其模式，特别是存储层（deque容量管理、game字段过滤）如何与采样逻辑分离。可以从 **`agentlightning/store/experience_store.py`** 这个好例子开始——它提供了add/sample/filter的清晰分层。然后，遵循该模式实现一个新的 **ExperienceReplayManager**，让 **训练器（lol_trainer/multi_game_trainer）** 可以 **使用优先级经验回放（PER）按TD-error排序采样高价值经验**，并能 **支持HER（Hindsight Experience Replay）对失败对局重新标注目标进行回放**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M528** `agentlightning/trainer/policy_gradient_trainer.py` — **策略梯度训练器**
+
+查看 **agentlightning** 上现有 **`algorithm/multi_game_ppo.py` 中 MultiGamePPO 的策略优化方式**的实现方式，理解其模式，特别是算法逻辑（advantage计算、clipped surrogate loss）如何与训练器循环（train_step、checkpoint）分离。可以从 **`agentlightning/trainer/lol_trainer.py`** 这个好例子开始——它将PPO的compute_advantages调用封装在train_step内部，对外只暴露batch→metrics接口。然后，遵循该模式实现一个新的 **PolicyGradientTrainer**，让 **agentlightning/runner/game_runner.py** 可以 **在游戏会话结束后直接将采集到的轨迹数据送入策略梯度训练**（支持PPO和REINFORCE两种模式切换），并能 **自动计算GAE优势估计并输出训练指标供evolution_callback上报**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M529** `agentlightning/trainer/value_network_trainer.py` — **价值网络训练器**
+
+查看 **DI-star** 上现有 **`rl_learner.py` 中 _setup_loss/ReinforcementLoss 的价值损失计算方式**的实现方式，理解其模式，特别是value_loss如何独立于policy_loss计算（value_loss_coef权重分离）。可以从 **`agentlightning/algorithm/multi_game_ppo.py`** 这个好例子开始——它的compute_value_loss已经展示了TD目标与预测值之间的MSE计算。然后，遵循该模式实现一个新的 **ValueNetworkTrainer**，让 **策略梯度训练器（M528）** 可以 **使用独立的价值网络进行TD(λ)价值函数逼近**（与策略网络分离训练，支持不同学习率），并能 **输出每步的价值预测误差作为经验优先级（送入M527的PER）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M530** `agentlightning/trainer/multi_agent_coordinator.py` — **多智能体协调器**
+
+查看 **agentlightning** 上现有 **`algorithm/self_play_scheduler.py` 中 SelfPlayScheduler 的多智能体调度方式**的实现方式，理解其模式，特别是智能体池管理（add_agent/schedule_match/record_result）如何与Elo评分计算分离。可以从 **`agentos/governance/evolution_orchestrator.py`** 这个好例子开始——它将多个game的evolution_loop注册到统一的orchestrator中按fitness分配资源。然后，遵循该模式实现一个新的 **MultiAgentCoordinator**，让 **LoL 5v5训练** 可以 **同时管理多个队友智能体的策略协调**（共享通信信道、联合动作选择），并能 **根据队友角色（TOP/JG/MID/ADC/SUP）分配差异化的奖励信号和训练资源**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M531** `agentlightning/trainer/curriculum_learning_engine.py` — **课程学习引擎**
+
+查看 **agentlightning** 上现有 **`trainer/curriculum_manager.py` 中 CurriculumManager 的难度递进方式**的实现方式，理解其模式，特别是关卡注册（register_level）如何与晋级判定（should_advance）分离。可以从 **`agentlightning/trainer/curriculum_manager.py`** 这个好例子开始——它定义了level→threshold→advance的清晰三步契约。然后，遵循该模式实现一个新的 **CurriculumLearningEngine**，让 **multi_game_trainer** 可以 **根据智能体当前能力自动调整训练难度**（从AI Bot→青铜对手→白银→黄金逐级递进），并能 **支持回退机制——当表现持续下降时回到上一级巩固**，以及生成课程进度报告供evolution_callback上报。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M532** `agentlightning/trainer/imitation_learning_pipeline.py` — **模仿学习管线**
+
+查看 **DI-star** 上现有 **`agent/default/replay_decoder.py` 中 ReplayDecoder 的回放解码方式**的实现方式，理解其模式，特别是原始回放二进制数据如何通过decode_replay→extract_features→training_data三步与训练数据格式分离。可以从 **`agentlightning/adapter/distar_adapter.py`** 这个好例子开始——它将DI-star的obs/action格式转换为AgentLightning的state/action/reward span格式。然后，遵循该模式实现一个新的 **ImitationLearningPipeline**，让 **lol_trainer** 可以 **从高段位玩家的录像回放中提取专家轨迹并进行行为克隆训练**（state→action映射学习），并能 **支持DAgger在线模仿——在agent执行时混合专家动作逐步脱离对专家的依赖**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M533** `agentlightning/trainer/self_play_arena.py` — **自我对弈竞技场**
+
+查看 **agentlightning** 上现有 **`algorithm/self_play_scheduler.py` 中 SelfPlayScheduler 的配对和Elo评分方式**的实现方式，理解其模式，特别是schedule_match（按Elo差距配对）如何与record_result（Elo更新公式）分离。可以从 **`agentlightning/algorithm/self_play_scheduler.py`** 这个好例子开始——它已经实现了add_agent/schedule/record三步。然后，遵循该模式实现一个新的 **SelfPlayArena**，让 **game_runner** 可以 **自动安排多个策略版本之间的对抗赛并更新Elo排名**（支持循环赛和淘汰赛两种赛制），并能 **将对弈产生的轨迹自动送入experience_replay_manager（M527）作为训练数据，形成自博弈→训练→更新策略→再对弈的闭环**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M534** `agentlightning/trainer/meta_learning_optimizer.py` — **元学习优化器**
+
+查看 **DI-star** 上现有 **`rl_learner.py` 中 _setup_optimizer 使用 Adam 的方式**的实现方式，理解其模式，特别是优化器如何与学习率调度器（MultiStepLR）分离、如何通过_train方法接收data批次。可以从 **`agentlightning/trainer/lol_trainer.py`** 这个好例子开始——它将optimizer配置（lr/gamma/clip）封装在__init__中，train_step只关注前向/反向/更新。然后，遵循该模式实现一个新的 **MetaLearningOptimizer**，让 **curriculum_learning_engine（M531）** 可以 **在切换新游戏/新难度时通过MAML/Reptile元学习快速适应**（少量梯度步即可收敛到新任务），并能 **维护一个元参数集合，使得从任意初始点到任意游戏任务的适应距离最短**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M535** `agentlightning/trainer/training_checkpoint_manager.py` — **训练检查点管理器**
+
+查看 **agentos** 上现有 **`governance/model_versioner.py` 中 ModelVersioner 的版本存储方式**的实现方式，理解其模式，特别是save/load/rollback如何与版本历史（list of {version, weights, saved_at}）分离。可以从 **`agentos/governance/model_versioner.py`** 这个好例子开始——它提供了清晰的save→load→diff→rollback四步契约。然后，遵循该模式实现一个新的 **TrainingCheckpointManager**，让 **所有训练器（M526-M534）** 可以 **在训练过程中按步数自动保存检查点快照**（包含模型权重、优化器状态、课程进度），并能 **支持A/B测试——同时加载两个检查点版本进行对比评估，自动选择表现更好的版本继续训练**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M536** `agentlightning/inference/action_sampler.py` — **动作采样器**
+
+查看 **dota2bot-OpenHyperAI** 上现有 **`BotLib/hero_*.lua` 中 Consider*Action 函数的动作选择方式**的实现方式，理解其模式，特别是动作评估（utility分数计算）如何与动作执行分离（Consider返回评分，外层选最高分）。可以从 **`integrations/lol/src/lol_agent/decision_engine.py`** 这个好例子开始——它的decide方法将游戏状态映射为一个strategy dict，动作选择由调用方决定。然后，遵循该模式实现一个新的 **ActionSampler**，让 **所有game agent** 可以 **从策略网络的logits输出中进行温度采样、top-k筛选、beam search等多种采样策略**，并能 **在训练时使用高温探索、推理时使用低温贪心，通过统一接口切换采样模式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M537** `agentlightning/inference/state_encoder_network.py` — **状态编码网络**
+
+查看 **DI-star** 上现有 **`agent/default/model/model.py` 中 Model 类的特征编码方式**的实现方式，理解其模式，特别是entity_encoder（单位特征）和spatial_encoder（地图特征）如何各自独立编码后再拼接融合。可以从 **`integrations/lol/src/lol_agent/state_encoder.py`** 这个好例子开始——它将游戏状态的12维特征（hp/gold/level等）归一化为固定维向量。然后，遵循该模式实现一个新的 **StateEncoderNetwork**，让 **策略梯度训练器（M528）和价值网络训练器（M529）** 可以 **将原始游戏状态编码为高维嵌入向量**（支持数值特征MLP编码+类别特征Embedding编码+序列特征RNN编码三种子编码器），并能 **自动检测特征类型并选择合适的子编码器，输出统一维度的state embedding**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M538** `agentlightning/inference/attention_mechanism.py` — **注意力机制**
+
+查看 **DI-star** 上现有 **`ctools/torch_utils/network/` 中 Transformer/Attention 模块的注意力计算方式**的实现方式，理解其模式，特别是query/key/value投影如何与注意力得分计算分离。可以从 **`integrations/lol/src/lol_agent/state_encoder.py`** 这个好例子开始——它的encode方法展示了多源特征如何汇聚到单一向量（这正是注意力要解决的问题）。然后，遵循该模式实现一个新的 **AttentionMechanism**，让 **StateEncoderNetwork（M537）** 可以 **使用多头自注意力动态关注当前最重要的游戏元素**（例如在团战中关注敌方刺客，在对线期关注兵线状态），并能 **输出attention权重图供RealTimeCoachingEngine（M521）解释"AI为什么做出这个决策"**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M539** `agentlightning/inference/decision_tree_fallback.py` — **决策树兜底引擎**
+
+查看 **dota2bot-OpenHyperAI** 上现有 **`BotLib/hero_axe.lua` 中基于规则的技能释放优先级判定方式**的实现方式，理解其模式，特别是条件判断树（if hp < threshold then retreat; if enemy_count > 2 then group）如何与执行动作分离。可以从 **`integrations/lol/src/lol_agent/decision_engine.py`** 这个好例子开始——它已经实现了基于gold_diff/kill_diff/phase的规则决策。然后，遵循该模式实现一个新的 **DecisionTreeFallback**，让 **ActionSampler（M536）** 可以 **在神经网络输出置信度低于阈值时自动切换到规则引擎兜底**（保证最坏情况下也有合理行为），并能 **记录每次兜底触发的上下文，供训练器识别策略盲区并针对性训练**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M540** `agentlightning/inference/model_ensemble.py` — **模型集成器**
+
+查看 **Akagi** 上现有 **`mjai_bot/` 下多个bot实现（mortal/base）的模型切换方式**的实现方式，理解其模式，特别是bot接口（react方法）如何统一，使得不同模型可以互换。可以从 **`agentlightning/adapter/base.py`** 这个好例子开始——它的Adapter[T_from, T_to]泛型设计展示了如何用统一接口包装不同实现。然后，遵循该模式实现一个新的 **ModelEnsemble**，让 **game_runner** 可以 **同时加载多个策略模型并通过投票/加权平均融合它们的输出**（类似随机森林的集成思路），并能 **根据各模型的历史表现动态调整投票权重（表现差的模型权重衰减）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M541** `agentos/governance/training_dashboard.py` — **训练仪表盘**
+
+查看 **agentos** 上现有 **`governance/evolution_metrics_exporter.py` 中指标导出方式**的实现方式，理解其模式，特别是指标采集（evolution_callback事件）如何与指标展示分离。可以从 **`agentos/governance/fitness_aggregator.py`** 这个好例子开始——它的report→aggregate→get_trend三步展示了指标从采集到汇总到趋势分析的完整链路。然后，遵循该模式实现一个新的 **TrainingDashboard**，让 **所有训练器和evolution_orchestrator** 可以 **将训练指标（loss、reward、winrate、Elo、课程进度）实时汇聚到统一仪表盘**，并能 **生成纯文本/JSON格式的训练报告，支持按时间窗口查询历史趋势和异常检测**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M542** `agentos/governance/hyperparameter_tuner.py` — **超参数调优器**
+
+查看 **DI-star** 上现有 **`rl_learner.py` 的 __init__ 中超参数配置方式（learning_rate、value_pretrain_iters等通过cfg传入）**的实现方式，理解其模式，特别是超参数如何通过config_helper读取并与训练逻辑分离。可以从 **`agentlightning/trainer/lol_trainer.py`** 这个好例子开始——它将lr/gamma/gae_lambda/clip_eps作为__init__参数，train_step中直接使用。然后，遵循该模式实现一个新的 **HyperparameterTuner**，让 **training_checkpoint_manager（M535）** 可以 **系统性地搜索最优超参数组合**（支持网格搜索、随机搜索和贝叶斯优化三种策略），并能 **在搜索过程中利用早停机制（表现不好的配置提前终止）节省计算资源，将最优配置自动应用到下一轮训练**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M543** `agentos/governance/distributed_training_coordinator.py` — **分布式训练协调器**
+
+查看 **DI-star** 上现有 **`ctools/worker/` 下 learner/actor/coordinator 的分布式训练架构**的实现方式，理解其模式，特别是LearnerComm如何将模型参数通过Flask在learner与actor之间同步（send_model/register_learner）。可以从 **`agentlightning/execution/client_server.py`** 这个好例子开始——它已经实现了进程间通信的client/server模式。然后，遵循该模式实现一个新的 **DistributedTrainingCoordinator**，让 **多个训练器实例** 可以 **在多进程/多节点环境下协同训练**（参数服务器模式：一个coordinator聚合各worker的梯度并广播更新后的参数），并能 **自动检测worker故障并重新分配任务，保证训练不中断**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M544** `agentos/governance/model_registry.py` — **模型注册中心**
+
+查看 **agentos** 上现有 **`governance/model_versioner.py` 中 ModelVersioner 的版本管理方式**的实现方式，理解其模式，特别是模型存储（save/load/rollback）如何与版本元信息（version string、saved_at时间戳）分离。可以从 **`agentlightning/trainer/registry.py`** 这个好例子开始——它展示了name→class的注册表模式。然后，遵循该模式实现一个新的 **ModelRegistry**，让 **所有game agent和训练器** 可以 **通过统一的注册中心发布、查询、加载任意版本的模型**（支持按游戏类型、训练阶段、Elo评分等多维度检索），并能 **追踪每个模型的部署状态（staging/production/deprecated）和血缘关系（从哪个检查点衍生）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M545** `agentos/governance/evolution_fitness_landscape.py` — **进化适应度景观**
+
+查看 **agentos** 上现有 **`governance/fitness_aggregator.py` 中 FitnessAggregator 的多模块适应度汇聚方式**的实现方式，理解其模式，特别是per-module fitness report如何通过权重加权聚合为global_fitness，以及get_trend如何从历史数据推断趋势方向。可以从 **`agentos/governance/fitness_aggregator.py`** 这个好例子开始——它的report→aggregate→get_history→get_trend四步展示了适应度数据的完整生命周期。然后，遵循该模式实现一个新的 **EvolutionFitnessLandscape**，让 **evolution_orchestrator** 可以 **将所有模块的适应度数据构建为一个多维景观图**（每个维度代表一个能力：对线、团战、宏观、出装等），并能 **识别适应度局部最优陷阱（plateau检测）、推荐最有潜力的进化方向（梯度最大的维度）、生成进化路径规划建议**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
