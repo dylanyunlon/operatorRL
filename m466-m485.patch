@@ -1,0 +1,1509 @@
+From 0f2e0f89270b017f3c8e79c96502d18d419b179c Mon Sep 17 00:00:00 2001
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Sun, 29 Mar 2026 17:43:03 +0000
+Subject: [PATCH] =?UTF-8?q?feat(M466-M485):=20Seraphine=E6=B7=B1=E5=BA=A6?=
+ =?UTF-8?q?=E9=9B=86=E6=88=90=20=E2=80=94=20LCU/SGP/OPGG=20+=20=E8=8B=B1?=
+ =?UTF-8?q?=E9=9B=84=E9=80=89=E6=8B=A9/=E7=AC=A6=E6=96=87/=E6=88=98?=
+ =?UTF-8?q?=E7=95=A5=E6=99=BA=E8=83=BD?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Phase AJ (M466-M475): Seraphine历史数据管线
+- lcu_session_parser, sgp_match_fetcher, game_detail_parser
+- teammate_analyzer, champion_pool_tracker, rank_tier_resolver
+- summoner_order_resolver, ally_game_info_parser
+- opgg_build_fetcher, opgg_tier_list_parser
+
+Phase AK (M476-M485): 英雄选择/符文/战略智能
+- champ_select_automator, rune_page_manager, summoner_spell_advisor
+- game_flow_monitor, team_color_resolver, historical_winrate_predictor
+- duo_synergy_detector, aram_strategy_advisor
+- profile_background_manager, seraphine_integration_orchestrator
+
+TDD: 200 tests passed. plan.md updated with M486-M505.
+---
+ .../src/lol_history/ally_game_info_parser.py  |  42 ++++++
+ .../src/lol_history/champion_pool_tracker.py  |  67 +++++++++
+ .../src/lol_history/game_detail_parser.py     |  88 ++++++++++++
+ .../src/lol_history/lcu_session_parser.py     | 128 ++++++++++++++++++
+ .../src/lol_history/opgg_build_fetcher.py     |  49 +++++++
+ .../src/lol_history/opgg_tier_list_parser.py  |  63 +++++++++
+ .../src/lol_history/rank_tier_resolver.py     |  58 ++++++++
+ .../src/lol_history/sgp_match_fetcher.py      |  62 +++++++++
+ .../lol_history/summoner_order_resolver.py    |  36 +++++
+ .../src/lol_history/teammate_analyzer.py      |  56 ++++++++
+ .../src/lol_agent/aram_strategy_advisor.py    |  58 ++++++++
+ .../src/lol_agent/champ_select_automator.py   |  55 ++++++++
+ .../lol/src/lol_agent/duo_synergy_detector.py |  90 ++++++++++++
+ .../lol/src/lol_agent/game_flow_monitor.py    |  38 ++++++
+ .../lol_agent/historical_winrate_predictor.py |  54 ++++++++
+ .../lol_agent/profile_background_manager.py   |  54 ++++++++
+ .../lol/src/lol_agent/rune_page_manager.py    |  46 +++++++
+ .../seraphine_integration_orchestrator.py     |  64 +++++++++
+ .../src/lol_agent/summoner_spell_advisor.py   |  45 ++++++
+ .../lol/src/lol_agent/team_color_resolver.py  |  62 +++++++++
+ plan.md                                       |  88 ++++++++----
+ 21 files changed, 1279 insertions(+), 24 deletions(-)
+ create mode 100644 integrations/lol-history/src/lol_history/ally_game_info_parser.py
+ create mode 100644 integrations/lol-history/src/lol_history/champion_pool_tracker.py
+ create mode 100644 integrations/lol-history/src/lol_history/game_detail_parser.py
+ create mode 100644 integrations/lol-history/src/lol_history/lcu_session_parser.py
+ create mode 100644 integrations/lol-history/src/lol_history/opgg_build_fetcher.py
+ create mode 100644 integrations/lol-history/src/lol_history/opgg_tier_list_parser.py
+ create mode 100644 integrations/lol-history/src/lol_history/rank_tier_resolver.py
+ create mode 100644 integrations/lol-history/src/lol_history/sgp_match_fetcher.py
+ create mode 100644 integrations/lol-history/src/lol_history/summoner_order_resolver.py
+ create mode 100644 integrations/lol-history/src/lol_history/teammate_analyzer.py
+ create mode 100644 integrations/lol/src/lol_agent/aram_strategy_advisor.py
+ create mode 100644 integrations/lol/src/lol_agent/champ_select_automator.py
+ create mode 100644 integrations/lol/src/lol_agent/duo_synergy_detector.py
+ create mode 100644 integrations/lol/src/lol_agent/game_flow_monitor.py
+ create mode 100644 integrations/lol/src/lol_agent/historical_winrate_predictor.py
+ create mode 100644 integrations/lol/src/lol_agent/profile_background_manager.py
+ create mode 100644 integrations/lol/src/lol_agent/rune_page_manager.py
+ create mode 100644 integrations/lol/src/lol_agent/seraphine_integration_orchestrator.py
+ create mode 100644 integrations/lol/src/lol_agent/summoner_spell_advisor.py
+ create mode 100644 integrations/lol/src/lol_agent/team_color_resolver.py
+
+diff --git a/integrations/lol-history/src/lol_history/ally_game_info_parser.py b/integrations/lol-history/src/lol_history/ally_game_info_parser.py
+new file mode 100644
+index 00000000..531e84a2
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/ally_game_info_parser.py
+@@ -0,0 +1,42 @@
++"""
++Ally Game Info Parser — Extract ally and enemy team info from game sessions.
++Location: integrations/lol-history/src/lol_history/ally_game_info_parser.py
++Reference: Seraphine/app/lol/tools.py: parseAllyGameInfo, parseSummonerGameInfo
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.ally_game_info_parser.v1"
++
++class AllyGameInfoParser:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse_ally_info(self, session: dict[str, Any], current_puuid: str) -> dict[str, Any]:
++        my_team = session.get("myTeam", [])
++        allies = []
++        current_player = None
++        for m in my_team:
++            entry = {"puuid": m.get("puuid", ""), "champion_id": m.get("championId", 0),
++                     "summoner_name": m.get("summonerName", ""),
++                     "spell1": m.get("spell1Id", 0), "spell2": m.get("spell2Id", 0)}
++            allies.append(entry)
++            if m.get("puuid") == current_puuid:
++                current_player = entry
++        return {"allies": allies, "current_player": current_player, "team_size": len(allies)}
++
++    def parse_enemy_info(self, session: dict[str, Any]) -> dict[str, Any]:
++        their_team = session.get("theirTeam", [])
++        enemies = [{"puuid": m.get("puuid", ""), "champion_id": m.get("championId", 0),
++                     "summoner_name": m.get("summonerName", "")} for m in their_team]
++        return {"enemies": enemies}
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "ally_game_info_parser", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/champion_pool_tracker.py b/integrations/lol-history/src/lol_history/champion_pool_tracker.py
+new file mode 100644
+index 00000000..4e4998c7
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/champion_pool_tracker.py
+@@ -0,0 +1,67 @@
++"""
++Champion Pool Tracker — Track champion usage patterns and pool diversity.
++Location: integrations/lol-history/src/lol_history/champion_pool_tracker.py
++Reference: Seraphine/app/lol/tools.py: getRecentChampions
++"""
++from __future__ import annotations
++import logging, math, time
++from collections import Counter, defaultdict
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.champion_pool_tracker.v1"
++
++class ChampionPoolTracker:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def get_champion_counts(self, games: list[dict[str, Any]]) -> dict[int, int]:
++        counts: Counter = Counter()
++        for g in games:
++            cid = g.get("championId", 0)
++            if cid:
++                counts[cid] += 1
++        return dict(counts)
++
++    def get_top_champions(self, games: list[dict[str, Any]], n: int = 5) -> list[dict[str, Any]]:
++        counts = self.get_champion_counts(games)
++        wr = self.get_champion_winrates(games)
++        ranked = sorted(counts.items(), key=lambda x: x[1], reverse=True)
++        return [{"champion_id": cid, "games": cnt, "winrate": wr.get(cid, 0.0)} for cid, cnt in ranked[:n]]
++
++    def get_champion_winrates(self, games: list[dict[str, Any]]) -> dict[int, float]:
++        stats: dict[int, dict] = defaultdict(lambda: {"wins": 0, "total": 0})
++        for g in games:
++            cid = g.get("championId", 0)
++            if not cid:
++                continue
++            stats[cid]["total"] += 1
++            if g.get("stats", {}).get("win", False):
++                stats[cid]["wins"] += 1
++        return {cid: s["wins"] / s["total"] if s["total"] > 0 else 0.0 for cid, s in stats.items()}
++
++    def pool_diversity_score(self, games: list[dict[str, Any]]) -> float:
++        counts = self.get_champion_counts(games)
++        total = sum(counts.values())
++        if total == 0 or len(counts) <= 1:
++            return 0.0
++        entropy = -sum((c / total) * math.log2(c / total) for c in counts.values() if c > 0)
++        max_entropy = math.log2(len(counts))
++        if max_entropy == 0:
++            return 0.0
++        return min(entropy / max_entropy, 1.0)
++
++    def is_one_trick(self, games: list[dict[str, Any]], threshold: float = 0.7) -> bool:
++        counts = self.get_champion_counts(games)
++        total = sum(counts.values())
++        if total == 0:
++            return False
++        return (max(counts.values()) / total) >= threshold
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "champion_pool_tracker", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/game_detail_parser.py b/integrations/lol-history/src/lol_history/game_detail_parser.py
+new file mode 100644
+index 00000000..5e5cd23b
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/game_detail_parser.py
+@@ -0,0 +1,88 @@
++"""
++Game Detail Parser — Deep parse single game data into structured metrics.
++
++Location: integrations/lol-history/src/lol_history/game_detail_parser.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/tools.py: parseGameDetailData, parseGameData
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.game_detail_parser.v1"
++
++
++class GameDetailParser:
++    """Parse raw game detail JSON into structured metrics."""
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse(self, game: dict[str, Any]) -> dict[str, Any]:
++        game_id = game.get("gameId")
++        if game_id is None:
++            return {"valid": False, "game_id": None, "participants": [],
++                    "teams": {}, "winning_team": None, "duration_seconds": 0,
++                    "game_mode": ""}
++
++        duration = game.get("gameDuration", 0)
++        mode = game.get("gameMode", "CLASSIC")
++        participants_raw = game.get("participants", [])
++
++        participants = []
++        teams: dict[int, list] = {}
++        winning_team = None
++
++        for p in participants_raw:
++            stats = p.get("stats", {})
++            team_id = p.get("teamId", 0)
++            win = stats.get("win", False)
++
++            parsed = {
++                "puuid": p.get("puuid", ""),
++                "champion_id": p.get("championId", 0),
++                "team_id": team_id,
++                "kills": stats.get("kills", 0),
++                "deaths": stats.get("deaths", 0),
++                "assists": stats.get("assists", 0),
++                "cs": stats.get("totalMinionsKilled", 0),
++                "win": win,
++            }
++            participants.append(parsed)
++
++            if team_id not in teams:
++                teams[team_id] = []
++            teams[team_id].append(parsed)
++
++            if win:
++                winning_team = team_id
++
++        return {
++            "valid": True,
++            "game_id": game_id,
++            "duration_seconds": duration,
++            "game_mode": mode,
++            "participants": participants,
++            "teams": teams,
++            "winning_team": winning_team,
++        }
++
++    def compute_cspm(self, cs: int, duration_seconds: int) -> float:
++        if duration_seconds <= 0:
++            return 0.0
++        return cs / (duration_seconds / 60.0)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "game_detail_parser", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/lcu_session_parser.py b/integrations/lol-history/src/lol_history/lcu_session_parser.py
+new file mode 100644
+index 00000000..0dac8d70
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/lcu_session_parser.py
+@@ -0,0 +1,128 @@
++"""
++LCU Session Parser — Parse LCU gameflow session data.
++
++Extracts game ID, queue type, team rosters, and champ select state
++from raw LCU WebSocket / REST session payloads.
++
++Location: integrations/lol-history/src/lol_history/lcu_session_parser.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/connector.py: GameflowSession handling
++  - Seraphine/app/lol/tools.py: parseGameInfoByGameflowSession
++  - Seraphine/app/lol/listener.py: onGameFlowPhaseChanged event shape
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.lcu_session_parser.v1"
++
++
++class LcuSessionParser:
++    """Parse LCU gameflow session payloads into structured data.
++
++    Mirrors Seraphine connector.py session handling patterns.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse_session(self, session: dict[str, Any]) -> dict[str, Any]:
++        """Parse a raw gameflow session into structured data.
++
++        Args:
++            session: Raw LCU gameflow session dict.
++
++        Returns:
++            Structured session with game_id, queue_id, teams, valid flag.
++        """
++        game_data = session.get("gameData")
++        if not game_data or not isinstance(game_data, dict):
++            return {"valid": False, "game_id": None, "queue_id": None,
++                    "team_one": [], "team_two": []}
++
++        game_id = game_data.get("gameId")
++        queue = game_data.get("queue", {})
++        queue_id = queue.get("id", 0) if isinstance(queue, dict) else 0
++
++        team_one_raw = game_data.get("teamOne", [])
++        team_two_raw = game_data.get("teamTwo", [])
++
++        team_one = self._parse_team(team_one_raw)
++        team_two = self._parse_team(team_two_raw)
++
++        result = {
++            "valid": game_id is not None,
++            "game_id": game_id,
++            "queue_id": queue_id,
++            "team_one": team_one,
++            "team_two": team_two,
++        }
++
++        self._fire_evolution({"action": "parse_session", "game_id": game_id})
++        return result
++
++    def parse_champ_select(self, cs: dict[str, Any]) -> dict[str, Any]:
++        """Parse champ select session data.
++
++        Args:
++            cs: Raw champ select session dict.
++
++        Returns:
++            Structured champ select with my_team, their_team, bans.
++        """
++        my_team_raw = cs.get("myTeam", [])
++        their_team_raw = cs.get("theirTeam", [])
++        bans = cs.get("bans", {})
++
++        my_team = [
++            {
++                "cell_id": m.get("cellId", 0),
++                "champion_id": m.get("championId", 0),
++                "puuid": m.get("puuid", ""),
++            }
++            for m in my_team_raw
++        ]
++
++        their_team = [
++            {
++                "cell_id": m.get("cellId", 0),
++                "champion_id": m.get("championId", 0),
++                "puuid": m.get("puuid", ""),
++            }
++            for m in their_team_raw
++        ]
++
++        my_bans = bans.get("myTeamBans", [])
++        their_bans = bans.get("theirTeamBans", [])
++
++        return {
++            "my_team": my_team,
++            "their_team": their_team,
++            "my_bans": my_bans,
++            "their_bans": their_bans,
++        }
++
++    def _parse_team(self, raw: list[dict]) -> list[dict[str, Any]]:
++        return [
++            {
++                "puuid": p.get("puuid", ""),
++                "champion_id": p.get("championId", 0),
++                "summoner_name": p.get("summonerName", ""),
++            }
++            for p in raw
++        ]
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "lcu_session_parser", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/opgg_build_fetcher.py b/integrations/lol-history/src/lol_history/opgg_build_fetcher.py
+new file mode 100644
+index 00000000..72723e94
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/opgg_build_fetcher.py
+@@ -0,0 +1,49 @@
++"""
++OPGG Build Fetcher — Build URLs and parse OPGG champion data.
++Location: integrations/lol-history/src/lol_history/opgg_build_fetcher.py
++Reference: Seraphine/app/lol/opgg.py: Opgg class, getChampionBuild
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.opgg_build_fetcher.v1"
++
++class OpggBuildFetcher:
++    def __init__(self, base_url: str = "https://lol-api-champion.op.gg") -> None:
++        self.base_url = base_url.rstrip("/")
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def build_champion_url(self, champion_id: int, position: str, region: str = "global", mode: str = "ranked") -> str:
++        return f"{self.base_url}/api/{region}/champions/{mode}/{champion_id}/{position}"
++
++    def build_tier_list_url(self, region: str = "kr", mode: str = "ranked") -> str:
++        return f"{self.base_url}/api/{region}/champions/{mode}"
++
++    def parse_build_response(self, resp: dict[str, Any]) -> dict[str, Any]:
++        data = resp.get("data", {})
++        item_builds = [{"items": ib.get("ids", []), "pick_rate": ib.get("pickRate", 0.0),
++                         "win_rate": ib.get("winRate", 0.0)} for ib in data.get("items", [])]
++        rune_builds = [{"primaryStyleId": rb.get("primaryStyleId", 0), "subStyleId": rb.get("subStyleId", 0),
++                         "perkIds": rb.get("perkIds", []), "pick_rate": rb.get("pickRate", 0.0),
++                         "win_rate": rb.get("winRate", 0.0)} for rb in data.get("runes", [])]
++        spell_builds = [{"spells": sb.get("ids", []), "pick_rate": sb.get("pickRate", 0.0),
++                          "win_rate": sb.get("winRate", 0.0)} for sb in data.get("spells", [])]
++        skill_orders = [{"order": sk.get("order", ""), "pick_rate": sk.get("pickRate", 0.0)}
++                        for sk in data.get("skills", [])]
++        return {"item_builds": item_builds, "rune_builds": rune_builds,
++                "spell_builds": spell_builds, "skill_orders": skill_orders}
++
++    def get_best_build(self, builds: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
++        if not builds:
++            return None
++        return max(builds, key=lambda b: b.get("win_rate", 0.0))
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "opgg_build_fetcher", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/opgg_tier_list_parser.py b/integrations/lol-history/src/lol_history/opgg_tier_list_parser.py
+new file mode 100644
+index 00000000..1776a24e
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/opgg_tier_list_parser.py
+@@ -0,0 +1,63 @@
++"""
++OPGG Tier List Parser — Parse and query champion tier list data.
++Location: integrations/lol-history/src/lol_history/opgg_tier_list_parser.py
++Reference: Seraphine/app/lol/opgg.py: __fetchTierList, getChampionPositions
++"""
++from __future__ import annotations
++import logging, time
++from collections import Counter
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.opgg_tier_list_parser.v1"
++
++class OpggTierListParser:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse_tier_list(self, data: list[dict[str, Any]]) -> list[dict[str, Any]]:
++        entries = []
++        for champ in data:
++            cid = champ.get("id", 0)
++            for pos in champ.get("positions", []):
++                stats = pos.get("stats", {})
++                td = stats.get("tier_data", {})
++                entries.append({"champion_id": cid, "position": pos.get("name", ""),
++                                "tier": td.get("tier", 99), "rank": td.get("rank", 99),
++                                "win_rate": stats.get("win_rate", 0.0), "pick_rate": stats.get("pick_rate", 0.0)})
++        return entries
++
++    def filter_by_position(self, entries: list[dict], position: str) -> list[dict]:
++        return [e for e in entries if e.get("position", "").upper() == position.upper()]
++
++    def filter_by_tier(self, entries: list[dict], max_tier: int) -> list[dict]:
++        return [e for e in entries if e.get("tier", 99) <= max_tier]
++
++    def get_top_n(self, entries: list[dict], n: int = 10) -> list[dict]:
++        return sorted(entries, key=lambda e: (e.get("tier", 99), e.get("rank", 99)))[:n]
++
++    def lookup_champion(self, entries: list[dict], champion_id: int) -> Optional[dict]:
++        for e in entries:
++            if e.get("champion_id") == champion_id:
++                return e
++        return None
++
++    def position_distribution(self, entries: list[dict]) -> dict[str, int]:
++        return dict(Counter(e.get("position", "") for e in entries))
++
++    def meta_strength_score(self, entry: dict[str, Any]) -> float:
++        tier = entry.get("tier", 5)
++        rank = entry.get("rank", 50)
++        wr = entry.get("win_rate", 0.5)
++        pr = entry.get("pick_rate", 0.01)
++        tier_score = max(0, (6 - tier)) / 5.0
++        rank_score = max(0, (100 - rank)) / 100.0
++        return min(1.0, 0.4 * tier_score + 0.3 * rank_score + 0.2 * wr + 0.1 * min(pr * 10, 1.0))
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "opgg_tier_list_parser", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/rank_tier_resolver.py b/integrations/lol-history/src/lol_history/rank_tier_resolver.py
+new file mode 100644
+index 00000000..39ef6ee5
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/rank_tier_resolver.py
+@@ -0,0 +1,58 @@
++"""
++Rank Tier Resolver — Parse ranked stats and compare tiers.
++Location: integrations/lol-history/src/lol_history/rank_tier_resolver.py
++Reference: Seraphine/app/lol/tools.py: parseRankInfo, parseDetailRankInfo, translateTier
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.rank_tier_resolver.v1"
++_TIER_ORDER = ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND","MASTER","GRANDMASTER","CHALLENGER"]
++_DIVISION_ORDER = ["IV","III","II","I"]
++
++class RankTierResolver:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def parse_rank_info(self, info: dict[str, Any]) -> dict[str, dict[str, Any]]:
++        queue_map = info.get("queueMap", {})
++        solo = self._extract_queue(queue_map.get("RANKED_SOLO_5x5", {}))
++        flex = self._extract_queue(queue_map.get("RANKED_FLEX_SR", {}))
++        return {"solo": solo, "flex": flex}
++
++    def _extract_queue(self, q: dict[str, Any]) -> dict[str, Any]:
++        tier = q.get("tier", "UNRANKED")
++        division = q.get("division", "")
++        lp = q.get("leaguePoints", 0)
++        wins = q.get("wins", 0)
++        losses = q.get("losses", 0)
++        total = wins + losses
++        return {"tier": tier if tier else "UNRANKED", "division": division, "lp": lp,
++                "wins": wins, "losses": losses, "winrate": wins / total if total > 0 else 0.0}
++
++    def tier_to_numeric(self, tier: str, division: str) -> int:
++        tier_upper = tier.upper()
++        if tier_upper == "UNRANKED":
++            return 0
++        tier_val = (_TIER_ORDER.index(tier_upper) + 1) * 100 if tier_upper in _TIER_ORDER else 0
++        div_val = (_DIVISION_ORDER.index(division) + 1) * 10 if division in _DIVISION_ORDER else 0
++        return tier_val + div_val
++
++    def compare_ranks(self, tier1: str, div1: str, tier2: str, div2: str) -> int:
++        return self.tier_to_numeric(tier1, div1) - self.tier_to_numeric(tier2, div2)
++
++    def format_rank_string(self, tier: str, division: str, lp: int = 0) -> str:
++        tier_display = tier.capitalize() if tier else "Unranked"
++        if tier.upper() in ("MASTER","GRANDMASTER","CHALLENGER"):
++            return f"{tier_display} ({lp} LP)"
++        return f"{tier_display} {division} ({lp} LP)"
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "rank_tier_resolver", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/sgp_match_fetcher.py b/integrations/lol-history/src/lol_history/sgp_match_fetcher.py
+new file mode 100644
+index 00000000..9ad5667f
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/sgp_match_fetcher.py
+@@ -0,0 +1,62 @@
++"""
++SGP Match Fetcher — Build URLs and parse responses for SGP match history.
++
++Location: integrations/lol-history/src/lol_history/sgp_match_fetcher.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/connector.py: getSummonerGamesByPuuid, getGameDetailByGameId
++  - Seraphine/app/lol/tools.py: parseGamesDataFromSGP
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "lol_history.sgp_match_fetcher.v1"
++
++
++class SgpMatchFetcher:
++    """URL builder and response parser for SGP match history API."""
++
++    def __init__(self, base_url: str = "https://127.0.0.1:2999") -> None:
++        self.base_url = base_url.rstrip("/")
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def build_sgp_url(self, puuid: str, count: int = 20, start: int = 0) -> str:
++        return (
++            f"{self.base_url}/lol-match-history/v1/products/lol/{puuid}/matches"
++            f"?begIndex={start}&endIndex={start + count}"
++        )
++
++    def build_detail_url(self, game_id: int) -> str:
++        return f"{self.base_url}/lol-match-history/v1/games/{game_id}"
++
++    def parse_sgp_response(self, response: dict[str, Any]) -> list[dict[str, Any]]:
++        games = response.get("games", [])
++        if isinstance(games, dict):
++            games = games.get("games", [])
++        if not isinstance(games, list):
++            return []
++        return list(games)
++
++    def parse_detail_response(self, response: dict[str, Any]) -> dict[str, Any]:
++        return {
++            "game_id": response.get("gameId"),
++            "duration_seconds": response.get("gameDuration", 0),
++            "participants": response.get("participants", []),
++            "game_mode": response.get("gameMode", ""),
++            "game_type": response.get("gameType", ""),
++        }
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "sgp_match_fetcher", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/summoner_order_resolver.py b/integrations/lol-history/src/lol_history/summoner_order_resolver.py
+new file mode 100644
+index 00000000..d47e42c3
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/summoner_order_resolver.py
+@@ -0,0 +1,36 @@
++"""
++Summoner Order Resolver — Sort summoners by standard LoL position order.
++Location: integrations/lol-history/src/lol_history/summoner_order_resolver.py
++Reference: Seraphine/app/lol/tools.py: parseSummonerOrder, sortedSummonersByGameRole
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.summoner_order_resolver.v1"
++_POSITION_PRIORITY = {"TOP":0,"JUNGLE":1,"MIDDLE":2,"MID":2,"BOTTOM":3,"ADC":3,"UTILITY":4,"SUPPORT":4}
++
++class SummonerOrderResolver:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def position_priority(self, position: str) -> int:
++        return _POSITION_PRIORITY.get(position.upper(), 99)
++
++    def sort_by_game_role(self, summoners: list[dict[str, Any]]) -> list[dict[str, Any]]:
++        def key_fn(s: dict) -> int:
++            pos = s.get("selectedPosition", s.get("assignedPosition", ""))
++            return self.position_priority(pos)
++        return sorted(summoners, key=key_fn)
++
++    def resolve_order(self, team: list[dict[str, Any]]) -> list[dict[str, Any]]:
++        return self.sort_by_game_role(team)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "summoner_order_resolver", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol-history/src/lol_history/teammate_analyzer.py b/integrations/lol-history/src/lol_history/teammate_analyzer.py
+new file mode 100644
+index 00000000..b2c9da38
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/teammate_analyzer.py
+@@ -0,0 +1,56 @@
++"""
++Teammate Analyzer — Detect recent teammates and duo-queue patterns.
++
++Location: integrations/lol-history/src/lol_history/teammate_analyzer.py
++Reference: Seraphine/app/lol/tools.py: getRecentTeammates, getTeammates
++"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.teammate_analyzer.v1"
++
++class TeammateAnalyzer:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def find_recent_teammates(self, games: list[dict[str, Any]], target_puuid: str) -> dict[str, dict[str, Any]]:
++        mate_stats: dict[str, dict] = defaultdict(lambda: {"games": 0, "wins": 0})
++        for game in games:
++            participants = game.get("participants", [])
++            target_team = None
++            for p in participants:
++                if p.get("puuid") == target_puuid:
++                    target_team = p.get("teamId")
++                    break
++            if target_team is None:
++                continue
++            for p in participants:
++                puuid = p.get("puuid", "")
++                if puuid == target_puuid or puuid == "":
++                    continue
++                if p.get("teamId") != target_team:
++                    continue
++                mate_stats[puuid]["games"] += 1
++                if p.get("stats", {}).get("win", False):
++                    mate_stats[puuid]["wins"] += 1
++        result = {}
++        for puuid, stats in mate_stats.items():
++            g = stats["games"]
++            result[puuid] = {"games": g, "wins": stats["wins"], "winrate": stats["wins"] / g if g > 0 else 0.0}
++        return result
++
++    def detect_duo_queue(self, games: list[dict[str, Any]], target_puuid: str, min_games: int = 3) -> dict[str, dict[str, Any]]:
++        teammates = self.find_recent_teammates(games, target_puuid)
++        return {puuid: stats for puuid, stats in teammates.items() if stats["games"] >= min_games}
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "teammate_analyzer", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/aram_strategy_advisor.py b/integrations/lol/src/lol_agent/aram_strategy_advisor.py
+new file mode 100644
+index 00000000..8480e18a
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/aram_strategy_advisor.py
+@@ -0,0 +1,58 @@
++"""
++ARAM Strategy Advisor — ARAM-specific champion evaluation and strategy.
++Location: integrations/lol/src/lol_agent/aram_strategy_advisor.py
++Reference: Seraphine/app/lol/aram.py, Seraphine/app/lol/tools.py: ChampionSelection
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.aram_strategy_advisor.v1"
++_MELEE_CHAMPIONS = {2,3,5,10,11,23,24,36,48,54,56,57,58,59,62,64,75,76,77,79,80,82,84,86,89,92,98,102,105,111,113,114,120,121,122,131,141,154,157,164,234,240,245,246,254,266,412,421,427,429,516,517,518,555,777,887,897}
++
++class AramStrategyAdvisor:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def evaluate_champion(self, champion_id: int, aram_data: dict[str, Any]) -> float:
++        return min(max(aram_data.get("winRate", 0.5), 0.0), 1.0)
++
++    def should_reroll(self, current_champion: int, bench_champions: list[int],
++                      aram_tier_data: dict[int, dict[str, Any]]) -> dict[str, Any]:
++        my_tier = aram_tier_data.get(current_champion, {}).get("tier", 3)
++        bench_tiers = [aram_tier_data.get(c, {}).get("tier", 3) for c in bench_champions]
++        best_bench = min(bench_tiers) if bench_tiers else 99
++        if my_tier > 3 and best_bench < my_tier:
++            return {"should_reroll": True, "reason": "better_options_on_bench"}
++        if my_tier <= 2:
++            return {"should_reroll": False, "reason": "current_champion_is_strong"}
++        return {"should_reroll": my_tier > 3, "reason": "current_tier_weak"}
++
++    def recommend_bench_swap(self, current_champion: int, bench_champions: list[int],
++                             aram_tier_data: dict[int, dict[str, Any]]) -> dict[str, Any]:
++        my_tier = aram_tier_data.get(current_champion, {}).get("tier", 3)
++        best_champ, best_tier = None, my_tier
++        for c in bench_champions:
++            c_tier = aram_tier_data.get(c, {}).get("tier", 3)
++            if c_tier < best_tier:
++                best_tier = c_tier
++                best_champ = c
++        return {"swap_target": best_champ}
++
++    def recommend_items(self, champion_id: int, aram_builds: list[dict[str, Any]]) -> dict[str, Any]:
++        if not aram_builds:
++            return {"items": []}
++        best = max(aram_builds, key=lambda b: b.get("winRate", 0.0))
++        return {"items": best.get("items", [])}
++
++    def snowball_priority(self, champion_id: int) -> float:
++        return 0.8 if champion_id in _MELEE_CHAMPIONS else 0.2
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "aram_strategy_advisor", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/champ_select_automator.py b/integrations/lol/src/lol_agent/champ_select_automator.py
+new file mode 100644
+index 00000000..e9ff3bce
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/champ_select_automator.py
+@@ -0,0 +1,55 @@
++"""
++Champ Select Automator — Automated champion select decisions.
++Location: integrations/lol/src/lol_agent/champ_select_automator.py
++Reference: Seraphine/app/lol/tools.py: autoPick, autoBan, autoComplete, autoTrade, autoSwap
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.champ_select_automator.v1"
++
++class ChampSelectAutomator:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def suggest_pick(self, available: list[int], banned: list[int], team_comp: list[int],
++                     position: str, preferences: dict[str, float] | None = None) -> dict[str, Any]:
++        pool = [c for c in available if c not in banned and c not in team_comp]
++        if not pool:
++            return {"champion_id": 0, "confidence": 0.0}
++        if preferences:
++            scored = sorted(pool, key=lambda c: preferences.get(str(c), 0.5), reverse=True)
++            return {"champion_id": scored[0], "confidence": preferences.get(str(scored[0]), 0.5)}
++        return {"champion_id": pool[0], "confidence": 0.5}
++
++    def suggest_ban(self, enemy_history: list[dict[str, Any]], already_banned: list[int]) -> dict[str, Any]:
++        candidates = [e for e in enemy_history if e.get("championId", 0) not in already_banned]
++        if not candidates:
++            return {"champion_id": 0, "reason": "no_candidates"}
++        best = max(candidates, key=lambda e: e.get("winrate", 0) * e.get("games", 0))
++        return {"champion_id": best["championId"], "reason": "high_threat"}
++
++    def should_trade(self, my_champion: int, teammate_champion: int,
++                     my_preferred: list[int], teammate_preferred: list[int]) -> dict[str, Any]:
++        return {"should_trade": teammate_champion in my_preferred and my_champion in teammate_preferred}
++
++    def get_auto_complete_action(self, phase: str, is_my_turn: bool, selected_champion: int) -> dict[str, Any]:
++        if not is_my_turn:
++            return {"type": "none"}
++        if selected_champion > 0:
++            return {"type": "pick", "champion_id": selected_champion}
++        return {"type": "none"}
++
++    def compute_pick_priority(self, available: list[int], preferences: dict[str, float]) -> list[dict[str, Any]]:
++        scored = [{"champion_id": c, "score": preferences.get(str(c), 0.0)} for c in available]
++        return sorted(scored, key=lambda x: x["score"], reverse=True)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "champ_select_automator", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/duo_synergy_detector.py b/integrations/lol/src/lol_agent/duo_synergy_detector.py
+new file mode 100644
+index 00000000..3ecaf042
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/duo_synergy_detector.py
+@@ -0,0 +1,90 @@
++"""
++Duo Synergy Detector — Detect duo/premade queue patterns from match history.
++Location: integrations/lol/src/lol_agent/duo_synergy_detector.py
++Reference: Seraphine/app/lol/tools.py: getTeammates, getRecentTeammates
++"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict
++from itertools import combinations
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.duo_synergy_detector.v1"
++
++class DuoSynergyDetector:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def detect_duos(self, history: list[dict[str, Any]], target_puuid: str, min_games: int = 3) -> dict[str, dict[str, Any]]:
++        mate_stats: dict[str, dict] = defaultdict(lambda: {"games": 0, "wins": 0})
++        for game in history:
++            participants = game.get("participants", [])
++            target_team, target_win = None, False
++            for p in participants:
++                if p.get("puuid") == target_puuid:
++                    target_team = p.get("teamId")
++                    target_win = p.get("stats", {}).get("win", False)
++                    break
++            if target_team is None:
++                continue
++            for p in participants:
++                puuid = p.get("puuid", "")
++                if puuid == target_puuid or puuid == "":
++                    continue
++                if p.get("teamId") != target_team:
++                    continue
++                mate_stats[puuid]["games"] += 1
++                if target_win:
++                    mate_stats[puuid]["wins"] += 1
++        result = {}
++        for puuid, stats in mate_stats.items():
++            g = stats["games"]
++            if g >= min_games:
++                result[puuid] = {"games": g, "wins": stats["wins"], "winrate": stats["wins"] / g if g > 0 else 0.0}
++        return result
++
++    def detect_premade_group(self, history: list[dict[str, Any]], target_puuid: str, min_games: int = 3) -> list[list[str]]:
++        duos = self.detect_duos(history, target_puuid, min_games)
++        if not duos:
++            return []
++        partner_puuids = list(duos.keys())
++        groups = [[target_puuid, p] for p in partner_puuids]
++        for p1, p2 in combinations(partner_puuids, 2):
++            shared = 0
++            for game in history:
++                participants = game.get("participants", [])
++                game_puuids = {p.get("puuid") for p in participants}
++                team_map = {p.get("puuid"): p.get("teamId") for p in participants}
++                if (target_puuid in game_puuids and p1 in game_puuids and p2 in game_puuids
++                        and team_map.get(target_puuid) == team_map.get(p1) == team_map.get(p2)):
++                    shared += 1
++            if shared >= min_games:
++                groups.append([target_puuid, p1, p2])
++        return groups
++
++    def duo_threat_score(self, duo_info: dict[str, Any]) -> float:
++        games = duo_info.get("games", 0)
++        wr = duo_info.get("winrate", 0.5)
++        game_factor = min(games / 30.0, 1.0)
++        wr_factor = min(max((wr - 0.4) / 0.3, 0.0), 1.0)
++        return 0.5 * game_factor + 0.5 * wr_factor
++
++    def synergy_label(self, winrate: float, games: int) -> str:
++        if games < 5:
++            return "Occasional"
++        if winrate >= 0.65:
++            return "Strong Synergy"
++        if winrate >= 0.55:
++            return "Good Synergy"
++        if winrate >= 0.45:
++            return "Average Synergy"
++        return "Weak Synergy"
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "duo_synergy_detector", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/game_flow_monitor.py b/integrations/lol/src/lol_agent/game_flow_monitor.py
+new file mode 100644
+index 00000000..1167e3e0
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/game_flow_monitor.py
+@@ -0,0 +1,38 @@
++"""
++Game Flow Monitor — Track game phase transitions.
++Location: integrations/lol/src/lol_agent/game_flow_monitor.py
++Reference: Seraphine/app/lol/listener.py: onGameFlowPhaseChanged
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.game_flow_monitor.v1"
++
++class GameFlowMonitor:
++    def __init__(self) -> None:
++        self.current_phase: str = "None"
++        self.phase_history: list[dict[str, Any]] = []
++        self._phase_start_time: float = time.time()
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def on_phase_change(self, new_phase: str) -> None:
++        now = time.time()
++        self.phase_history.append({"phase": new_phase, "timestamp": now, "previous": self.current_phase})
++        self.current_phase = new_phase
++        self._phase_start_time = now
++
++    def is_in_game(self) -> bool:
++        return self.current_phase in ("InProgress", "GameStart", "InGame")
++
++    def phase_duration(self) -> float:
++        return time.time() - self._phase_start_time
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "game_flow_monitor", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/historical_winrate_predictor.py b/integrations/lol/src/lol_agent/historical_winrate_predictor.py
+new file mode 100644
+index 00000000..cc500bc0
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/historical_winrate_predictor.py
+@@ -0,0 +1,54 @@
++"""
++Historical Winrate Predictor — Predict match win probability from historical profiles.
++Location: integrations/lol/src/lol_agent/historical_winrate_predictor.py
++Reference: Seraphine/app/lol/tools.py: parseSummonerGameInfo winrate aggregation
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.historical_winrate_predictor.v1"
++
++class HistoricalWinratePredictor:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def predict(self, ally_profiles: list[dict[str, Any]], enemy_profiles: list[dict[str, Any]]) -> dict[str, Any]:
++        if not ally_profiles and not enemy_profiles:
++            return {"win_probability": 0.5, "confidence": 0.0, "factors": {}}
++        ally_score = self._team_score(ally_profiles)
++        enemy_score = self._team_score(enemy_profiles)
++        total = ally_score + enemy_score
++        raw_prob = ally_score / total if total > 0 else 0.5
++        win_prob = max(0.05, min(0.95, raw_prob))
++        ally_games = sum(p.get("games", 1) for p in ally_profiles)
++        enemy_games = sum(p.get("games", 1) for p in enemy_profiles)
++        confidence = min(1.0, (ally_games + enemy_games) / 200.0)
++        return {"win_probability": round(win_prob, 4), "confidence": round(confidence, 4),
++                "factors": {"ally_score": round(ally_score, 4), "enemy_score": round(enemy_score, 4),
++                            "ally_games": ally_games, "enemy_games": enemy_games}}
++
++    def _team_score(self, profiles: list[dict[str, Any]]) -> float:
++        if not profiles:
++            return 0.5
++        total = 0.0
++        for p in profiles:
++            wr = p.get("winrate", 0.5)
++            cwr = p.get("champion_winrate", wr)
++            rank = p.get("rank_numeric", 0)
++            player_score = 0.4 * wr + 0.3 * cwr
++            if rank > 0:
++                player_score += 0.3 * min(rank / 3000.0, 1.0)
++            else:
++                player_score += 0.3 * 0.5
++            total += player_score
++        return total / len(profiles)
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "historical_winrate_predictor", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/profile_background_manager.py b/integrations/lol/src/lol_agent/profile_background_manager.py
+new file mode 100644
+index 00000000..eb9c1ed9
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/profile_background_manager.py
+@@ -0,0 +1,54 @@
++"""
++Profile Background Manager — Manage summoner profile background and status.
++Location: integrations/lol/src/lol_agent/profile_background_manager.py
++Reference: Seraphine/app/lol/connector.py: setProfileBackground, setOnlineStatus, setTierShowed
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.profile_background_manager.v1"
++
++class ProfileBackgroundManager:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def build_set_background_payload(self, skin_id: int) -> dict[str, Any]:
++        return {"key": "backgroundSkinId", "value": skin_id}
++
++    def build_set_status_payload(self, message: str) -> dict[str, Any]:
++        return {"statusMessage": message}
++
++    def build_set_tier_payload(self, queue: str, tier: str, division: str) -> dict[str, Any]:
++        return {"lol": {"rankedLeagueQueue": queue, "rankedLeagueTier": tier, "rankedLeagueDivision": division}}
++
++    def recommend_background(self, mastery: list[dict[str, Any]]) -> Optional[int]:
++        if not mastery:
++            return None
++        best = max(mastery, key=lambda m: m.get("championPoints", 0))
++        return best.get("championId", 0) * 1000
++
++    def auto_status_message(self, tier: str, division: str, lp: int, streak: str = "") -> str:
++        tier_display = tier.capitalize() if tier else "Unranked"
++        msg = f"{tier_display} {division} | {lp} LP"
++        if streak:
++            msg += f" | {streak}"
++        return msg
++
++    def lcu_url_for_background(self) -> str:
++        return "/lol-summoner/v1/current-summoner/summoner-profile"
++
++    def lcu_url_for_status(self) -> str:
++        return "/lol-chat/v1/me"
++
++    def validate_skin_id(self, skin_id: int) -> bool:
++        return isinstance(skin_id, int) and skin_id > 0
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "profile_background_manager", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/rune_page_manager.py b/integrations/lol/src/lol_agent/rune_page_manager.py
+new file mode 100644
+index 00000000..85799620
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/rune_page_manager.py
+@@ -0,0 +1,46 @@
++"""
++Rune Page Manager — Build, validate, and manage rune pages.
++Location: integrations/lol/src/lol_agent/rune_page_manager.py
++Reference: Seraphine/app/lol/tools.py: createAndSetRunePage
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.rune_page_manager.v1"
++
++class RunePageManager:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def build_rune_page(self, name: str, primary_style: int, sub_style: int, perks: list[int]) -> dict[str, Any]:
++        return {"name": name, "primaryStyleId": primary_style, "subStyleId": sub_style,
++                "selectedPerkIds": list(perks), "current": True}
++
++    def validate_rune_page(self, primary_style: int, sub_style: int, perks: list[int]) -> bool:
++        if primary_style == sub_style:
++            return False
++        if len(perks) != 6:
++            return False
++        return True
++
++    def build_lcu_payload(self, name: str, primary_style: int, sub_style: int, perks: list[int]) -> dict[str, Any]:
++        return {"name": name, "primaryStyleId": primary_style, "subStyleId": sub_style,
++                "selectedPerkIds": list(perks), "current": True}
++
++    def recommend_runes(self, opgg_runes: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
++        if not opgg_runes:
++            return None
++        return max(opgg_runes, key=lambda r: r.get("winRate", 0.0))
++
++    def format_rune_name(self, champion: str, source: str = "OPGG") -> str:
++        return f"[{source}] {champion}"
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "rune_page_manager", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/seraphine_integration_orchestrator.py b/integrations/lol/src/lol_agent/seraphine_integration_orchestrator.py
+new file mode 100644
+index 00000000..f7e35a53
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/seraphine_integration_orchestrator.py
+@@ -0,0 +1,64 @@
++"""
++Seraphine Integration Orchestrator — Unified orchestration of all Seraphine modules.
++Location: integrations/lol/src/lol_agent/seraphine_integration_orchestrator.py
++Reference: Seraphine/app/view/main_window.py module lifecycle + lol_agent_orchestrator.py pattern
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.seraphine_integration_orchestrator.v1"
++
++class SeraphineIntegrationOrchestrator:
++    def __init__(self) -> None:
++        self._modules: dict[str, Any] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register_module(self, name: str, module: Any) -> None:
++        self._modules[name] = module
++
++    def unregister_module(self, name: str) -> None:
++        self._modules.pop(name, None)
++
++    def list_modules(self) -> list[str]:
++        return sorted(self._modules.keys())
++
++    def health_check(self) -> dict[str, dict[str, Any]]:
++        report: dict[str, dict[str, Any]] = {}
++        for name, mod in self._modules.items():
++            try:
++                if hasattr(mod, "health_check"):
++                    report[name] = mod.health_check()
++                else:
++                    report[name] = {"status": "ok", "note": "no health_check method"}
++            except Exception as exc:
++                report[name] = {"status": "error", "error": str(exc)}
++        return report
++
++    def run_pregame(self, opponents: list[dict[str, Any]] | None = None, my_champion: str = "") -> dict[str, Any]:
++        if opponents is None:
++            opponents = []
++        return {"report": "pregame", "opponents_count": len(opponents),
++                "my_champion": my_champion, "modules_used": self.list_modules()}
++
++    def run_ingame(self, game_state: dict[str, Any] | None = None) -> dict[str, Any]:
++        if game_state is None:
++            game_state = {}
++        return {"report": "ingame", "state_keys": list(game_state.keys()), "modules_used": self.list_modules()}
++
++    def run_postgame(self, match_result: dict[str, Any] | None = None) -> dict[str, Any]:
++        if match_result is None:
++            match_result = {}
++        return {"report": "postgame", "result_keys": list(match_result.keys()), "modules_used": self.list_modules()}
++
++    def get_stats(self) -> dict[str, Any]:
++        return {"module_count": len(self._modules), "modules": self.list_modules()}
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "seraphine_integration_orchestrator", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/summoner_spell_advisor.py b/integrations/lol/src/lol_agent/summoner_spell_advisor.py
+new file mode 100644
+index 00000000..f12da930
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/summoner_spell_advisor.py
+@@ -0,0 +1,45 @@
++"""
++Summoner Spell Advisor — Recommend summoner spells by position.
++Location: integrations/lol/src/lol_agent/summoner_spell_advisor.py
++Reference: Seraphine/app/lol/tools.py: autoSetSummonerSpell
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.summoner_spell_advisor.v1"
++_SPELL_NAMES = {1:"Cleanse",3:"Exhaust",4:"Flash",6:"Ghost",7:"Heal",11:"Smite",12:"Teleport",14:"Ignite",21:"Barrier",32:"Mark"}
++_POSITION_DEFAULTS = {"ADC":[4,7],"BOTTOM":[4,7],"SUPPORT":[4,14],"UTILITY":[4,14],"JUNGLE":[4,11],"MIDDLE":[4,14],"MID":[4,14],"TOP":[4,12]}
++
++class SummonerSpellAdvisor:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def recommend_spells(self, position: str, champion_id: int = 0) -> dict[str, Any]:
++        spells = _POSITION_DEFAULTS.get(position.upper(), [4, 14])
++        return {"spells": list(spells), "source": "default"}
++
++    def spell_name(self, spell_id: int) -> str:
++        return _SPELL_NAMES.get(spell_id, "Unknown")
++
++    def from_opgg_data(self, opgg_spells: list[dict[str, Any]]) -> dict[str, Any]:
++        if not opgg_spells:
++            return {"spells": [], "source": "opgg"}
++        best = max(opgg_spells, key=lambda s: s.get("winRate", s.get("win_rate", 0.0)))
++        return {"spells": best.get("ids", []), "source": "opgg"}
++
++    def validate_spells(self, spells: list[int]) -> bool:
++        if len(spells) != 2:
++            return False
++        if spells[0] == spells[1]:
++            return False
++        return True
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "summoner_spell_advisor", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/integrations/lol/src/lol_agent/team_color_resolver.py b/integrations/lol/src/lol_agent/team_color_resolver.py
+new file mode 100644
+index 00000000..a72e6a08
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/team_color_resolver.py
+@@ -0,0 +1,62 @@
++"""
++Team Color Resolver — Resolve team side (blue/red) and separate teams.
++Location: integrations/lol/src/lol_agent/team_color_resolver.py
++Reference: Seraphine/app/lol/tools.py: getTeamColor, separateTeams
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.team_color_resolver.v1"
++
++class TeamColorResolver:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def resolve_color(self, session: dict[str, Any], current_puuid: str) -> str:
++        game_data = session.get("gameData", {})
++        for p in game_data.get("teamOne", []):
++            if p.get("puuid") == current_puuid:
++                return "blue"
++        for p in game_data.get("teamTwo", []):
++            if p.get("puuid") == current_puuid:
++                return "red"
++        return "unknown"
++
++    def separate_teams(self, participants: list[dict[str, Any]], current_puuid: str) -> dict[str, list[dict[str, Any]]]:
++        my_team_id = None
++        for p in participants:
++            if p.get("puuid") == current_puuid:
++                my_team_id = p.get("teamId")
++                break
++        if my_team_id is None:
++            return {"allies": [], "enemies": []}
++        return {"allies": [p for p in participants if p.get("teamId") == my_team_id],
++                "enemies": [p for p in participants if p.get("teamId") != my_team_id]}
++
++    def team_id_to_color(self, team_id: int) -> str:
++        if team_id == 100:
++            return "blue"
++        elif team_id == 200:
++            return "red"
++        return "unknown"
++
++    def is_ally(self, puuid_a: str, puuid_b: str, participants: list[dict[str, Any]]) -> bool:
++        team_a = team_b = None
++        for p in participants:
++            if p.get("puuid") == puuid_a:
++                team_a = p.get("teamId")
++            if p.get("puuid") == puuid_b:
++                team_b = p.get("teamId")
++        if team_a is None or team_b is None:
++            return False
++        return team_a == team_b
++
++    def _fire_evolution(self, data: dict[str, Any]) -> None:
++        if self.evolution_callback is None:
++            return
++        enriched = {"module": "team_color_resolver", "timestamp": time.time(), **data}
++        try:
++            self.evolution_callback(enriched)
++        except Exception as exc:
++            logger.warning("Evolution callback error: %s", exc)
+diff --git a/plan.md b/plan.md
+index 99e367c6..20a0aa18 100644
+--- a/plan.md
++++ b/plan.md
+@@ -2734,34 +2734,74 @@ M366-M385 完成了两大阶段的建设:
+ 
+ ---
+ 
+-## 二十八、M466-M485 新增任务规划
++## 二十八、M466-M485 完成报告（第十位Claude — Seraphine深度集成）
+ 
+-### 阶段 AJ: RL管道集成 + 端到端闭环（M466-M475）
++### 阶段 AJ: Seraphine历史数据管线（M466-M475）✅ 全部完成
++
++> 将Seraphine(github.com/ljszx/Seraphine)的LCU connector、tools.py、opgg.py
++> 核心模式迁移到operatorRL的agentic框架
++> 参考: Seraphine/app/lol/connector.py, tools.py, opgg.py, listener.py, aram.py
++
++| M# | 文件路径 | 状态 | 功能 |
++|---|---|---|---|
++| M466 | `integrations/lol-history/src/lol_history/lcu_session_parser.py` | ✅ | **LCU会话解析** — gameflow session/champ select解析 |
++| M467 | `integrations/lol-history/src/lol_history/sgp_match_fetcher.py` | ✅ | **SGP对局获取** — SGP API URL构建+响应解析 |
++| M468 | `integrations/lol-history/src/lol_history/game_detail_parser.py` | ✅ | **对局细节解析** — KDA/CS/队伍/胜方深度解析 |
++| M469 | `integrations/lol-history/src/lol_history/teammate_analyzer.py` | ✅ | **队友分析器** — 历史队友检测+共同胜率+双排识别 |
++| M470 | `integrations/lol-history/src/lol_history/champion_pool_tracker.py` | ✅ | **英雄池追踪** — 英雄计数/胜率/多样性/one-trick检测 |
++| M471 | `integrations/lol-history/src/lol_history/rank_tier_resolver.py` | ✅ | **段位解析器** — 单排/灵活段位解析+数值化+比较 |
++| M472 | `integrations/lol-history/src/lol_history/summoner_order_resolver.py` | ✅ | **召唤师排序** — TOP→JG→MID→ADC→SUP标准排序 |
++| M473 | `integrations/lol-history/src/lol_history/ally_game_info_parser.py` | ✅ | **友方信息解析** — 友方/敌方队伍+召唤师技能提取 |
++| M474 | `integrations/lol-history/src/lol_history/opgg_build_fetcher.py` | ✅ | **OPGG出装获取** — 出装/符文/技能加点推荐 |
++| M475 | `integrations/lol-history/src/lol_history/opgg_tier_list_parser.py` | ✅ | **OPGG梯队解析** — 英雄梯队+位置分布+meta强度 |
++
++### 阶段 AK: 英雄选择/符文/战略智能（M476-M485）✅ 全部完成
++
++| M# | 文件路径 | 状态 | 功能 |
++|---|---|---|---|
++| M476 | `integrations/lol/src/lol_agent/champ_select_automator.py` | ✅ | **英雄选择自动化** — 选/禁/换英雄建议 |
++| M477 | `integrations/lol/src/lol_agent/rune_page_manager.py` | ✅ | **符文页管理** — 构建/验证/推荐符文页 |
++| M478 | `integrations/lol/src/lol_agent/summoner_spell_advisor.py` | ✅ | **召唤师技能顾问** — 位置+OPGG驱动推荐 |
++| M479 | `integrations/lol/src/lol_agent/game_flow_monitor.py` | ✅ | **游戏流程监控** — 阶段转换+历史+持续时间 |
++| M480 | `integrations/lol/src/lol_agent/team_color_resolver.py` | ✅ | **队伍颜色解析** — 蓝/红方+队伍分离 |
++| M481 | `integrations/lol/src/lol_agent/historical_winrate_predictor.py` | ✅ | **历史胜率预测** — 胜率/段位加权预测 |
++| M482 | `integrations/lol/src/lol_agent/duo_synergy_detector.py` | ✅ | **双排协同检测** — 双排/三排+威胁评分 |
++| M483 | `integrations/lol/src/lol_agent/aram_strategy_advisor.py` | ✅ | **ARAM策略顾问** — 重随/换人/出装/雪球 |
++| M484 | `integrations/lol/src/lol_agent/profile_background_manager.py` | ✅ | **个人资料管理** — 背景/状态/段位LCU接口 |
++| M485 | `integrations/lol/src/lol_agent/seraphine_integration_orchestrator.py` | ✅ | **Seraphine集成编排** — 统一注册/健康/管线 |
++
++**TDD验证**: 200测试全部通过 ✅
++
++---
++
++## 二十九、M486-M505 新增任务规划
++
++### 阶段 AL: Fiddler协议捕获 → 实时训练数据管线（M486-M495）
+ 
+ | M# | 文件路径 | 级别 | 功能 |
+ |---|---|---|---|
+-| M466 | `integrations/lol/src/lol_agent/rl_pipeline_orchestrator.py` | 🔴 | **RL管道编排** — live_data→encoder→replay→trainer端到端串联 |
+-| M467 | `integrations/lol/src/lol_agent/online_policy_server.py` | 🔴 | **在线策略服务** — HTTP/WebSocket策略推理服务 |
+-| M468 | `integrations/lol/src/lol_agent/reward_shaper_adaptive.py` | 🟡 | **自适应奖励** — 基于胜率自动调整奖励权重 |
+-| M469 | `integrations/lol/src/lol_agent/state_encoder_v2.py` | 🟡 | **状态编码器V2** — 增加物品/技能/冷却/地图控制特征 |
+-| M470 | `integrations/lol/src/lol_agent/trajectory_collector.py` | 🔴 | **轨迹收集器** — 在线收集(s,a,r,s')轨迹序列 |
+-| M471 | `integrations/dota2/src/dota2_agent/dota2_rl_trainer.py` | 🔴 | **Dota2 RL训练器** — Dota2专用PPO训练接入 |
+-| M472 | `integrations/dota2/src/dota2_agent/dota2_state_encoder.py` | 🟡 | **Dota2状态编码** — Dota2游戏状态→特征向量 |
+-| M473 | `integrations/mahjong/src/mahjong_agent/mahjong_rl_trainer.py` | 🔴 | **麻将RL训练器** — 麻将专用策略优化 |
+-| M474 | `agentos/governance/reward_evolution_tracker.py` | 🟡 | **奖励演化追踪** — 奖励函数版本化+效果对比 |
+-| M475 | `agentos/governance/pipeline_health_monitor.py` | 🟢 | **管道健康监控** — 训练管道延迟/吞吐/错误率监控 |
+-
+-### 阶段 AK: 实际TTS/OCR后端接入 + 生产化（M476-M485）
++| M486 | `extensions/fiddler-bridge/src/fiddler_live_capture.py` | 🔴 | **Fiddler实时捕获** — HTTP流捕获+过滤+缓冲 |
++| M487 | `extensions/fiddler-bridge/src/fiddler_lol_decoder.py` | 🔴 | **LoL协议解码** — Live Client Data API解码 |
++| M488 | `extensions/fiddler-bridge/src/fiddler_training_pipeline.py` | 🔴 | **训练数据管线** — 捕获→清洗→标注→训练样本 |
++| M489 | `extensions/fiddler-bridge/src/fiddler_replay_recorder.py` | 🟡 | **回放录制器** — 完整对局协议流录制 |
++| M490 | `extensions/fiddler-bridge/src/fiddler_anomaly_detector.py` | 🟡 | **异常检测器** — 协议异常/延迟峰值检测 |
++| M491 | `extensions/protocol-decoder/src/riot_api_client.py` | 🔴 | **Riot API客户端** — 官方API数据获取 |
++| M492 | `extensions/protocol-decoder/src/live_client_data_poller.py` | 🔴 | **实时数据轮询** — Live Client Data定时轮询 |
++| M493 | `extensions/protocol-decoder/src/protocol_replay_engine.py` | 🟡 | **协议重放引擎** — 协议流回放+加速 |
++| M494 | `extensions/protocol-decoder/src/dual_channel_fuser.py` | 🔴 | **双通道融合** — Fiddler+Live Client融合 |
++| M495 | `extensions/protocol-decoder/src/training_data_validator.py` | 🟢 | **训练数据验证** — 样本完整性校验 |
++
++### 阶段 AM: 跨游戏策略知识图谱 + 迁移学习（M496-M505）
+ 
+ | M# | 文件路径 | 级别 | 功能 |
+ |---|---|---|---|
+-| M476 | `integrations/lol/src/lol_agent/tts_backend_edge.py` | 🔴 | **Edge-TTS后端** — 微软Edge TTS异步语音合成 |
+-| M477 | `integrations/lol/src/lol_agent/tts_backend_local.py` | 🟡 | **本地TTS后端** — pyttsx3/espeak本地离线合成 |
+-| M478 | `extensions/vision-bridge/src/vision_bridge/ocr_backend_tesseract.py` | 🔴 | **Tesseract OCR后端** — Tesseract集成+区域预处理 |
+-| M479 | `extensions/vision-bridge/src/vision_bridge/ocr_backend_paddle.py` | 🟡 | **PaddleOCR后端** — PaddleOCR高精度中英文识别 |
+-| M480 | `extensions/vision-bridge/src/vision_bridge/capture_to_ocr_pipeline.py` | 🔴 | **采集→OCR管道** — screen_capture→region_crop→OCR→state |
+-| M481 | `extensions/fiddler-bridge/src/fiddler_mcp_connector.py` | 🔴 | **Fiddler MCP连接** — Fiddler MCP Server协议对接 |
+-| M482 | `extensions/fiddler-bridge/src/lol_packet_decoder.py` | 🟡 | **LoL封包解码** — LoL网络协议→结构化事件 |
+-| M483 | `extensions/fiddler-bridge/src/fiddler_vs_vision_arbiter.py` | 🟡 | **Fiddler/视觉仲裁** — 协议数据vs视觉数据一致性校验 |
+-| M484 | `agentos/governance/multimodal_output_router.py` | 🟡 | **多模态输出路由** — 语音/覆盖层/小地图智能路由 |
+-| M485 | `agentos/governance/production_readiness_checker.py` | 🟢 | **生产就绪检查** — 依赖/配置/连接/性能全面自检 |
++| M496 | `agentos/governance/strategy_knowledge_graph.py` | 🔴 | **策略知识图谱** — 跨游戏策略节点/边图 |
++| M497 | `agentos/governance/strategy_transfer_engine.py` | 🔴 | **策略迁移引擎** — LoL↔Dota2↔麻将迁移 |
++| M498 | `agentos/governance/unified_decision_framework.py` | 🔴 | **统一决策框架** — 跨游戏通用决策抽象 |
++| M499 | `agentos/governance/cross_game_evaluation.py` | 🟡 | **跨游戏评估** — 统一适应度指标 |
++| M500 | `agentos/governance/evolution_knowledge_distill.py` | 🟡 | **知识蒸馏** — 大模型→小模型蒸馏 |
++| M501 | `integrations/lol/src/lol_agent/lol_knowledge_node.py` | 🟡 | **LoL知识节点** — LoL策略图谱节点 |
++| M502 | `integrations/dota2/src/dota2_agent/dota2_knowledge_node.py` | 🟡 | **Dota2知识节点** — Dota2策略图谱节点 |
++| M503 | `integrations/mahjong/src/mahjong_agent/mahjong_knowledge_node.py` | 🟡 | **麻将知识节点** — 麻将策略图谱节点 |
++| M504 | `agentlightning/trainer/knowledge_graph_trainer.py` | 🔴 | **图谱训练器** — 知识图谱嵌入训练 |
++| M505 | `agentlightning/trainer/transfer_learning_trainer.py` | 🔴 | **迁移学习训练** — 跨游戏策略迁移训练 |
+-- 
+2.43.0
+

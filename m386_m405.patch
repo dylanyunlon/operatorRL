@@ -1,0 +1,2494 @@
+From c4e8b90343cd85d887b0dd616e52d0a3c6983616 Mon Sep 17 00:00:00 2001
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Sun, 29 Mar 2026 07:00:37 +0000
+Subject: [PATCH] feat(M386-M405): Fiddler MCP deep protocol integration +
+ multi-game real-time assistant framework
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Phase AB (M386-M395): Fiddler MCP Deep Protocol Integration
+- M386 FiddlerSessionManager: disconnected→connected→capturing state machine
+- M387 FiddlerTrafficFilter: domain/port/protocol filtering + match/reject stats
+- M388 FiddlerPacketParser: HTTP/WebSocket frame parsing + JSON extraction
+- M389 FiddlerReplayEngine: timestamped packet recording + time-window replay + JSON export
+- M390 FiddlerAnomalyDetector: timeout/error code detection + anomaly rate tracking
+- M391 LoLProtocolDecoder: Live Client API 5-endpoint JSON decoding
+- M392 ProtocolRegistry: multi-game protocol decoder registration + routing
+- M393 PacketCorrelation: request-response pairing + latency analysis + orphan detection
+- M394 FiddlerEvolutionAdapter: traffic→evolution event conversion + quality score
+- M395 FiddlerCLIIntegration: argparse subcommands + status formatting
+
+Phase AC (M396-M405): Multi-Game Real-Time Assistant Unified Framework
+- M396 RealTimeAssistantABC: scout/decide/feedback/postgame contract
+- M397 SessionManagerABC: state/transition/reset/duration contract
+- M398 DangerAssessmentABC: assess/safe_direction/is_safe contract
+- M399 ObjectiveTrackerABC: start/remaining/clear/active contract
+- M400 Dota2RealTimeAssistant: 3-phase (laning/mid/late) strategy
+- M401 Dota2ObjectiveTimer: Roshan/Aegis/Buyback timers
+- M402 MahjongRealTimeAssistant: shanten-aware tile recommendation
+- M403 AssistantLauncher: unified launch/stop/list CLI
+- M404 AssistantRegistry: cross-game assistant registration
+- M405 CrossGameFeedback: multi-game feedback aggregation + transfer insights
+
+TDD: 215 tests (200 unit + 15 overfit verification), 215/215 passed
+---
+ agentos/cli/assistant_launcher.py             | 112 +++++++++++
+ agentos/governance/assistant_registry.py      |  82 ++++++++
+ agentos/governance/cross_game_feedback.py     | 161 ++++++++++++++++
+ .../src/fiddler_anomaly_detector.py           | 117 ++++++++++++
+ .../src/fiddler_cli_integration.py            | 109 +++++++++++
+ .../src/fiddler_evolution_adapter.py          | 124 ++++++++++++
+ .../src/fiddler_packet_parser.py              | 124 ++++++++++++
+ .../src/fiddler_replay_engine.py              | 108 +++++++++++
+ .../src/fiddler_session_manager.py            | 129 +++++++++++++
+ .../src/fiddler_traffic_filter.py             | 121 ++++++++++++
+ .../src/lol_protocol_decoder.py               | 144 ++++++++++++++
+ .../src/packet_correlation.py                 | 120 ++++++++++++
+ .../protocol-decoder/src/protocol_registry.py |  92 +++++++++
+ .../src/dota2_agent/dota2_objective_timer.py  | 118 ++++++++++++
+ .../dota2_agent/dota2_real_time_assistant.py  | 176 ++++++++++++++++++
+ .../mahjong_real_time_assistant.py            | 163 ++++++++++++++++
+ modules/danger_assessment_abc.py              |  77 ++++++++
+ modules/objective_tracker_abc.py              |  72 +++++++
+ modules/real_time_assistant_abc.py            |  86 +++++++++
+ modules/session_manager_abc.py                |  59 ++++++
+ 20 files changed, 2294 insertions(+)
+ create mode 100644 agentos/cli/assistant_launcher.py
+ create mode 100644 agentos/governance/assistant_registry.py
+ create mode 100644 agentos/governance/cross_game_feedback.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_anomaly_detector.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_cli_integration.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_evolution_adapter.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_packet_parser.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_replay_engine.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_session_manager.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_traffic_filter.py
+ create mode 100644 extensions/protocol-decoder/src/lol_protocol_decoder.py
+ create mode 100644 extensions/protocol-decoder/src/packet_correlation.py
+ create mode 100644 extensions/protocol-decoder/src/protocol_registry.py
+ create mode 100644 integrations/dota2/src/dota2_agent/dota2_objective_timer.py
+ create mode 100644 integrations/dota2/src/dota2_agent/dota2_real_time_assistant.py
+ create mode 100644 integrations/mahjong/src/mahjong_agent/mahjong_real_time_assistant.py
+ create mode 100644 modules/danger_assessment_abc.py
+ create mode 100644 modules/objective_tracker_abc.py
+ create mode 100644 modules/real_time_assistant_abc.py
+ create mode 100644 modules/session_manager_abc.py
+
+diff --git a/agentos/cli/assistant_launcher.py b/agentos/cli/assistant_launcher.py
+new file mode 100644
+index 00000000..39cc9d01
+--- /dev/null
++++ b/agentos/cli/assistant_launcher.py
+@@ -0,0 +1,112 @@
++"""
++Assistant Launcher — Unified real-time assistant launch/manage CLI.
++
++Provides argparse subcommands for launching, stopping, and listing
++game-specific real-time assistants across all supported games.
++
++Location: agentos/cli/assistant_launcher.py
++
++Reference (拿来主义):
++  - agentos/cli/main.py: CLI argparse + route pattern
++  - agentos/cli/game_launcher.py: game register/launch/stop lifecycle
++  - extensions/fiddler-bridge/src/fiddler_cli_integration.py: CLI integration
++"""
++
++from __future__ import annotations
++
++import argparse
++import logging
++import time
++from typing import Any
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.cli.assistant_launcher.v1"
++
++# Simulated assistant state (production: real process management)
++_active_assistants: dict[str, dict[str, Any]] = {}
++
++# Supported games
++_SUPPORTED_GAMES = ["lol", "dota2", "mahjong"]
++
++
++def create_assistant_parser() -> argparse.ArgumentParser:
++    """Create argparse parser for assistant launcher CLI.
++
++    Returns:
++        Configured ArgumentParser.
++    """
++    parser = argparse.ArgumentParser(
++        prog="agentos-assistant",
++        description="Real-Time Game Assistant Launcher",
++    )
++    sub = parser.add_subparsers(dest="command")
++
++    launch_p = sub.add_parser("launch", help="Launch a game assistant")
++    launch_p.add_argument("--game", required=True, help="Game identifier")
++
++    stop_p = sub.add_parser("stop", help="Stop a game assistant")
++    stop_p.add_argument("--game", required=True, help="Game identifier")
++
++    sub.add_parser("list", help="List available/active assistants")
++
++    return parser
++
++
++def route_assistant_command(command: str, **kwargs: Any) -> dict[str, Any]:
++    """Route an assistant CLI command.
++
++    Args:
++        command: Command name (launch, stop, list).
++        **kwargs: Command-specific arguments.
++
++    Returns:
++        Result dict.
++    """
++    if command == "launch":
++        game = kwargs.get("game", "")
++        _active_assistants[game] = {
++            "state": "running",
++            "started_at": time.time(),
++        }
++        logger.info("Assistant launched for: %s", game)
++        return {"status": "launched", "game": game}
++
++    elif command == "stop":
++        game = kwargs.get("game", "")
++        _active_assistants.pop(game, None)
++        logger.info("Assistant stopped for: %s", game)
++        return {"status": "stopped", "game": game}
++
++    elif command == "list":
++        return {
++            "status": "ok",
++            "assistants": list(_active_assistants.keys()),
++            "games": _SUPPORTED_GAMES,
++            "active_count": len(_active_assistants),
++        }
++
++    else:
++        return {"status": "unknown", "error": f"Unknown command: {command}"}
++
++
++def format_assistant_status(status_data: dict[str, Any]) -> str:
++    """Format assistant status for CLI display.
++
++    Args:
++        status_data: Status dict with game, state, uptime.
++
++    Returns:
++        Formatted status string.
++    """
++    game = status_data.get("game", "unknown")
++    state = status_data.get("state", "unknown")
++    uptime = status_data.get("uptime", 0.0)
++
++    lines = [
++        f"Game Assistant Status",
++        f"  Game: {game}",
++        f"  State: {state}",
++        f"  Uptime: {uptime:.1f}s",
++    ]
++    return "\n".join(lines)
+diff --git a/agentos/governance/assistant_registry.py b/agentos/governance/assistant_registry.py
+new file mode 100644
+index 00000000..1b408489
+--- /dev/null
++++ b/agentos/governance/assistant_registry.py
+@@ -0,0 +1,82 @@
++"""
++Assistant Registry — Cross-game real-time assistant registration/query/management.
++
++Central registry for game-specific real-time assistants.
++Supports register/unregister/query/export operations.
++
++Location: agentos/governance/assistant_registry.py
++
++Reference (拿来主义):
++  - DI-star/distar/agent/default/policy/policy_factory.py: policy registration
++  - agentos/governance/game_registry.py: register/unregister pattern
++  - extensions/protocol-decoder/src/protocol_registry.py: registry pattern
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.assistant_registry.v1"
++
++
++class AssistantRegistry:
++    """Central registry for game real-time assistants.
++
++    Supports register/unregister/get_info/list/count/export.
++    Duplicate registration overwrites previous entry.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._registry: dict[str, dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register(self, game: str, info: dict[str, Any]) -> None:
++        """Register an assistant for a game.
++
++        Args:
++            game: Game identifier.
++            info: Assistant info dict (name, version, etc.).
++        """
++        self._registry[game] = dict(info)
++        logger.info("Registered assistant for: %s", game)
++        self._fire_evolution({"action": "register", "game": game})
++
++    def unregister(self, game: str) -> None:
++        """Remove an assistant registration."""
++        self._registry.pop(game, None)
++
++    def get_info(self, game: str) -> Optional[dict[str, Any]]:
++        """Get assistant info for a game. Returns None if not found."""
++        entry = self._registry.get(game)
++        return dict(entry) if entry is not None else None
++
++    def list_games(self) -> list[str]:
++        """List all registered game identifiers."""
++        return sorted(self._registry.keys())
++
++    def count(self) -> int:
++        """Return number of registered assistants."""
++        return len(self._registry)
++
++    def export_summary(self) -> dict[str, Any]:
++        """Export summary of all registered assistants."""
++        return {game: dict(info) for game, info in self._registry.items()}
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (assistant_registry)")
+diff --git a/agentos/governance/cross_game_feedback.py b/agentos/governance/cross_game_feedback.py
+new file mode 100644
+index 00000000..2896c75d
+--- /dev/null
++++ b/agentos/governance/cross_game_feedback.py
+@@ -0,0 +1,161 @@
++"""
++Cross-Game Feedback — Multi-game feedback aggregation + learning transfer.
++
++Aggregates feedback data across all game integrations (LoL, Dota2, Mahjong).
++Computes per-game and global match rates, and generates cross-game
++transfer insights for shared strategic patterns.
++
++Location: agentos/governance/cross_game_feedback.py
++
++Reference (拿来主义):
++  - integrations/lol/src/lol_agent/feedback_recorder.py: match_rate + deviation pattern
++  - modules/evolution_loop_abc.py: record/fitness pattern
++  - agentos/governance/telemetry_collector.py: cross-module metric aggregation
++  - DI-star/distar/ctools/utils/log_helper.py: multi-source log aggregation
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.cross_game_feedback.v1"
++
++
++class CrossGameFeedback:
++    """Multi-game feedback aggregation and learning transfer.
++
++    Collects feedback records per game, computes match rates,
++    and generates transfer insights between games.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._feedback: dict[str, list[dict[str, Any]]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record(self, game: str, feedback: dict[str, Any]) -> None:
++        """Record a feedback entry for a game.
++
++        Args:
++            game: Game identifier.
++            feedback: Feedback dict with at least 'match' bool key.
++        """
++        if game not in self._feedback:
++            self._feedback[game] = []
++        self._feedback[game].append(dict(feedback))
++        self._fire_evolution({"action": "record", "game": game})
++
++    def feedback_count(self, game: str) -> int:
++        """Return number of feedback records for a game."""
++        return len(self._feedback.get(game, []))
++
++    def match_rate(self, game: str) -> float:
++        """Compute match rate for a game (matched / total).
++
++        Returns:
++            Float 0.0-1.0, or 0.0 if no records.
++        """
++        records = self._feedback.get(game, [])
++        if not records:
++            return 0.0
++        matches = sum(1 for r in records if r.get("match", False))
++        return matches / len(records)
++
++    def global_match_rate(self) -> float:
++        """Compute global match rate across all games.
++
++        Returns:
++            Float 0.0-1.0, or 0.0 if no records.
++        """
++        all_records = []
++        for records in self._feedback.values():
++            all_records.extend(records)
++        if not all_records:
++            return 0.0
++        matches = sum(1 for r in all_records if r.get("match", False))
++        return matches / len(all_records)
++
++    def list_games(self) -> list[str]:
++        """List all games with recorded feedback."""
++        return sorted(self._feedback.keys())
++
++    def export_summary(self) -> dict[str, Any]:
++        """Export summary of feedback across all games."""
++        summary = {}
++        for game in self._feedback:
++            summary[game] = {
++                "count": self.feedback_count(game),
++                "match_rate": self.match_rate(game),
++            }
++        return summary
++
++    def transfer_insights(
++        self, source_game: str, target_game: str
++    ) -> dict[str, Any]:
++        """Generate transfer learning insights from source to target game.
++
++        Analyzes feedback patterns from source game that might be
++        applicable to the target game (e.g., positioning patterns,
++        risk assessment, timing decisions).
++
++        Args:
++            source_game: Game to learn from.
++            target_game: Game to apply insights to.
++
++        Returns:
++            Dict with transferable insights.
++        """
++        source_records = self._feedback.get(source_game, [])
++        if not source_records:
++            return {
++                "source_game": source_game,
++                "from_game": source_game,
++                "target_game": target_game,
++                "insights": [],
++                "message": "No source data available",
++            }
++
++        # Analyze categories of successful advice
++        matched = [r for r in source_records if r.get("match", False)]
++        unmatched = [r for r in source_records if not r.get("match", False)]
++
++        categories: dict[str, int] = {}
++        for r in matched:
++            cat = r.get("category", "general")
++            categories[cat] = categories.get(cat, 0) + 1
++
++        # Sort by frequency
++        sorted_cats = sorted(categories.items(), key=lambda x: x[1], reverse=True)
++
++        return {
++            "source_game": source_game,
++            "from_game": source_game,
++            "target_game": target_game,
++            "source_match_rate": self.match_rate(source_game),
++            "total_source_records": len(source_records),
++            "matched_count": len(matched),
++            "unmatched_count": len(unmatched),
++            "top_categories": sorted_cats[:5],
++            "insights": [
++                f"Pattern '{cat}' successful {count} times in {source_game}"
++                for cat, count in sorted_cats[:3]
++            ],
++        }
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (cross_game_feedback)")
+diff --git a/extensions/fiddler-bridge/src/fiddler_anomaly_detector.py b/extensions/fiddler-bridge/src/fiddler_anomaly_detector.py
+new file mode 100644
+index 00000000..2e53fb5d
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_anomaly_detector.py
+@@ -0,0 +1,117 @@
++"""
++Fiddler Anomaly Detector — Protocol anomaly/timeout/error detection.
++
++Detects timeouts, HTTP error codes, and protocol anomalies in captured traffic.
++Tracks anomaly history and computes anomaly rates.
++
++Location: extensions/fiddler-bridge/src/fiddler_anomaly_detector.py
++
++Reference (拿来主义):
++  - agentos/cli/health_monitor.py: health check + threshold pattern
++  - extensions/fiddler-bridge/src/fiddler_bridge/client.py: SessionStatus categorization
++  - Akagi/mitm/client.py: error handling and retry patterns
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_anomaly_detector.v1"
++
++_DEFAULT_TIMEOUT: float = 5.0
++
++
++class FiddlerAnomalyDetector:
++    """Protocol anomaly detector for captured traffic.
++
++    Detects:
++    - Timeouts (latency > threshold)
++    - HTTP error codes (4xx, 5xx)
++    - Protocol-level anomalies
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self, timeout_threshold: float = _DEFAULT_TIMEOUT) -> None:
++        self._timeout_threshold = timeout_threshold
++        self._anomaly_history: list[dict[str, Any]] = []
++        self._total_checked: int = 0
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def check(self, packet: dict[str, Any]) -> dict[str, Any]:
++        """Check a packet for anomalies.
++
++        Args:
++            packet: Dict with latency, status_code, type keys.
++
++        Returns:
++            Dict with is_anomaly bool and reason string.
++        """
++        self._total_checked += 1
++        latency = packet.get("latency", 0.0)
++        status_code = packet.get("status_code", 200)
++
++        is_anomaly = False
++        reasons: list[str] = []
++
++        # Timeout detection
++        if latency > self._timeout_threshold:
++            is_anomaly = True
++            reasons.append(f"timeout ({latency:.1f}s > {self._timeout_threshold:.1f}s)")
++
++        # Error code detection
++        if isinstance(status_code, int) and status_code >= 400:
++            is_anomaly = True
++            reasons.append(f"error code {status_code}")
++
++        result = {
++            "is_anomaly": is_anomaly,
++            "reason": "; ".join(reasons) if reasons else "normal",
++            "latency": latency,
++            "status_code": status_code,
++        }
++
++        if is_anomaly:
++            self._anomaly_history.append({
++                **result,
++                "timestamp": time.time(),
++            })
++            self._fire_evolution({"action": "anomaly_detected", "detail": result})
++
++        return result
++
++    def get_anomaly_history(self) -> list[dict[str, Any]]:
++        """Return history of detected anomalies."""
++        return list(self._anomaly_history)
++
++    def get_anomaly_rate(self) -> float:
++        """Compute anomaly rate (anomalies / total checked).
++
++        Returns:
++            Float between 0.0 and 1.0, or 0.0 if nothing checked.
++        """
++        if self._total_checked == 0:
++            return 0.0
++        return len(self._anomaly_history) / self._total_checked
++
++    def reset(self) -> None:
++        """Clear anomaly history and counters."""
++        self._anomaly_history.clear()
++        self._total_checked = 0
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (fiddler_anomaly_detector)")
+diff --git a/extensions/fiddler-bridge/src/fiddler_cli_integration.py b/extensions/fiddler-bridge/src/fiddler_cli_integration.py
+new file mode 100644
+index 00000000..86be806f
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_cli_integration.py
+@@ -0,0 +1,109 @@
++"""
++Fiddler CLI Integration — CLI subcommands + status display + config.
++
++Provides argparse subcommands for Fiddler MCP operations:
++start, stop, status. Integrates with existing CLI framework.
++
++Location: extensions/fiddler-bridge/src/fiddler_cli_integration.py
++
++Reference (拿来主义):
++  - agentos/cli/main.py: CLI argparse + route pattern
++  - agentos/cli/status_reporter.py: status formatting
++  - Fiddler MCP Server documentation: command structure
++"""
++
++from __future__ import annotations
++
++import argparse
++import logging
++import time
++from typing import Any
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_cli_integration.v1"
++
++# Internal simulated state (production would connect to real Fiddler)
++_sim_state: dict[str, Any] = {"state": "idle", "host": "", "port": 0, "packets_captured": 0}
++
++
++def create_fiddler_parser() -> argparse.ArgumentParser:
++    """Create argparse parser for Fiddler CLI subcommands.
++
++    Returns:
++        Configured ArgumentParser.
++    """
++    parser = argparse.ArgumentParser(
++        prog="agentos-fiddler",
++        description="Fiddler MCP Bridge CLI",
++    )
++    sub = parser.add_subparsers(dest="command")
++
++    start_p = sub.add_parser("start", help="Start Fiddler capture session")
++    start_p.add_argument("--host", default="localhost", help="Fiddler host")
++    start_p.add_argument("--port", type=int, default=8866, help="Fiddler port")
++
++    sub.add_parser("stop", help="Stop Fiddler capture session")
++    sub.add_parser("status", help="Show Fiddler session status")
++
++    return parser
++
++
++def route_fiddler_command(command: str, **kwargs: Any) -> dict[str, Any]:
++    """Route a Fiddler CLI command to the appropriate handler.
++
++    Args:
++        command: Command name (start, stop, status).
++        **kwargs: Command-specific arguments.
++
++    Returns:
++        Result dict with status and details.
++    """
++    if command == "start":
++        host = kwargs.get("host", "localhost")
++        port = kwargs.get("port", 8866)
++        _sim_state["state"] = "capturing"
++        _sim_state["host"] = host
++        _sim_state["port"] = port
++        logger.info("Fiddler CLI: started capture on %s:%d", host, port)
++        return {"status": "started", "host": host, "port": port}
++
++    elif command == "stop":
++        _sim_state["state"] = "idle"
++        logger.info("Fiddler CLI: stopped capture")
++        return {"status": "stopped"}
++
++    elif command == "status":
++        return {
++            "status": "ok",
++            "state": _sim_state["state"],
++            "host": _sim_state["host"],
++            "port": _sim_state["port"],
++            "packets_captured": _sim_state["packets_captured"],
++        }
++
++    else:
++        return {"status": "unknown", "error": f"Unknown command: {command}"}
++
++
++def format_fiddler_status(status_data: dict[str, Any]) -> str:
++    """Format Fiddler status for CLI display.
++
++    Args:
++        status_data: Status dict with state, host, port, packets_captured.
++
++    Returns:
++        Formatted status string.
++    """
++    state = status_data.get("state", "unknown")
++    host = status_data.get("host", "")
++    port = status_data.get("port", 0)
++    packets = status_data.get("packets_captured", 0)
++
++    lines = [
++        f"Fiddler MCP Bridge Status",
++        f"  State: {state}",
++        f"  Host: {host}:{port}" if host else "  Host: (not connected)",
++        f"  Packets Captured: {packets}",
++    ]
++    return "\n".join(lines)
+diff --git a/extensions/fiddler-bridge/src/fiddler_evolution_adapter.py b/extensions/fiddler-bridge/src/fiddler_evolution_adapter.py
+new file mode 100644
+index 00000000..3b42ec81
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_evolution_adapter.py
+@@ -0,0 +1,124 @@
++"""
++Fiddler Evolution Adapter — Protocol data → evolution event conversion.
++
++Converts captured Fiddler traffic packets into evolution events,
++classifying traffic quality and computing health scores.
++
++Location: extensions/fiddler-bridge/src/fiddler_evolution_adapter.py
++
++Reference (拿来主义):
++  - extensions/fiddler-bridge/src/fiddler_bridge/fiddler_evolution_bridge.py: evolution bridge
++  - modules/evolution_loop_abc.py: record/fitness pattern
++  - integrations/lol/src/lol_agent/feedback_recorder.py: event classification
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_evolution_adapter.v1"
++
++_ANOMALY_LATENCY_THRESHOLD: float = 5.0
++_ANOMALY_STATUS_THRESHOLD: int = 400
++
++
++class FiddlerEvolutionAdapter:
++    """Converts Fiddler traffic data into evolution events.
++
++    Classifies each packet as 'normal' or 'anomaly', tracks quality,
++    and provides a quality score for the evolution system.
++
++    Attributes:
++        event_count: Number of events converted.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._events: list[dict[str, Any]] = []
++        self._normal_count: int = 0
++        self._anomaly_count: int = 0
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def event_count(self) -> int:
++        return len(self._events)
++
++    def convert(self, packet: dict[str, Any]) -> dict[str, Any]:
++        """Convert a captured packet into an evolution event.
++
++        Args:
++            packet: Dict with type, status_code, latency, ts keys.
++
++        Returns:
++            Evolution event dict with source, classification, etc.
++        """
++        latency = packet.get("latency", 0.0)
++        status_code = packet.get("status_code", 200)
++
++        is_anomaly = (
++            latency > _ANOMALY_LATENCY_THRESHOLD
++            or (isinstance(status_code, int) and status_code >= _ANOMALY_STATUS_THRESHOLD)
++        )
++
++        classification = "anomaly" if is_anomaly else "normal"
++
++        if is_anomaly:
++            self._anomaly_count += 1
++        else:
++            self._normal_count += 1
++
++        event = {
++            "event_type": "traffic_observation",
++            "source": "fiddler",
++            "classification": classification,
++            "latency": latency,
++            "status_code": status_code,
++            "timestamp": packet.get("ts", time.time()),
++        }
++        self._events.append(event)
++        self._fire_evolution({"action": "convert", "classification": classification})
++        return event
++
++    def batch_convert(self, packets: list[dict[str, Any]]) -> list[dict[str, Any]]:
++        """Convert multiple packets in batch.
++
++        Args:
++            packets: List of packet dicts.
++
++        Returns:
++            List of evolution event dicts.
++        """
++        return [self.convert(p) for p in packets]
++
++    def get_quality_score(self) -> float:
++        """Compute traffic quality score (normal / total).
++
++        Returns:
++            Float between 0.0 and 1.0, or 0.0 if no events.
++        """
++        total = self._normal_count + self._anomaly_count
++        if total == 0:
++            return 0.0
++        return self._normal_count / total
++
++    def reset(self) -> None:
++        """Reset all counters and events."""
++        self._events.clear()
++        self._normal_count = 0
++        self._anomaly_count = 0
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (fiddler_evolution_adapter)")
+diff --git a/extensions/fiddler-bridge/src/fiddler_packet_parser.py b/extensions/fiddler-bridge/src/fiddler_packet_parser.py
+new file mode 100644
+index 00000000..fb1ab2cb
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_packet_parser.py
+@@ -0,0 +1,124 @@
++"""
++Fiddler Packet Parser — HTTP/WebSocket frame parsing + content extraction.
++
++Parses raw captured packets into structured data: HTTP responses,
++WebSocket text/binary frames, with JSON body extraction.
++
++Location: extensions/fiddler-bridge/src/fiddler_packet_parser.py
++
++Reference (拿来主义):
++  - Akagi/mitm/bridge/majsoul/liqi.py: struct.unpack + protobuf parsing
++  - extensions/protocol-decoder/src/protocol_decoder/websocket.py: WS frame handling
++  - extensions/fiddler-bridge/src/fiddler_bridge/client.py: HTTP response categorization
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_packet_parser.v1"
++
++
++class FiddlerPacketParser:
++    """HTTP/WebSocket packet parser.
++
++    Handles:
++    - HTTP responses: status code + headers + JSON body parsing
++    - WebSocket frames: text (JSON) + binary
++    - Unknown types: passthrough with raw data
++
++    Attributes:
++        parse_count: Number of packets parsed.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._parse_count: int = 0
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def parse_count(self) -> int:
++        return self._parse_count
++
++    def parse(self, raw: dict[str, Any]) -> dict[str, Any]:
++        """Parse a raw packet into structured data.
++
++        Args:
++            raw: Dict with 'type' key and type-specific fields.
++
++        Returns:
++            Parsed packet dict.
++        """
++        self._parse_count += 1
++        ptype = raw.get("type", "unknown")
++
++        if ptype == "http_response":
++            result = self._parse_http_response(raw)
++        elif ptype == "websocket":
++            result = self._parse_websocket(raw)
++        else:
++            result = {"type": ptype, "raw": raw}
++
++        self._fire_evolution({"action": "parse", "type": ptype})
++        return result
++
++    def _parse_http_response(self, raw: dict[str, Any]) -> dict[str, Any]:
++        """Parse HTTP response packet."""
++        status_code = raw.get("status_code", 0)
++        headers = raw.get("headers", {})
++        body = raw.get("body", "")
++
++        result: dict[str, Any] = {
++            "type": "http_response",
++            "status_code": status_code,
++            "headers": headers,
++        }
++
++        content_type = headers.get("content-type", "")
++        if "json" in content_type and body:
++            try:
++                result["parsed_body"] = json.loads(body)
++            except (json.JSONDecodeError, TypeError):
++                result["parsed_body"] = None
++                result["error"] = "invalid_json"
++        else:
++            result["parsed_body"] = body if body else None
++
++        return result
++
++    def _parse_websocket(self, raw: dict[str, Any]) -> dict[str, Any]:
++        """Parse WebSocket frame."""
++        opcode = raw.get("opcode", "text")
++        payload = raw.get("payload", "")
++
++        result: dict[str, Any] = {
++            "type": "websocket",
++            "frame_type": opcode,
++        }
++
++        if opcode == "text":
++            try:
++                result["parsed_payload"] = json.loads(payload)
++            except (json.JSONDecodeError, TypeError):
++                result["parsed_payload"] = payload
++        else:
++            result["raw_payload"] = payload
++
++        return result
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (fiddler_packet_parser)")
+diff --git a/extensions/fiddler-bridge/src/fiddler_replay_engine.py b/extensions/fiddler-bridge/src/fiddler_replay_engine.py
+new file mode 100644
+index 00000000..452f65c1
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_replay_engine.py
+@@ -0,0 +1,108 @@
++"""
++Fiddler Replay Engine — Captured traffic offline replay + timeline.
++
++Records captured packets with timestamps for later replay.
++Supports time-window filtering and JSON export.
++
++Location: extensions/fiddler-bridge/src/fiddler_replay_engine.py
++
++Reference (拿来主义):
++  - extensions/fiddler-bridge/src/fiddler_bridge/session_capture.py: session recording
++  - agentos/cli/session_recorder.py: recording + export pattern
++  - Akagi/mitm/logger.py: packet logging with timestamps
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_replay_engine.v1"
++
++
++class FiddlerReplayEngine:
++    """Captured traffic replay engine.
++
++    Records packets with timestamps, supports ordered replay,
++    time-window filtering, and JSON export.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._packets: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def packet_count(self) -> int:
++        return len(self._packets)
++
++    def record(self, packet: dict[str, Any]) -> None:
++        """Record a captured packet.
++
++        Args:
++            packet: Dict with 'ts' timestamp key.
++        """
++        self._packets.append(dict(packet))
++        self._fire_evolution({"action": "record", "count": len(self._packets)})
++
++    def replay(
++        self,
++        start_ts: Optional[float] = None,
++        end_ts: Optional[float] = None,
++    ) -> list[dict[str, Any]]:
++        """Replay recorded packets in timestamp order.
++
++        Args:
++            start_ts: Optional start time filter.
++            end_ts: Optional end time filter.
++
++        Returns:
++            List of packets sorted by timestamp.
++        """
++        sorted_packets = sorted(self._packets, key=lambda p: p.get("ts", 0.0))
++
++        if start_ts is not None or end_ts is not None:
++            s = start_ts if start_ts is not None else float("-inf")
++            e = end_ts if end_ts is not None else float("inf")
++            sorted_packets = [
++                p for p in sorted_packets if s <= p.get("ts", 0.0) <= e
++            ]
++
++        return sorted_packets
++
++    def clear(self) -> None:
++        """Remove all recorded packets."""
++        self._packets.clear()
++
++    def get_time_range(self) -> dict[str, float]:
++        """Return start/end timestamps of recorded data."""
++        if not self._packets:
++            return {"start": 0.0, "end": 0.0}
++        timestamps = [p.get("ts", 0.0) for p in self._packets]
++        return {"start": min(timestamps), "end": max(timestamps)}
++
++    def export_json(self) -> str:
++        """Export all packets as JSON string."""
++        return json.dumps({
++            "packets": self.replay(),
++            "count": self.packet_count,
++            "time_range": self.get_time_range(),
++        })
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (fiddler_replay_engine)")
+diff --git a/extensions/fiddler-bridge/src/fiddler_session_manager.py b/extensions/fiddler-bridge/src/fiddler_session_manager.py
+new file mode 100644
+index 00000000..3550666b
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_session_manager.py
+@@ -0,0 +1,129 @@
++"""
++Fiddler Session Manager — MCP connection + capture lifecycle state machine.
++
++Manages Fiddler MCP server session: disconnected → connected → capturing.
++Tracks transition history and connection info.
++
++Location: extensions/fiddler-bridge/src/fiddler_session_manager.py
++
++Reference (拿来主义):
++  - Akagi/mitm/client.py: MITM proxy session lifecycle
++  - integrations/lol/src/lol_agent/game_session_manager.py: state machine pattern
++  - DI-star/distar/ctools/worker/learner/base_learner.py: before_run/after_run hooks
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_session_manager.v1"
++
++# Valid state transitions (mirrors Akagi MITM proxy lifecycle)
++_VALID_TRANSITIONS: dict[str, set[str]] = {
++    "disconnected": {"connected"},
++    "connected": {"capturing", "disconnected"},
++    "capturing": {"connected", "disconnected"},
++}
++
++
++class FiddlerSessionManager:
++    """Fiddler MCP session lifecycle state machine.
++
++    States: disconnected → connected → capturing.
++    Mirrors Akagi's MITM proxy session management
++    with explicit transition validation and history tracking.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._state: str = "disconnected"
++        self._history: list[dict[str, Any]] = []
++        self._host: str = ""
++        self._port: int = 0
++        self._capture_start: float = 0.0
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def state(self) -> str:
++        """Current session state."""
++        return self._state
++
++    def _transition(self, new_state: str) -> None:
++        """Internal state transition with validation."""
++        allowed = _VALID_TRANSITIONS.get(self._state, set())
++        if new_state not in allowed:
++            raise ValueError(
++                f"Invalid transition: {self._state} → {new_state}. "
++                f"Allowed: {allowed}"
++            )
++        old = self._state
++        self._state = new_state
++        entry = {
++            "from": old,
++            "to": new_state,
++            "timestamp": time.time(),
++        }
++        self._history.append(entry)
++        logger.info("Fiddler session: %s → %s", old, new_state)
++        self._fire_evolution({"action": "transition", "detail": entry})
++
++    def connect(self, host: str, port: int) -> None:
++        """Connect to Fiddler MCP server.
++
++        Args:
++            host: Fiddler server hostname.
++            port: Fiddler server port.
++        """
++        self._host = host
++        self._port = port
++        self._transition("connected")
++
++    def start_capture(self) -> None:
++        """Start traffic capture."""
++        self._capture_start = time.time()
++        self._transition("capturing")
++
++    def stop_capture(self) -> None:
++        """Stop traffic capture, return to connected."""
++        self._transition("connected")
++
++    def disconnect(self) -> None:
++        """Disconnect from Fiddler MCP server."""
++        if self._state == "capturing":
++            self._transition("connected")
++        self._transition("disconnected")
++        self._host = ""
++        self._port = 0
++
++    def get_history(self) -> list[dict[str, Any]]:
++        """Return transition history."""
++        return list(self._history)
++
++    def get_connection_info(self) -> dict[str, Any]:
++        """Return current connection details."""
++        return {
++            "host": self._host,
++            "port": self._port,
++            "state": self._state,
++        }
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        """Fire evolution event if callback set."""
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (fiddler_session_manager)")
+diff --git a/extensions/fiddler-bridge/src/fiddler_traffic_filter.py b/extensions/fiddler-bridge/src/fiddler_traffic_filter.py
+new file mode 100644
+index 00000000..a9a56f42
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_traffic_filter.py
+@@ -0,0 +1,121 @@
++"""
++Fiddler Traffic Filter — Filter game traffic by domain/port/protocol.
++
++Filters captured traffic to isolate game-relevant packets.
++Supports domain, port, and protocol-level filtering with stats tracking.
++
++Location: extensions/fiddler-bridge/src/fiddler_traffic_filter.py
++
++Reference (拿来主义):
++  - Akagi/mitm/bridge/unified/bridge.py: traffic routing by game type
++  - Akagi/mitm/common.py: packet filtering patterns
++  - extensions/fiddler-bridge/src/fiddler_bridge/client.py: SessionStatus categorization
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_traffic_filter.v1"
++
++
++class FiddlerTrafficFilter:
++    """Traffic filter for Fiddler-captured packets.
++
++    Filters by domain, port, and protocol. When no filters are set,
++    all traffic passes (permissive default — mirrors Akagi's unified bridge).
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._domain_filters: set[str] = set()
++        self._port_filters: set[int] = set()
++        self._protocol_filters: set[str] = set()
++        self._matched: int = 0
++        self._rejected: int = 0
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    # --- Domain filters ---
++    def add_domain_filter(self, domain: str) -> None:
++        self._domain_filters.add(domain)
++        self._fire_evolution({"action": "add_domain", "domain": domain})
++
++    def remove_domain_filter(self, domain: str) -> None:
++        self._domain_filters.discard(domain)
++
++    def get_domain_filters(self) -> list[str]:
++        return sorted(self._domain_filters)
++
++    # --- Port filters ---
++    def add_port_filter(self, port: int) -> None:
++        self._port_filters.add(port)
++
++    def remove_port_filter(self, port: int) -> None:
++        self._port_filters.discard(port)
++
++    def get_port_filters(self) -> list[int]:
++        return sorted(self._port_filters)
++
++    # --- Protocol filters ---
++    def add_protocol_filter(self, protocol: str) -> None:
++        self._protocol_filters.add(protocol)
++
++    def get_protocol_filters(self) -> list[str]:
++        return sorted(self._protocol_filters)
++
++    # --- Match logic ---
++    def matches(self, packet: dict[str, Any]) -> bool:
++        """Check if a packet matches the configured filters.
++
++        When no filters are set, all traffic passes.
++        When filters are set, packet must match at least one filter
++        in each non-empty filter category.
++
++        Args:
++            packet: Dict with host, port, protocol keys.
++
++        Returns:
++            True if packet passes filters.
++        """
++        host = packet.get("host", "")
++        port = packet.get("port", 0)
++        protocol = packet.get("protocol", "")
++
++        domain_ok = (not self._domain_filters) or (host in self._domain_filters)
++        port_ok = (not self._port_filters) or (port in self._port_filters)
++        proto_ok = (not self._protocol_filters) or (protocol in self._protocol_filters)
++
++        result = domain_ok and port_ok and proto_ok
++        if result:
++            self._matched += 1
++        else:
++            self._rejected += 1
++        return result
++
++    def get_stats(self) -> dict[str, int]:
++        """Return match/reject stats."""
++        return {
++            "matched": self._matched,
++            "rejected": self._rejected,
++            "total": self._matched + self._rejected,
++        }
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (fiddler_traffic_filter)")
+diff --git a/extensions/protocol-decoder/src/lol_protocol_decoder.py b/extensions/protocol-decoder/src/lol_protocol_decoder.py
+new file mode 100644
+index 00000000..870a0a5d
+--- /dev/null
++++ b/extensions/protocol-decoder/src/lol_protocol_decoder.py
+@@ -0,0 +1,144 @@
++"""
++LoL Protocol Decoder — Live Client API JSON decoding + field mapping.
++
++Decodes LoL Live Client Data API responses into standardized fields.
++Supports allgamedata, activeplayer, playerlist, gamestats, eventdata endpoints.
++
++Location: extensions/protocol-decoder/src/lol_protocol_decoder.py
++
++Reference (拿来主义):
++  - leagueoflegends-optimizer/src/live_client/: Live Client API data pipeline
++  - integrations/lol/src/lol_agent/live_client_connector.py: parse_response pattern
++  - extensions/fiddler-bridge/src/fiddler_bridge/lol_protocol_decoder.py: initial decoder
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.lol_protocol_decoder.v1"
++
++
++class LoLProtocolDecoder:
++    """LoL Live Client Data API protocol decoder.
++
++    Decodes JSON responses from LoL's local API (https://127.0.0.1:2999)
++    into standardized field names for downstream processing.
++
++    Attributes:
++        game_name: Always 'lol'.
++        decode_count: Number of decodes performed.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    game_name: str = "lol"
++
++    def __init__(self) -> None:
++        self._decode_count: int = 0
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def decode_count(self) -> int:
++        return self._decode_count
++
++    def decode(self, raw: str, endpoint: str = "", **kwargs: Any) -> dict[str, Any]:
++        """Decode a raw JSON response from LoL Live Client API.
++
++        Args:
++            raw: Raw JSON string.
++            endpoint: API endpoint path for routing.
++
++        Returns:
++            Decoded and normalized dict.
++        """
++        self._decode_count += 1
++
++        try:
++            data = json.loads(raw)
++        except (json.JSONDecodeError, TypeError):
++            return {"error": "invalid_json", "raw": raw[:200]}
++
++        # Route to specific decoder based on endpoint
++        if "allgamedata" in endpoint:
++            result = self._decode_all_game_data(data)
++        elif "activeplayer" in endpoint:
++            result = self._decode_active_player(data)
++        elif "playerlist" in endpoint:
++            result = self._decode_player_list(data)
++        elif "gamestats" in endpoint:
++            result = self._decode_game_stats(data)
++        elif "eventdata" in endpoint:
++            result = self._decode_event_data(data)
++        else:
++            result = {"data": data, "raw": True}
++
++        result["_endpoint"] = endpoint
++        self._fire_evolution({"action": "decode", "endpoint": endpoint})
++        return result
++
++    def _decode_all_game_data(self, data: dict) -> dict[str, Any]:
++        game_data = data.get("gameData", {})
++        return {
++            "game_time": game_data.get("gameTime", 0.0),
++            "map_number": game_data.get("mapNumber", 0),
++            "all_players": data.get("allPlayers", []),
++            "active_player": data.get("activePlayer", {}),
++        }
++
++    def _decode_active_player(self, data: dict) -> dict[str, Any]:
++        return {
++            "summoner_name": data.get("summonerName", ""),
++            "level": data.get("level", 0),
++            "current_gold": data.get("currentGold", 0.0),
++            "abilities": data.get("abilities", {}),
++            "champion_stats": data.get("championStats", {}),
++        }
++
++    def _decode_player_list(self, data: Any) -> dict[str, Any]:
++        if isinstance(data, list):
++            players = [
++                {
++                    "summoner_name": p.get("summonerName", ""),
++                    "team": p.get("team", ""),
++                    "champion": p.get("championName", ""),
++                }
++                for p in data
++            ]
++        else:
++            players = []
++        return {"players": players}
++
++    def _decode_game_stats(self, data: dict) -> dict[str, Any]:
++        return {
++            "game_mode": data.get("gameMode", ""),
++            "game_time": data.get("gameTime", 0.0),
++            "map_name": data.get("mapName", ""),
++        }
++
++    def _decode_event_data(self, data: dict) -> dict[str, Any]:
++        raw_events = data.get("Events", [])
++        events = [
++            {
++                "name": e.get("EventName", ""),
++                "time": e.get("EventTime", 0.0),
++            }
++            for e in raw_events
++        ]
++        return {"events": events}
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (lol_protocol_decoder)")
+diff --git a/extensions/protocol-decoder/src/packet_correlation.py b/extensions/protocol-decoder/src/packet_correlation.py
+new file mode 100644
+index 00000000..c0cfcafc
+--- /dev/null
++++ b/extensions/protocol-decoder/src/packet_correlation.py
+@@ -0,0 +1,120 @@
++"""
++Packet Correlation — Request-response pairing + timing analysis.
++
++Correlates HTTP requests with their responses by ID, computes latencies,
++and tracks orphaned requests/responses.
++
++Location: extensions/protocol-decoder/src/packet_correlation.py
++
++Reference (拿来主义):
++  - Akagi/mitm/client.py: request-response flow tracking
++  - extensions/fiddler-bridge/src/fiddler_bridge/combat_calculator.py: timing analysis
++  - agentos/governance/telemetry_collector.py: metric pairing pattern
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.packet_correlation.v1"
++
++
++class PacketCorrelation:
++    """Request-response packet correlator.
++
++    Pairs requests with responses by ID, computes latency,
++    and identifies orphaned requests/responses.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._pending_requests: dict[str, dict[str, Any]] = {}
++        self._pairs: list[dict[str, Any]] = []
++        self._orphan_responses: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def pending_count(self) -> int:
++        return len(self._pending_requests)
++
++    def record_request(self, request_id: str, data: dict[str, Any]) -> None:
++        """Record an outgoing request.
++
++        Args:
++            request_id: Unique request identifier.
++            data: Request data including 'ts' timestamp.
++        """
++        self._pending_requests[request_id] = dict(data)
++
++    def record_response(self, request_id: str, data: dict[str, Any]) -> None:
++        """Record an incoming response and pair with request if found.
++
++        Args:
++            request_id: Matching request identifier.
++            data: Response data including 'ts' timestamp.
++        """
++        if request_id in self._pending_requests:
++            req = self._pending_requests.pop(request_id)
++            latency = data.get("ts", 0.0) - req.get("ts", 0.0)
++            pair = {
++                "request_id": request_id,
++                "request": req,
++                "response": data,
++                "latency": latency,
++            }
++            self._pairs.append(pair)
++            self._fire_evolution({"action": "paired", "request_id": request_id, "latency": latency})
++        else:
++            self._orphan_responses.append({
++                "request_id": request_id,
++                "response": data,
++            })
++
++    def get_pairs(self) -> list[dict[str, Any]]:
++        """Return all request-response pairs."""
++        return list(self._pairs)
++
++    def get_orphan_requests(self) -> list[dict[str, Any]]:
++        """Return requests without matching responses."""
++        return [
++            {"request_id": rid, "request": data}
++            for rid, data in self._pending_requests.items()
++        ]
++
++    def get_orphan_responses(self) -> list[dict[str, Any]]:
++        """Return responses without matching requests."""
++        return list(self._orphan_responses)
++
++    def average_latency(self) -> float:
++        """Compute average latency across all pairs.
++
++        Returns:
++            Average latency in seconds, or 0.0 if no pairs.
++        """
++        if not self._pairs:
++            return 0.0
++        return sum(p["latency"] for p in self._pairs) / len(self._pairs)
++
++    def clear(self) -> None:
++        """Clear all state."""
++        self._pending_requests.clear()
++        self._pairs.clear()
++        self._orphan_responses.clear()
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (packet_correlation)")
+diff --git a/extensions/protocol-decoder/src/protocol_registry.py b/extensions/protocol-decoder/src/protocol_registry.py
+new file mode 100644
+index 00000000..d56ae14c
+--- /dev/null
++++ b/extensions/protocol-decoder/src/protocol_registry.py
+@@ -0,0 +1,92 @@
++"""
++Protocol Registry — Multi-game protocol decoder registration + routing.
++
++Central registry for game-specific protocol decoders.
++Routes raw data to the correct decoder based on game identifier.
++
++Location: extensions/protocol-decoder/src/protocol_registry.py
++
++Reference (拿来主义):
++  - DI-star/distar/agent/default/policy/policy_factory.py: policy registration
++  - agentos/governance/game_registry.py: register/unregister/route pattern
++  - extensions/protocol-decoder/src/protocol_decoder/codec.py: codec registry
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_registry.v1"
++
++
++class ProtocolRegistry:
++    """Central registry for game protocol decoders.
++
++    Supports register/unregister/route/list operations.
++    Duplicate registration overwrites the previous decoder.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._decoders: dict[str, Any] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register(self, game: str, decoder: Any) -> None:
++        """Register a decoder for a game.
++
++        Args:
++            game: Game identifier.
++            decoder: Decoder instance with decode() method.
++        """
++        self._decoders[game] = decoder
++        logger.info("Registered decoder for game: %s", game)
++        self._fire_evolution({"action": "register", "game": game})
++
++    def unregister(self, game: str) -> None:
++        """Remove a decoder for a game."""
++        self._decoders.pop(game, None)
++
++    def get_decoder(self, game: str) -> Optional[Any]:
++        """Get the decoder for a game. Returns None if not found."""
++        return self._decoders.get(game, None)
++
++    def route(self, game: str, raw_data: Any, **kwargs: Any) -> dict[str, Any]:
++        """Route data to the correct decoder.
++
++        Args:
++            game: Game identifier.
++            raw_data: Raw data to decode.
++            **kwargs: Extra args passed to decoder.decode().
++
++        Returns:
++            Decoded result dict.
++
++        Raises:
++            KeyError: If game has no registered decoder.
++        """
++        decoder = self._decoders.get(game)
++        if decoder is None:
++            raise KeyError(f"No decoder registered for game: {game}")
++        return decoder.decode(raw_data, **kwargs)
++
++    def list_games(self) -> list[str]:
++        """List all registered game identifiers."""
++        return sorted(self._decoders.keys())
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (protocol_registry)")
+diff --git a/integrations/dota2/src/dota2_agent/dota2_objective_timer.py b/integrations/dota2/src/dota2_agent/dota2_objective_timer.py
+new file mode 100644
+index 00000000..c94a4a9e
+--- /dev/null
++++ b/integrations/dota2/src/dota2_agent/dota2_objective_timer.py
+@@ -0,0 +1,118 @@
++"""
++Dota2 Objective Timer — Roshan/Aegis/Buyback respawn timers.
++
++Implements ObjectiveTrackerABC for Dota 2 objectives:
++Roshan (8-11min), Aegis (5min), Buyback (8min).
++
++Location: integrations/dota2/src/dota2_agent/dota2_objective_timer.py
++
++Reference (拿来主义):
++  - dota2bot-OpenHyperAI/mode_roshan.lua: Roshan timer logic
++  - integrations/lol/src/lol_agent/objective_timer.py: timer pattern
++  - modules/objective_tracker_abc.py: ABC contract
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import logging
++import sys
++import os
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.dota2.dota2_objective_timer.v1"
++
++_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
++_ABC_FILE = os.path.join(_ROOT, "modules", "objective_tracker_abc.py")
++
++
++def _resolve_abc(filepath: str, cls_name: str) -> type:
++    """Find already-loaded ABC class or load from file."""
++    abs_path = os.path.abspath(filepath)
++    for mod in list(sys.modules.values()):
++        f = getattr(mod, "__file__", None)
++        if f and os.path.abspath(f) == abs_path and hasattr(mod, cls_name):
++            return getattr(mod, cls_name)
++    spec = importlib.util.spec_from_file_location("modules.objective_tracker_abc", filepath)
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules["modules.objective_tracker_abc"] = mod
++    spec.loader.exec_module(mod)
++    return getattr(mod, cls_name)
++
++
++ObjectiveTrackerABC = _resolve_abc(_ABC_FILE, "ObjectiveTrackerABC")
++
++# Dota 2 respawn times (seconds)
++_RESPAWN_TIMES: dict[str, float] = {
++    "roshan": 480.0,     # 8 min minimum (8-11 min random)
++    "aegis": 300.0,      # 5 min
++    "buyback": 480.0,    # 8 min cooldown
++    "glyph": 300.0,      # 5 min
++    "outpost": 600.0,    # 10 min
++}
++
++
++class Dota2ObjectiveTimer(ObjectiveTrackerABC):
++    """Dota 2 objective respawn timer.
++
++    Tracks Roshan, Aegis, Buyback, and other objective timers.
++    Implements ObjectiveTrackerABC for cross-game compatibility.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._timers: dict[str, float] = {}  # objective → respawn_at game_time
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def start_timer(self, objective: str, game_time: float) -> None:
++        """Start a respawn timer.
++
++        Args:
++            objective: Objective name (roshan, aegis, buyback, etc.).
++            game_time: Game time when objective was taken/killed.
++        """
++        respawn_duration = _RESPAWN_TIMES.get(objective, 300.0)
++        self._timers[objective] = game_time + respawn_duration
++        logger.info("Dota2 timer started: %s respawns at %.0f", objective,
++                     self._timers[objective])
++        self._fire_evolution({"action": "start_timer", "objective": objective})
++
++    def time_remaining(self, objective: str, current_time: float) -> float:
++        """Get remaining respawn time.
++
++        Args:
++            objective: Objective name.
++            current_time: Current game time.
++
++        Returns:
++            Remaining seconds, or 0.0 if expired/not tracked.
++        """
++        respawn_at = self._timers.get(objective)
++        if respawn_at is None:
++            return 0.0
++        return max(0.0, respawn_at - current_time)
++
++    def clear(self, objective: str) -> None:
++        """Clear an objective timer."""
++        self._timers.pop(objective, None)
++
++    def active_timers(self) -> list[str]:
++        """List currently active objective timers."""
++        return list(self._timers.keys())
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (dota2_objective_timer)")
+diff --git a/integrations/dota2/src/dota2_agent/dota2_real_time_assistant.py b/integrations/dota2/src/dota2_agent/dota2_real_time_assistant.py
+new file mode 100644
+index 00000000..6d8b18bd
+--- /dev/null
++++ b/integrations/dota2/src/dota2_agent/dota2_real_time_assistant.py
+@@ -0,0 +1,176 @@
++"""
++Dota2 Real-Time Assistant — RealTimeAssistantABC implementation for Dota 2.
++
++Provides real-time game advice for Dota 2 matches:
++scouting, decision-making, feedback recording, and post-game analysis.
++
++Location: integrations/dota2/src/dota2_agent/dota2_real_time_assistant.py
++
++Reference (拿来主义):
++  - dota2bot-OpenHyperAI/mode_push.lua: push/farm/retreat decisions
++  - integrations/dota2/src/dota2_agent/bot_commander.py: command priority
++  - integrations/lol/src/lol_agent/decision_engine.py: phase-based strategy
++  - modules/real_time_assistant_abc.py: ABC contract
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import logging
++import sys
++import os
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.dota2.dota2_real_time_assistant.v1"
++
++# Resolve ABC: reuse already-loaded module (handles test _load() scenario)
++_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
++_ABC_FILE = os.path.join(_ROOT, "modules", "real_time_assistant_abc.py")
++
++
++def _resolve_abc(filepath: str, cls_name: str) -> type:
++    """Find already-loaded ABC class or load from file."""
++    abs_path = os.path.abspath(filepath)
++    for mod in list(sys.modules.values()):
++        f = getattr(mod, "__file__", None)
++        if f and os.path.abspath(f) == abs_path and hasattr(mod, cls_name):
++            return getattr(mod, cls_name)
++    spec = importlib.util.spec_from_file_location("modules.real_time_assistant_abc", filepath)
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules["modules.real_time_assistant_abc"] = mod
++    spec.loader.exec_module(mod)
++    return getattr(mod, cls_name)
++
++
++RealTimeAssistantABC = _resolve_abc(_ABC_FILE, "RealTimeAssistantABC")
++
++# Game phase thresholds (seconds) — mirrors dota2bot mode switching
++_EARLY_END: float = 720.0   # 12 min laning
++_MID_END: float = 1800.0    # 30 min midgame
++
++
++class Dota2RealTimeAssistant(RealTimeAssistantABC):
++    """Dota 2 real-time game assistant.
++
++    Implements scout/decide/feedback/postgame for Dota 2,
++    using phase-based strategy (laning → midgame → lategame)
++    mirroring dota2bot-OpenHyperAI's mode system.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._feedback_records: list[dict[str, Any]] = []
++        self._decision_history: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def game_name(self) -> str:
++        return "dota2"
++
++    def scout(self, context: dict[str, Any]) -> dict[str, Any]:
++        """Scout allies and enemies pre-game or during.
++
++        Args:
++            context: Dict with allies, enemies lists.
++
++        Returns:
++            Scouting report dict.
++        """
++        allies = context.get("allies", [])
++        enemies = context.get("enemies", [])
++        return {
++            "ally_count": len(allies),
++            "enemy_count": len(enemies),
++            "threat_level": min(1.0, len(enemies) * 0.2),
++        }
++
++    def decide(self, state: dict[str, Any]) -> dict[str, Any]:
++        """Produce Dota 2 strategy decision.
++
++        Uses game_time for phase detection and gold_diff for aggression.
++
++        Args:
++            state: Dict with game_time, gold_diff.
++
++        Returns:
++            Strategy dict with phase, action, confidence.
++        """
++        game_time = state.get("game_time", 0.0)
++        gold_diff = state.get("gold_diff", 0)
++
++        # Phase detection (dota2bot mode_push/farm/retreat)
++        if game_time < _EARLY_END:
++            phase = "early"
++            if gold_diff > 500:
++                action = "aggressive_lane"
++            else:
++                action = "safe_farm"
++        elif game_time < _MID_END:
++            phase = "mid"
++            if gold_diff > 2000:
++                action = "push_tower"
++            elif gold_diff < -2000:
++                action = "defensive_farm"
++            else:
++                action = "team_fight"
++        else:
++            phase = "late"
++            if gold_diff > 5000:
++                action = "push_high_ground"
++            else:
++                action = "roshan_then_push"
++
++        confidence = min(1.0, 0.5 + abs(gold_diff) / 10000.0)
++
++        decision = {
++            "phase": phase,
++            "action": action,
++            "strategy": action,
++            "confidence": confidence,
++            "game_time": game_time,
++        }
++        self._decision_history.append(decision)
++        self._fire_evolution({"action": "decide", "phase": phase})
++        return decision
++
++    def record_feedback(
++        self, advice: dict[str, Any], action: dict[str, Any]
++    ) -> None:
++        """Record advice vs actual action."""
++        match = advice.get("action") == action.get("action")
++        self._feedback_records.append({
++            "advice": advice,
++            "action": action,
++            "match": match,
++            "timestamp": time.time(),
++        })
++
++    def post_game_report(self) -> dict[str, Any]:
++        """Generate post-game analysis."""
++        total = len(self._feedback_records)
++        matches = sum(1 for f in self._feedback_records if f.get("match"))
++        return {
++            "game": "dota2",
++            "total_feedback": total,
++            "feedback_count": total,
++            "match_count": matches,
++            "match_rate": matches / max(total, 1),
++            "decisions_made": len(self._decision_history),
++        }
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (dota2_real_time_assistant)")
+diff --git a/integrations/mahjong/src/mahjong_agent/mahjong_real_time_assistant.py b/integrations/mahjong/src/mahjong_agent/mahjong_real_time_assistant.py
+new file mode 100644
+index 00000000..cb849864
+--- /dev/null
++++ b/integrations/mahjong/src/mahjong_agent/mahjong_real_time_assistant.py
+@@ -0,0 +1,163 @@
++"""
++Mahjong Real-Time Assistant — RealTimeAssistantABC implementation for Mahjong.
++
++Provides real-time tile advice for Mahjong matches:
++scouting opponents, discard recommendations, feedback, post-game analysis.
++
++Location: integrations/mahjong/src/mahjong_agent/mahjong_real_time_assistant.py
++
++Reference (拿来主义):
++  - Akagi/mjai_bot/controller.py: Controller.react() event-driven decisions
++  - integrations/mahjong/src/mahjong_agent/mahjong_strategy_advisor.py: advise pattern
++  - integrations/mahjong/src/mahjong_agent/discard_advisor.py: tile evaluation
++  - modules/real_time_assistant_abc.py: ABC contract
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import logging
++import sys
++import os
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.mahjong.mahjong_real_time_assistant.v1"
++
++_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
++_ABC_FILE = os.path.join(_ROOT, "modules", "real_time_assistant_abc.py")
++
++
++def _resolve_abc(filepath: str, cls_name: str) -> type:
++    """Find already-loaded ABC class or load from file."""
++    abs_path = os.path.abspath(filepath)
++    for mod in list(sys.modules.values()):
++        f = getattr(mod, "__file__", None)
++        if f and os.path.abspath(f) == abs_path and hasattr(mod, cls_name):
++            return getattr(mod, cls_name)
++    spec = importlib.util.spec_from_file_location("modules.real_time_assistant_abc", filepath)
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules["modules.real_time_assistant_abc"] = mod
++    spec.loader.exec_module(mod)
++    return getattr(mod, cls_name)
++
++
++RealTimeAssistantABC = _resolve_abc(_ABC_FILE, "RealTimeAssistantABC")
++
++
++class MahjongRealTimeAssistant(RealTimeAssistantABC):
++    """Mahjong real-time game assistant.
++
++    Implements scout/decide/feedback/postgame for Mahjong,
++    mirroring Akagi's controller.react() decision flow
++    with shanten-aware tile recommendations.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._feedback_records: list[dict[str, Any]] = []
++        self._decision_history: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def game_name(self) -> str:
++        return "mahjong"
++
++    def scout(self, context: dict[str, Any]) -> dict[str, Any]:
++        """Scout opponents and round context.
++
++        Args:
++            context: Dict with opponents, wind, round info.
++
++        Returns:
++            Scouting report dict.
++        """
++        opponents = context.get("opponents", [])
++        wind = context.get("wind", "unknown")
++        round_num = context.get("round", 0)
++        return {
++            "opponent_count": len(opponents),
++            "wind": wind,
++            "round": round_num,
++            "threat_level": min(1.0, len(opponents) * 0.25),
++        }
++
++    def decide(self, state: dict[str, Any]) -> dict[str, Any]:
++        """Produce tile recommendation from hand state.
++
++        Uses shanten distance for strategy selection.
++
++        Args:
++            state: Dict with hand tiles, discards, shanten.
++
++        Returns:
++            Decision dict with action, recommendation, shanten.
++        """
++        hand = state.get("hand", [])
++        shanten = state.get("shanten", 6)
++
++        # Simple strategy: closer to tenpai → more aggressive
++        if shanten <= 1:
++            action = "riichi_or_damaten"
++            confidence = 0.9
++        elif shanten <= 3:
++            action = "build_hand"
++            confidence = 0.6
++        else:
++            action = "safe_discard"
++            confidence = 0.4
++
++        # Recommend discarding last tile if hand is non-empty
++        recommendation = hand[-1] if hand else "pass"
++
++        decision = {
++            "action": action,
++            "recommendation": recommendation,
++            "shanten": shanten,
++            "confidence": confidence,
++            "hand_size": len(hand),
++        }
++        self._decision_history.append(decision)
++        self._fire_evolution({"action": "decide", "shanten": shanten})
++        return decision
++
++    def record_feedback(
++        self, advice: dict[str, Any], action: dict[str, Any]
++    ) -> None:
++        """Record advice vs actual action."""
++        match = advice.get("action") == action.get("action")
++        self._feedback_records.append({
++            "advice": advice,
++            "action": action,
++            "match": match,
++            "timestamp": time.time(),
++        })
++
++    def post_game_report(self) -> dict[str, Any]:
++        """Generate post-game analysis."""
++        total = len(self._feedback_records)
++        matches = sum(1 for f in self._feedback_records if f.get("match"))
++        return {
++            "game": "mahjong",
++            "total_feedback": total,
++            "feedback_count": total,
++            "match_count": matches,
++            "match_rate": matches / max(total, 1),
++            "decisions_made": len(self._decision_history),
++        }
++
++    # --- Evolution pattern ---
++    def _fire_evolution(self, detail: dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            try:
++                self.evolution_callback({
++                    "key": _EVOLUTION_KEY,
++                    "detail": detail,
++                    "timestamp": time.time(),
++                })
++            except Exception:
++                logger.warning("Evolution callback error (mahjong_real_time_assistant)")
+diff --git a/modules/danger_assessment_abc.py b/modules/danger_assessment_abc.py
+new file mode 100644
+index 00000000..16412e79
+--- /dev/null
++++ b/modules/danger_assessment_abc.py
+@@ -0,0 +1,77 @@
++"""
++Danger Assessment ABC — Cross-game unified danger detection interface.
++
++Provides abstract base class for all game-specific danger detectors,
++enabling unified assess/safe_direction/is_safe access across games.
++
++Location: modules/danger_assessment_abc.py
++
++Reference (拿来主义):
++  - integrations/lol/src/lol_agent/danger_zone_detector.py: danger assessment
++  - modules/game_bridge_abc.py: ABC pattern
++  - LeagueAI/helper.py: distance-based danger calculation
++"""
++
++from __future__ import annotations
++
++from abc import ABC, abstractmethod
++from typing import Any
++
++_EVOLUTION_KEY: str = "modules.danger_assessment_abc.v1"
++
++
++class DangerAssessmentABC(ABC):
++    """Abstract base class for game-specific danger assessment.
++
++    All danger assessors must provide:
++    - assess: compute danger level at position
++    - safe_direction: find safest movement direction
++    - is_safe: check if position is safe
++    """
++
++    @abstractmethod
++    def assess(
++        self, position: Any, enemies: Any, vision: Any
++    ) -> float:
++        """Compute danger level at a given position.
++
++        Args:
++            position: Current position (format varies by game).
++            enemies: Known enemy positions/data.
++            vision: Vision/fog-of-war data.
++
++        Returns:
++            Danger level float (0.0 = safe, 1.0 = maximum danger).
++        """
++        ...
++
++    @abstractmethod
++    def safe_direction(
++        self, position: Any, enemies: Any
++    ) -> dict[str, Any]:
++        """Find the safest direction to move.
++
++        Args:
++            position: Current position.
++            enemies: Known enemy positions.
++
++        Returns:
++            Dict with direction components.
++        """
++        ...
++
++    @abstractmethod
++    def is_safe(
++        self, position: Any, enemies: Any, vision: Any
++    ) -> bool:
++        """Check if current position is safe.
++
++        Args:
++            position: Current position.
++            enemies: Known enemy positions.
++            vision: Vision data.
++
++        Returns:
++            True if position is safe.
++        """
++        ...
+diff --git a/modules/objective_tracker_abc.py b/modules/objective_tracker_abc.py
+new file mode 100644
+index 00000000..96b6aa88
+--- /dev/null
++++ b/modules/objective_tracker_abc.py
+@@ -0,0 +1,72 @@
++"""
++Objective Tracker ABC — Cross-game unified objective timing interface.
++
++Provides abstract base class for all game-specific objective timers,
++enabling unified start/remaining/clear/active access across games.
++
++Location: modules/objective_tracker_abc.py
++
++Reference (拿来主义):
++  - integrations/lol/src/lol_agent/objective_timer.py: dragon/baron timers
++  - dota2bot-OpenHyperAI/mode_roshan.lua: Roshan timer logic
++  - modules/game_bridge_abc.py: ABC pattern
++"""
++
++from __future__ import annotations
++
++from abc import ABC, abstractmethod
++from typing import Any
++
++_EVOLUTION_KEY: str = "modules.objective_tracker_abc.v1"
++
++
++class ObjectiveTrackerABC(ABC):
++    """Abstract base class for game-specific objective timers.
++
++    All objective trackers must provide:
++    - start_timer: begin tracking an objective respawn
++    - time_remaining: query remaining time
++    - clear: remove a timer
++    - active_timers: list active objective timers
++    """
++
++    @abstractmethod
++    def start_timer(self, objective: str, game_time: float) -> None:
++        """Start a respawn timer for an objective.
++
++        Args:
++            objective: Objective identifier (e.g., 'dragon', 'roshan').
++            game_time: Game time when objective was taken.
++        """
++        ...
++
++    @abstractmethod
++    def time_remaining(self, objective: str, current_time: float) -> float:
++        """Get remaining respawn time for an objective.
++
++        Args:
++            objective: Objective identifier.
++            current_time: Current game time.
++
++        Returns:
++            Remaining seconds (0.0 if expired or not tracked).
++        """
++        ...
++
++    @abstractmethod
++    def clear(self, objective: str) -> None:
++        """Clear an objective timer.
++
++        Args:
++            objective: Objective identifier to clear.
++        """
++        ...
++
++    @abstractmethod
++    def active_timers(self) -> list[str]:
++        """List currently active objective timers.
++
++        Returns:
++            List of objective identifier strings.
++        """
++        ...
+diff --git a/modules/real_time_assistant_abc.py b/modules/real_time_assistant_abc.py
+new file mode 100644
+index 00000000..9e24e666
+--- /dev/null
++++ b/modules/real_time_assistant_abc.py
+@@ -0,0 +1,86 @@
++"""
++Real-Time Assistant ABC — Cross-game unified real-time assistant interface.
++
++Provides abstract base class for all game-specific real-time assistants,
++enabling unified scout/decide/feedback/postgame access across games.
++
++Location: modules/real_time_assistant_abc.py
++
++Reference (拿来主义):
++  - modules/game_bridge_abc.py: cross-game ABC pattern (game_name property)
++  - modules/strategy_advisor_abc.py: advise/evaluate pattern
++  - integrations/lol/src/lol_agent/lol_agent_orchestrator.py: full lifecycle
++"""
++
++from __future__ import annotations
++
++from abc import ABC, abstractmethod
++from typing import Any
++
++_EVOLUTION_KEY: str = "modules.real_time_assistant_abc.v1"
++
++
++class RealTimeAssistantABC(ABC):
++    """Abstract base class for game-specific real-time assistants.
++
++    All real-time assistants must provide:
++    - game_name: property returning game identifier
++    - scout: pre-game or real-time reconnaissance
++    - decide: produce strategic decision from game state
++    - record_feedback: record advice vs actual action divergence
++    - post_game_report: generate post-game analysis report
++
++    Mirrors the LoL Agent Orchestrator lifecycle abstracted
++    for cross-game reuse (Dota2, Mahjong, etc.).
++    """
++
++    @property
++    @abstractmethod
++    def game_name(self) -> str:
++        """Unique game identifier string."""
++        ...
++
++    @abstractmethod
++    def scout(self, context: dict[str, Any]) -> dict[str, Any]:
++        """Perform reconnaissance / scouting.
++
++        Args:
++            context: Game-specific context for scouting.
++
++        Returns:
++            Dict with scouting results (threats, intel, etc.).
++        """
++        ...
++
++    @abstractmethod
++    def decide(self, state: dict[str, Any]) -> dict[str, Any]:
++        """Produce a strategic decision from game state.
++
++        Args:
++            state: Current game state dict.
++
++        Returns:
++            Dict with recommended action and reasoning.
++        """
++        ...
++
++    @abstractmethod
++    def record_feedback(
++        self, advice: dict[str, Any], action: dict[str, Any]
++    ) -> None:
++        """Record feedback: advice given vs action taken.
++
++        Args:
++            advice: The advice that was given.
++            action: The action that was actually taken.
++        """
++        ...
++
++    @abstractmethod
++    def post_game_report(self) -> dict[str, Any]:
++        """Generate post-game analysis report.
++
++        Returns:
++            Dict with game summary, key moments, improvement suggestions.
++        """
++        ...
+diff --git a/modules/session_manager_abc.py b/modules/session_manager_abc.py
+new file mode 100644
+index 00000000..634f12a5
+--- /dev/null
++++ b/modules/session_manager_abc.py
+@@ -0,0 +1,59 @@
++"""
++Session Manager ABC — Cross-game unified session lifecycle interface.
++
++Provides abstract base class for all game session managers,
++enabling unified transition/reset/duration access across games.
++
++Location: modules/session_manager_abc.py
++
++Reference (拿来主义):
++  - integrations/lol/src/lol_agent/game_session_manager.py: state machine
++  - modules/game_bridge_abc.py: ABC pattern
++  - DI-star/distar/ctools/worker/learner/base_learner.py: lifecycle hooks
++"""
++
++from __future__ import annotations
++
++from abc import ABC, abstractmethod
++
++_EVOLUTION_KEY: str = "modules.session_manager_abc.v1"
++
++
++class SessionManagerABC(ABC):
++    """Abstract base class for game session managers.
++
++    All session managers must provide:
++    - state: property returning current state
++    - transition: move to a new state
++    - reset: reset to initial state
++    - get_duration: return session duration
++    """
++
++    @property
++    @abstractmethod
++    def state(self) -> str:
++        """Current session state string."""
++        ...
++
++    @abstractmethod
++    def transition(self, new_state: str) -> None:
++        """Transition to a new session state.
++
++        Args:
++            new_state: Target state.
++        """
++        ...
++
++    @abstractmethod
++    def reset(self) -> None:
++        """Reset session to initial state."""
++        ...
++
++    @abstractmethod
++    def get_duration(self) -> float:
++        """Return current session duration in seconds.
++
++        Returns:
++            Duration as float.
++        """
++        ...
+-- 
+2.43.0
+

@@ -1,0 +1,1607 @@
+From 2b25fecc7d8ee992a5171ca47dd9bf6617d7e06d Mon Sep 17 00:00:00 2001
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Sun, 29 Mar 2026 10:56:05 +0000
+Subject: [PATCH] feat(M406-M425): LoL History Strategy Fusion + Evolution
+ Pipeline Hardening
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Phase AD (M406-M415): LoL History → Real-Time Strategy Fusion Pipeline
+- M406: HistoryMatchAggregator — cross-champion-pool stat aggregation
+- M407: ChampionTendencyAnalyzer — per-champion aggression/farm/consistency
+- M408: OpponentWeaknessDetector — exploitable weakness identification
+- M409: TeamSynergyScorer — duo/trio historical synergy evaluation
+- M410: MetaShiftTracker — patch-level meta trend detection
+- M411: HistoryStrategyFuser — live state + history → strategy recs
+- M412: DraftRecommendationEngine — pick/ban from history + matchups
+- M413: LaneMatchupPredictor — lane outcome prediction from history
+- M414: PlaystyleClassifier — aggressive/passive/farm/supportive
+- M415: TiltDetector — loss streak + death pattern tilt detection
+
+Phase AE (M416-M425): Evolution Event Bus + Persistence Hardening
+- M416: EvolutionEventBus — pub/sub with wildcard + error isolation
+- M417: EvolutionPersistence — snapshot save/load with deepcopy safety
+- M418: EvolutionReplay — event replay by type/time + timeline export
+- M419: FitnessAggregator — weighted cross-module fitness + trend
+- M420: GenerationScheduler — episode/fitness/cooldown-based scheduling
+- M421: ProtocolHealthMonitor — decode health metrics + alerts
+- M422: PacketRateLimiter — per-protocol + global rate limiting
+- M423: FiddlerSnapshotExporter — capture → training span conversion
+- M424: FiddlerRuleEngine — declarative traffic filtering rules
+- M425: FiddlerDashboardData — dashboard metrics aggregation
+
+TDD: 215 tests passed (200 unit + 15 overfit validation)
+plan.md: M426-M445 new tasks appended
+---
+ agentos/governance/evolution_event_bus.py     |  57 +++++++++
+ agentos/governance/evolution_persistence.py   |  45 +++++++
+ agentos/governance/evolution_replay.py        |  52 ++++++++
+ agentos/governance/fitness_aggregator.py      |  49 ++++++++
+ agentos/governance/generation_scheduler.py    |  60 +++++++++
+ .../src/fiddler_dashboard_data.py             |  64 ++++++++++
+ .../fiddler-bridge/src/fiddler_rule_engine.py |  64 ++++++++++
+ .../src/fiddler_snapshot_exporter.py          |  48 ++++++++
+ .../src/packet_rate_limiter.py                |  60 +++++++++
+ .../src/protocol_health_monitor.py            |  70 +++++++++++
+ .../lol_history/champion_tendency_analyzer.py |  86 +++++++++++++
+ .../lol_history/history_match_aggregator.py   |  77 ++++++++++++
+ .../src/lol_history/meta_shift_tracker.py     |  88 +++++++++++++
+ .../lol_history/opponent_weakness_detector.py |  85 +++++++++++++
+ .../src/lol_history/team_synergy_scorer.py    |  63 ++++++++++
+ .../lol_agent/draft_recommendation_engine.py  |  66 ++++++++++
+ .../src/lol_agent/history_strategy_fuser.py   |  60 +++++++++
+ .../src/lol_agent/lane_matchup_predictor.py   |  51 ++++++++
+ .../lol/src/lol_agent/playstyle_classifier.py |  68 ++++++++++
+ .../lol/src/lol_agent/tilt_detector.py        |  68 ++++++++++
+ plan.md                                       | 116 ++++++++++++++++++
+ 21 files changed, 1397 insertions(+)
+ create mode 100644 agentos/governance/evolution_event_bus.py
+ create mode 100644 agentos/governance/evolution_persistence.py
+ create mode 100644 agentos/governance/evolution_replay.py
+ create mode 100644 agentos/governance/fitness_aggregator.py
+ create mode 100644 agentos/governance/generation_scheduler.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_dashboard_data.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_rule_engine.py
+ create mode 100644 extensions/fiddler-bridge/src/fiddler_snapshot_exporter.py
+ create mode 100644 extensions/protocol-decoder/src/packet_rate_limiter.py
+ create mode 100644 extensions/protocol-decoder/src/protocol_health_monitor.py
+ create mode 100644 integrations/lol-history/src/lol_history/champion_tendency_analyzer.py
+ create mode 100644 integrations/lol-history/src/lol_history/history_match_aggregator.py
+ create mode 100644 integrations/lol-history/src/lol_history/meta_shift_tracker.py
+ create mode 100644 integrations/lol-history/src/lol_history/opponent_weakness_detector.py
+ create mode 100644 integrations/lol-history/src/lol_history/team_synergy_scorer.py
+ create mode 100644 integrations/lol/src/lol_agent/draft_recommendation_engine.py
+ create mode 100644 integrations/lol/src/lol_agent/history_strategy_fuser.py
+ create mode 100644 integrations/lol/src/lol_agent/lane_matchup_predictor.py
+ create mode 100644 integrations/lol/src/lol_agent/playstyle_classifier.py
+ create mode 100644 integrations/lol/src/lol_agent/tilt_detector.py
+
+diff --git a/agentos/governance/evolution_event_bus.py b/agentos/governance/evolution_event_bus.py
+new file mode 100644
+index 00000000..daabf661
+--- /dev/null
++++ b/agentos/governance/evolution_event_bus.py
+@@ -0,0 +1,57 @@
++"""
++Evolution Event Bus — Pub/sub event bus for cross-module evolution events.
++Location: agentos/governance/evolution_event_bus.py
++Reference: DI-star event system, Akagi bridge message queue, PARL event bus
++"""
++from __future__ import annotations
++import logging, time, uuid
++from typing import Any, Callable, Optional
++from collections import defaultdict
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "agentos.governance.evolution_event_bus.v1"
++
++class EvolutionEventBus:
++    def __init__(self, max_history: int = 1000) -> None:
++        self._subscribers: dict[str, dict[str, Callable]] = defaultdict(dict)
++        self._history: dict[str, list[dict]] = defaultdict(list)
++        self._max_history = max_history
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def subscribe(self, topic: str, handler: Callable[[dict], None]) -> str:
++        sub_id = str(uuid.uuid4())
++        self._subscribers[topic][sub_id] = handler
++        return sub_id
++
++    def unsubscribe(self, sub_id: str) -> None:
++        for topic in self._subscribers:
++            self._subscribers[topic].pop(sub_id, None)
++
++    def publish(self, topic: str, event: dict[str, Any]) -> None:
++        event_with_meta = {**event, "_topic": topic, "_published_at": time.time()}
++        # Store history
++        self._history[topic].append(event_with_meta)
++        if len(self._history[topic]) > self._max_history:
++            self._history[topic] = self._history[topic][-self._max_history:]
++        # Deliver to topic subscribers
++        for sid, handler in list(self._subscribers.get(topic, {}).items()):
++            try:
++                handler(event)
++            except Exception as e:
++                logger.warning("Subscriber %s error on topic %s: %s", sid, topic, e)
++        # Deliver to wildcard subscribers
++        if topic != "*":
++            for sid, handler in list(self._subscribers.get("*", {}).items()):
++                try:
++                    handler(event)
++                except Exception as e:
++                    logger.warning("Wildcard subscriber %s error: %s", sid, e)
++        # Evolution callback
++        if self.evolution_callback:
++            self.evolution_callback({"type": "event_published", "key": _EVOLUTION_KEY,
++                                     "topic": topic, "timestamp": time.time()})
++
++    def get_history(self, topic: str) -> list[dict]:
++        return list(self._history.get(topic, []))
++
++    def subscriber_count(self, topic: str) -> int:
++        return len(self._subscribers.get(topic, {}))
+diff --git a/agentos/governance/evolution_persistence.py b/agentos/governance/evolution_persistence.py
+new file mode 100644
+index 00000000..6bac8d32
+--- /dev/null
++++ b/agentos/governance/evolution_persistence.py
+@@ -0,0 +1,45 @@
++"""
++Evolution Persistence — Persistence layer for evolution state snapshots.
++Location: agentos/governance/evolution_persistence.py
++Reference: DI-star checkpoint saving, ELF model persistence
++"""
++from __future__ import annotations
++import copy, logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "agentos.governance.evolution_persistence.v1"
++
++class EvolutionPersistence:
++    def __init__(self) -> None:
++        self._store: dict[str, dict[str, Any]] = {}
++        self._metadata: dict[str, dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def save_snapshot(self, key: str, snapshot: dict[str, Any]) -> None:
++        self._store[key] = copy.deepcopy(snapshot)
++        self._metadata[key] = {"saved_at": time.time(), "key": key}
++        if self.evolution_callback:
++            self.evolution_callback({"type": "snapshot_saved", "key": _EVOLUTION_KEY,
++                                     "snapshot_key": key, "timestamp": time.time()})
++
++    def load_snapshot(self, key: str) -> Optional[dict[str, Any]]:
++        if key not in self._store:
++            return None
++        return copy.deepcopy(self._store[key])
++
++    def delete_snapshot(self, key: str) -> None:
++        self._store.pop(key, None)
++        self._metadata.pop(key, None)
++
++    def list_snapshots(self) -> list[str]:
++        return list(self._store.keys())
++
++    def get_metadata(self, key: str) -> dict[str, Any]:
++        return dict(self._metadata.get(key, {}))
++
++    def snapshot_count(self) -> int:
++        return len(self._store)
++
++    def clear_all(self) -> None:
++        self._store.clear()
++        self._metadata.clear()
+diff --git a/agentos/governance/evolution_replay.py b/agentos/governance/evolution_replay.py
+new file mode 100644
+index 00000000..ac91e9ec
+--- /dev/null
++++ b/agentos/governance/evolution_replay.py
+@@ -0,0 +1,52 @@
++"""
++Evolution Replay — Replay evolution events for debugging/analysis.
++Location: agentos/governance/evolution_replay.py
++Reference: DI-star replay buffer, open_spiel game replay
++"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "agentos.governance.evolution_replay.v1"
++
++class EvolutionReplay:
++    def __init__(self, max_events: int = 100000) -> None:
++        self._events: list[dict[str, Any]] = []
++        self._max_events = max_events
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record(self, event: dict[str, Any]) -> None:
++        entry = {**event, "_recorded_at": time.time()}
++        self._events.append(entry)
++        if len(self._events) > self._max_events:
++            self._events = self._events[-self._max_events:]
++        if self.evolution_callback:
++            self.evolution_callback({"type": "event_recorded", "key": _EVOLUTION_KEY, "timestamp": time.time()})
++
++    def event_count(self) -> int:
++        return len(self._events)
++
++    def replay(self, *, event_type: str | None = None,
++               start_time: float | None = None, end_time: float | None = None) -> list[dict]:
++        result = self._events
++        if event_type:
++            result = [e for e in result if e.get("type") == event_type]
++        if start_time is not None:
++            result = [e for e in result if e.get("_recorded_at", 0) >= start_time]
++        if end_time is not None:
++            result = [e for e in result if e.get("_recorded_at", 0) <= end_time]
++        return list(result)
++
++    def clear(self) -> None:
++        self._events.clear()
++
++    def summary(self) -> dict[str, Any]:
++        by_type: dict[str, int] = defaultdict(int)
++        for e in self._events:
++            by_type[e.get("type", "unknown")] += 1
++        return {"total_events": len(self._events), "by_type": dict(by_type)}
++
++    def export_timeline(self) -> list[dict[str, Any]]:
++        return [{"timestamp": e.get("_recorded_at", 0), "event": {k: v for k, v in e.items() if not k.startswith("_")}}
++                for e in self._events]
+diff --git a/agentos/governance/fitness_aggregator.py b/agentos/governance/fitness_aggregator.py
+new file mode 100644
+index 00000000..76f25085
+--- /dev/null
++++ b/agentos/governance/fitness_aggregator.py
+@@ -0,0 +1,49 @@
++"""
++Fitness Aggregator — Cross-module fitness score aggregation.
++Location: agentos/governance/fitness_aggregator.py
++Reference: DI-star training metrics, PARL fitness evaluation
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++from collections import defaultdict
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "agentos.governance.fitness_aggregator.v1"
++
++class FitnessAggregator:
++    def __init__(self) -> None:
++        self._latest: dict[str, float] = {}
++        self._weights: dict[str, float] = {}
++        self._history: dict[str, list[float]] = defaultdict(list)
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def report(self, module: str, fitness: float, weight: float = 1.0) -> None:
++        clamped = min(max(fitness, 0.0), 1.0)
++        self._latest[module] = clamped
++        self._weights[module] = weight
++        self._history[module].append(clamped)
++        if self.evolution_callback:
++            self.evolution_callback({"type": "fitness_reported", "key": _EVOLUTION_KEY,
++                                     "module": module, "fitness": clamped, "timestamp": time.time()})
++
++    def aggregate(self) -> dict[str, Any]:
++        if not self._latest:
++            return {"global_fitness": 0.0, "per_module": {}}
++        total_w = sum(self._weights.get(m, 1.0) for m in self._latest)
++        weighted_sum = sum(self._latest[m] * self._weights.get(m, 1.0) for m in self._latest)
++        return {"global_fitness": weighted_sum / total_w if total_w > 0 else 0.0,
++                "per_module": dict(self._latest)}
++
++    def get_history(self, module: str) -> list[float]:
++        return list(self._history.get(module, []))
++
++    def get_trend(self, module: str) -> str:
++        h = self._history.get(module, [])
++        if len(h) < 3:
++            return "insufficient_data"
++        recent = h[-3:]
++        if all(recent[i] <= recent[i + 1] for i in range(len(recent) - 1)):
++            return "improving"
++        if all(recent[i] >= recent[i + 1] for i in range(len(recent) - 1)):
++            return "declining"
++        return "stable"
+diff --git a/agentos/governance/generation_scheduler.py b/agentos/governance/generation_scheduler.py
+new file mode 100644
+index 00000000..e97d2241
+--- /dev/null
++++ b/agentos/governance/generation_scheduler.py
+@@ -0,0 +1,60 @@
++"""
++Generation Scheduler — Schedule generation advances based on multi-game fitness.
++Location: agentos/governance/generation_scheduler.py
++Reference: DI-star training loop, ELF self-play scheduler
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "agentos.governance.generation_scheduler.v1"
++
++class GenerationScheduler:
++    def __init__(self, min_episodes: int = 10, min_fitness: float = 0.5,
++                 cooldown_seconds: float = 0.0) -> None:
++        self._min_episodes = min_episodes
++        self._min_fitness = min_fitness
++        self._cooldown = cooldown_seconds
++        self.current_generation: int = 0
++        self._episodes: list[dict[str, Any]] = []
++        self._fitness: float = 0.0
++        self._last_advance: float = 0.0
++        self._gen_history: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record_episode(self, game: str, episode: dict[str, Any]) -> None:
++        self._episodes.append({"game": game, **episode, "timestamp": time.time()})
++        if self.evolution_callback:
++            self.evolution_callback({"type": "episode_recorded", "key": _EVOLUTION_KEY,
++                                     "game": game, "timestamp": time.time()})
++
++    def set_fitness(self, fitness: float) -> None:
++        self._fitness = min(max(fitness, 0.0), 1.0)
++
++    def episode_count(self) -> int:
++        return len(self._episodes)
++
++    def should_advance(self) -> bool:
++        if len(self._episodes) < self._min_episodes:
++            return False
++        if self._fitness < self._min_fitness:
++            return False
++        if self._cooldown > 0 and self._last_advance > 0:
++            if time.time() - self._last_advance < self._cooldown:
++                return False
++        return True
++
++    def advance(self) -> None:
++        self._gen_history.append({"generation": self.current_generation,
++                                  "episodes": len(self._episodes), "fitness": self._fitness,
++                                  "advanced_at": time.time()})
++        self.current_generation += 1
++        self._episodes.clear()
++        self._last_advance = time.time()
++
++    def generation_history(self) -> list[dict[str, Any]]:
++        return list(self._gen_history)
++
++    def status(self) -> dict[str, Any]:
++        return {"current_generation": self.current_generation,
++                "episode_count": len(self._episodes), "fitness": self._fitness}
+diff --git a/extensions/fiddler-bridge/src/fiddler_dashboard_data.py b/extensions/fiddler-bridge/src/fiddler_dashboard_data.py
+new file mode 100644
+index 00000000..9e9747e1
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_dashboard_data.py
+@@ -0,0 +1,64 @@
++"""
++Fiddler Dashboard Data — Dashboard metrics aggregation for Fiddler bridge.
++Location: extensions/fiddler-bridge/src/fiddler_dashboard_data.py
++Reference: Akagi monitoring, Fiddler Everywhere dashboard data
++"""
++from __future__ import annotations
++import logging, time
++from collections import Counter, defaultdict
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_dashboard_data.v1"
++
++class FiddlerDashboardData:
++    def __init__(self) -> None:
++        self._packets: list[dict[str, Any]] = []
++        self._sessions: set[str] = set()
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record_packet(self, packet: dict[str, Any]) -> None:
++        self._packets.append({**packet, "_recorded_at": time.time()})
++        if self.evolution_callback:
++            self.evolution_callback({"type": "packet_recorded", "key": _EVOLUTION_KEY, "timestamp": time.time()})
++
++    def start_session(self, session_id: str) -> None:
++        self._sessions.add(session_id)
++
++    def end_session(self, session_id: str) -> None:
++        self._sessions.discard(session_id)
++
++    def get_dashboard(self) -> dict[str, Any]:
++        n = len(self._packets)
++        if n == 0:
++            return {"total_packets": 0, "active_sessions": len(self._sessions),
++                    "total_bytes": 0, "error_rate": 0.0, "avg_latency_ms": 0.0,
++                    "top_endpoints": []}
++
++        total_bytes = sum(p.get("size_bytes", 0) for p in self._packets)
++        errors = sum(1 for p in self._packets if p.get("status", 200) >= 400)
++        latencies = [p.get("latency_ms", 0) for p in self._packets]
++
++        # Top endpoints
++        url_counts = Counter(p.get("url", "") for p in self._packets)
++        top = [{"url": url, "count": cnt} for url, cnt in url_counts.most_common(10)]
++
++        return {
++            "total_packets": n,
++            "active_sessions": len(self._sessions),
++            "total_bytes": total_bytes,
++            "error_rate": errors / n if n > 0 else 0.0,
++            "avg_latency_ms": sum(latencies) / n if n > 0 else 0.0,
++            "top_endpoints": top,
++        }
++
++    def get_time_series(self, window_seconds: int = 60) -> list[dict[str, Any]]:
++        now = time.time()
++        relevant = [p for p in self._packets if now - p.get("_recorded_at", 0) < window_seconds]
++        # Group into 1-second buckets
++        buckets: dict[int, list] = defaultdict(list)
++        for p in relevant:
++            bucket = int(p.get("_recorded_at", 0))
++            buckets[bucket].append(p)
++        return [{"timestamp": ts, "count": len(pkts),
++                 "avg_latency": sum(p.get("latency_ms", 0) for p in pkts) / len(pkts)}
++                for ts, pkts in sorted(buckets.items())]
+diff --git a/extensions/fiddler-bridge/src/fiddler_rule_engine.py b/extensions/fiddler-bridge/src/fiddler_rule_engine.py
+new file mode 100644
+index 00000000..62a9cd26
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_rule_engine.py
+@@ -0,0 +1,64 @@
++"""
++Fiddler Rule Engine — Declarative traffic filtering rules.
++Location: extensions/fiddler-bridge/src/fiddler_rule_engine.py
++Reference: Akagi MITM filter rules, Fiddler Everywhere rule system
++"""
++from __future__ import annotations
++import logging, re, time, uuid
++from typing import Any, Callable, Optional
++from urllib.parse import urlparse
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_rule_engine.v1"
++
++class FiddlerRuleEngine:
++    def __init__(self) -> None:
++        self._rules: dict[str, dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def add_rule(self, rule: dict[str, Any]) -> str:
++        rule_id = str(uuid.uuid4())
++        self._rules[rule_id] = {**rule, "id": rule_id}
++        return rule_id
++
++    def remove_rule(self, rule_id: str) -> None:
++        self._rules.pop(rule_id, None)
++
++    def list_rules(self) -> list[dict[str, Any]]:
++        return list(self._rules.values())
++
++    def evaluate(self, packet: dict[str, Any]) -> bool:
++        if self.evolution_callback:
++            self.evolution_callback({"type": "rule_evaluated", "key": _EVOLUTION_KEY, "timestamp": time.time()})
++
++        if not self._rules:
++            return True
++
++        # Sort rules by priority (lower = higher priority)
++        sorted_rules = sorted(self._rules.values(), key=lambda r: r.get("priority", 10))
++
++        for rule in sorted_rules:
++            rtype = rule.get("type", "")
++            url = packet.get("url", "")
++            parsed = urlparse(url)
++            domain = parsed.hostname or ""
++
++            if rtype == "domain_blacklist":
++                if domain in rule.get("domains", []):
++                    return False
++            elif rtype == "domain_whitelist":
++                if domain not in rule.get("domains", []):
++                    return False
++            elif rtype == "status_filter":
++                status = packet.get("status", 200)
++                if status in rule.get("exclude", []):
++                    return False
++            elif rtype == "method_filter":
++                method = packet.get("method", "GET")
++                if method not in rule.get("allowed", []):
++                    return False
++            elif rtype == "url_pattern":
++                pattern = rule.get("pattern", "")
++                if pattern not in url:
++                    return False
++
++        return True
+diff --git a/extensions/fiddler-bridge/src/fiddler_snapshot_exporter.py b/extensions/fiddler-bridge/src/fiddler_snapshot_exporter.py
+new file mode 100644
+index 00000000..77840775
+--- /dev/null
++++ b/extensions/fiddler-bridge/src/fiddler_snapshot_exporter.py
+@@ -0,0 +1,48 @@
++"""
++Fiddler Snapshot Exporter — Export Fiddler captures to evolution training data.
++Location: extensions/fiddler-bridge/src/fiddler_snapshot_exporter.py
++Reference: Akagi MITM replay export, DI-star training data pipeline
++"""
++from __future__ import annotations
++import json, logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_snapshot_exporter.v1"
++
++class FiddlerSnapshotExporter:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def export(self, captures: list[dict[str, Any]], *, exclude_errors: bool = False) -> dict[str, Any]:
++        if not captures:
++            self._fire("export_empty", {})
++            return {"spans": [], "export_timestamp": time.time(), "total_captures": 0}
++
++        filtered = captures
++        if exclude_errors:
++            filtered = [c for c in captures if c.get("status", 200) < 400]
++
++        # Sort by timestamp
++        filtered.sort(key=lambda c: c.get("timestamp", 0))
++
++        spans = []
++        for c in filtered:
++            body_str = c.get("body", "{}")
++            try:
++                state = json.loads(body_str) if isinstance(body_str, str) else body_str
++            except (json.JSONDecodeError, TypeError):
++                state = {"raw": body_str}
++
++            spans.append({
++                "state": state,
++                "action": {"method": c.get("method", "GET"), "url": c.get("url", "")},
++                "timestamp": c.get("timestamp", 0),
++            })
++
++        result = {"spans": spans, "export_timestamp": time.time(), "total_captures": len(captures)}
++        self._fire("export_complete", {"spans": len(spans)})
++        return result
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/extensions/protocol-decoder/src/packet_rate_limiter.py b/extensions/protocol-decoder/src/packet_rate_limiter.py
+new file mode 100644
+index 00000000..bce87d53
+--- /dev/null
++++ b/extensions/protocol-decoder/src/packet_rate_limiter.py
+@@ -0,0 +1,60 @@
++"""
++Packet Rate Limiter — Rate-limit protocol decode to prevent overload.
++Location: extensions/protocol-decoder/src/packet_rate_limiter.py
++Reference: Akagi traffic throttling, DI-star worker rate limits
++"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.packet_rate_limiter.v1"
++
++class PacketRateLimiter:
++    def __init__(self, max_per_second: int = 100, burst: int = 0,
++                 global_max_per_second: int = 0) -> None:
++        self._max_ps = max_per_second
++        self._burst = burst if burst > 0 else max_per_second
++        self._global_max = global_max_per_second
++        self._windows: dict[str, list[float]] = defaultdict(list)
++        self._global_window: list[float] = []
++        self._stats: dict[str, dict[str, int]] = defaultdict(lambda: {"allowed": 0, "rejected": 0})
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def _clean_window(self, window: list[float], now: float) -> list[float]:
++        return [t for t in window if now - t < 1.0]
++
++    def allow(self, protocol: str) -> bool:
++        now = time.time()
++        self._windows[protocol] = self._clean_window(self._windows[protocol], now)
++        self._global_window = self._clean_window(self._global_window, now)
++
++        # Check global limit
++        if self._global_max > 0 and len(self._global_window) >= self._global_max:
++            self._stats[protocol]["rejected"] += 1
++            return False
++
++        # Check per-protocol limit (use burst for initial window)
++        if len(self._windows[protocol]) >= self._burst:
++            self._stats[protocol]["rejected"] += 1
++            return False
++
++        self._windows[protocol].append(now)
++        self._global_window.append(now)
++        self._stats[protocol]["allowed"] += 1
++        if self.evolution_callback:
++            self.evolution_callback({"type": "packet_allowed", "key": _EVOLUTION_KEY,
++                                     "protocol": protocol, "timestamp": now})
++        return True
++
++    def get_stats(self, protocol: str) -> dict[str, int]:
++        return dict(self._stats[protocol])
++
++    def reset(self, protocol: str) -> None:
++        self._windows[protocol].clear()
++        self._stats[protocol] = {"allowed": 0, "rejected": 0}
++
++    def remaining(self, protocol: str) -> int:
++        now = time.time()
++        self._windows[protocol] = self._clean_window(self._windows[protocol], now)
++        return max(0, self._max_ps - len(self._windows[protocol]))
+diff --git a/extensions/protocol-decoder/src/protocol_health_monitor.py b/extensions/protocol-decoder/src/protocol_health_monitor.py
+new file mode 100644
+index 00000000..b674457b
+--- /dev/null
++++ b/extensions/protocol-decoder/src/protocol_health_monitor.py
+@@ -0,0 +1,70 @@
++"""
++Protocol Health Monitor — Protocol decode health metrics + alerts.
++Location: extensions/protocol-decoder/src/protocol_health_monitor.py
++Reference: Akagi MITM health checks, DI-star worker health monitoring
++"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_health_monitor.v1"
++
++class ProtocolHealthMonitor:
++    def __init__(self, error_rate_threshold: float = 0.5) -> None:
++        self._error_threshold = error_rate_threshold
++        self._metrics: dict[str, dict[str, Any]] = defaultdict(lambda: {"success_count": 0, "error_count": 0, "latencies": [], "errors": []})
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record_decode(self, protocol: str, success: bool, latency_ms: float, error: str = "") -> None:
++        m = self._metrics[protocol]
++        if success:
++            m["success_count"] += 1
++            m["latencies"].append(latency_ms)
++        else:
++            m["error_count"] += 1
++            m["errors"].append(error)
++        if self.evolution_callback:
++            self.evolution_callback({"type": "decode_recorded", "key": _EVOLUTION_KEY,
++                                     "protocol": protocol, "success": success, "timestamp": time.time()})
++
++    def get_metrics(self, protocol: str) -> dict[str, Any]:
++        m = self._metrics[protocol]
++        return {"success_count": m["success_count"], "error_count": m["error_count"],
++                "total": m["success_count"] + m["error_count"]}
++
++    def is_healthy(self) -> bool:
++        for proto, m in self._metrics.items():
++            total = m["success_count"] + m["error_count"]
++            if total > 0 and m["error_count"] / total > self._error_threshold:
++                return False
++        return True
++
++    def latency_percentile(self, protocol: str, percentile: float) -> float:
++        lats = sorted(self._metrics[protocol]["latencies"])
++        if not lats:
++            return 0.0
++        idx = int(len(lats) * percentile / 100.0)
++        idx = min(idx, len(lats) - 1)
++        return lats[idx]
++
++    def get_alerts(self) -> list[dict[str, Any]]:
++        alerts = []
++        for proto, m in self._metrics.items():
++            total = m["success_count"] + m["error_count"]
++            if total > 0:
++                rate = m["error_count"] / total
++                if rate > self._error_threshold:
++                    alerts.append({"protocol": proto, "error_rate": rate, "severity": "critical"})
++        return alerts
++
++    def reset(self, protocol: str) -> None:
++        self._metrics[protocol] = {"success_count": 0, "error_count": 0, "latencies": [], "errors": []}
++
++    def global_summary(self) -> dict[str, Any]:
++        total_d, total_e = 0, 0
++        for m in self._metrics.values():
++            total_d += m["success_count"] + m["error_count"]
++            total_e += m["error_count"]
++        return {"total_decodes": total_d, "total_errors": total_e,
++                "protocols": list(self._metrics.keys())}
+diff --git a/integrations/lol-history/src/lol_history/champion_tendency_analyzer.py b/integrations/lol-history/src/lol_history/champion_tendency_analyzer.py
+new file mode 100644
+index 00000000..4d91f7fb
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/champion_tendency_analyzer.py
+@@ -0,0 +1,86 @@
++"""
++Champion Tendency Analyzer — Detect per-champion play patterns.
++
++Location: integrations/lol-history/src/lol_history/champion_tendency_analyzer.py
++
++Reference (拿来主义):
++  - Seraphine: getGameDetailByGameId champion-level stats
++  - leagueoflegends-optimizer: article5.md per-champion features
++  - integrations/lol-history/src/lol_history/player_profiler.py: profiling pattern
++"""
++from __future__ import annotations
++import logging, time, statistics
++from typing import Any, Callable, Optional
++from collections import Counter
++
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.champion_tendency_analyzer.v1"
++
++
++class ChampionTendencyAnalyzer:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def analyze(self, champion: str, matches: list[dict[str, Any]]) -> dict[str, Any]:
++        filtered = [m for m in matches if m.get("champion") == champion]
++        if not filtered:
++            self._fire("analyze_empty", {"champion": champion})
++            return {"champion": champion, "games": 0, "aggression_score": 0.0,
++                    "farm_score": 0.0, "early_game_tendency": 0.0, "death_rate": 0.0,
++                    "consistency_score": 0.0, "preferred_role": None}
++
++        n = len(filtered)
++        kill_rates, cs_rates, death_rates_list = [], [], []
++        fb_count = 0
++        roles: list[str] = []
++
++        for m in filtered:
++            dur = m.get("duration_minutes", 1) or 1
++            k, d, a = m.get("kills", 0), m.get("deaths", 0), m.get("assists", 0)
++            cs = m.get("cs", 0)
++            kill_rates.append(k / dur)
++            cs_rates.append(cs / dur)
++            death_rates_list.append(d / dur)
++            if m.get("first_blood"):
++                fb_count += 1
++            if m.get("role"):
++                roles.append(m["role"])
++
++        avg_kill_rate = sum(kill_rates) / n
++        avg_cs_rate = sum(cs_rates) / n
++        avg_death_rate = sum(death_rates_list) / n
++
++        # Aggression: high kills/min + first blood frequency
++        aggression_raw = min(avg_kill_rate / 0.5, 1.0) * 0.6 + (fb_count / n) * 0.4
++        aggression_score = min(max(aggression_raw, 0.0), 1.0)
++
++        # Farm: cs/min normalized (10 cs/min = 1.0)
++        farm_score = min(avg_cs_rate / 10.0, 1.0)
++
++        # Early game: first blood ratio
++        early_game_tendency = fb_count / n
++
++        # Death rate: average deaths per minute
++        death_rate = avg_death_rate
++
++        # Consistency: 1 - coefficient of variation of KDA
++        kdas = [(m.get("kills", 0) + m.get("assists", 0)) / max(1, m.get("deaths", 1)) for m in filtered]
++        if n >= 2 and statistics.mean(kdas) > 0:
++            cv = statistics.stdev(kdas) / statistics.mean(kdas)
++            consistency_score = max(0.0, min(1.0, 1.0 - cv))
++        else:
++            consistency_score = 0.5
++
++        preferred_role = Counter(roles).most_common(1)[0][0] if roles else None
++
++        self._fire("analyze_complete", {"champion": champion, "games": n})
++        return {
++            "champion": champion, "games": n,
++            "aggression_score": aggression_score, "farm_score": farm_score,
++            "early_game_tendency": early_game_tendency, "death_rate": death_rate,
++            "consistency_score": consistency_score, "preferred_role": preferred_role,
++        }
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol-history/src/lol_history/history_match_aggregator.py b/integrations/lol-history/src/lol_history/history_match_aggregator.py
+new file mode 100644
+index 00000000..49f8bbdb
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/history_match_aggregator.py
+@@ -0,0 +1,77 @@
++"""
++History Match Aggregator — Aggregate match stats across champion pool.
++
++Computes total games, winrate, avg KDA, gold/cs per minute, 
++per-champion breakdown, and most played champion.
++
++Location: integrations/lol-history/src/lol_history/history_match_aggregator.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/connector.py: match history response parsing
++  - leagueoflegends-optimizer: article5.md feature engineering (f1,f2,f3)
++  - integrations/lol-history/src/lol_history/match_analyzer.py: stat aggregation
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++from collections import defaultdict
++
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.history_match_aggregator.v1"
++
++
++class HistoryMatchAggregator:
++    """Aggregate match statistics across a player's champion pool."""
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def aggregate(self, matches: list[dict[str, Any]]) -> dict[str, Any]:
++        if not matches:
++            return {"total_games": 0, "avg_kda": 0.0, "winrate": 0.0,
++                    "avg_gold_per_min": 0.0, "avg_cs_per_min": 0.0,
++                    "by_champion": {}, "most_played": "", "recommendations": []}
++
++        total = len(matches)
++        wins = sum(1 for m in matches if m.get("win"))
++        kdas, gpm_list, cspm_list = [], [], []
++        by_champ: dict[str, dict[str, Any]] = defaultdict(lambda: {"games": 0, "wins": 0, "kills": 0, "deaths": 0, "assists": 0})
++
++        for m in matches:
++            k, d, a = m.get("kills", 0), m.get("deaths", 0), m.get("assists", 0)
++            kda = (k + a) / max(1, d)
++            kdas.append(kda)
++
++            dur = m.get("duration_minutes", 0)
++            gold = m.get("gold", 0)
++            cs = m.get("cs", 0)
++            if dur and dur > 0:
++                gpm_list.append(gold / dur)
++                cspm_list.append(cs / dur)
++
++            champ = m.get("champion", "unknown")
++            by_champ[champ]["games"] += 1
++            if m.get("win"):
++                by_champ[champ]["wins"] += 1
++            by_champ[champ]["kills"] += k
++            by_champ[champ]["deaths"] += d
++            by_champ[champ]["assists"] += a
++
++        most_played = max(by_champ, key=lambda c: by_champ[c]["games"]) if by_champ else ""
++
++        result = {
++            "total_games": total,
++            "winrate": wins / total if total else 0.0,
++            "avg_kda": sum(kdas) / len(kdas) if kdas else 0.0,
++            "avg_gold_per_min": sum(gpm_list) / len(gpm_list) if gpm_list else 0.0,
++            "avg_cs_per_min": sum(cspm_list) / len(cspm_list) if cspm_list else 0.0,
++            "by_champion": dict(by_champ),
++            "most_played": most_played,
++        }
++
++        self._fire_evolution("aggregation_complete", {"total_games": total, "winrate": result["winrate"]})
++        return result
++
++    def _fire_evolution(self, event_type: str, data: dict[str, Any]) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, "timestamp": time.time(), **data})
+diff --git a/integrations/lol-history/src/lol_history/meta_shift_tracker.py b/integrations/lol-history/src/lol_history/meta_shift_tracker.py
+new file mode 100644
+index 00000000..9fc213b0
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/meta_shift_tracker.py
+@@ -0,0 +1,88 @@
++"""
++Meta Shift Tracker — Track patch-level meta shifts in history data.
++Location: integrations/lol-history/src/lol_history/meta_shift_tracker.py
++Reference: leagueoflegends-optimizer patch data, Seraphine match history
++"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict, OrderedDict
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.meta_shift_tracker.v1"
++
++class MetaShiftTracker:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def track(self, matches: list[dict[str, Any]]) -> dict[str, Any]:
++        if not matches:
++            self._fire("track_empty", {})
++            return {"shifts": [], "patch_stats": {}, "trending_up": [], "trending_down": []}
++
++        # Group by patch
++        by_patch: dict[str, list[dict]] = defaultdict(list)
++        for m in matches:
++            by_patch[m.get("patch", "unknown")].append(m)
++
++        # Sort patches
++        sorted_patches = sorted(by_patch.keys())
++        patch_stats: OrderedDict[str, dict[str, Any]] = OrderedDict()
++
++        for patch in sorted_patches:
++            pms = by_patch[patch]
++            champ_stats: dict[str, dict] = defaultdict(lambda: {"games": 0, "wins": 0})
++            for m in pms:
++                c = m.get("champion", "unknown")
++                champ_stats[c]["games"] += 1
++                if m.get("win"):
++                    champ_stats[c]["wins"] += 1
++            for c in champ_stats:
++                g = champ_stats[c]["games"]
++                champ_stats[c]["winrate"] = champ_stats[c]["wins"] / g if g > 0 else 0
++                champ_stats[c]["pickrate"] = g / len(pms) if pms else 0
++            patch_stats[patch] = {"total_games": len(pms), "champion_stats": dict(champ_stats)}
++
++        # Detect shifts between consecutive patches
++        shifts = []
++        patches_list = list(sorted_patches)
++        if len(patches_list) >= 2:
++            for i in range(1, len(patches_list)):
++                prev_p, curr_p = patches_list[i - 1], patches_list[i]
++                prev_cs = patch_stats[prev_p]["champion_stats"]
++                curr_cs = patch_stats[curr_p]["champion_stats"]
++                all_champs = set(prev_cs.keys()) | set(curr_cs.keys())
++                for c in all_champs:
++                    prev_wr = prev_cs.get(c, {}).get("winrate", 0)
++                    curr_wr = curr_cs.get(c, {}).get("winrate", 0)
++                    prev_pr = prev_cs.get(c, {}).get("pickrate", 0)
++                    curr_pr = curr_cs.get(c, {}).get("pickrate", 0)
++                    wr_delta = curr_wr - prev_wr
++                    pr_delta = curr_pr - prev_pr
++                    if abs(wr_delta) > 0.05 or abs(pr_delta) > 0.1:
++                        shifts.append({"champion": c, "from_patch": prev_p, "to_patch": curr_p,
++                                       "winrate_delta": wr_delta, "pickrate_delta": pr_delta})
++
++        # Trending analysis: compare game count growth across patches
++        trending_up, trending_down = [], []
++        if len(patches_list) >= 2:
++            first_cs = patch_stats[patches_list[0]]["champion_stats"]
++            last_cs = patch_stats[patches_list[-1]]["champion_stats"]
++            all_c = set(first_cs.keys()) | set(last_cs.keys())
++            for c in all_c:
++                first_games = first_cs.get(c, {}).get("games", 0)
++                last_games = last_cs.get(c, {}).get("games", 0)
++                first_pr = first_cs.get(c, {}).get("pickrate", 0)
++                last_pr = last_cs.get(c, {}).get("pickrate", 0)
++                # Trending up: pickrate increase OR game count increase (2x+)
++                if last_pr > first_pr + 0.1 or (first_games > 0 and last_games >= first_games * 2):
++                    trending_up.append(c)
++                elif first_pr > last_pr + 0.1 or (last_games == 0 and first_games > 0) or (first_games > 0 and last_games > 0 and last_games <= first_games * 0.5):
++                    trending_down.append(c)
++
++        self._fire("track_complete", {"patches": len(sorted_patches), "shifts": len(shifts)})
++        return {"shifts": shifts, "patch_stats": dict(patch_stats),
++                "trending_up": trending_up, "trending_down": trending_down}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol-history/src/lol_history/opponent_weakness_detector.py b/integrations/lol-history/src/lol_history/opponent_weakness_detector.py
+new file mode 100644
+index 00000000..2492c5e3
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/opponent_weakness_detector.py
+@@ -0,0 +1,85 @@
++"""
++Opponent Weakness Detector — Identify exploitable weaknesses from history.
++Location: integrations/lol-history/src/lol_history/opponent_weakness_detector.py
++Reference: Seraphine opponent profiling, leagueoflegends-optimizer feature engineering
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.opponent_weakness_detector.v1"
++
++_THRESHOLDS = {"death_rate": 0.25, "cs_per_min": 5.5, "wards_per_min": 0.4}
++
++class OpponentWeaknessDetector:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def detect(self, matches: list[dict[str, Any]]) -> dict[str, Any]:
++        if not matches:
++            self._fire("detect_empty", {})
++            return {"weaknesses": []}
++        n = len(matches)
++        weaknesses: list[dict[str, Any]] = []
++
++        # Compute averages
++        total_deaths, total_cs, total_dur, total_wards = 0, 0, 0.0, 0
++        total_kills, total_assists = 0, 0
++        losses_streak, deaths_increasing = 0, True
++        prev_deaths = -1
++        has_wards = False
++
++        for m in matches:
++            d = m.get("deaths", 0); k = m.get("kills", 0); a = m.get("assists", 0)
++            cs = m.get("cs", 0); dur = m.get("duration_minutes", 1) or 1
++            total_deaths += d; total_kills += k; total_assists += a
++            total_cs += cs; total_dur += dur
++            if "wards_placed" in m:
++                has_wards = True
++                total_wards += m["wards_placed"]
++            if not m.get("win"):
++                losses_streak += 1
++            if prev_deaths >= 0 and d <= prev_deaths:
++                deaths_increasing = False
++            prev_deaths = d
++
++        avg_death_rate = total_deaths / total_dur if total_dur > 0 else 0
++        avg_cs_pm = total_cs / total_dur if total_dur > 0 else 0
++        avg_wards_pm = total_wards / total_dur if total_dur > 0 else 0
++        avg_kda = (total_kills + total_assists) / max(1, total_deaths)
++
++        # High death rate
++        if avg_death_rate > _THRESHOLDS["death_rate"]:
++            sev = min(avg_death_rate / 0.5, 1.0)
++            weaknesses.append({"type": "high_death_rate", "severity": sev,
++                               "recommendation": "Punish aggressive positioning; likely to overextend and die"})
++
++        # Low CS
++        if avg_cs_pm < _THRESHOLDS["cs_per_min"]:
++            sev = max(0.0, 1.0 - avg_cs_pm / _THRESHOLDS["cs_per_min"])
++            weaknesses.append({"type": "low_cs", "severity": sev,
++                               "recommendation": "Outfarm opponent; they fall behind in gold passively"})
++
++        # Low vision
++        if has_wards and avg_wards_pm < _THRESHOLDS["wards_per_min"]:
++            sev = max(0.0, 1.0 - avg_wards_pm / _THRESHOLDS["wards_per_min"])
++            weaknesses.append({"type": "low_vision", "severity": sev,
++                               "recommendation": "Exploit poor vision; roam and set up ganks in blind spots"})
++
++        # Tilt pattern: consecutive losses with increasing deaths
++        if losses_streak >= 3 and deaths_increasing and n >= 3:
++            weaknesses.append({"type": "tilt_pattern", "severity": min(losses_streak / 5.0, 1.0),
++                               "recommendation": "Opponent may be tilted; apply early pressure to tilt further"})
++
++        # Strong player: no weaknesses if KDA > 5 and CS > 7/min
++        if avg_kda > 5.0 and avg_cs_pm > 7.0:
++            weaknesses = []
++
++        # Sort by severity desc
++        weaknesses.sort(key=lambda w: w["severity"], reverse=True)
++        self._fire("detect_complete", {"weakness_count": len(weaknesses)})
++        return {"weaknesses": weaknesses}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol-history/src/lol_history/team_synergy_scorer.py b/integrations/lol-history/src/lol_history/team_synergy_scorer.py
+new file mode 100644
+index 00000000..8fc663e9
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/team_synergy_scorer.py
+@@ -0,0 +1,63 @@
++"""
++Team Synergy Scorer — Evaluate historical duo/trio synergy.
++Location: integrations/lol-history/src/lol_history/team_synergy_scorer.py
++Reference: Seraphine match history, leagueoflegends-optimizer team features
++"""
++from __future__ import annotations
++import logging, time
++from itertools import combinations
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "lol_history.team_synergy_scorer.v1"
++
++class TeamSynergyScorer:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def score(self, team: list[str], matches: list[dict[str, Any]]) -> dict[str, Any]:
++        if len(team) < 2 or not matches:
++            self._fire("score_empty", {})
++            return {"synergy_score": 0.0, "duo_stats": {}, "trio_stats": {}}
++
++        duo_stats: dict[tuple[str, str], dict[str, Any]] = {}
++        trio_stats: dict[tuple[str, str, str], dict[str, Any]] = {}
++
++        # Duo combinations
++        for pair in combinations(sorted(team), 2):
++            games, wins = 0, 0
++            for m in matches:
++                players = set(m.get("players", []))
++                if pair[0] in players and pair[1] in players:
++                    games += 1
++                    if m.get("win"):
++                        wins += 1
++            if games > 0:
++                duo_stats[pair] = {"games_together": games, "wins": wins, "winrate": wins / games}
++
++        # Trio combinations (if 3+ players)
++        if len(team) >= 3:
++            for trio in combinations(sorted(team), 3):
++                games, wins = 0, 0
++                for m in matches:
++                    players = set(m.get("players", []))
++                    if all(p in players for p in trio):
++                        games += 1
++                        if m.get("win"):
++                            wins += 1
++                if games > 0:
++                    trio_stats[trio] = {"games_together": games, "wins": wins, "winrate": wins / games}
++
++        # Overall synergy score: weighted average of duo winrates
++        if duo_stats:
++            total_games = sum(d["games_together"] for d in duo_stats.values())
++            weighted_wr = sum(d["winrate"] * d["games_together"] for d in duo_stats.values())
++            synergy_score = min(1.0, weighted_wr / total_games if total_games > 0 else 0.0)
++        else:
++            synergy_score = 0.0
++
++        self._fire("score_complete", {"synergy_score": synergy_score, "duos": len(duo_stats)})
++        return {"synergy_score": synergy_score, "duo_stats": duo_stats, "trio_stats": trio_stats}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol/src/lol_agent/draft_recommendation_engine.py b/integrations/lol/src/lol_agent/draft_recommendation_engine.py
+new file mode 100644
+index 00000000..d7d1283c
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/draft_recommendation_engine.py
+@@ -0,0 +1,66 @@
++"""
++Draft Recommendation Engine — Pre-game pick/ban recommendation from history.
++Location: integrations/lol/src/lol_agent/draft_recommendation_engine.py
++Reference: leagueoflegends-optimizer draft, Seraphine champion data
++"""
++from __future__ import annotations
++import logging, math, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.draft_recommendation_engine.v1"
++
++class DraftRecommendationEngine:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def recommend(self, player_history: list[dict[str, Any]], team_comp: list[str],
++                  enemy_picks: list[str], *, enemy_history: list[dict[str, Any]] | None = None,
++                  matchup_data: dict[str, dict[str, float]] | None = None,
++                  banned: list[str] | None = None) -> dict[str, Any]:
++        banned_set = set(banned or []) | set(team_comp) | set(enemy_picks)
++        picks: list[dict[str, Any]] = []
++        bans: list[str] = []
++
++        # Ban recommendations from enemy history
++        if enemy_history:
++            sorted_enemy = sorted(enemy_history, key=lambda h: h.get("winrate", 0) * h.get("games", 0), reverse=True)
++            for eh in sorted_enemy[:3]:
++                if eh.get("winrate", 0) > 0.6 and eh.get("games", 0) >= 5:
++                    bans.append(eh["champion"])
++
++        # Pick recommendations from player pool
++        available = [h for h in player_history if h.get("champion") not in banned_set]
++        if matchup_data and enemy_picks:
++            for h in available:
++                champ = h["champion"]
++                if champ in (matchup_data or {}):
++                    bonus = sum(matchup_data[champ].get(f"vs_{e}", 0.5) - 0.5 for e in enemy_picks)
++                    h = dict(h)
++                    h["_matchup_bonus"] = bonus
++                    available = [x if x.get("champion") != champ else h for x in available]
++
++        # Sort by composite score
++        def _score(h: dict) -> float:
++            wr = h.get("winrate", 0.5)
++            games = h.get("games", 0)
++            conf = min(1.0, games / 20.0)
++            bonus = h.get("_matchup_bonus", 0)
++            return wr * conf + bonus * 0.3
++
++        available.sort(key=_score, reverse=True)
++
++        for h in available[:5]:
++            games = h.get("games", 0)
++            conf = min(1.0, games / 20.0)
++            reason_parts = [f"{h['champion']}: {h.get('winrate', 0):.0%} WR over {games} games"]
++            if h.get("role"):
++                reason_parts.append(f"role={h['role']}")
++            picks.append({"champion": h["champion"], "confidence": conf,
++                          "score": _score(h), "reason": ", ".join(reason_parts)})
++
++        self._fire("recommend_complete", {"picks": len(picks), "bans": len(bans)})
++        return {"picks": picks, "bans": bans}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol/src/lol_agent/history_strategy_fuser.py b/integrations/lol/src/lol_agent/history_strategy_fuser.py
+new file mode 100644
+index 00000000..5c361a28
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/history_strategy_fuser.py
+@@ -0,0 +1,60 @@
++"""
++History Strategy Fuser — Fuse historical profiles into live strategy.
++Location: integrations/lol/src/lol_agent/history_strategy_fuser.py
++Reference: opponent_history_merger, lol_strategy_advisor, DI-star rl_learner
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.history_strategy_fuser.v1"
++
++class HistoryStrategyFuser:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def fuse(self, live_state: dict[str, Any], opponent_profile: dict[str, Any],
++             historical_tendencies: dict[str, Any]) -> dict[str, Any]:
++        recs: list[dict[str, Any]] = []
++        game_time = live_state.get("game_time", 0)
++        is_early = game_time < 900  # < 15 min
++        games = opponent_profile.get("games", 0)
++        confidence = min(1.0, games / 20.0) if games > 0 else 0.0
++
++        # Aggressive opponent analysis
++        agg = opponent_profile.get("aggression_score", 0)
++        if agg > 0.6:
++            if is_early and historical_tendencies.get("early_game_tendency", 0) > 0.5:
++                recs.append({"action": "play_safe", "reason": "Opponent is highly aggressive with strong early game — play cautious until mid",
++                             "priority": 1})
++            elif not is_early:
++                recs.append({"action": "punish", "reason": "Aggressive opponent in late game — punish overextension",
++                             "priority": 2})
++
++        # Weak CS opponent
++        avg_cs = opponent_profile.get("avg_cs_per_min", 0)
++        if 0 < avg_cs < 5.5:
++            recs.append({"action": "outfarm", "reason": "Opponent has low CS/min — focus on farm advantage",
++                         "priority": 3})
++
++        # Tilt detection
++        tilt = opponent_profile.get("tilt_score", 0)
++        if tilt > 0.5:
++            recs.append({"action": "pressure", "reason": f"Opponent appears tilted (score={tilt:.1f}) — apply constant pressure",
++                         "priority": 1})
++
++        # Death rate weakness
++        dr = opponent_profile.get("death_rate", 0)
++        if dr > 0.3:
++            recs.append({"action": "all_in", "reason": "High death rate opponent — look for all-in opportunities",
++                         "priority": 2})
++
++        # Sort by priority
++        recs.sort(key=lambda r: r["priority"])
++
++        self._fire("fuse_complete", {"recs": len(recs), "confidence": confidence})
++        return {"recommendations": recs, "confidence": confidence}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol/src/lol_agent/lane_matchup_predictor.py b/integrations/lol/src/lol_agent/lane_matchup_predictor.py
+new file mode 100644
+index 00000000..44505d73
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/lane_matchup_predictor.py
+@@ -0,0 +1,51 @@
++"""
++Lane Matchup Predictor — Predict lane outcome from historical matchups.
++Location: integrations/lol/src/lol_agent/lane_matchup_predictor.py
++Reference: leagueoflegends-optimizer matchup analysis, Seraphine match details
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.lane_matchup_predictor.v1"
++
++class LaneMatchupPredictor:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def predict(self, my_champion: str, enemy_champion: str,
++                history: list[dict[str, Any]]) -> dict[str, Any]:
++        relevant = [h for h in history
++                    if h.get("my_champion") == my_champion and h.get("enemy_champion") == enemy_champion]
++        n = len(relevant)
++        if n == 0:
++            self._fire("predict_empty", {"my": my_champion, "enemy": enemy_champion})
++            return {"win_probability": 0.5, "confidence": 0.0, "sample_size": 0,
++                    "tips": [], "avg_cs_diff": 0.0, "avg_kill_diff": 0.0}
++
++        wins = sum(1 for h in relevant if h.get("win_lane"))
++        win_prob = wins / n
++        confidence = min(1.0, n / 10.0)
++
++        cs_diffs = [h["cs_diff"] for h in relevant if "cs_diff" in h]
++        kill_diffs = [h["kill_diff"] for h in relevant if "kill_diff" in h]
++        avg_cs = sum(cs_diffs) / len(cs_diffs) if cs_diffs else 0.0
++        avg_kill = sum(kill_diffs) / len(kill_diffs) if kill_diffs else 0.0
++
++        tips = []
++        if win_prob > 0.6:
++            tips.append(f"Historically strong matchup ({win_prob:.0%} win rate)")
++        elif win_prob < 0.4:
++            tips.append(f"Historically weak matchup ({win_prob:.0%} win rate) — play safe")
++        if avg_cs > 10:
++            tips.append("You typically get a CS advantage — focus on farming")
++        if avg_kill > 0.5:
++            tips.append("You tend to get kills in this matchup — look for trades")
++
++        self._fire("predict_complete", {"my": my_champion, "enemy": enemy_champion, "n": n})
++        return {"win_probability": win_prob, "confidence": confidence, "sample_size": n,
++                "tips": tips, "avg_cs_diff": avg_cs, "avg_kill_diff": avg_kill}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol/src/lol_agent/playstyle_classifier.py b/integrations/lol/src/lol_agent/playstyle_classifier.py
+new file mode 100644
+index 00000000..f1bb4b9e
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/playstyle_classifier.py
+@@ -0,0 +1,68 @@
++"""
++Playstyle Classifier — Classify player playstyle (aggressive/passive/farm/supportive).
++Location: integrations/lol/src/lol_agent/playstyle_classifier.py
++Reference: leagueoflegends-optimizer player features, DI-star agent categorization
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.playstyle_classifier.v1"
++
++class PlaystyleClassifier:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def classify(self, matches: list[dict[str, Any]]) -> dict[str, Any]:
++        if not matches:
++            self._fire("classify_empty", {})
++            return {"playstyle": "unknown", "scores": {"aggressive": 0, "passive": 0, "farm": 0, "supportive": 0}}
++
++        n = len(matches)
++        total_k, total_d, total_a, total_cs, total_dur = 0, 0, 0, 0, 0.0
++        total_fb, total_wards = 0, 0
++
++        for m in matches:
++            total_k += m.get("kills", 0)
++            total_d += m.get("deaths", 0)
++            total_a += m.get("assists", 0)
++            total_cs += m.get("cs", 0)
++            total_dur += m.get("duration_minutes", 1) or 1
++            if m.get("first_blood"):
++                total_fb += 1
++            total_wards += m.get("wards_placed", 0)
++
++        kpm = total_k / total_dur if total_dur > 0 else 0
++        apm = total_a / total_dur if total_dur > 0 else 0
++        cspm = total_cs / total_dur if total_dur > 0 else 0
++        wpm = total_wards / total_dur if total_dur > 0 else 0
++        fb_rate = total_fb / n
++
++        # Scoring — weights tuned to differentiate playstyles
++        # Aggressive: high kills/min + first blood
++        aggressive = min(1.0, (kpm / 0.4) * 0.5 + fb_rate * 0.3 + min(total_d / total_dur / 0.3, 1.0) * 0.2)
++        # Farm: high CS but NOT high assists/wards (pure farmer)
++        farm_raw = min(1.0, cspm / 10.0)
++        assist_suppress = min(1.0, apm / 0.3)  # High assists suppress farm label
++        ward_suppress = min(1.0, wpm / 0.8)
++        farm = farm_raw * max(0.2, 1.0 - (assist_suppress * 0.4 + ward_suppress * 0.3))
++        # Supportive: high assists + high wards
++        supportive = min(1.0, (apm / 0.5) * 0.4 + (wpm / 1.5) * 0.6)
++        # Passive: low kills, moderate everything else
++        passive = min(1.0, max(0, 1.0 - aggressive) * 0.5 + (1.0 - min(kpm / 0.3, 1.0)) * 0.3 + min(wpm / 1.0, 1.0) * 0.2)
++
++        scores = {"aggressive": aggressive, "passive": passive, "farm": farm, "supportive": supportive}
++
++        # Determine dominant style
++        best = max(scores, key=scores.get)
++        # If scores are close, label as balanced
++        vals = list(scores.values())
++        if max(vals) - min(vals) < 0.15:
++            best = "balanced"
++
++        self._fire("classify_complete", {"playstyle": best, "n": n})
++        return {"playstyle": best, "scores": scores}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/integrations/lol/src/lol_agent/tilt_detector.py b/integrations/lol/src/lol_agent/tilt_detector.py
+new file mode 100644
+index 00000000..bb3d8e61
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/tilt_detector.py
+@@ -0,0 +1,68 @@
++"""
++Tilt Detector — Detect tilt from recent match loss patterns.
++Location: integrations/lol/src/lol_agent/tilt_detector.py
++Reference: Seraphine match history analysis, leagueoflegends-optimizer
++"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY: str = "integrations.lol.tilt_detector.v1"
++
++class TiltDetector:
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def detect(self, matches: list[dict[str, Any]]) -> dict[str, Any]:
++        if not matches:
++            self._fire("detect_empty", {})
++            return {"tilt_score": 0.0, "is_tilted": False, "indicators": []}
++
++        n = len(matches)
++        indicators: list[str] = []
++        score = 0.0
++
++        # Loss streak analysis (most recent first — matches in chronological order)
++        losses = sum(1 for m in matches if not m.get("win"))
++        loss_ratio = losses / n
++        score += loss_ratio * 0.3
++
++        # Consecutive losses at end
++        consecutive_losses = 0
++        for m in reversed(matches):
++            if not m.get("win"):
++                consecutive_losses += 1
++            else:
++                break
++        if consecutive_losses >= 2:
++            score += min(consecutive_losses / 5.0, 0.3)
++            indicators.append(f"Losing streak: {consecutive_losses} consecutive losses")
++
++        # Increasing deaths pattern
++        deaths = [m.get("deaths", 0) for m in matches]
++        if len(deaths) >= 2:
++            increasing = all(deaths[i] <= deaths[i + 1] for i in range(len(deaths) - 1))
++            if increasing and losses >= 2:
++                score += 0.2
++                indicators.append("Deaths increasing across games")
++
++        # Short game surrenders (< 18 min)
++        short_losses = sum(1 for m in matches if not m.get("win") and m.get("duration_minutes", 30) < 18)
++        if short_losses >= 1:
++            score += short_losses / n * 0.2
++            indicators.append(f"Short game surrenders: {short_losses}")
++
++        # Recovery: recent wins reduce tilt
++        recent_wins = sum(1 for m in matches[-2:] if m.get("win")) if len(matches) >= 2 else 0
++        if recent_wins > 0:
++            score *= (1.0 - recent_wins * 0.25)
++
++        score = min(max(score, 0.0), 1.0)
++        is_tilted = score > 0.5
++
++        self._fire("detect_complete", {"tilt_score": score, "is_tilted": is_tilted})
++        return {"tilt_score": score, "is_tilted": is_tilted, "indicators": indicators}
++
++    def _fire(self, t: str, d: dict) -> None:
++        if self.evolution_callback:
++            self.evolution_callback({"type": t, "key": _EVOLUTION_KEY, "timestamp": time.time(), **d})
+diff --git a/plan.md b/plan.md
+index a9a07c93..a32f1028 100644
+--- a/plan.md
++++ b/plan.md
+@@ -2489,3 +2489,119 @@ M366-M385 完成了两大阶段的建设:
+ | M403 | `agentos/cli/assistant_launcher.py` | 🟡 | **助手启动器** — 统一实时助手启动/管理CLI |
+ | M404 | `agentos/governance/assistant_registry.py` | 🟢 | **助手注册表** — 跨游戏实时助手注册/查询/管理 |
+ | M405 | `agentos/governance/cross_game_feedback.py` | 🔴 | **跨游戏反馈** — 多游戏反馈数据聚合 + 学习迁移 |
++
++---
++
++## 二十三、M406-M425 任务完成报告 + M426-M445 新增任务
++
++### 阶段 AD: LoL History → Real-Time Strategy Fusion Pipeline（M406-M415）✅ 全部完成
++
++> 将Seraphine历史数据与实时策略深度融合
++> 实现对手弱点检测、队伍协同评估、meta变化追踪
++> 参考: Seraphine match history API + leagueoflegends-optimizer feature engineering
++
++| M# | 文件路径 | 状态 | 功能 |
++|---|---|---|---|
++| M406 | `integrations/lol-history/src/lol_history/history_match_aggregator.py` | ✅ | **历史比赛聚合** — 跨英雄池统计 (KDA/WR/GPM/CSPM/英雄分布) |
++| M407 | `integrations/lol-history/src/lol_history/champion_tendency_analyzer.py` | ✅ | **英雄倾向分析** — 每英雄攻击性/农刀/早期/死亡率/一致性评分 |
++| M408 | `integrations/lol-history/src/lol_history/opponent_weakness_detector.py` | ✅ | **对手弱点检测** — 高死亡/低CS/低视野/倾斜模式识别+利用建议 |
++| M409 | `integrations/lol-history/src/lol_history/team_synergy_scorer.py` | ✅ | **队伍协同评分** — 双排/三排历史胜率 + 协同分数 |
++| M410 | `integrations/lol-history/src/lol_history/meta_shift_tracker.py` | ✅ | **版本变化追踪** — 跨版本英雄选择率/胜率变化 + 趋势分析 |
++| M411 | `integrations/lol/src/lol_agent/history_strategy_fuser.py` | ✅ | **历史策略融合** — 实时状态+对手画像+历史倾向 → 策略建议 |
++| M412 | `integrations/lol/src/lol_agent/draft_recommendation_engine.py` | ✅ | **BP推荐引擎** — 基于历史胜率/对线数据/阵容平衡的英雄推荐 |
++| M413 | `integrations/lol/src/lol_agent/lane_matchup_predictor.py` | ✅ | **对线预测器** — 基于历史对线胜率/CS差/击杀差的对线预测 |
++| M414 | `integrations/lol/src/lol_agent/playstyle_classifier.py` | ✅ | **玩法分类器** — 攻击型/被动型/农刀型/辅助型分类 |
++| M415 | `integrations/lol/src/lol_agent/tilt_detector.py` | ✅ | **倾斜检测器** — 连败/死亡递增/短局投降模式识别 |
++
++**TDD验证**: tests/tdd_m406_m425/test_m406_m415_history_fusion.py — 100测试全部通过 ✅
++
++### 阶段 AE: Evolution Event Bus + Persistence Hardening（M416-M425）✅ 全部完成
++
++> 跨模块演化事件总线 + 状态持久化 + 重放调试
++> 协议解码健康监控 + 流量限速 + Fiddler数据导出
++> 参考: DI-star event system + Akagi bridge + PARL training pipeline
++
++| M# | 文件路径 | 状态 | 功能 |
++|---|---|---|---|
++| M416 | `agentos/governance/evolution_event_bus.py` | ✅ | **演化事件总线** — 发布/订阅 + 通配符 + 历史记录 + 错误隔离 |
++| M417 | `agentos/governance/evolution_persistence.py` | ✅ | **演化持久化** — 快照保存/加载/删除/列表 + 元数据 |
++| M418 | `agentos/governance/evolution_replay.py` | ✅ | **演化重放** — 按类型/时间范围重放 + 摘要 + 时间线导出 |
++| M419 | `agentos/governance/fitness_aggregator.py` | ✅ | **适应度聚合** — 加权跨模块适应度 + 历史趋势 + 方向检测 |
++| M420 | `agentos/governance/generation_scheduler.py` | ✅ | **代际调度器** — 基于episode数/fitness/冷却的自动进化调度 |
++| M421 | `extensions/protocol-decoder/src/protocol_health_monitor.py` | ✅ | **协议健康监控** — 成功/失败率 + 延迟百分位 + 告警 |
++| M422 | `extensions/protocol-decoder/src/packet_rate_limiter.py` | ✅ | **数据包限速** — 每协议/全局限速 + 突发容忍 + 配额查询 |
++| M423 | `extensions/fiddler-bridge/src/fiddler_snapshot_exporter.py` | ✅ | **Fiddler快照导出** — 捕获→训练数据span转换 + 排序 + 过滤 |
++| M424 | `extensions/fiddler-bridge/src/fiddler_rule_engine.py` | ✅ | **Fiddler规则引擎** — 声明式域名/状态码/方法/URL过滤 |
++| M425 | `extensions/fiddler-bridge/src/fiddler_dashboard_data.py` | ✅ | **Fiddler仪表板** — 流量统计/错误率/延迟/热门端点/会话追踪 |
++
++**TDD验证**: tests/tdd_m406_m425/test_m416_m425_evolution_hardening.py — 100测试全部通过 ✅
++
++### Knuth《计算机程序设计艺术》级别审查
++
++**用户角度 — 潜在Bug分析**:
++
++1. **HistoryMatchAggregator.aggregate()** duration_minutes缺失时使用0导致除零？→ 已处理: `dur > 0`才计算GPM/CSPM。**安全**。
++2. **ChampionTendencyAnalyzer** consistency_score单场时使用0.5默认值。→ 合理: 1场数据不足以判断一致性。**安全**。
++3. **OpponentWeaknessDetector** 强玩家判断(`KDA>5 AND CS>7/min`)会清空所有弱点。→ 设计意图: 高水平玩家的"弱点"不可靠。**合理**。
++4. **TeamSynergyScorer** 使用tuple作为dict key (`("Alice","Bob")`) — 依赖sorted保证顺序一致。→ 已使用`combinations(sorted(team), 2)`。**安全**。
++5. **MetaShiftTracker** trending_up/down使用pickrate阈值0.1 AND 游戏数2倍增长双重判断。→ 避免单英雄池假阳性。**安全**。
++6. **HistoryStrategyFuser** game_time>2400(40min)时不生成early_game建议。→ 合理: 40分钟后早期优势不再相关。**安全**。
++7. **DraftRecommendationEngine** banned集合包含team_comp(已选英雄)。→ 正确: 不推荐已选英雄。**安全**。
++8. **PlaystyleClassifier** 高CS+高助攻的玩家可能在aggressive/farm/supportive之间混淆。→ 已修复: assist_suppress降低farm分数。**安全**。
++9. **TiltDetector** 使用`reversed(matches)`假设时间正序。→ 文档已标注。**注意使用顺序**。
++10. **EvolutionEventBus** 通配符`*`订阅者也收到topic事件 — 重复通知？→ 否: topic和`*`分开投递。**安全**。
++
++**系统角度 — 结构完整性**:
++
++1. **_EVOLUTION_KEY一致性**: 全部20个模块均定义唯一`_EVOLUTION_KEY` + `evolution_callback`。**合约满足**。
++2. **EvolutionEventBus→各模块管线**: event_bus可以作为所有模块evolution_callback的统一接收端。**集成就绪**。
++3. **EvolutionPersistence深拷贝**: `copy.deepcopy`防止外部修改污染快照。**数据完整性保证**。
++4. **PacketRateLimiter时间窗口**: 使用wall-clock `time.time()` — 在高并发下可能有微秒级竞争。生产环境建议加锁。**已知限制**。
++5. **FiddlerRuleEngine规则优先级**: 数字越小优先级越高,blacklist可以覆盖whitelist。**设计正确**。
++6. **GenerationScheduler冷却期**: 通过`time.time() - _last_advance < cooldown`防止过频进化。**安全**。
++7. **FiddlerDashboardData时间序列**: 按秒分桶聚合 — 适合实时仪表板刷新。**合理**。
++8. **EvolutionReplay max_events**: 超限时保留最新事件 `_events[-max:]`。**不会OOM**。
++9. **FitnessAggregator clamp**: `min(max(fitness, 0.0), 1.0)` 防止越界值污染聚合。**安全**。
++10. **ProtocolHealthMonitor隔离**: 每协议独立metrics,一个协议失败不影响其他。**故障隔离正确**。
++
++---
++
++## 二十四、M426-M445 新增任务规划
++
++### 阶段 AF: 端到端实时助手集成测试 + 演化闭环（M426-M435）
++
++> 将Phase AD的历史分析 + Phase AE的演化基础设施
++> 连接为端到端的实时助手闭环
++> 参考: DI-star端到端训练, Akagi实时对弈
++
++| M# | 文件路径 | 级别 | 功能 |
++|---|---|---|---|
++| M426 | `integrations/lol/src/lol_agent/pregame_pipeline.py` | 🔴 | **赛前管线** — Seraphine历史→对手画像→BP推荐→对线预测 端到端 |
++| M427 | `integrations/lol/src/lol_agent/ingame_advisor_pipeline.py` | 🔴 | **游戏中顾问管线** — 实时数据→策略融合→语音播报 端到端 |
++| M428 | `integrations/lol/src/lol_agent/postgame_evolution_pipeline.py` | 🔴 | **赛后演化管线** — 反馈记录→适应度→代际推进 端到端 |
++| M429 | `integrations/lol/src/lol_agent/matchup_knowledge_base.py` | 🟡 | **对线知识库** — 持久化英雄对线胜率/策略/经验 |
++| M430 | `integrations/lol/src/lol_agent/live_danger_fuser.py` | 🔴 | **实时危险融合** — danger_zone + 历史死亡热区 → 综合预警 |
++| M431 | `agentos/governance/evolution_pipeline_orchestrator.py` | 🔴 | **演化管线编排** — event_bus + persistence + replay 统一编排 |
++| M432 | `agentos/governance/cross_module_health.py` | 🟡 | **跨模块健康** — 所有模块健康状态聚合 + 降级策略 |
++| M433 | `agentos/governance/evolution_audit_log.py` | 🟢 | **演化审计日志** — 不可变演化历史记录 + 合规追踪 |
++| M434 | `agentos/governance/rollback_manager.py` | 🟡 | **回滚管理器** — 演化失败时自动回滚到上一代 |
++| M435 | `agentos/governance/evolution_metrics_exporter.py` | 🟢 | **演化指标导出** — Prometheus/OpenTelemetry指标输出 |
++
++### 阶段 AG: 多游戏协议统一 + Dota2/麻将深度适配（M436-M445）
++
++> 将LoL的历史分析框架泛化到Dota2和麻将
++> 统一协议解码 + 策略引擎接口
++> 参考: dota2bot-OpenHyperAI, Akagi/Mortal, open_spiel
++
++| M# | 文件路径 | 级别 | 功能 |
++|---|---|---|---|
++| M436 | `integrations/dota2/src/dota2_agent/dota2_history_aggregator.py` | 🔴 | **Dota2历史聚合** — OpenDota API历史数据聚合 |
++| M437 | `integrations/dota2/src/dota2_agent/dota2_hero_tendency.py` | 🟡 | **Dota2英雄倾向** — Hero-specific play pattern analysis |
++| M438 | `integrations/dota2/src/dota2_agent/dota2_draft_advisor.py` | 🔴 | **Dota2 BP顾问** — 基于历史+meta的英雄推荐 |
++| M439 | `integrations/dota2/src/dota2_agent/dota2_playstyle_classifier.py` | 🟡 | **Dota2玩法分类** — 攻击/防守/推进/游走分类 |
++| M440 | `integrations/dota2/src/dota2_agent/dota2_tilt_detector.py` | 🟢 | **Dota2倾斜检测** — 连败/弃局/毒瘤聊天检测 |
++| M441 | `integrations/mahjong/src/mahjong_agent/mahjong_history_aggregator.py` | 🔴 | **麻将历史聚合** — 跨对局统计 (和牌率/放铳率/立直率) |
++| M442 | `integrations/mahjong/src/mahjong_agent/mahjong_opponent_model_v2.py` | 🟡 | **麻将对手模型V2** — 基于历史的对手打牌倾向预测 |
++| M443 | `integrations/mahjong/src/mahjong_agent/mahjong_meta_tracker.py` | 🟢 | **麻将meta追踪** — 段位/规则集meta变化追踪 |
++| M444 | `extensions/protocol-decoder/src/unified_protocol_adapter.py` | 🔴 | **统一协议适配器** — LoL/Dota2/Mahjong协议→统一事件格式 |
++| M445 | `extensions/protocol-decoder/src/protocol_version_negotiator.py` | 🟡 | **协议版本协商** — 多版本协议自动检测 + 降级 |
+-- 
+2.43.0
+

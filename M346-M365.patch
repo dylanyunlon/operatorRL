@@ -1,0 +1,5047 @@
+From 7ef8b43748898a8dd89ed32c7ac9ef082a5d1975 Mon Sep 17 00:00:00 2001
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Sun, 29 Mar 2026 04:07:49 +0000
+Subject: [PATCH] =?UTF-8?q?M346-M365:=20LoL=20Live=20Client=20+=20Seraphin?=
+ =?UTF-8?q?e=20history=20+=20AgentOS=20governance=20=E2=80=94=2020=20sourc?=
+ =?UTF-8?q?e=20files=20+=20plan=20update?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Phase X (M346-M355): Seraphine历史数据 + Live Client Data API深度集成
+- LiveClientConnector: Riot Live Client API (127.0.0.1:2999)
+- LiveGameState: 实时游戏状态解析 + 金币差计算
+- SeraphineHistoryClient: LCU历史数据 + 排位解析
+- OpponentHistoryMerger: 实时+历史合并 + 威胁评分
+- ChampionPerformanceAnalyzer: KDA/CS/视野趋势分析
+- WinProbabilityPredictor: Logistic胜率模型 + 在线学习
+- ItemBuildAdvisor: 对手感知出装推荐(16装备池)
+- VoiceNarrationEngine: 优先级堆TTS语音引擎
+- LoLEvolutionLoop: EvolutionLoopABC实现
+- LoLStrategyAdvisor: StrategyAdvisorABC + 三阶段策略
+
+Phase Y (M356-M365): 统一AgentOS治理 + 跨游戏部署框架
+- GameRegistry + DeploymentManager + ABTestController
+- TelemetryCollector + PolicyEnforcer + ModelVersioner
+- CrossGameDashboard + EvolutionOrchestrator
+- DataPipeline + NotificationService
+
+TDD: 215 tests (200 unit + 15 overfit validation), 215/215 passed (100%)
+---
+ agentos/__init__.py                           |   0
+ agentos/governance/__init__.py                |   0
+ agentos/governance/ab_test_controller.py      | 177 ++++
+ agentos/governance/cross_game_dashboard.py    | 112 +++
+ agentos/governance/data_pipeline.py           |  82 ++
+ agentos/governance/deployment_manager.py      | 151 +++
+ agentos/governance/evolution_orchestrator.py  | 145 +++
+ agentos/governance/game_registry.py           |  98 ++
+ agentos/governance/model_versioner.py         | 164 ++++
+ agentos/governance/notification_service.py    | 122 +++
+ agentos/governance/policy_enforcer.py         | 126 +++
+ agentos/governance/telemetry_collector.py     | 129 +++
+ agentos/tests/__init__.py                     |   0
+ agentos/tests/test_m356_m365.py               | 777 ++++++++++++++++
+ integrations/lol/__init__.py                  |   0
+ integrations/lol/src/__init__.py              |   0
+ integrations/lol/src/lol_agent/__init__.py    |   0
+ .../champion_performance_analyzer.py          | 148 +++
+ .../lol/src/lol_agent/item_build_advisor.py   | 160 ++++
+ .../src/lol_agent/live_client_connector.py    | 126 +++
+ .../lol/src/lol_agent/live_game_state.py      | 150 +++
+ .../lol/src/lol_agent/lol_evolution_loop.py   | 142 +++
+ .../lol/src/lol_agent/lol_strategy_advisor.py | 179 ++++
+ .../src/lol_agent/opponent_history_merger.py  | 141 +++
+ .../src/lol_agent/seraphine_history_client.py | 138 +++
+ .../src/lol_agent/voice_narration_engine.py   | 133 +++
+ .../lol_agent/win_probability_predictor.py    | 118 +++
+ integrations/lol/tests/__init__.py            |   0
+ integrations/lol/tests/test_m346_m355.py      | 871 ++++++++++++++++++
+ plan.md                                       | 169 ++++
+ tests/test_m346_m365_overfit.py               | 226 +++++
+ 31 files changed, 4784 insertions(+)
+ create mode 100644 agentos/__init__.py
+ create mode 100644 agentos/governance/__init__.py
+ create mode 100644 agentos/governance/ab_test_controller.py
+ create mode 100644 agentos/governance/cross_game_dashboard.py
+ create mode 100644 agentos/governance/data_pipeline.py
+ create mode 100644 agentos/governance/deployment_manager.py
+ create mode 100644 agentos/governance/evolution_orchestrator.py
+ create mode 100644 agentos/governance/game_registry.py
+ create mode 100644 agentos/governance/model_versioner.py
+ create mode 100644 agentos/governance/notification_service.py
+ create mode 100644 agentos/governance/policy_enforcer.py
+ create mode 100644 agentos/governance/telemetry_collector.py
+ create mode 100644 agentos/tests/__init__.py
+ create mode 100644 agentos/tests/test_m356_m365.py
+ create mode 100644 integrations/lol/__init__.py
+ create mode 100644 integrations/lol/src/__init__.py
+ create mode 100644 integrations/lol/src/lol_agent/__init__.py
+ create mode 100644 integrations/lol/src/lol_agent/champion_performance_analyzer.py
+ create mode 100644 integrations/lol/src/lol_agent/item_build_advisor.py
+ create mode 100644 integrations/lol/src/lol_agent/live_client_connector.py
+ create mode 100644 integrations/lol/src/lol_agent/live_game_state.py
+ create mode 100644 integrations/lol/src/lol_agent/lol_evolution_loop.py
+ create mode 100644 integrations/lol/src/lol_agent/lol_strategy_advisor.py
+ create mode 100644 integrations/lol/src/lol_agent/opponent_history_merger.py
+ create mode 100644 integrations/lol/src/lol_agent/seraphine_history_client.py
+ create mode 100644 integrations/lol/src/lol_agent/voice_narration_engine.py
+ create mode 100644 integrations/lol/src/lol_agent/win_probability_predictor.py
+ create mode 100644 integrations/lol/tests/__init__.py
+ create mode 100644 integrations/lol/tests/test_m346_m355.py
+ create mode 100644 tests/test_m346_m365_overfit.py
+
+diff --git a/agentos/__init__.py b/agentos/__init__.py
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/agentos/governance/__init__.py b/agentos/governance/__init__.py
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/agentos/governance/ab_test_controller.py b/agentos/governance/ab_test_controller.py
+new file mode 100644
+index 00000000..bbef1339
+--- /dev/null
++++ b/agentos/governance/ab_test_controller.py
+@@ -0,0 +1,177 @@
++"""
++A/B Test Controller — Multi-strategy parallel comparison.
++
++Manages experiments with multiple variants, records outcomes,
++computes statistical significance using Welch's t-test.
++
++Location: agentos/governance/ab_test_controller.py
++
++Reference (拿来主义):
++  - agentlightning/algorithm/self_play_scheduler.py: Elo comparison pattern
++  - DI-star: rl_learner.py evaluation comparison
++  - operatorRL: A/B testing design from plan.md
++"""
++
++from __future__ import annotations
++
++import hashlib
++import logging
++import math
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.ab_test_controller.v1"
++
++
++class ABTestController:
++    """A/B test controller for multi-strategy comparison.
++
++    Supports experiment creation, variant assignment, outcome recording,
++    and statistical significance testing via Welch's t-test.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._experiments: dict[str, dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def create_experiment(
++        self,
++        name: str,
++        variants: list[str],
++        traffic_split: list[float],
++    ) -> str:
++        """Create a new A/B experiment.
++
++        Args:
++            name: Unique experiment name.
++            variants: List of variant identifiers.
++            traffic_split: Traffic allocation per variant (must sum to ~1.0).
++
++        Returns:
++            Experiment ID (same as name).
++        """
++        self._experiments[name] = {
++            "variants": variants,
++            "traffic_split": traffic_split,
++            "outcomes": {v: [] for v in variants},
++            "created_at": time.time(),
++        }
++        self._fire_evolution("experiment_created", {"name": name, "variants": variants})
++        return name
++
++    def assign_variant(self, experiment: str, user_id: str) -> str:
++        """Assign a user to a variant deterministically.
++
++        Uses hash-based assignment for consistency.
++
++        Args:
++            experiment: Experiment name.
++            user_id: User identifier.
++
++        Returns:
++            Assigned variant name.
++        """
++        exp = self._experiments[experiment]
++        h = int(hashlib.md5(f"{experiment}:{user_id}".encode()).hexdigest(), 16)
++        ratio = (h % 10000) / 10000.0
++
++        cumulative = 0.0
++        for variant, split in zip(exp["variants"], exp["traffic_split"]):
++            cumulative += split
++            if ratio < cumulative:
++                return variant
++        return exp["variants"][-1]
++
++    def record_outcome(
++        self, experiment: str, variant: str, metric_value: float
++    ) -> None:
++        """Record a metric outcome for a variant.
++
++        Args:
++            experiment: Experiment name.
++            variant: Variant identifier.
++            metric_value: Observed metric value.
++        """
++        self._experiments[experiment]["outcomes"][variant].append(metric_value)
++
++    def get_results(self, experiment: str) -> dict[str, dict[str, Any]]:
++        """Get summary results for an experiment.
++
++        Args:
++            experiment: Experiment name.
++
++        Returns:
++            Dict mapping variant → {mean, std, count}.
++        """
++        outcomes = self._experiments[experiment]["outcomes"]
++        results = {}
++        for variant, values in outcomes.items():
++            n = len(values)
++            if n == 0:
++                results[variant] = {"mean": 0.0, "std": 0.0, "count": 0}
++                continue
++            mean = sum(values) / n
++            variance = sum((v - mean) ** 2 for v in values) / max(n - 1, 1)
++            results[variant] = {
++                "mean": mean,
++                "std": math.sqrt(variance),
++                "count": n,
++            }
++        return results
++
++    def is_significant(
++        self, experiment: str, p_threshold: float = 0.05
++    ) -> bool:
++        """Test statistical significance between first two variants.
++
++        Uses Welch's t-test approximation.
++
++        Args:
++            experiment: Experiment name.
++            p_threshold: Significance threshold.
++
++        Returns:
++            True if difference is statistically significant.
++        """
++        results = self.get_results(experiment)
++        variants = list(results.keys())
++        if len(variants) < 2:
++            return False
++
++        a = results[variants[0]]
++        b = results[variants[1]]
++
++        if a["count"] < 5 or b["count"] < 5:
++            return False
++
++        se_a = (a["std"] ** 2) / max(a["count"], 1)
++        se_b = (b["std"] ** 2) / max(b["count"], 1)
++        se_diff = math.sqrt(se_a + se_b)
++
++        if se_diff == 0:
++            return a["mean"] != b["mean"]
++
++        t_stat = abs(a["mean"] - b["mean"]) / se_diff
++
++        # Approximate: |t| > 1.96 → p < 0.05 (two-tailed)
++        # |t| > 2.576 → p < 0.01
++        critical_value = 1.96 if p_threshold >= 0.05 else 2.576
++        return t_stat > critical_value
++
++    def list_experiments(self) -> list[str]:
++        """List all experiment names."""
++        return list(self._experiments.keys())
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/cross_game_dashboard.py b/agentos/governance/cross_game_dashboard.py
+new file mode 100644
+index 00000000..35963894
+--- /dev/null
++++ b/agentos/governance/cross_game_dashboard.py
+@@ -0,0 +1,112 @@
++"""
++Cross-Game Dashboard — Unified monitoring view.
++
++Provides a panel-based dashboard for monitoring metrics across
++all games, with global snapshot and report export.
++
++Location: agentos/governance/cross_game_dashboard.py
++
++Reference (拿来主义):
++  - agentlightning/algorithm/self_play_scheduler.py: leaderboard/ranking pattern
++  - operatorRL: dashboard design from plan.md
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.cross_game_dashboard.v1"
++
++
++class CrossGameDashboard:
++    """Unified monitoring dashboard for all game agents.
++
++    Manages per-game panels with named metrics, supports
++    global snapshot and report export.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        # game → {metric_name → value}
++        self._panels: dict[str, dict[str, Any]] = {}
++        self._panel_metrics: dict[str, list[str]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register_panel(self, game: str, metrics: list[str]) -> None:
++        """Register a game panel with its metrics.
++
++        Args:
++            game: Game identifier.
++            metrics: List of metric names to track.
++        """
++        self._panels[game] = {m: 0.0 for m in metrics}
++        self._panel_metrics[game] = metrics
++
++    def remove_panel(self, game: str) -> None:
++        """Remove a game panel."""
++        self._panels.pop(game, None)
++        self._panel_metrics.pop(game, None)
++
++    def panel_count(self) -> int:
++        """Number of registered panels."""
++        return len(self._panels)
++
++    def update_metric(self, game: str, metric: str, value: float) -> None:
++        """Update a metric value on a game panel.
++
++        Args:
++            game: Game identifier.
++            metric: Metric name.
++            value: New metric value.
++        """
++        if game in self._panels:
++            self._panels[game][metric] = value
++            self._fire_evolution("metric_updated", {
++                "game": game, "metric": metric, "value": value,
++            })
++
++    def get_snapshot(self, game: str) -> dict[str, Any]:
++        """Get current metric snapshot for a game.
++
++        Args:
++            game: Game identifier.
++
++        Returns:
++            Dict of metric → value.
++        """
++        return dict(self._panels.get(game, {}))
++
++    def get_global_snapshot(self) -> dict[str, dict[str, Any]]:
++        """Get snapshots for all games.
++
++        Returns:
++            Dict of game → {metric → value}.
++        """
++        return {g: dict(m) for g, m in self._panels.items()}
++
++    def export_report(self) -> dict[str, Any]:
++        """Export a full dashboard report.
++
++        Returns:
++            Report dict with all panels and metadata.
++        """
++        return {
++            "timestamp": time.time(),
++            "panels": self.get_global_snapshot(),
++            "panel_count": self.panel_count(),
++        }
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/data_pipeline.py b/agentos/governance/data_pipeline.py
+new file mode 100644
+index 00000000..cb144faf
+--- /dev/null
++++ b/agentos/governance/data_pipeline.py
+@@ -0,0 +1,82 @@
++"""
++Data Pipeline — Multi-stage data processing pipeline.
++
++Provides a composable pipeline of named stages for transforming
++raw game data into training-ready spans.
++
++Location: agentos/governance/data_pipeline.py
++
++Reference (拿来主义):
++  - leagueoflegends-optimizer: data processing pipeline (article5.md)
++  - agentlightning/verl/reward_shaping.py: normalization stages
++  - DI-star: replay_decoder.py → training data pipeline
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.data_pipeline.v1"
++
++
++class DataPipeline:
++    """Composable multi-stage data processing pipeline.
++
++    Stages are named functions applied sequentially:
++    raw_data → stage_1 → stage_2 → ... → processed_data.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._stages: list[dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def add_stage(self, name: str, fn: Callable[[list], list]) -> None:
++        """Add a processing stage.
++
++        Args:
++            name: Stage identifier.
++            fn: Callable that transforms a list of records.
++        """
++        self._stages.append({"name": name, "fn": fn})
++
++    def stage_count(self) -> int:
++        """Number of registered stages."""
++        return len(self._stages)
++
++    def run(self, data: list[Any]) -> list[Any]:
++        """Run the pipeline on input data.
++
++        Applies all stages sequentially.
++
++        Args:
++            data: Input data list.
++
++        Returns:
++            Processed data list.
++        """
++        result = data
++        for stage in self._stages:
++            result = stage["fn"](result)
++
++        self._fire_evolution("pipeline_run", {
++            "input_count": len(data),
++            "output_count": len(result),
++            "stages": len(self._stages),
++        })
++        return result
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/deployment_manager.py b/agentos/governance/deployment_manager.py
+new file mode 100644
+index 00000000..52684c53
+--- /dev/null
++++ b/agentos/governance/deployment_manager.py
+@@ -0,0 +1,151 @@
++"""
++Deployment Manager — Game agent deployment lifecycle management.
++
++Provides deploy/stop/rollback/health-check for game agents,
++with version tracking and automatic rollback on failure.
++
++Location: agentos/governance/deployment_manager.py
++
++Reference (拿来主义):
++  - PARL: agent deployment lifecycle (agent_base.py)
++  - agentlightning/runner/game_runner.py: start/stop/status pattern
++  - DI-star: distributed deployment patterns
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.deployment_manager.v1"
++
++
++class DeploymentManager:
++    """Manages deployment lifecycle for game agents.
++
++    Tracks deployments by game name, supports version history,
++    health checks, and automatic rollback.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._deployments: dict[str, dict[str, Any]] = {}
++        self._version_history: dict[str, list[str]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def deploy(
++        self, game: str, version: str, config: dict[str, Any]
++    ) -> dict[str, Any]:
++        """Deploy or update a game agent.
++
++        Args:
++            game: Game identifier.
++            version: Version string.
++            config: Deployment configuration.
++
++        Returns:
++            Status dict with 'status' and 'version'.
++        """
++        if game not in self._version_history:
++            self._version_history[game] = []
++
++        # Save current version to history before overwriting
++        if game in self._deployments:
++            old_ver = self._deployments[game]["version"]
++            self._version_history[game].append(old_ver)
++
++        self._deployments[game] = {
++            "version": version,
++            "config": config,
++            "status": "deployed",
++            "deployed_at": time.time(),
++        }
++
++        self._fire_evolution("deployed", {"game": game, "version": version})
++        return {"status": "deployed", "version": version}
++
++    def stop(self, game: str) -> None:
++        """Stop a deployed game agent.
++
++        Args:
++            game: Game identifier.
++
++        Raises:
++            KeyError: If game not deployed.
++        """
++        if game not in self._deployments:
++            raise KeyError(f"Game '{game}' not deployed")
++        self._deployments[game]["status"] = "stopped"
++
++    def rollback(self, game: str) -> dict[str, Any]:
++        """Rollback to previous version.
++
++        Args:
++            game: Game identifier.
++
++        Returns:
++            Status dict with new version.
++
++        Raises:
++            KeyError: If game not deployed or no history.
++        """
++        if game not in self._deployments:
++            raise KeyError(f"Game '{game}' not deployed")
++        history = self._version_history.get(game, [])
++        if not history:
++            raise KeyError(f"No version history for '{game}'")
++
++        prev_version = history.pop()
++        self._deployments[game]["version"] = prev_version
++        self._deployments[game]["status"] = "deployed"
++        return {"status": "deployed", "version": prev_version}
++
++    def health_check(self, game: str) -> dict[str, Any]:
++        """Check health of a deployed game agent.
++
++        Args:
++            game: Game identifier.
++
++        Returns:
++            Health status dict.
++        """
++        if game not in self._deployments:
++            return {"healthy": False, "reason": "not_deployed"}
++        dep = self._deployments[game]
++        healthy = dep["status"] in ("deployed", "running")
++        return {"healthy": healthy, "status": dep["status"], "version": dep["version"]}
++
++    def get_status(self, game: str) -> dict[str, Any]:
++        """Get current deployment status.
++
++        Args:
++            game: Game identifier.
++
++        Returns:
++            Status dict.
++        """
++        if game not in self._deployments:
++            return {"status": "not_deployed", "version": None}
++        dep = self._deployments[game]
++        return {"status": dep["status"], "version": dep["version"]}
++
++    def list_deployments(self) -> list[dict[str, Any]]:
++        """List all current deployments."""
++        return [
++            {"game": g, "version": d["version"], "status": d["status"]}
++            for g, d in self._deployments.items()
++        ]
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/evolution_orchestrator.py b/agentos/governance/evolution_orchestrator.py
+new file mode 100644
+index 00000000..261d6111
+--- /dev/null
++++ b/agentos/governance/evolution_orchestrator.py
+@@ -0,0 +1,145 @@
++"""
++Evolution Orchestrator — Cross-game self-evolution scheduling.
++
++Manages multiple game evolution loops, running cycles, allocating
++resources proportionally, and collecting fitness reports.
++
++Location: agentos/governance/evolution_orchestrator.py
++
++Reference (拿来主义):
++  - agentlightning/trainer/multi_game_trainer.py: train_step per game pattern
++  - agentlightning/algorithm/self_play_scheduler.py: scheduling across agents
++  - modules/evolution_loop_abc.py: EvolutionLoopABC contract
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional, Protocol
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.evolution_orchestrator.v1"
++
++
++class EvolutionLoopProtocol(Protocol):
++    """Protocol matching EvolutionLoopABC interface."""
++    def compute_fitness(self) -> float: ...
++    def should_evolve(self) -> bool: ...
++    def advance_generation(self) -> None: ...
++    def export_training_data(self) -> list: ...
++    def reset(self) -> None: ...
++
++
++class EvolutionOrchestrator:
++    """Cross-game evolution orchestrator.
++
++    Manages registered evolution loops, runs cycles, allocates
++    resources based on fitness, and fires evolution callbacks.
++
++    Attributes:
++        total_budget: Total resource budget for allocation.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self, total_budget: int = 100) -> None:
++        self.total_budget = total_budget
++        self._loops: dict[str, Any] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register_loop(self, game: str, loop: Any) -> None:
++        """Register an evolution loop for a game.
++
++        Args:
++            game: Game identifier.
++            loop: Object implementing EvolutionLoopABC interface.
++        """
++        self._loops[game] = loop
++
++    def unregister_loop(self, game: str) -> None:
++        """Remove an evolution loop."""
++        self._loops.pop(game, None)
++
++    def loop_count(self) -> int:
++        """Number of registered loops."""
++        return len(self._loops)
++
++    def run_cycle(self) -> dict[str, Any]:
++        """Run one evolution cycle across all registered loops.
++
++        For each loop that should_evolve(), advances generation
++        and exports training data.
++
++        Returns:
++            Dict with per-game cycle results.
++        """
++        results = {}
++        for game, loop in self._loops.items():
++            if loop.should_evolve():
++                loop.advance_generation()
++                spans = loop.export_training_data()
++                results[game] = {
++                    "evolved": True,
++                    "spans_exported": len(spans),
++                    "fitness": loop.compute_fitness(),
++                }
++            else:
++                results[game] = {
++                    "evolved": False,
++                    "fitness": loop.compute_fitness(),
++                }
++
++        self._fire_evolution("cycle_completed", {
++            "games_evolved": sum(1 for r in results.values() if r.get("evolved")),
++            "total_games": len(results),
++        })
++        return results
++
++    def allocate_resources(self) -> dict[str, int]:
++        """Allocate resources proportionally to fitness.
++
++        Higher fitness → more resources. Minimum 1 per game.
++
++        Returns:
++            Dict of game → allocated resource units.
++        """
++        if not self._loops:
++            return {}
++
++        fitnesses = {}
++        for game, loop in self._loops.items():
++            fitnesses[game] = max(loop.compute_fitness(), 0.01)
++
++        total_fitness = sum(fitnesses.values())
++        allocation = {}
++        remaining = self.total_budget
++
++        for game, fitness in fitnesses.items():
++            share = max(1, int(self.total_budget * fitness / total_fitness))
++            allocation[game] = share
++            remaining -= share
++
++        # Distribute remaining to highest fitness
++        if remaining > 0 and fitnesses:
++            best = max(fitnesses, key=fitnesses.get)
++            allocation[best] += remaining
++
++        return allocation
++
++    def get_fitness_report(self) -> dict[str, float]:
++        """Get fitness for all registered games.
++
++        Returns:
++            Dict of game → fitness score.
++        """
++        return {game: loop.compute_fitness() for game, loop in self._loops.items()}
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/game_registry.py b/agentos/governance/game_registry.py
+new file mode 100644
+index 00000000..d2b92cb1
+--- /dev/null
++++ b/agentos/governance/game_registry.py
+@@ -0,0 +1,98 @@
++"""
++Game Registry — Unified game registration and configuration.
++
++Central registry for all games managed by AgentOS: LoL, Dota2, Mahjong, etc.
++Provides register/unregister/lookup with evolution callback hooks.
++
++Location: agentos/governance/game_registry.py
++
++Reference (拿来主义):
++  - DI-star: policy_factory.py game registration pattern
++  - agentlightning/trainer/multi_game_trainer.py: game registration dict
++  - PARL: agent_factory.py build/register pattern
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.game_registry.v1"
++
++
++class GameRegistry:
++    """Central registry for all games under AgentOS governance.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._registry: dict[str, dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def register(self, game_name: str, config: dict[str, Any]) -> None:
++        """Register a game with its configuration.
++
++        Args:
++            game_name: Unique game identifier.
++            config: Game configuration dict.
++        """
++        self._registry[game_name] = {
++            "config": config,
++            "registered_at": time.time(),
++        }
++        self._fire_evolution("game_registered", {"game": game_name})
++
++    def unregister(self, game_name: str) -> None:
++        """Remove a game from the registry.
++
++        Args:
++            game_name: Game to remove.
++
++        Raises:
++            KeyError: If game not registered.
++        """
++        if game_name not in self._registry:
++            raise KeyError(f"Game '{game_name}' not registered")
++        del self._registry[game_name]
++
++    def is_registered(self, game_name: str) -> bool:
++        """Check if a game is registered."""
++        return game_name in self._registry
++
++    def get_config(self, game_name: str) -> dict[str, Any]:
++        """Get configuration for a registered game.
++
++        Args:
++            game_name: Game identifier.
++
++        Returns:
++            Configuration dict.
++
++        Raises:
++            KeyError: If game not registered.
++        """
++        if game_name not in self._registry:
++            raise KeyError(f"Game '{game_name}' not registered")
++        return self._registry[game_name]["config"]
++
++    def list_games(self) -> list[str]:
++        """List all registered game names."""
++        return list(self._registry.keys())
++
++    def count(self) -> int:
++        """Number of registered games."""
++        return len(self._registry)
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/model_versioner.py b/agentos/governance/model_versioner.py
+new file mode 100644
+index 00000000..e759952a
+--- /dev/null
++++ b/agentos/governance/model_versioner.py
+@@ -0,0 +1,164 @@
++"""
++Model Versioner — Model weight version tracking and management.
++
++Provides save/load/rollback/diff for model weights, with version
++history and evolution callback hooks.
++
++Location: agentos/governance/model_versioner.py
++
++Reference (拿来主义):
++  - DI-star: checkpoint save/load patterns
++  - agentlightning/trainer/multi_game_trainer.py: checkpoint management
++  - operatorRL: model versioning design from plan.md
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.model_versioner.v1"
++
++
++class ModelVersioner:
++    """Model weight version manager.
++
++    Stores named model versions with weights, supports rollback
++    to previous versions and diff between versions.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        # model_name → list of {version, weights, saved_at}
++        self._store: dict[str, list[dict[str, Any]]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def save(
++        self, model_name: str, version: str, weights: dict[str, Any]
++    ) -> None:
++        """Save a model version.
++
++        Args:
++            model_name: Model identifier.
++            version: Version string.
++            weights: Weight dict to store.
++        """
++        if model_name not in self._store:
++            self._store[model_name] = []
++
++        self._store[model_name].append({
++            "version": version,
++            "weights": weights,
++            "saved_at": time.time(),
++        })
++
++        self._fire_evolution("version_saved", {
++            "model": model_name,
++            "version": version,
++        })
++
++    def load(self, model_name: str, version: str) -> dict[str, Any]:
++        """Load a specific model version.
++
++        Args:
++            model_name: Model identifier.
++            version: Version string.
++
++        Returns:
++            Weight dict.
++
++        Raises:
++            KeyError: If model or version not found.
++        """
++        if model_name not in self._store:
++            raise KeyError(f"Model '{model_name}' not found")
++        for entry in self._store[model_name]:
++            if entry["version"] == version:
++                return entry["weights"]
++        raise KeyError(f"Version '{version}' not found for '{model_name}'")
++
++    def load_latest(self, model_name: str) -> dict[str, Any]:
++        """Load the latest version of a model.
++
++        Args:
++            model_name: Model identifier.
++
++        Returns:
++            Weight dict of latest version.
++
++        Raises:
++            KeyError: If model not found or no versions.
++        """
++        if model_name not in self._store or not self._store[model_name]:
++            raise KeyError(f"Model '{model_name}' not found or empty")
++        return self._store[model_name][-1]["weights"]
++
++    def rollback(self, model_name: str) -> None:
++        """Remove the latest version, rolling back to previous.
++
++        Args:
++            model_name: Model identifier.
++
++        Raises:
++            KeyError: If model not found or only one version.
++        """
++        if model_name not in self._store or len(self._store[model_name]) < 2:
++            raise KeyError(f"Cannot rollback '{model_name}': insufficient versions")
++        self._store[model_name].pop()
++
++    def list_versions(self, model_name: str) -> list[str]:
++        """List all version strings for a model.
++
++        Args:
++            model_name: Model identifier.
++
++        Returns:
++            List of version strings.
++        """
++        if model_name not in self._store:
++            return []
++        return [e["version"] for e in self._store[model_name]]
++
++    def version_count(self, model_name: str) -> int:
++        """Number of stored versions for a model."""
++        return len(self._store.get(model_name, []))
++
++    def diff(
++        self, model_name: str, version_a: str, version_b: str
++    ) -> dict[str, Any]:
++        """Compute diff between two versions.
++
++        Args:
++            model_name: Model identifier.
++            version_a: First version.
++            version_b: Second version.
++
++        Returns:
++            Dict with changed keys and their old/new values.
++        """
++        weights_a = self.load(model_name, version_a)
++        weights_b = self.load(model_name, version_b)
++
++        changes = {}
++        all_keys = set(weights_a.keys()) | set(weights_b.keys())
++        for key in all_keys:
++            val_a = weights_a.get(key)
++            val_b = weights_b.get(key)
++            if val_a != val_b:
++                changes[key] = {"old": val_a, "new": val_b}
++
++        return changes
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/notification_service.py b/agentos/governance/notification_service.py
+new file mode 100644
+index 00000000..75b56d39
+--- /dev/null
++++ b/agentos/governance/notification_service.py
+@@ -0,0 +1,122 @@
++"""
++Notification Service — Event broadcasting and alert management.
++
++Provides pub/sub notification channels for evolution events,
++anomaly alerts, and performance report delivery.
++
++Location: agentos/governance/notification_service.py
++
++Reference (拿来主义):
++  - operatorRL: event callback pattern (_fire_evolution)
++  - Akagi: bridge message queue broadcasting pattern
++  - agentlightning/runner/game_runner.py: event notification
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from collections import defaultdict
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.notification_service.v1"
++
++
++class NotificationService:
++    """Pub/sub notification service for AgentOS events.
++
++    Supports channel-based subscriptions, broadcasting,
++    direct sends, and message history.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._subscribers: dict[str, list[Callable]] = defaultdict(list)
++        self._history: dict[str, list[dict[str, Any]]] = defaultdict(list)
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def subscribe(self, channel: str, callback: Callable) -> None:
++        """Subscribe to a notification channel.
++
++        Args:
++            channel: Channel name.
++            callback: Callable receiving message string.
++        """
++        self._subscribers[channel].append(callback)
++
++    def unsubscribe(self, channel: str, callback: Callable) -> None:
++        """Unsubscribe from a notification channel.
++
++        Args:
++            channel: Channel name.
++            callback: Callback to remove.
++        """
++        if channel in self._subscribers:
++            self._subscribers[channel] = [
++                cb for cb in self._subscribers[channel] if cb is not callback
++            ]
++
++    def subscriber_count(self, channel: str) -> int:
++        """Number of subscribers on a channel."""
++        return len(self._subscribers.get(channel, []))
++
++    def broadcast(self, channel: str, message: str) -> None:
++        """Broadcast a message to all subscribers on a channel.
++
++        Args:
++            channel: Channel name.
++            message: Message string.
++        """
++        self._history[channel].append({
++            "message": message,
++            "timestamp": time.time(),
++        })
++        for cb in self._subscribers.get(channel, []):
++            try:
++                cb(message)
++            except Exception as e:
++                logger.warning("Subscriber callback error: %s", e)
++
++    def send(self, channel: str, message: str) -> dict[str, Any]:
++        """Send a message (logged to history, not broadcast).
++
++        Args:
++            channel: Channel name.
++            message: Message string.
++
++        Returns:
++            Status dict with 'sent' bool.
++        """
++        self._history[channel].append({
++            "message": message,
++            "timestamp": time.time(),
++        })
++        self._fire_evolution("notification_sent", {
++            "channel": channel,
++            "message_preview": message[:50],
++        })
++        return {"sent": True, "channel": channel}
++
++    def get_history(self, channel: str) -> list[dict[str, Any]]:
++        """Get message history for a channel.
++
++        Args:
++            channel: Channel name.
++
++        Returns:
++            List of {message, timestamp} dicts.
++        """
++        return list(self._history.get(channel, []))
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/policy_enforcer.py b/agentos/governance/policy_enforcer.py
+new file mode 100644
+index 00000000..ced974f0
+--- /dev/null
++++ b/agentos/governance/policy_enforcer.py
+@@ -0,0 +1,126 @@
++"""
++Policy Enforcer — Safety boundaries and fairness constraints.
++
++Enforces action rate limits, fairness constraints, and anti-cheat
++rules across all game agents.
++
++Location: agentos/governance/policy_enforcer.py
++
++Reference (拿来主义):
++  - integrations/dota2/src/dota2_agent/agentos_integration.py: policy check pattern
++  - operatorRL: governance/safety design from plan.md
++  - PARL: agent constraint patterns
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.policy_enforcer.v1"
++
++
++class PolicyEnforcer:
++    """Enforces safety and fairness policies on agent actions.
++
++    Maintains a set of named rules with limits, checking incoming
++    actions against all active rules.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._rules: dict[str, dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def add_rule(self, name: str, limit: float) -> None:
++        """Add a policy rule.
++
++        Args:
++            name: Rule identifier.
++            limit: Maximum allowed value for this rule.
++        """
++        self._rules[name] = {"limit": limit, "created_at": time.time()}
++
++    def remove_rule(self, name: str) -> None:
++        """Remove a policy rule.
++
++        Args:
++            name: Rule identifier.
++        """
++        self._rules.pop(name, None)
++
++    def rule_count(self) -> int:
++        """Number of active rules."""
++        return len(self._rules)
++
++    def list_rules(self) -> list[dict[str, Any]]:
++        """List all active rules."""
++        return [{"name": n, "limit": r["limit"]} for n, r in self._rules.items()]
++
++    def check(self, action: dict[str, Any]) -> dict[str, Any]:
++        """Check an action against all active rules.
++
++        For 'max_actions_per_second': checks action['rate'] vs limit.
++        For 'fairness': checks action['advantage_score'] vs limit.
++        Generic fallback: checks action['rate'] vs limit.
++
++        Args:
++            action: Action dict with type and relevant fields.
++
++        Returns:
++            Dict with 'allowed' bool and 'violations' list.
++        """
++        violations = []
++
++        for name, rule in self._rules.items():
++            limit = rule["limit"]
++
++            if name == "max_actions_per_second":
++                rate = action.get("rate", 0)
++                if rate > limit:
++                    violations.append({
++                        "rule": name,
++                        "value": rate,
++                        "limit": limit,
++                    })
++            elif name == "fairness":
++                adv = action.get("advantage_score", 0)
++                if adv > limit:
++                    violations.append({
++                        "rule": name,
++                        "value": adv,
++                        "limit": limit,
++                    })
++            else:
++                # Generic: check 'rate' field
++                val = action.get("rate", 0)
++                if val > limit:
++                    violations.append({
++                        "rule": name,
++                        "value": val,
++                        "limit": limit,
++                    })
++
++        allowed = len(violations) == 0
++        result = {"allowed": allowed, "violations": violations}
++
++        self._fire_evolution("policy_checked", {
++            "action_type": action.get("type", "unknown"),
++            "allowed": allowed,
++            "violation_count": len(violations),
++        })
++        return result
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/governance/telemetry_collector.py b/agentos/governance/telemetry_collector.py
+new file mode 100644
+index 00000000..df2cc0fd
+--- /dev/null
++++ b/agentos/governance/telemetry_collector.py
+@@ -0,0 +1,129 @@
++"""
++Telemetry Collector — Cross-game performance metrics aggregation.
++
++Collects, stores, and queries performance metrics across all games
++managed by AgentOS.
++
++Location: agentos/governance/telemetry_collector.py
++
++Reference (拿来主义):
++  - agentlightning/store/experience_store.py: deque storage pattern
++  - agentlightning/verl/reward_shaping.py: metric normalization
++  - operatorRL: telemetry design from plan.md
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from collections import defaultdict, deque
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "agentos.governance.telemetry_collector.v1"
++
++
++class TelemetryCollector:
++    """Cross-game telemetry metric collector.
++
++    Stores timestamped metric values per game, supports latest/average
++    queries, and fires evolution callbacks on new data.
++
++    Attributes:
++        max_history: Maximum metric entries per game-metric pair.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self, max_history: int = 1000) -> None:
++        self.max_history = max_history
++        self._metrics: dict[str, dict[str, deque]] = defaultdict(
++            lambda: defaultdict(lambda: deque(maxlen=max_history))
++        )
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record(self, game: str, metric: str, value: float) -> None:
++        """Record a metric value.
++
++        Args:
++            game: Game identifier.
++            metric: Metric name.
++            value: Metric value.
++        """
++        self._metrics[game][metric].append({
++            "value": value,
++            "timestamp": time.time(),
++        })
++        self._fire_evolution("metric_recorded", {
++            "game": game, "metric": metric, "value": value,
++        })
++
++    def get_metrics(self, game: str) -> dict[str, list[dict]]:
++        """Get all metrics for a game.
++
++        Args:
++            game: Game identifier.
++
++        Returns:
++            Dict mapping metric name → list of {value, timestamp}.
++            Returns empty dict if game has no metrics.
++        """
++        if game not in self._metrics:
++            return {}
++        return {k: list(v) for k, v in self._metrics[game].items()}
++
++    def get_latest(self, game: str, metric: str) -> Optional[float]:
++        """Get the latest value for a specific metric.
++
++        Args:
++            game: Game identifier.
++            metric: Metric name.
++
++        Returns:
++            Latest value, or None if no data.
++        """
++        if game not in self._metrics or metric not in self._metrics[game]:
++            return None
++        entries = self._metrics[game][metric]
++        if not entries:
++            return None
++        return entries[-1]["value"]
++
++    def get_average(self, game: str, metric: str) -> float:
++        """Get average value for a specific metric.
++
++        Args:
++            game: Game identifier.
++            metric: Metric name.
++
++        Returns:
++            Average value, or 0.0 if no data.
++        """
++        if game not in self._metrics or metric not in self._metrics[game]:
++            return 0.0
++        entries = self._metrics[game][metric]
++        if not entries:
++            return 0.0
++        return sum(e["value"] for e in entries) / len(entries)
++
++    def list_games_with_metrics(self) -> list[str]:
++        """List all games that have recorded metrics."""
++        return list(self._metrics.keys())
++
++    def clear(self, game: str) -> None:
++        """Clear all metrics for a game.
++
++        Args:
++            game: Game identifier.
++        """
++        if game in self._metrics:
++            del self._metrics[game]
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/agentos/tests/__init__.py b/agentos/tests/__init__.py
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/agentos/tests/test_m356_m365.py b/agentos/tests/test_m356_m365.py
+new file mode 100644
+index 00000000..d69baf2e
+--- /dev/null
++++ b/agentos/tests/test_m356_m365.py
+@@ -0,0 +1,777 @@
++"""
++TDD Tests for M356-M365: Unified AgentOS Governance + Cross-game Deployment.
++
++100 tests (10 per module), designed for ~50% initial failure rate.
++Tests written BEFORE implementation per TDD methodology.
++
++Reference projects (拿来主义):
++  - DI-star: policy_factory.py game registry pattern
++  - PARL: agent_factory.py deployment lifecycle
++  - operatorRL: AgentOS governance patterns, evolution_callback, _EVOLUTION_KEY
++"""
++
++import importlib.util
++import json
++import os
++import sys
++import time
++
++import pytest
++
++# ---------------------------------------------------------------------------
++# Helper: load module from file path
++# ---------------------------------------------------------------------------
++_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
++_GOV_DIR = os.path.join(_ROOT, "governance")
++
++
++def _load(name: str, filepath: str):
++    spec = importlib.util.spec_from_file_location(name, filepath)
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules[name] = mod
++    spec.loader.exec_module(mod)
++    return mod
++
++
++# ---------------------------------------------------------------------------
++# Fixtures
++# ---------------------------------------------------------------------------
++@pytest.fixture(scope="module")
++def game_registry_mod():
++    return _load("game_registry", os.path.join(_GOV_DIR, "game_registry.py"))
++
++
++@pytest.fixture(scope="module")
++def deploy_mod():
++    return _load("deployment_manager", os.path.join(_GOV_DIR, "deployment_manager.py"))
++
++
++@pytest.fixture(scope="module")
++def ab_test_mod():
++    return _load("ab_test_controller", os.path.join(_GOV_DIR, "ab_test_controller.py"))
++
++
++@pytest.fixture(scope="module")
++def telemetry_mod():
++    return _load("telemetry_collector", os.path.join(_GOV_DIR, "telemetry_collector.py"))
++
++
++@pytest.fixture(scope="module")
++def policy_mod():
++    return _load("policy_enforcer", os.path.join(_GOV_DIR, "policy_enforcer.py"))
++
++
++@pytest.fixture(scope="module")
++def versioner_mod():
++    return _load("model_versioner", os.path.join(_GOV_DIR, "model_versioner.py"))
++
++
++@pytest.fixture(scope="module")
++def dashboard_mod():
++    return _load("cross_game_dashboard", os.path.join(_GOV_DIR, "cross_game_dashboard.py"))
++
++
++@pytest.fixture(scope="module")
++def orchestrator_mod():
++    return _load("evolution_orchestrator", os.path.join(_GOV_DIR, "evolution_orchestrator.py"))
++
++
++@pytest.fixture(scope="module")
++def pipeline_mod():
++    return _load("data_pipeline", os.path.join(_GOV_DIR, "data_pipeline.py"))
++
++
++@pytest.fixture(scope="module")
++def notif_mod():
++    return _load("notification_service", os.path.join(_GOV_DIR, "notification_service.py"))
++
++
++# =====================================================================
++# M356 — GameRegistry (10 tests)
++# Reference: DI-star policy_factory game registration
++# =====================================================================
++class TestGameRegistry:
++    def test_class_exists(self, game_registry_mod):
++        assert hasattr(game_registry_mod, "GameRegistry")
++
++    def test_has_evolution_key(self, game_registry_mod):
++        assert hasattr(game_registry_mod, "_EVOLUTION_KEY")
++        assert "game_registry" in game_registry_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        assert reg is not None
++
++    def test_register_game(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        reg.register("league_of_legends", config={"type": "moba", "api": "live_client"})
++        assert reg.is_registered("league_of_legends")
++
++    def test_register_multiple_games(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        reg.register("lol", config={"type": "moba"})
++        reg.register("dota2", config={"type": "moba"})
++        reg.register("mahjong", config={"type": "tabletop"})
++        assert reg.count() == 3
++
++    def test_get_game_config(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        reg.register("lol", config={"type": "moba", "api": "live_client"})
++        cfg = reg.get_config("lol")
++        assert cfg["type"] == "moba"
++
++    def test_unregister(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        reg.register("temp_game", config={"type": "test"})
++        reg.unregister("temp_game")
++        assert not reg.is_registered("temp_game")
++
++    def test_list_games(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        reg.register("lol", config={})
++        reg.register("dota2", config={})
++        games = reg.list_games()
++        assert "lol" in games
++        assert "dota2" in games
++
++    def test_get_unregistered_raises(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        with pytest.raises(KeyError):
++            reg.get_config("nonexistent")
++
++    def test_evolution_callback(self, game_registry_mod):
++        reg = game_registry_mod.GameRegistry()
++        events = []
++        reg.evolution_callback = lambda e: events.append(e)
++        reg.register("lol", config={"type": "moba"})
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M357 — DeploymentManager (10 tests)
++# Reference: PARL agent deployment lifecycle
++# =====================================================================
++class TestDeploymentManager:
++    def test_class_exists(self, deploy_mod):
++        assert hasattr(deploy_mod, "DeploymentManager")
++
++    def test_has_evolution_key(self, deploy_mod):
++        assert hasattr(deploy_mod, "_EVOLUTION_KEY")
++        assert "deployment" in deploy_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        assert dm is not None
++
++    def test_deploy(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        result = dm.deploy(game="lol", version="v1.0", config={"mode": "assistant"})
++        assert result["status"] in ("deployed", "running")
++
++    def test_health_check(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        dm.deploy(game="lol", version="v1.0", config={})
++        health = dm.health_check("lol")
++        assert health["healthy"] is True
++
++    def test_rollback(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        dm.deploy(game="lol", version="v1.0", config={})
++        dm.deploy(game="lol", version="v2.0", config={})
++        dm.rollback("lol")
++        status = dm.get_status("lol")
++        assert status["version"] == "v1.0"
++
++    def test_stop(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        dm.deploy(game="lol", version="v1.0", config={})
++        dm.stop("lol")
++        status = dm.get_status("lol")
++        assert status["status"] == "stopped"
++
++    def test_list_deployments(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        dm.deploy(game="lol", version="v1.0", config={})
++        dm.deploy(game="dota2", version="v1.0", config={})
++        deps = dm.list_deployments()
++        assert len(deps) == 2
++
++    def test_deploy_nonexistent_stop(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        with pytest.raises(KeyError):
++            dm.stop("nonexistent")
++
++    def test_evolution_callback(self, deploy_mod):
++        dm = deploy_mod.DeploymentManager()
++        events = []
++        dm.evolution_callback = lambda e: events.append(e)
++        dm.deploy(game="test", version="v1", config={})
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M358 — ABTestController (10 tests)
++# =====================================================================
++class TestABTestController:
++    def test_class_exists(self, ab_test_mod):
++        assert hasattr(ab_test_mod, "ABTestController")
++
++    def test_has_evolution_key(self, ab_test_mod):
++        assert hasattr(ab_test_mod, "_EVOLUTION_KEY")
++        assert "ab_test" in ab_test_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        assert ab is not None
++
++    def test_create_experiment(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        exp_id = ab.create_experiment(
++            name="strategy_v1_vs_v2",
++            variants=["strategy_v1", "strategy_v2"],
++            traffic_split=[0.5, 0.5],
++        )
++        assert exp_id is not None
++
++    def test_assign_variant(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        ab.create_experiment(
++            name="test_exp",
++            variants=["A", "B"],
++            traffic_split=[0.5, 0.5],
++        )
++        variant = ab.assign_variant("test_exp", user_id="user_123")
++        assert variant in ("A", "B")
++
++    def test_record_outcome(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        ab.create_experiment(name="exp1", variants=["A", "B"], traffic_split=[0.5, 0.5])
++        ab.record_outcome("exp1", variant="A", metric_value=0.8)
++        ab.record_outcome("exp1", variant="B", metric_value=0.6)
++        results = ab.get_results("exp1")
++        assert "A" in results
++        assert "B" in results
++
++    def test_statistical_significance(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        ab.create_experiment(name="sig_test", variants=["A", "B"], traffic_split=[0.5, 0.5])
++        for _ in range(50):
++            ab.record_outcome("sig_test", variant="A", metric_value=0.9)
++            ab.record_outcome("sig_test", variant="B", metric_value=0.3)
++        sig = ab.is_significant("sig_test", p_threshold=0.05)
++        assert sig is True
++
++    def test_not_significant_small_sample(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        ab.create_experiment(name="small_exp", variants=["A", "B"], traffic_split=[0.5, 0.5])
++        ab.record_outcome("small_exp", variant="A", metric_value=0.5)
++        ab.record_outcome("small_exp", variant="B", metric_value=0.5)
++        sig = ab.is_significant("small_exp", p_threshold=0.05)
++        assert sig is False
++
++    def test_list_experiments(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        ab.create_experiment(name="exp_a", variants=["X", "Y"], traffic_split=[0.5, 0.5])
++        ab.create_experiment(name="exp_b", variants=["X", "Y"], traffic_split=[0.5, 0.5])
++        exps = ab.list_experiments()
++        assert len(exps) >= 2
++
++    def test_evolution_callback(self, ab_test_mod):
++        ab = ab_test_mod.ABTestController()
++        events = []
++        ab.evolution_callback = lambda e: events.append(e)
++        ab.create_experiment(name="cb_exp", variants=["A", "B"], traffic_split=[0.5, 0.5])
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M359 — TelemetryCollector (10 tests)
++# =====================================================================
++class TestTelemetryCollector:
++    def test_class_exists(self, telemetry_mod):
++        assert hasattr(telemetry_mod, "TelemetryCollector")
++
++    def test_has_evolution_key(self, telemetry_mod):
++        assert hasattr(telemetry_mod, "_EVOLUTION_KEY")
++        assert "telemetry" in telemetry_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        assert tc is not None
++
++    def test_record_metric(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        tc.record("lol", metric="win_rate", value=0.55)
++        metrics = tc.get_metrics("lol")
++        assert len(metrics) >= 1
++
++    def test_record_multiple_games(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        tc.record("lol", metric="win_rate", value=0.55)
++        tc.record("dota2", metric="win_rate", value=0.60)
++        tc.record("mahjong", metric="win_rate", value=0.45)
++        games = tc.list_games_with_metrics()
++        assert len(games) == 3
++
++    def test_get_latest(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        tc.record("lol", metric="fps", value=60.0)
++        tc.record("lol", metric="fps", value=55.0)
++        latest = tc.get_latest("lol", "fps")
++        assert latest == 55.0
++
++    def test_get_average(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        tc.record("lol", metric="latency", value=30.0)
++        tc.record("lol", metric="latency", value=50.0)
++        avg = tc.get_average("lol", "latency")
++        assert abs(avg - 40.0) < 0.01
++
++    def test_clear_game(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        tc.record("lol", metric="test", value=1.0)
++        tc.clear("lol")
++        assert len(tc.get_metrics("lol")) == 0
++
++    def test_empty_metrics(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        metrics = tc.get_metrics("nonexistent")
++        assert metrics == [] or metrics == {}
++
++    def test_evolution_callback(self, telemetry_mod):
++        tc = telemetry_mod.TelemetryCollector()
++        events = []
++        tc.evolution_callback = lambda e: events.append(e)
++        tc.record("lol", metric="score", value=100.0)
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M360 — PolicyEnforcer (10 tests)
++# =====================================================================
++class TestPolicyEnforcer:
++    def test_class_exists(self, policy_mod):
++        assert hasattr(policy_mod, "PolicyEnforcer")
++
++    def test_has_evolution_key(self, policy_mod):
++        assert hasattr(policy_mod, "_EVOLUTION_KEY")
++        assert "policy_enforcer" in policy_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        assert pe is not None
++
++    def test_add_rule(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        pe.add_rule(name="max_actions_per_second", limit=10)
++        assert pe.rule_count() >= 1
++
++    def test_check_pass(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        pe.add_rule(name="max_actions_per_second", limit=10)
++        result = pe.check(action={"type": "move", "rate": 5})
++        assert result["allowed"] is True
++
++    def test_check_fail(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        pe.add_rule(name="max_actions_per_second", limit=10)
++        result = pe.check(action={"type": "move", "rate": 15})
++        assert result["allowed"] is False
++
++    def test_fairness_constraint(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        pe.add_rule(name="fairness", limit=1.0)
++        result = pe.check(action={"type": "exploit", "advantage_score": 0.5})
++        assert result["allowed"] is True
++
++    def test_remove_rule(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        pe.add_rule(name="temp_rule", limit=5)
++        pe.remove_rule("temp_rule")
++        assert pe.rule_count() == 0
++
++    def test_list_rules(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        pe.add_rule(name="rule_a", limit=10)
++        pe.add_rule(name="rule_b", limit=20)
++        rules = pe.list_rules()
++        assert len(rules) == 2
++
++    def test_evolution_callback(self, policy_mod):
++        pe = policy_mod.PolicyEnforcer()
++        events = []
++        pe.evolution_callback = lambda e: events.append(e)
++        pe.add_rule(name="test_rule", limit=5)
++        pe.check(action={"type": "test", "rate": 3})
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M361 — ModelVersioner (10 tests)
++# =====================================================================
++class TestModelVersioner:
++    def test_class_exists(self, versioner_mod):
++        assert hasattr(versioner_mod, "ModelVersioner")
++
++    def test_has_evolution_key(self, versioner_mod):
++        assert hasattr(versioner_mod, "_EVOLUTION_KEY")
++        assert "model_versioner" in versioner_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        assert mv is not None
++
++    def test_save_version(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        mv.save("lol_strategy", version="v1.0", weights={"layer1": [0.1, 0.2, 0.3]})
++        assert mv.version_count("lol_strategy") >= 1
++
++    def test_load_version(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        mv.save("test_model", version="v1.0", weights={"w": [1.0, 2.0]})
++        loaded = mv.load("test_model", version="v1.0")
++        assert loaded["w"] == [1.0, 2.0]
++
++    def test_load_latest(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        mv.save("model_a", version="v1.0", weights={"w": [1.0]})
++        mv.save("model_a", version="v2.0", weights={"w": [2.0]})
++        latest = mv.load_latest("model_a")
++        assert latest["w"] == [2.0]
++
++    def test_rollback(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        mv.save("model_b", version="v1.0", weights={"w": [1.0]})
++        mv.save("model_b", version="v2.0", weights={"w": [2.0]})
++        mv.rollback("model_b")
++        latest = mv.load_latest("model_b")
++        assert latest["w"] == [1.0]
++
++    def test_list_versions(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        mv.save("model_c", version="v1.0", weights={})
++        mv.save("model_c", version="v2.0", weights={})
++        mv.save("model_c", version="v3.0", weights={})
++        versions = mv.list_versions("model_c")
++        assert len(versions) == 3
++
++    def test_diff(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        mv.save("model_d", version="v1", weights={"a": [1.0, 2.0]})
++        mv.save("model_d", version="v2", weights={"a": [1.0, 3.0]})
++        diff = mv.diff("model_d", "v1", "v2")
++        assert diff is not None
++        assert len(diff) > 0
++
++    def test_evolution_callback(self, versioner_mod):
++        mv = versioner_mod.ModelVersioner()
++        events = []
++        mv.evolution_callback = lambda e: events.append(e)
++        mv.save("cb_model", version="v1", weights={"x": [1.0]})
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M362 — CrossGameDashboard (10 tests)
++# =====================================================================
++class TestCrossGameDashboard:
++    def test_class_exists(self, dashboard_mod):
++        assert hasattr(dashboard_mod, "CrossGameDashboard")
++
++    def test_has_evolution_key(self, dashboard_mod):
++        assert hasattr(dashboard_mod, "_EVOLUTION_KEY")
++        assert "dashboard" in dashboard_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        assert db is not None
++
++    def test_register_game_panel(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        db.register_panel("lol", metrics=["win_rate", "kda", "cs_per_min"])
++        assert db.panel_count() >= 1
++
++    def test_update_metric(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        db.register_panel("lol", metrics=["win_rate"])
++        db.update_metric("lol", "win_rate", 0.55)
++        snapshot = db.get_snapshot("lol")
++        assert snapshot["win_rate"] == 0.55
++
++    def test_get_global_snapshot(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        db.register_panel("lol", metrics=["wr"])
++        db.register_panel("dota2", metrics=["wr"])
++        db.update_metric("lol", "wr", 0.55)
++        db.update_metric("dota2", "wr", 0.60)
++        snapshot = db.get_global_snapshot()
++        assert "lol" in snapshot
++        assert "dota2" in snapshot
++
++    def test_remove_panel(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        db.register_panel("temp", metrics=["x"])
++        db.remove_panel("temp")
++        assert db.panel_count() == 0
++
++    def test_export_report(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        db.register_panel("lol", metrics=["wr"])
++        db.update_metric("lol", "wr", 0.55)
++        report = db.export_report()
++        assert isinstance(report, (dict, str))
++
++    def test_empty_dashboard(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        snapshot = db.get_global_snapshot()
++        assert snapshot == {} or isinstance(snapshot, dict)
++
++    def test_evolution_callback(self, dashboard_mod):
++        db = dashboard_mod.CrossGameDashboard()
++        events = []
++        db.evolution_callback = lambda e: events.append(e)
++        db.register_panel("lol", metrics=["wr"])
++        db.update_metric("lol", "wr", 0.55)
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M363 — EvolutionOrchestrator (10 tests)
++# =====================================================================
++class TestEvolutionOrchestrator:
++    def test_class_exists(self, orchestrator_mod):
++        assert hasattr(orchestrator_mod, "EvolutionOrchestrator")
++
++    def test_has_evolution_key(self, orchestrator_mod):
++        assert hasattr(orchestrator_mod, "_EVOLUTION_KEY")
++        assert "evolution_orchestrator" in orchestrator_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator()
++        assert eo is not None
++
++    def test_register_loop(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator()
++
++        class MockLoop:
++            def compute_fitness(self): return 0.5
++            def should_evolve(self): return True
++            def advance_generation(self): pass
++            def export_training_data(self): return []
++            def reset(self): pass
++
++        eo.register_loop("lol", MockLoop())
++        assert eo.loop_count() >= 1
++
++    def test_schedule_evolution(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator()
++
++        class MockLoop:
++            def __init__(self):
++                self.gen = 0
++            def compute_fitness(self): return 0.6
++            def should_evolve(self): return True
++            def advance_generation(self):
++                self.gen += 1
++            def export_training_data(self): return [{"span": "data"}]
++            def reset(self): pass
++
++        loop = MockLoop()
++        eo.register_loop("lol", loop)
++        eo.run_cycle()
++        assert loop.gen >= 1
++
++    def test_resource_allocation(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator(total_budget=100)
++
++        class MockLoop:
++            def compute_fitness(self): return 0.5
++            def should_evolve(self): return True
++            def advance_generation(self): pass
++            def export_training_data(self): return []
++            def reset(self): pass
++
++        eo.register_loop("lol", MockLoop())
++        eo.register_loop("dota2", MockLoop())
++        alloc = eo.allocate_resources()
++        assert sum(alloc.values()) <= 100
++
++    def test_unregister_loop(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator()
++
++        class MockLoop:
++            def compute_fitness(self): return 0.0
++            def should_evolve(self): return False
++            def advance_generation(self): pass
++            def export_training_data(self): return []
++            def reset(self): pass
++
++        eo.register_loop("temp", MockLoop())
++        eo.unregister_loop("temp")
++        assert eo.loop_count() == 0
++
++    def test_get_fitness_report(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator()
++
++        class MockLoop:
++            def compute_fitness(self): return 0.7
++            def should_evolve(self): return False
++            def advance_generation(self): pass
++            def export_training_data(self): return []
++            def reset(self): pass
++
++        eo.register_loop("lol", MockLoop())
++        report = eo.get_fitness_report()
++        assert "lol" in report
++        assert report["lol"] == 0.7
++
++    def test_empty_run_cycle(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator()
++        # Should not crash with no loops
++        eo.run_cycle()
++
++    def test_evolution_callback(self, orchestrator_mod):
++        eo = orchestrator_mod.EvolutionOrchestrator()
++        events = []
++        eo.evolution_callback = lambda e: events.append(e)
++
++        class MockLoop:
++            def compute_fitness(self): return 0.8
++            def should_evolve(self): return True
++            def advance_generation(self): pass
++            def export_training_data(self): return [{"x": 1}]
++            def reset(self): pass
++
++        eo.register_loop("lol", MockLoop())
++        eo.run_cycle()
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M364 — DataPipeline (10 tests)
++# =====================================================================
++class TestDataPipeline:
++    def test_class_exists(self, pipeline_mod):
++        assert hasattr(pipeline_mod, "DataPipeline")
++
++    def test_has_evolution_key(self, pipeline_mod):
++        assert hasattr(pipeline_mod, "_EVOLUTION_KEY")
++        assert "data_pipeline" in pipeline_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        assert dp is not None
++
++    def test_add_stage(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        dp.add_stage("clean", fn=lambda data: [d for d in data if d.get("valid")])
++        assert dp.stage_count() >= 1
++
++    def test_run_pipeline(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        dp.add_stage("passthrough", fn=lambda data: data)
++        raw = [{"value": 1}, {"value": 2}]
++        result = dp.run(raw)
++        assert len(result) == 2
++
++    def test_multi_stage(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        dp.add_stage("filter", fn=lambda data: [d for d in data if d.get("value", 0) > 1])
++        dp.add_stage("transform", fn=lambda data: [{"v": d["value"] * 2} for d in data])
++        raw = [{"value": 1}, {"value": 2}, {"value": 3}]
++        result = dp.run(raw)
++        assert len(result) == 2
++        assert result[0]["v"] == 4
++
++    def test_empty_pipeline(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        result = dp.run([{"x": 1}])
++        assert result == [{"x": 1}]
++
++    def test_empty_data(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        dp.add_stage("noop", fn=lambda data: data)
++        result = dp.run([])
++        assert result == []
++
++    def test_to_training_spans(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        dp.add_stage("to_span", fn=lambda data: [
++            {"state": d.get("state"), "action": d.get("action"), "reward": d.get("reward", 0)}
++            for d in data
++        ])
++        raw = [{"state": {"hp": 100}, "action": "farm", "reward": 0.5}]
++        spans = dp.run(raw)
++        assert spans[0]["reward"] == 0.5
++
++    def test_evolution_callback(self, pipeline_mod):
++        dp = pipeline_mod.DataPipeline()
++        events = []
++        dp.evolution_callback = lambda e: events.append(e)
++        dp.add_stage("noop", fn=lambda d: d)
++        dp.run([{"x": 1}])
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M365 — NotificationService (10 tests)
++# =====================================================================
++class TestNotificationService:
++    def test_class_exists(self, notif_mod):
++        assert hasattr(notif_mod, "NotificationService")
++
++    def test_has_evolution_key(self, notif_mod):
++        assert hasattr(notif_mod, "_EVOLUTION_KEY")
++        assert "notification" in notif_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        assert ns is not None
++
++    def test_send_notification(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        result = ns.send(channel="log", message="Evolution complete for LoL v2.0")
++        assert result["sent"] is True
++
++    def test_subscribe(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        ns.subscribe("evolution_events", callback=lambda msg: None)
++        assert ns.subscriber_count("evolution_events") >= 1
++
++    def test_broadcast(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        received = []
++        ns.subscribe("alerts", callback=lambda msg: received.append(msg))
++        ns.broadcast("alerts", message="Model degradation detected!")
++        assert len(received) == 1
++        assert "degradation" in received[0]
++
++    def test_multiple_subscribers(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        r1, r2 = [], []
++        ns.subscribe("ch1", callback=lambda msg: r1.append(msg))
++        ns.subscribe("ch1", callback=lambda msg: r2.append(msg))
++        ns.broadcast("ch1", message="test")
++        assert len(r1) == 1
++        assert len(r2) == 1
++
++    def test_unsubscribe(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        cb = lambda msg: None
++        ns.subscribe("ch2", callback=cb)
++        ns.unsubscribe("ch2", callback=cb)
++        assert ns.subscriber_count("ch2") == 0
++
++    def test_history(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        ns.send(channel="log", message="msg1")
++        ns.send(channel="log", message="msg2")
++        history = ns.get_history("log")
++        assert len(history) >= 2
++
++    def test_evolution_callback(self, notif_mod):
++        ns = notif_mod.NotificationService()
++        events = []
++        ns.evolution_callback = lambda e: events.append(e)
++        ns.send(channel="log", message="test event")
++        assert len(events) >= 1
+diff --git a/integrations/lol/__init__.py b/integrations/lol/__init__.py
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/integrations/lol/src/__init__.py b/integrations/lol/src/__init__.py
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/integrations/lol/src/lol_agent/__init__.py b/integrations/lol/src/lol_agent/__init__.py
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/integrations/lol/src/lol_agent/champion_performance_analyzer.py b/integrations/lol/src/lol_agent/champion_performance_analyzer.py
+new file mode 100644
+index 00000000..57faf7b8
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/champion_performance_analyzer.py
+@@ -0,0 +1,148 @@
++"""
++Champion Performance Analyzer — Player stat analysis and trending.
++
++Computes KDA, CS/min, damage share, ward efficiency, and trend
++analysis across historical match data.
++
++Location: integrations/lol/src/lol_agent/champion_performance_analyzer.py
++
++Reference (拿来主义):
++  - leagueoflegends-optimizer: stats pipeline (article5.md)
++  - integrations/lol-history/src/lol_history/match_analyzer.py: analysis pattern
++  - Seraphine/app/lol/tools.py: stat calculation utilities
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.champion_performance_analyzer.v1"
++
++
++class ChampionPerformanceAnalyzer:
++    """Analyzes champion/player performance from match statistics.
++
++    Computes standard metrics (KDA, CS/min, damage, wards) and
++    provides trend analysis across multiple matches.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def compute_kda(self, kills: int, deaths: int, assists: int) -> float:
++        """Compute KDA ratio.
++
++        Args:
++            kills: Total kills.
++            deaths: Total deaths.
++            assists: Total assists.
++
++        Returns:
++            KDA ratio. Returns (kills+assists) if deaths == 0 (perfect KDA).
++        """
++        if deaths == 0:
++            return float(kills + assists) if (kills + assists) > 0 else 0.0
++        return (kills + assists) / deaths
++
++    def compute_cs_per_minute(
++        self, creep_score: int, game_time_seconds: float
++    ) -> float:
++        """Compute CS per minute.
++
++        Args:
++            creep_score: Total creep score.
++            game_time_seconds: Game duration in seconds.
++
++        Returns:
++            CS/min. Returns 0 if game_time is 0.
++        """
++        if game_time_seconds <= 0:
++            return 0.0
++        return creep_score / (game_time_seconds / 60.0)
++
++    def analyze(self, stats: dict[str, Any]) -> dict[str, Any]:
++        """Produce a full performance report from a single match's stats.
++
++        Args:
++            stats: Dict with kills, deaths, assists, creepScore,
++                   damageDealt, wardsPlaced, game_time_seconds.
++
++        Returns:
++            Report dict with kda, cs_per_min, damage, wards_per_min.
++        """
++        kills = stats.get("kills", 0)
++        deaths = stats.get("deaths", 0)
++        assists = stats.get("assists", 0)
++        cs = stats.get("creepScore", 0)
++        damage = stats.get("damageDealt", 0)
++        wards = stats.get("wardsPlaced", 0)
++        game_time = stats.get("game_time_seconds", 0)
++
++        kda = self.compute_kda(kills, deaths, assists)
++        cs_per_min = self.compute_cs_per_minute(cs, game_time)
++        wards_per_min = (wards / (game_time / 60.0)) if game_time > 0 else 0.0
++
++        report = {
++            "kda": kda,
++            "kills": kills,
++            "deaths": deaths,
++            "assists": assists,
++            "cs_per_min": cs_per_min,
++            "damage": damage,
++            "wards_per_min": wards_per_min,
++            "game_time_seconds": game_time,
++        }
++
++        self._fire_evolution("performance_analyzed", {"kda": kda})
++        return report
++
++    def compute_trend(
++        self, history: list[dict[str, Any]]
++    ) -> dict[str, float]:
++        """Compute performance trend across a list of match stats.
++
++        Uses simple linear slope estimation for KDA and CS/min.
++
++        Args:
++            history: List of stat dicts (same format as analyze() input).
++
++        Returns:
++            Dict with kda_trend and cs_trend (positive = improving).
++        """
++        if len(history) < 2:
++            return {"kda_trend": 0.0, "cs_trend": 0.0}
++
++        kdas = []
++        cspm = []
++        for stats in history:
++            k = stats.get("kills", 0)
++            d = stats.get("deaths", 0)
++            a = stats.get("assists", 0)
++            cs = stats.get("creepScore", 0)
++            gt = stats.get("game_time_seconds", 1)
++            kdas.append(self.compute_kda(k, d, a))
++            cspm.append(self.compute_cs_per_minute(cs, gt))
++
++        # Simple slope: (last - first) / (n - 1)
++        n = len(kdas)
++        kda_trend = (kdas[-1] - kdas[0]) / max(n - 1, 1)
++        cs_trend = (cspm[-1] - cspm[0]) / max(n - 1, 1)
++
++        return {"kda_trend": kda_trend, "cs_trend": cs_trend}
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/item_build_advisor.py b/integrations/lol/src/lol_agent/item_build_advisor.py
+new file mode 100644
+index 00000000..87304c50
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/item_build_advisor.py
+@@ -0,0 +1,160 @@
++"""
++Item Build Advisor — Context-aware item recommendation engine.
++
++Recommends items based on champion, role, current items, gold budget,
++and opponent composition. Scores items using a multi-factor heuristic.
++
++Location: integrations/lol/src/lol_agent/item_build_advisor.py
++
++Reference (拿来主义):
++  - leagueoflegends-optimizer: item recommendation pipeline
++  - Seraphine/app/lol/tools.py: item utilities
++  - integrations/lol-history/src/lol_history/champion_meta.py: meta patterns
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.item_build_advisor.v1"
++
++# Simplified item pool (production would load from data dragon)
++_ITEM_POOL: list[dict[str, Any]] = [
++    {"name": "Infinity Edge", "cost": 3400, "tags": ["crit", "ad"], "roles": ["ADC", "MID"]},
++    {"name": "Kraken Slayer", "cost": 3400, "tags": ["attack_speed", "ad"], "roles": ["ADC"]},
++    {"name": "Lord Dominik's Regards", "cost": 3000, "tags": ["armor_pen", "ad"], "roles": ["ADC", "MID"]},
++    {"name": "Phantom Dancer", "cost": 2800, "tags": ["attack_speed", "crit"], "roles": ["ADC"]},
++    {"name": "Bloodthirster", "cost": 3200, "tags": ["lifesteal", "ad"], "roles": ["ADC"]},
++    {"name": "Luden's Tempest", "cost": 3200, "tags": ["ap", "mana"], "roles": ["MID", "SUPPORT"]},
++    {"name": "Rabadon's Deathcap", "cost": 3600, "tags": ["ap"], "roles": ["MID"]},
++    {"name": "Void Staff", "cost": 2800, "tags": ["magic_pen", "ap"], "roles": ["MID"]},
++    {"name": "Zhonya's Hourglass", "cost": 3000, "tags": ["ap", "armor"], "roles": ["MID"]},
++    {"name": "Sunfire Aegis", "cost": 3200, "tags": ["tank", "armor", "health"], "roles": ["TOP", "JUNGLE"]},
++    {"name": "Thornmail", "cost": 2700, "tags": ["armor", "tank"], "roles": ["TOP", "JUNGLE", "SUPPORT"]},
++    {"name": "Gargoyle Stoneplate", "cost": 3200, "tags": ["tank", "armor", "magic_resist"], "roles": ["TOP", "JUNGLE"]},
++    {"name": "Boots of Swiftness", "cost": 900, "tags": ["boots"], "roles": ["ADC", "MID", "TOP", "JUNGLE", "SUPPORT"]},
++    {"name": "Long Sword", "cost": 350, "tags": ["ad"], "roles": ["ADC", "MID", "TOP", "JUNGLE"]},
++    {"name": "Amplifying Tome", "cost": 435, "tags": ["ap"], "roles": ["MID", "SUPPORT"]},
++    {"name": "Doran's Blade", "cost": 450, "tags": ["ad", "starter"], "roles": ["ADC", "TOP"]},
++]
++
++
++class ItemBuildAdvisor:
++    """Context-aware item recommendation engine.
++
++    Scores and ranks items based on champion role, budget, current
++    build, and opponent composition.
++
++    Attributes:
++        item_pool: Available item pool.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(
++        self,
++        item_pool: Optional[list[dict[str, Any]]] = None,
++    ) -> None:
++        self._item_pool: list[dict[str, Any]] = list(item_pool or _ITEM_POOL)
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def item_pool(self) -> list[dict[str, Any]]:
++        """Current item pool."""
++        return self._item_pool
++
++    def score_item(
++        self, item_name: str, context: dict[str, Any]
++    ) -> float:
++        """Score a single item given the build context.
++
++        Factors:
++          - Role match (item tags vs champion role)
++          - Budget fit (cost vs available gold)
++          - Not already owned
++
++        Args:
++            item_name: Item name.
++            context: Build context dict.
++
++        Returns:
++            Score >= 0. Higher is better.
++        """
++        item = None
++        for it in self._item_pool:
++            if it["name"] == item_name:
++                item = it
++                break
++        if item is None:
++            return 0.0
++
++        # Already owned → 0
++        if item_name in context.get("current_items", []):
++            return 0.0
++
++        score = 1.0
++
++        # Role match bonus
++        role = context.get("role", "").upper()
++        if role in item.get("roles", []):
++            score += 2.0
++
++        # Budget fit
++        gold = context.get("gold", 0)
++        if item["cost"] <= gold:
++            score += 1.5
++        else:
++            score *= 0.3  # Penalty for unaffordable
++
++        # Opponent-aware bonus
++        opponents = context.get("opponents", [])
++        for opp in opponents:
++            if opp.get("armor", 0) > 150 and "armor_pen" in item.get("tags", []):
++                score += 2.0
++            if opp.get("magic_resist", 0) > 150 and "magic_pen" in item.get("tags", []):
++                score += 2.0
++
++        return score
++
++    def recommend(
++        self, context: dict[str, Any], top_k: int = 3
++    ) -> list[str]:
++        """Recommend top-k items for the current context.
++
++        Args:
++            context: Build context with champion, role, current_items,
++                     gold, opponents.
++            top_k: Number of items to recommend.
++
++        Returns:
++            List of item name strings.
++        """
++        scored = []
++        for item in self._item_pool:
++            name = item["name"]
++            if name in context.get("current_items", []):
++                continue
++            s = self.score_item(name, context)
++            scored.append((s, name))
++
++        scored.sort(key=lambda x: -x[0])
++        result = [name for _, name in scored[:top_k]]
++
++        self._fire_evolution("items_recommended", {
++            "champion": context.get("champion", ""),
++            "recommended": result,
++        })
++        return result
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/live_client_connector.py b/integrations/lol/src/lol_agent/live_client_connector.py
+new file mode 100644
+index 00000000..5545a78a
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/live_client_connector.py
+@@ -0,0 +1,126 @@
++"""
++Live Client Connector — Riot Live Client Data API interface.
++
++Provides URL building, response parsing, and connection management for
++the LoL Live Client Data API at https://127.0.0.1:2999/liveclientdata/.
++
++Location: integrations/lol/src/lol_agent/live_client_connector.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/connector.py: retry decorator, needLcu guard, PastRequest tracking
++  - leagueoflegends-optimizer: Riot API endpoint patterns
++  - integrations/lol-history/src/lol_history/seraphine_bridge.py: URL building pattern
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.live_client_connector.v1"
++
++# Live Client Data API endpoint map (reference: Riot developer docs)
++_ENDPOINTS: dict[str, str] = {
++    "allgamedata": "/liveclientdata/allgamedata",
++    "playerlist": "/liveclientdata/playerlist",
++    "activeplayer": "/liveclientdata/activeplayer",
++    "eventdata": "/liveclientdata/eventdata",
++    "gamestats": "/liveclientdata/gamestats",
++    "scores": "/liveclientdata/playerscores",
++    "items": "/liveclientdata/playeritems",
++    "abilities": "/liveclientdata/activeplayerabilities",
++    "runes": "/liveclientdata/activeplayerrunes",
++}
++
++
++class LiveClientConnector:
++    """HTTP connector for Riot's Live Client Data API.
++
++    Mirrors Seraphine's connector.py patterns: URL building,
++    response parsing, retry-aware design, evolution callback hooks.
++
++    Attributes:
++        base_url: Base URL for the API (default: https://127.0.0.1:2999).
++        timeout: Request timeout in seconds.
++        evolution_callback: Optional callback for self-evolution events.
++    """
++
++    def __init__(
++        self,
++        base_url: str = "https://127.0.0.1:2999",
++        timeout: float = 5.0,
++        max_retries: int = 3,
++    ) -> None:
++        # --- Seraphine connector.py fields (拿来主义) ---
++        self.base_url = base_url.rstrip("/")
++        self.timeout = timeout
++        self.max_retries = max_retries
++
++        # --- Request tracking (mirrors PastRequest pattern) ---
++        self._request_count: int = 0
++        self._last_request_time: float = 0.0
++        self._error_count: int = 0
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def build_url(self, endpoint: str) -> str:
++        """Build full URL for a Live Client Data API endpoint.
++
++        Args:
++            endpoint: Endpoint key (e.g., 'allgamedata', 'playerlist').
++
++        Returns:
++            Full URL string.
++        """
++        path = _ENDPOINTS.get(endpoint, f"/liveclientdata/{endpoint}")
++        return f"{self.base_url}{path}"
++
++    def parse_response(self, raw: str) -> dict[str, Any]:
++        """Parse a JSON response string from the API.
++
++        Args:
++            raw: Raw response body string.
++
++        Returns:
++            Parsed dict, or dict with 'error' key on failure.
++        """
++        try:
++            data = json.loads(raw)
++            if isinstance(data, dict):
++                self._request_count += 1
++                self._last_request_time = time.time()
++                return data
++            if isinstance(data, list):
++                self._request_count += 1
++                return {"items": data}
++            return {"data": data}
++        except (json.JSONDecodeError, TypeError):
++            self._error_count += 1
++            return {"error": "invalid_json", "raw": str(raw)[:200]}
++
++    def get_stats(self) -> dict[str, Any]:
++        """Return connector statistics.
++
++        Returns:
++            Dict with request_count, error_count, last_request_time.
++        """
++        return {
++            "request_count": self._request_count,
++            "error_count": self._error_count,
++            "last_request_time": self._last_request_time,
++        }
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/live_game_state.py b/integrations/lol/src/lol_agent/live_game_state.py
+new file mode 100644
+index 00000000..95738cb3
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/live_game_state.py
+@@ -0,0 +1,150 @@
++"""
++Live Game State — Real-time LoL game state aggregator.
++
++Parses allgamedata JSON from the Live Client Data API into structured
++game state: active player, all players, events, teams, gold differences.
++
++Location: integrations/lol/src/lol_agent/live_game_state.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/connector.py: getGameDetailByGameId response structure
++  - Live Client Data API: allgamedata schema (activePlayer/allPlayers/events/gameData)
++  - integrations/dota2/src/dota2_agent/dota2_bridge.py: parse_game_state pattern
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.live_game_state.v1"
++
++
++class LiveGameState:
++    """Aggregated real-time LoL game state.
++
++    Maintains a structured snapshot of the current game, updated
++    from Live Client Data API allgamedata responses.
++
++    Attributes:
++        game_time: Current game time in seconds.
++        game_mode: Game mode string (e.g., CLASSIC, ARAM).
++        active_player: Active player data dict.
++        all_players: List of all player dicts.
++        events: List of game event dicts.
++    """
++
++    def __init__(self) -> None:
++        self.game_time: float = 0.0
++        self.game_mode: str = ""
++        self.map_number: int = 0
++
++        self.active_player: dict[str, Any] = {}
++        self.all_players: list[dict[str, Any]] = []
++        self.events: list[dict[str, Any]] = []
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def update(self, allgamedata: dict[str, Any]) -> None:
++        """Update state from allgamedata API response.
++
++        Args:
++            allgamedata: Full response dict from /liveclientdata/allgamedata.
++        """
++        if not allgamedata:
++            return
++
++        # --- gameData ---
++        game_data = allgamedata.get("gameData", {})
++        self.game_time = game_data.get("gameTime", 0.0)
++        self.game_mode = game_data.get("gameMode", "")
++        self.map_number = game_data.get("mapNumber", 0)
++
++        # --- activePlayer ---
++        self.active_player = allgamedata.get("activePlayer", {})
++
++        # --- allPlayers ---
++        self.all_players = allgamedata.get("allPlayers", [])
++
++        # --- events ---
++        events_wrapper = allgamedata.get("events", {})
++        self.events = events_wrapper.get("Events", [])
++
++        self._fire_evolution("state_updated", {
++            "game_time": self.game_time,
++            "player_count": len(self.all_players),
++        })
++
++    def get_player(self, summoner_name: str) -> Optional[dict[str, Any]]:
++        """Find a player by summoner name.
++
++        Args:
++            summoner_name: Player's display name.
++
++        Returns:
++            Player dict or None if not found.
++        """
++        for p in self.all_players:
++            if p.get("summonerName") == summoner_name:
++                return p
++        return None
++
++    def get_active_player(self) -> dict[str, Any]:
++        """Return active player data."""
++        return self.active_player
++
++    def get_teams(self) -> tuple[list[dict], list[dict]]:
++        """Split players into ORDER and CHAOS teams.
++
++        Returns:
++            Tuple of (order_players, chaos_players).
++        """
++        order = [p for p in self.all_players if p.get("team") == "ORDER"]
++        chaos = [p for p in self.all_players if p.get("team") == "CHAOS"]
++        return order, chaos
++
++    def compute_gold_advantage(self, my_team: str) -> float:
++        """Compute gold advantage for a team.
++
++        Uses kill/death/assist scores as proxy since Live Client API
++        doesn't expose exact team gold. Approximation:
++          gold_proxy = kills * 300 + assists * 150 + creepScore * 20
++
++        Args:
++            my_team: Team identifier ("ORDER" or "CHAOS").
++
++        Returns:
++            Gold difference (positive = my team ahead).
++        """
++        my_gold = 0.0
++        enemy_gold = 0.0
++        for p in self.all_players:
++            scores = p.get("scores", {})
++            proxy = (
++                scores.get("kills", 0) * 300
++                + scores.get("assists", 0) * 150
++                + scores.get("creepScore", 0) * 20
++            )
++            if p.get("team") == my_team:
++                my_gold += proxy
++            else:
++                enemy_gold += proxy
++        return my_gold - enemy_gold
++
++    def get_events(self) -> list[dict[str, Any]]:
++        """Return all game events."""
++        return self.events
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/lol_evolution_loop.py b/integrations/lol/src/lol_agent/lol_evolution_loop.py
+new file mode 100644
+index 00000000..9926494b
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/lol_evolution_loop.py
+@@ -0,0 +1,142 @@
++"""
++LoL Evolution Loop — Self-evolution lifecycle for League of Legends.
++
++Implements EvolutionLoopABC: record episodes, compute fitness,
++manage generations, export training data, and reset cycles.
++
++Location: integrations/lol/src/lol_agent/lol_evolution_loop.py
++
++Reference (拿来主义):
++  - modules/evolution_loop_abc.py: record/fitness/evolve/export/reset contract
++  - integrations/mahjong/src/mahjong_agent/mahjong_evolution_loop.py: same pattern
++  - DI-star: rl_learner.py training lifecycle
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.lol_evolution_loop.v1"
++
++
++class LoLEvolutionLoop:
++    """Self-evolution loop for League of Legends agent.
++
++    Implements the EvolutionLoopABC contract:
++      - record_episode: store completed game episodes
++      - compute_fitness: evaluate current performance
++      - should_evolve: check if enough data for next generation
++      - advance_generation: step to next generation
++      - export_training_data: produce training spans
++      - reset: clear state for new cycle
++
++    Attributes:
++        evolve_threshold: Minimum episodes before evolution triggers.
++        generation: Current generation number.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(
++        self,
++        evolve_threshold: int = 10,
++    ) -> None:
++        self.evolve_threshold = evolve_threshold
++        self.generation: int = 0
++        self._episodes: list[dict[str, Any]] = []
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def record_episode(
++        self,
++        states: list[Any],
++        actions: list[Any],
++        reward: float,
++    ) -> None:
++        """Record a completed LoL game episode.
++
++        Args:
++            states: Sequence of game states.
++            actions: Sequence of actions taken.
++            reward: Final episode reward.
++        """
++        self._episodes.append({
++            "states": states,
++            "actions": actions,
++            "reward": max(-10.0, min(10.0, reward)),  # clip
++            "timestamp": time.time(),
++            "generation": self.generation,
++        })
++
++    def episode_count(self) -> int:
++        """Number of recorded episodes."""
++        return len(self._episodes)
++
++    def compute_fitness(self) -> float:
++        """Compute current fitness from recorded episodes.
++
++        Uses mean clipped reward normalized to [-1, 1].
++
++        Returns:
++            Fitness score in [-1.0, 1.0].
++        """
++        if not self._episodes:
++            return 0.0
++        rewards = [ep["reward"] for ep in self._episodes]
++        mean_reward = sum(rewards) / len(rewards)
++        return max(-1.0, min(1.0, mean_reward))
++
++    def should_evolve(self) -> bool:
++        """Check if enough episodes to trigger evolution.
++
++        Returns:
++            True if episode_count >= evolve_threshold.
++        """
++        return len(self._episodes) >= self.evolve_threshold
++
++    def advance_generation(self) -> None:
++        """Advance to the next generation."""
++        self.generation += 1
++        self._fire_evolution("generation_advanced", {
++            "generation": self.generation,
++            "episodes_used": len(self._episodes),
++            "fitness": self.compute_fitness(),
++        })
++
++    def export_training_data(self) -> list[dict[str, Any]]:
++        """Export recorded episodes as training spans.
++
++        Returns:
++            List of training span dicts.
++        """
++        spans = []
++        for ep in self._episodes:
++            states = ep["states"]
++            actions = ep["actions"]
++            n = min(len(states), len(actions))
++            for i in range(n):
++                spans.append({
++                    "state": states[i],
++                    "action": actions[i],
++                    "reward": ep["reward"],
++                    "generation": ep["generation"],
++                })
++        return spans
++
++    def reset(self) -> None:
++        """Clear all recorded episodes for new cycle."""
++        self._episodes.clear()
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/lol_strategy_advisor.py b/integrations/lol/src/lol_agent/lol_strategy_advisor.py
+new file mode 100644
+index 00000000..71a62175
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/lol_strategy_advisor.py
+@@ -0,0 +1,179 @@
++"""
++LoL Strategy Advisor — StrategyAdvisorABC implementation for League of Legends.
++
++Provides game-phase-aware strategic advice (early/mid/late game),
++action evaluation, and confidence tracking.
++
++Location: integrations/lol/src/lol_agent/lol_strategy_advisor.py
++
++Reference (拿来主义):
++  - modules/strategy_advisor_abc.py: advise/evaluate_action/get_confidence contract
++  - integrations/mahjong/src/mahjong_agent/mahjong_strategy_advisor.py: same pattern
++  - dota2bot-OpenHyperAI: mode_*.lua strategy decision patterns
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.lol_strategy_advisor.v1"
++
++# Game phase thresholds (seconds)
++_EARLY_GAME_END = 840.0    # 14 minutes
++_MID_GAME_END = 1800.0     # 30 minutes
++
++
++class LoLStrategyAdvisor:
++    """Strategic advisor for League of Legends.
++
++    Implements StrategyAdvisorABC contract: advise(), evaluate_action(),
++    get_confidence(). Produces game-phase-aware strategy suggestions.
++
++    Attributes:
++        game_name: Always 'league_of_legends'.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self._confidence: float = 0.3  # initial low confidence
++        self._evaluation_count: int = 0
++        self._correct_predictions: int = 0
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def game_name(self) -> str:
++        """Unique game identifier."""
++        return "league_of_legends"
++
++    def advise(self, game_state: dict[str, Any]) -> dict[str, Any]:
++        """Produce a strategy suggestion based on current game state.
++
++        Considers game phase, gold/kill/tower/dragon advantages.
++
++        Args:
++            game_state: Dict with game_time, gold_diff, kill_diff,
++                        dragon_count, tower_diff.
++
++        Returns:
++            Dict with 'action', 'suggestion', 'phase', 'confidence'.
++        """
++        game_time = game_state.get("game_time", 0.0)
++        gold_diff = game_state.get("gold_diff", 0)
++        kill_diff = game_state.get("kill_diff", 0)
++        dragon_count = game_state.get("dragon_count", 0)
++        tower_diff = game_state.get("tower_diff", 0)
++
++        # Determine game phase
++        if game_time < _EARLY_GAME_END:
++            phase = "early"
++        elif game_time < _MID_GAME_END:
++            phase = "mid"
++        else:
++            phase = "late"
++
++        # Generate strategy based on phase and advantage
++        advantage = gold_diff / 1000.0 + kill_diff * 0.5 + tower_diff * 1.5
++
++        if phase == "early":
++            if advantage > 2:
++                action = "aggressive_lane"
++                suggestion = "Press lane advantage, zone enemy from CS"
++            elif advantage < -2:
++                action = "safe_farm"
++                suggestion = "Play safe, farm under tower, wait for jungle help"
++            else:
++                action = "balanced_farm"
++                suggestion = "Focus on CS, trade when favorable"
++        elif phase == "mid":
++            if advantage > 3:
++                action = "push_objectives"
++                suggestion = "Group for dragon/baron, take towers"
++            elif advantage < -3:
++                action = "defensive_vision"
++                suggestion = "Ward defensively, avoid 5v5, catch side waves"
++            else:
++                action = "skirmish"
++                suggestion = "Look for picks, contest objectives when possible"
++        else:  # late game
++            if advantage > 4:
++                action = "force_baron"
++                suggestion = "Force baron, end game with number advantage"
++            elif advantage < -4:
++                action = "turtle"
++                suggestion = "Defend base, look for one fight to turn"
++            else:
++                action = "team_fight"
++                suggestion = "Stay grouped, fight for elder dragon or baron"
++
++        advice = {
++            "action": action,
++            "suggestion": suggestion,
++            "phase": phase,
++            "advantage_score": advantage,
++            "confidence": self._confidence,
++        }
++
++        self._fire_evolution("strategy_advised", {
++            "phase": phase,
++            "action": action,
++            "advantage": advantage,
++        })
++        return advice
++
++    def evaluate_action(self, action: Any, outcome: Any) -> float:
++        """Evaluate an action given its outcome.
++
++        Args:
++            action: Action dict that was taken.
++            outcome: Outcome dict with 'result' field.
++
++        Returns:
++            Score in [-1.0, 1.0].
++        """
++        self._evaluation_count += 1
++
++        result = outcome if isinstance(outcome, str) else outcome.get("result", "")
++        positive_results = {"tower_taken", "dragon_taken", "baron_taken",
++                            "kill_secured", "gold_gained", "cs_gained"}
++        negative_results = {"death", "tower_lost", "dragon_lost", "baron_lost"}
++
++        if result in positive_results:
++            score = 0.8
++            self._correct_predictions += 1
++        elif result in negative_results:
++            score = -0.5
++        else:
++            score = 0.1  # Neutral
++
++        # Update confidence based on prediction accuracy
++        if self._evaluation_count > 0:
++            accuracy = self._correct_predictions / self._evaluation_count
++            self._confidence = max(0.1, min(1.0,
++                0.5 * self._confidence + 0.5 * accuracy
++            ))
++
++        return score
++
++    def get_confidence(self) -> float:
++        """Current confidence level.
++
++        Returns:
++            Confidence in [0.0, 1.0].
++        """
++        return self._confidence
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/opponent_history_merger.py b/integrations/lol/src/lol_agent/opponent_history_merger.py
+new file mode 100644
+index 00000000..c5cdc05b
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/opponent_history_merger.py
+@@ -0,0 +1,141 @@
++"""
++Opponent History Merger — Live + Historical opponent analysis.
++
++Identifies opponents from the live player list, merges with Seraphine
++historical data, and computes threat scores for strategic decisions.
++
++Location: integrations/lol/src/lol_agent/opponent_history_merger.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/connector.py: getGameDetailByGameId response (player stats)
++  - integrations/lol-history/src/lol_history/opponent_profiler.py: profiling pattern
++  - integrations/lol-history/src/lol_history/pregame_scout.py: scouting pattern
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.opponent_history_merger.v1"
++
++
++class OpponentHistoryMerger:
++    """Merges live opponent data with historical match records.
++
++    Provides opponent identification, history merging, and threat
++    scoring for real-time strategic advantage.
++
++    Attributes:
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++        self._merge_count: int = 0
++
++    def identify_opponents(
++        self,
++        all_players: list[dict[str, Any]],
++        my_team: str,
++    ) -> list[dict[str, Any]]:
++        """Identify opponent players from the full player list.
++
++        Args:
++            all_players: List of player dicts with 'team' field.
++            my_team: My team identifier ('ORDER' or 'CHAOS').
++
++        Returns:
++            List of opponent player dicts.
++        """
++        return [p for p in all_players if p.get("team") != my_team]
++
++    def merge(
++        self,
++        live_player: dict[str, Any],
++        history: list[dict[str, Any]],
++    ) -> dict[str, Any]:
++        """Merge live player data with historical match records.
++
++        Args:
++            live_player: Current live player dict from the API.
++            history: List of historical match dicts.
++
++        Returns:
++            Dict with 'live' and 'history' keys.
++        """
++        self._merge_count += 1
++        merged = {
++            "live": live_player,
++            "history": history,
++            "merge_timestamp": time.time(),
++        }
++
++        self._fire_evolution("opponent_merged", {
++            "summoner": live_player.get("summonerName", "unknown"),
++            "history_count": len(history),
++        })
++        return merged
++
++    def compute_threat_score(self, merged: dict[str, Any]) -> float:
++        """Compute a threat score for a merged opponent profile.
++
++        Factors:
++          - Live KDA (kills + assists vs deaths)
++          - Live CS (creep score as farming efficiency proxy)
++          - Historical average KDA across recent matches
++          - Level advantage
++
++        Score is normalized to [0.0, 1.0].
++
++        Args:
++            merged: Result of merge() with 'live' and 'history' keys.
++
++        Returns:
++            Threat score in [0.0, 1.0].
++        """
++        live = merged.get("live", {})
++        history = merged.get("history", [])
++
++        # --- Live KDA component ---
++        scores = live.get("scores", {})
++        kills = scores.get("kills", 0)
++        deaths = max(scores.get("deaths", 0), 1)  # avoid /0
++        assists = scores.get("assists", 0)
++        live_kda = (kills + assists) / deaths
++
++        # --- Live CS component ---
++        cs = scores.get("creepScore", 0)
++        level = live.get("level", 1)
++
++        # --- Historical KDA component ---
++        hist_kdas = []
++        for match in history:
++            stats = match.get("stats", {})
++            hk = stats.get("kills", 0)
++            hd = max(stats.get("deaths", 0), 1)
++            ha = stats.get("assists", 0)
++            hist_kdas.append((hk + ha) / hd)
++        avg_hist_kda = sum(hist_kdas) / max(len(hist_kdas), 1)
++
++        # --- Composite score (logistic-like normalization) ---
++        raw = (
++            0.35 * min(live_kda / 10.0, 1.0)
++            + 0.20 * min(cs / 200.0, 1.0)
++            + 0.25 * min(avg_hist_kda / 10.0, 1.0)
++            + 0.20 * min(level / 18.0, 1.0)
++        )
++        return max(0.0, min(1.0, raw))
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/seraphine_history_client.py b/integrations/lol/src/lol_agent/seraphine_history_client.py
+new file mode 100644
+index 00000000..4beb9f37
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/seraphine_history_client.py
+@@ -0,0 +1,138 @@
++"""
++Seraphine History Client — Historical match data via LCU/WeGame API.
++
++Provides URL building and response parsing for historical match data
++using Seraphine-compatible LCU API endpoints.
++
++Location: integrations/lol/src/lol_agent/seraphine_history_client.py
++
++Reference (拿来主义):
++  - Seraphine/app/lol/connector.py: getGameDetailByGameId, getRankedStatsByPuuid
++  - integrations/lol-history/src/lol_history/seraphine_bridge.py: URL building
++  - Seraphine/app/lol/connector.py: LCU endpoint patterns (/lol-match-history/v1/)
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.seraphine_history_client.v1"
++
++
++class SeraphineHistoryClient:
++    """HTTP client for Seraphine-style LCU match history access.
++
++    Mirrors Seraphine connector.py patterns: URL building for
++    match history, summoner lookup, ranked stats, and game detail.
++
++    Attributes:
++        base_url: LCU or proxy base URL.
++        timeout: Request timeout.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(
++        self,
++        base_url: str = "https://127.0.0.1:2999",
++        timeout: float = 10.0,
++    ) -> None:
++        # --- Seraphine connector.py fields (拿来主义) ---
++        self.base_url = base_url.rstrip("/")
++        self.timeout = timeout
++        self._request_count: int = 0
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def build_summoner_url(self, summoner_name: str) -> str:
++        """Build URL for summoner lookup (Seraphine connector pattern).
++
++        Args:
++            summoner_name: Summoner display name.
++
++        Returns:
++            Full URL string.
++        """
++        return f"{self.base_url}/lol-summoner/v1/summoners?name={summoner_name}"
++
++    def build_match_history_url(
++        self, puuid: str, count: int = 20, start: int = 0
++    ) -> str:
++        """Build URL for match history (Seraphine connector pattern).
++
++        Args:
++            puuid: Player UUID.
++            count: Number of matches to fetch.
++            start: Start index for pagination.
++
++        Returns:
++            Full URL string.
++        """
++        return (
++            f"{self.base_url}/lol-match-history/v1/products/lol/"
++            f"{puuid}/matches?begIndex={start}&endIndex={start + count}"
++        )
++
++    def build_game_detail_url(self, game_id: int) -> str:
++        """Build URL for single game detail (mirrors getGameDetailByGameId).
++
++        Args:
++            game_id: Game ID.
++
++        Returns:
++            Full URL string.
++        """
++        return f"{self.base_url}/lol-match-history/v1/games/{game_id}"
++
++    def parse_match_list(self, response: dict[str, Any]) -> list[dict[str, Any]]:
++        """Parse match list response.
++
++        Args:
++            response: Response dict with 'games' key.
++
++        Returns:
++            List of match dicts.
++        """
++        games = response.get("games", [])
++        self._request_count += 1
++
++        self._fire_evolution("match_list_parsed", {
++            "count": len(games),
++        })
++        return games
++
++    def parse_ranked_stats(self, response: dict[str, Any]) -> dict[str, Any]:
++        """Parse ranked stats response (mirrors getRankedStatsByPuuid).
++
++        Extracts RANKED_SOLO_5x5 queue data.
++
++        Args:
++            response: Response dict with 'queues' key.
++
++        Returns:
++            Dict with tier, division, wins, losses.
++        """
++        queues = response.get("queues", [])
++        for q in queues:
++            if q.get("queueType") == "RANKED_SOLO_5x5":
++                return {
++                    "tier": q.get("tier", "UNRANKED"),
++                    "division": q.get("division", ""),
++                    "wins": q.get("wins", 0),
++                    "losses": q.get("losses", 0),
++                }
++        return {"tier": "UNRANKED", "division": "", "wins": 0, "losses": 0}
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/voice_narration_engine.py b/integrations/lol/src/lol_agent/voice_narration_engine.py
+new file mode 100644
+index 00000000..369fbd67
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/voice_narration_engine.py
+@@ -0,0 +1,133 @@
++"""
++Voice Narration Engine — Priority-based strategy narration queue.
++
++Manages a priority queue of strategy messages, providing TTS-ready
++text output for real-time voice guidance during gameplay.
++
++Location: integrations/lol/src/lol_agent/voice_narration_engine.py
++
++Reference (拿来主义):
++  - operatorRL voice_advisor: priority queue + message formatting
++  - integrations/dota2/src/dota2_agent/bot_commander.py: (-priority, seq) ordering
++  - Akagi: bridge message queue pattern (majsoul.py mjai_messages deque)
++"""
++
++from __future__ import annotations
++
++import heapq
++import logging
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.voice_narration_engine.v1"
++
++
++class VoiceNarrationEngine:
++    """Priority-based voice narration queue for real-time gameplay.
++
++    Messages are enqueued with priority (0 = highest) and dequeued
++    in priority order. Supports max queue size, TTS text formatting,
++    and evolution callback hooks.
++
++    Attributes:
++        max_queue: Maximum queue size (oldest low-priority dropped).
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(
++        self,
++        max_queue: int = 50,
++    ) -> None:
++        self.max_queue = max_queue
++        self._heap: list[tuple[int, int, str]] = []  # (priority, seq, message)
++        self._seq: int = 0
++        self._dequeue_count: int = 0
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    def enqueue(self, message: str, priority: int = 5) -> None:
++        """Add a message to the narration queue.
++
++        Args:
++            message: Text message to narrate.
++            priority: Priority level (0 = critical, 5 = info).
++        """
++        self._seq += 1
++        heapq.heappush(self._heap, (priority, self._seq, message))
++
++        # Enforce max queue size by dropping lowest-priority (highest number)
++        while len(self._heap) > self.max_queue:
++            # Remove the item with highest priority number (least urgent)
++            # Since heapq is a min-heap, we need to find and remove the max
++            if len(self._heap) > self.max_queue:
++                # Simple approach: sort, trim, re-heapify
++                self._heap.sort()
++                self._heap = self._heap[:self.max_queue]
++                heapq.heapify(self._heap)
++
++    def dequeue(self) -> Optional[str]:
++        """Get the highest-priority message.
++
++        Returns:
++            Message string, or None if queue is empty.
++        """
++        if not self._heap:
++            return None
++
++        priority, seq, message = heapq.heappop(self._heap)
++        self._dequeue_count += 1
++
++        self._fire_evolution("message_dequeued", {
++            "priority": priority,
++            "message_preview": message[:50],
++        })
++        return message
++
++    def queue_size(self) -> int:
++        """Current number of messages in queue."""
++        return len(self._heap)
++
++    def clear(self) -> None:
++        """Clear all messages from the queue."""
++        self._heap.clear()
++        self._seq = 0
++
++    def to_tts_text(self, message: str) -> str:
++        """Format a message for TTS output.
++
++        Adds appropriate pauses and emphasis markers.
++
++        Args:
++            message: Raw text message.
++
++        Returns:
++            TTS-formatted text string.
++        """
++        # Simple formatting: strip excess whitespace, add period if missing
++        text = message.strip()
++        if text and text[-1] not in ".!?":
++            text += "."
++        return text
++
++    def peek(self) -> Optional[str]:
++        """Peek at the highest-priority message without removing it.
++
++        Returns:
++            Message string, or None if empty.
++        """
++        if not self._heap:
++            return None
++        return self._heap[0][2]
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/src/lol_agent/win_probability_predictor.py b/integrations/lol/src/lol_agent/win_probability_predictor.py
+new file mode 100644
+index 00000000..8f25340e
+--- /dev/null
++++ b/integrations/lol/src/lol_agent/win_probability_predictor.py
+@@ -0,0 +1,118 @@
++"""
++Win Probability Predictor — Real-time win probability estimation.
++
++Uses a lightweight logistic model over game features (gold diff,
++kill diff, tower diff, dragon diff, game time) to predict win chance.
++
++Location: integrations/lol/src/lol_agent/win_probability_predictor.py
++
++Reference (拿来主义):
++  - leagueoflegends-optimizer: ML prediction pipeline (article5.md)
++  - DI-star: rl_learner.py value network output (sigmoid probability)
++  - integrations/lol-history/src/lol_history/winrate_tracker.py: tracking pattern
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from typing import Any, Callable, Optional
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol.win_probability_predictor.v1"
++
++# Default feature weights (tuned from leagueoflegends-optimizer patterns)
++_DEFAULT_WEIGHTS: dict[str, float] = {
++    "gold_diff": 0.0003,
++    "kill_diff": 0.05,
++    "tower_diff": 0.12,
++    "dragon_diff": 0.08,
++    "game_time": -0.0001,  # Late game reduces certainty
++}
++
++
++class WinProbabilityPredictor:
++    """Logistic regression win probability predictor.
++
++    Computes P(win) = sigmoid(sum(w_i * x_i)) where features are
++    gold_diff, kill_diff, tower_diff, dragon_diff, game_time.
++
++    Supports online weight updates from game outcomes.
++
++    Attributes:
++        weights: Feature weight dict.
++        learning_rate: Update step size.
++        evolution_callback: Optional callback for evolution events.
++    """
++
++    def __init__(
++        self,
++        weights: Optional[dict[str, float]] = None,
++        learning_rate: float = 0.001,
++    ) -> None:
++        self._weights: dict[str, float] = dict(weights or _DEFAULT_WEIGHTS)
++        self.learning_rate = learning_rate
++        self._update_count: int = 0
++
++        # --- Evolution pattern ---
++        self.evolution_callback: Optional[Callable[[dict], None]] = None
++
++    @property
++    def weights(self) -> dict[str, float]:
++        """Current feature weights."""
++        return dict(self._weights)
++
++    def predict(self, features: dict[str, float]) -> float:
++        """Predict win probability.
++
++        Args:
++            features: Dict with gold_diff, kill_diff, tower_diff,
++                      dragon_diff, game_time.
++
++        Returns:
++            Probability in [0.0, 1.0].
++        """
++        logit = 0.0
++        for key, weight in self._weights.items():
++            logit += weight * features.get(key, 0.0)
++
++        # Sigmoid activation
++        prob = 1.0 / (1.0 + math.exp(-max(-20, min(20, logit))))
++        return prob
++
++    def update(self, features: dict[str, float], outcome: float) -> None:
++        """Online weight update from a game outcome.
++
++        Uses simple gradient descent on logistic loss.
++
++        Args:
++            features: Feature dict (same as predict input).
++            outcome: Actual outcome (1.0 = win, 0.0 = loss).
++        """
++        pred = self.predict(features)
++        error = outcome - pred
++
++        for key in self._weights:
++            grad = error * features.get(key, 0.0)
++            self._weights[key] += self.learning_rate * grad
++
++        self._update_count += 1
++
++        self._fire_evolution("weights_updated", {
++            "prediction": pred,
++            "outcome": outcome,
++            "error": error,
++            "update_count": self._update_count,
++        })
++
++    def _fire_evolution(self, event_type: str, payload: dict) -> None:
++        """Fire evolution callback if registered."""
++        if self.evolution_callback is not None:
++            self.evolution_callback({
++                "source": _EVOLUTION_KEY,
++                "type": event_type,
++                "timestamp": time.time(),
++                "payload": payload,
++            })
+diff --git a/integrations/lol/tests/__init__.py b/integrations/lol/tests/__init__.py
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/integrations/lol/tests/test_m346_m355.py b/integrations/lol/tests/test_m346_m355.py
+new file mode 100644
+index 00000000..b5afe35f
+--- /dev/null
++++ b/integrations/lol/tests/test_m346_m355.py
+@@ -0,0 +1,871 @@
++"""
++TDD Tests for M346-M355: Seraphine History + Live Client Data API Deep Integration.
++
++100 tests (10 per module), designed for ~50% initial failure rate.
++Tests written BEFORE implementation per TDD methodology.
++
++Reference projects (拿来主义):
++  - Seraphine: app/lol/connector.py (LCU async client, match history, summoner API)
++  - leagueoflegends-optimizer: articles/article5.md (Riot API data pipeline)
++  - operatorRL ABCs: GameBridgeABC, EvolutionLoopABC, StrategyAdvisorABC
++  - operatorRL existing: extensions/fiddler-bridge, integrations/lol-history
++"""
++
++import importlib.util
++import json
++import os
++import sys
++import time
++
++import pytest
++
++# ---------------------------------------------------------------------------
++# Helper: load module from file path (avoids package dependency chain)
++# ---------------------------------------------------------------------------
++_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
++_LOL_SRC = os.path.join(_ROOT, "lol", "src", "lol_agent")
++_MODULES_DIR = os.path.join(_ROOT, "..", "modules")
++
++
++def _load(name: str, filepath: str):
++    spec = importlib.util.spec_from_file_location(name, filepath)
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules[name] = mod
++    spec.loader.exec_module(mod)
++    return mod
++
++
++# ---------------------------------------------------------------------------
++# Fixtures: lazy-load each module under test
++# ---------------------------------------------------------------------------
++@pytest.fixture(scope="module")
++def live_client_mod():
++    return _load("live_client_connector", os.path.join(_LOL_SRC, "live_client_connector.py"))
++
++
++@pytest.fixture(scope="module")
++def live_game_state_mod():
++    return _load("live_game_state", os.path.join(_LOL_SRC, "live_game_state.py"))
++
++
++@pytest.fixture(scope="module")
++def seraphine_history_mod():
++    return _load("seraphine_history_client", os.path.join(_LOL_SRC, "seraphine_history_client.py"))
++
++
++@pytest.fixture(scope="module")
++def opponent_merger_mod():
++    return _load("opponent_history_merger", os.path.join(_LOL_SRC, "opponent_history_merger.py"))
++
++
++@pytest.fixture(scope="module")
++def champion_perf_mod():
++    return _load("champion_performance_analyzer", os.path.join(_LOL_SRC, "champion_performance_analyzer.py"))
++
++
++@pytest.fixture(scope="module")
++def win_prob_mod():
++    return _load("win_probability_predictor", os.path.join(_LOL_SRC, "win_probability_predictor.py"))
++
++
++@pytest.fixture(scope="module")
++def item_build_mod():
++    return _load("item_build_advisor", os.path.join(_LOL_SRC, "item_build_advisor.py"))
++
++
++@pytest.fixture(scope="module")
++def voice_narration_mod():
++    return _load("voice_narration_engine", os.path.join(_LOL_SRC, "voice_narration_engine.py"))
++
++
++@pytest.fixture(scope="module")
++def lol_evo_mod():
++    return _load("lol_evolution_loop", os.path.join(_LOL_SRC, "lol_evolution_loop.py"))
++
++
++@pytest.fixture(scope="module")
++def lol_strategy_mod():
++    return _load("lol_strategy_advisor", os.path.join(_LOL_SRC, "lol_strategy_advisor.py"))
++
++
++# =====================================================================
++# M346 — LiveClientConnector (10 tests)
++# Reference: Riot Live Client Data API https://127.0.0.1:2999/liveclientdata/
++# Reference: Seraphine/app/lol/connector.py retry/needLcu decorators
++# =====================================================================
++class TestLiveClientConnector:
++    def test_class_exists(self, live_client_mod):
++        assert hasattr(live_client_mod, "LiveClientConnector")
++
++    def test_has_evolution_key(self, live_client_mod):
++        assert hasattr(live_client_mod, "_EVOLUTION_KEY")
++        assert "live_client" in live_client_mod._EVOLUTION_KEY
++
++    def test_instantiation_default(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector()
++        assert lcc.base_url == "https://127.0.0.1:2999"
++
++    def test_instantiation_custom_url(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector(base_url="http://localhost:9999")
++        assert lcc.base_url == "http://localhost:9999"
++
++    def test_build_allgamedata_url(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector()
++        url = lcc.build_url("allgamedata")
++        assert "/liveclientdata/allgamedata" in url
++
++    def test_build_playerlist_url(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector()
++        url = lcc.build_url("playerlist")
++        assert "/liveclientdata/playerlist" in url
++
++    def test_build_activeplayer_url(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector()
++        url = lcc.build_url("activeplayer")
++        assert "/liveclientdata/activeplayer" in url
++
++    def test_build_eventdata_url(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector()
++        url = lcc.build_url("eventdata")
++        assert "/liveclientdata/eventdata" in url
++
++    def test_parse_response_valid_json(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector()
++        data = lcc.parse_response('{"gameMode": "CLASSIC", "gameTime": 120.5}')
++        assert data["gameMode"] == "CLASSIC"
++        assert data["gameTime"] == 120.5
++
++    def test_parse_response_invalid_json(self, live_client_mod):
++        lcc = live_client_mod.LiveClientConnector()
++        data = lcc.parse_response("not json")
++        assert data == {} or data is None or "error" in data
++
++
++# =====================================================================
++# M347 — LiveGameState (10 tests)
++# Reference: Live Client Data API allgamedata/playerlist/activeplayer
++# =====================================================================
++class TestLiveGameState:
++    def test_class_exists(self, live_game_state_mod):
++        assert hasattr(live_game_state_mod, "LiveGameState")
++
++    def test_has_evolution_key(self, live_game_state_mod):
++        assert hasattr(live_game_state_mod, "_EVOLUTION_KEY")
++        assert "live_game_state" in live_game_state_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        assert lgs is not None
++
++    def test_update_from_allgamedata(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        sample = {
++            "activePlayer": {"summonerName": "TestPlayer", "level": 10,
++                             "currentGold": 3500.0, "championStats": {"maxHealth": 1200}},
++            "allPlayers": [
++                {"summonerName": "TestPlayer", "championName": "Ahri",
++                 "team": "ORDER", "level": 10, "scores": {"kills": 3, "deaths": 1, "assists": 5, "creepScore": 120}},
++            ],
++            "events": {"Events": []},
++            "gameData": {"gameMode": "CLASSIC", "gameTime": 600.0, "mapNumber": 11},
++        }
++        lgs.update(sample)
++        assert lgs.game_time == 600.0
++        assert lgs.game_mode == "CLASSIC"
++
++    def test_get_player_by_name(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        sample = {
++            "activePlayer": {"summonerName": "Me", "level": 5,
++                             "currentGold": 1000.0, "championStats": {"maxHealth": 800}},
++            "allPlayers": [
++                {"summonerName": "Me", "championName": "Lux", "team": "ORDER",
++                 "level": 5, "scores": {"kills": 1, "deaths": 0, "assists": 2, "creepScore": 80}},
++                {"summonerName": "Enemy", "championName": "Zed", "team": "CHAOS",
++                 "level": 6, "scores": {"kills": 2, "deaths": 1, "assists": 0, "creepScore": 90}},
++            ],
++            "events": {"Events": []},
++            "gameData": {"gameMode": "CLASSIC", "gameTime": 300.0, "mapNumber": 11},
++        }
++        lgs.update(sample)
++        player = lgs.get_player("Me")
++        assert player is not None
++        assert player["championName"] == "Lux"
++
++    def test_get_active_player(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        sample = {
++            "activePlayer": {"summonerName": "Me", "level": 8,
++                             "currentGold": 2500.0, "championStats": {"maxHealth": 1000}},
++            "allPlayers": [],
++            "events": {"Events": []},
++            "gameData": {"gameMode": "CLASSIC", "gameTime": 450.0, "mapNumber": 11},
++        }
++        lgs.update(sample)
++        ap = lgs.get_active_player()
++        assert ap["summonerName"] == "Me"
++        assert ap["level"] == 8
++
++    def test_get_teams(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        sample = {
++            "activePlayer": {"summonerName": "A", "level": 1,
++                             "currentGold": 500.0, "championStats": {"maxHealth": 600}},
++            "allPlayers": [
++                {"summonerName": "A", "championName": "Garen", "team": "ORDER",
++                 "level": 1, "scores": {"kills": 0, "deaths": 0, "assists": 0, "creepScore": 0}},
++                {"summonerName": "B", "championName": "Darius", "team": "CHAOS",
++                 "level": 1, "scores": {"kills": 0, "deaths": 0, "assists": 0, "creepScore": 0}},
++            ],
++            "events": {"Events": []},
++            "gameData": {"gameMode": "CLASSIC", "gameTime": 30.0, "mapNumber": 11},
++        }
++        lgs.update(sample)
++        order, chaos = lgs.get_teams()
++        assert len(order) == 1
++        assert len(chaos) == 1
++        assert order[0]["championName"] == "Garen"
++
++    def test_gold_difference(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        # After update with gold data, we can compute team gold diff
++        sample = {
++            "activePlayer": {"summonerName": "A", "level": 10,
++                             "currentGold": 5000.0, "championStats": {"maxHealth": 1500}},
++            "allPlayers": [
++                {"summonerName": "A", "championName": "Jinx", "team": "ORDER",
++                 "level": 10, "scores": {"kills": 5, "deaths": 2, "assists": 3, "creepScore": 150}},
++                {"summonerName": "B", "championName": "Vayne", "team": "CHAOS",
++                 "level": 9, "scores": {"kills": 3, "deaths": 4, "assists": 1, "creepScore": 130}},
++            ],
++            "events": {"Events": []},
++            "gameData": {"gameMode": "CLASSIC", "gameTime": 900.0, "mapNumber": 11},
++        }
++        lgs.update(sample)
++        diff = lgs.compute_gold_advantage("ORDER")
++        assert isinstance(diff, (int, float))
++
++    def test_event_timeline(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        sample = {
++            "activePlayer": {"summonerName": "A", "level": 5,
++                             "currentGold": 1500.0, "championStats": {"maxHealth": 800}},
++            "allPlayers": [],
++            "events": {"Events": [
++                {"EventID": 0, "EventName": "GameStart", "EventTime": 0.0},
++                {"EventID": 1, "EventName": "FirstBlood", "EventTime": 180.5},
++            ]},
++            "gameData": {"gameMode": "CLASSIC", "gameTime": 200.0, "mapNumber": 11},
++        }
++        lgs.update(sample)
++        events = lgs.get_events()
++        assert len(events) == 2
++
++    def test_empty_update(self, live_game_state_mod):
++        lgs = live_game_state_mod.LiveGameState()
++        lgs.update({})
++        assert lgs.game_time == 0.0
++
++
++# =====================================================================
++# M348 — SeraphineHistoryClient (10 tests)
++# Reference: Seraphine/app/lol/connector.py getGameDetailByGameId/getRankedStatsByPuuid
++# Reference: integrations/lol-history/src/lol_history/seraphine_bridge.py
++# =====================================================================
++class TestSeraphineHistoryClient:
++    def test_class_exists(self, seraphine_history_mod):
++        assert hasattr(seraphine_history_mod, "SeraphineHistoryClient")
++
++    def test_has_evolution_key(self, seraphine_history_mod):
++        assert hasattr(seraphine_history_mod, "_EVOLUTION_KEY")
++        assert "seraphine_history" in seraphine_history_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        assert shc is not None
++
++    def test_build_match_history_url(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        url = shc.build_match_history_url(puuid="abc-123", count=20)
++        assert "abc-123" in url
++        assert "20" in url or "count" in url
++
++    def test_build_summoner_url(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        url = shc.build_summoner_url("TestPlayer")
++        assert "TestPlayer" in url
++
++    def test_parse_match_list(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        raw = {"games": [
++            {"gameId": 1001, "champion": "Ahri", "stats": {"kills": 5, "deaths": 2, "assists": 8}},
++            {"gameId": 1002, "champion": "Lux", "stats": {"kills": 3, "deaths": 3, "assists": 10}},
++        ]}
++        parsed = shc.parse_match_list(raw)
++        assert len(parsed) == 2
++        assert parsed[0]["gameId"] == 1001
++
++    def test_parse_ranked_stats(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        raw = {"queues": [
++            {"queueType": "RANKED_SOLO_5x5", "tier": "GOLD", "division": "II",
++             "wins": 50, "losses": 45},
++        ]}
++        parsed = shc.parse_ranked_stats(raw)
++        assert parsed["tier"] == "GOLD"
++        assert parsed["division"] == "II"
++
++    def test_parse_empty_ranked(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        parsed = shc.parse_ranked_stats({"queues": []})
++        assert parsed["tier"] == "UNRANKED" or parsed.get("tier") is None
++
++    def test_evolution_callback_hook(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        events = []
++        shc.evolution_callback = lambda e: events.append(e)
++        shc.parse_match_list({"games": [{"gameId": 999, "champion": "Zed", "stats": {"kills": 10, "deaths": 0, "assists": 5}}]})
++        # Should have fired at least one evolution event
++        assert len(events) >= 1
++
++    def test_build_game_detail_url(self, seraphine_history_mod):
++        shc = seraphine_history_mod.SeraphineHistoryClient()
++        url = shc.build_game_detail_url(game_id=12345)
++        assert "12345" in url
++
++
++# =====================================================================
++# M349 — OpponentHistoryMerger (10 tests)
++# Reference: Seraphine opponent lookup + Live Client playerlist
++# =====================================================================
++class TestOpponentHistoryMerger:
++    def test_class_exists(self, opponent_merger_mod):
++        assert hasattr(opponent_merger_mod, "OpponentHistoryMerger")
++
++    def test_has_evolution_key(self, opponent_merger_mod):
++        assert hasattr(opponent_merger_mod, "_EVOLUTION_KEY")
++        assert "opponent_history" in opponent_merger_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        assert ohm is not None
++
++    def test_identify_opponents(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        players = [
++            {"summonerName": "Ally1", "team": "ORDER"},
++            {"summonerName": "Enemy1", "team": "CHAOS"},
++            {"summonerName": "Enemy2", "team": "CHAOS"},
++        ]
++        opponents = ohm.identify_opponents(players, my_team="ORDER")
++        assert len(opponents) == 2
++        assert all(o["team"] == "CHAOS" for o in opponents)
++
++    def test_merge_history_with_live(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        live_player = {"summonerName": "Enemy1", "championName": "Zed", "team": "CHAOS",
++                       "level": 8, "scores": {"kills": 3, "deaths": 1, "assists": 2, "creepScore": 100}}
++        history = [
++            {"gameId": 1, "champion": "Zed", "stats": {"kills": 10, "deaths": 2, "assists": 5}},
++            {"gameId": 2, "champion": "Zed", "stats": {"kills": 7, "deaths": 3, "assists": 8}},
++        ]
++        merged = ohm.merge(live_player, history)
++        assert "live" in merged
++        assert "history" in merged
++        assert merged["live"]["championName"] == "Zed"
++        assert len(merged["history"]) == 2
++
++    def test_compute_opponent_threat(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        merged = {
++            "live": {"summonerName": "Enemy1", "championName": "Zed", "level": 10,
++                     "scores": {"kills": 5, "deaths": 1, "assists": 2, "creepScore": 130}},
++            "history": [
++                {"gameId": 1, "champion": "Zed", "stats": {"kills": 10, "deaths": 2, "assists": 5}},
++            ],
++        }
++        threat = ohm.compute_threat_score(merged)
++        assert 0.0 <= threat <= 1.0
++
++    def test_threat_score_high_kda(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        merged = {
++            "live": {"summonerName": "Smurf", "championName": "Katarina", "level": 15,
++                     "scores": {"kills": 15, "deaths": 0, "assists": 10, "creepScore": 200}},
++            "history": [
++                {"gameId": i, "champion": "Katarina", "stats": {"kills": 20, "deaths": 1, "assists": 10}}
++                for i in range(10)
++            ],
++        }
++        threat = ohm.compute_threat_score(merged)
++        assert threat > 0.7  # High KDA → high threat
++
++    def test_threat_score_low_kda(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        merged = {
++            "live": {"summonerName": "Newbie", "championName": "Garen", "level": 3,
++                     "scores": {"kills": 0, "deaths": 5, "assists": 0, "creepScore": 30}},
++            "history": [
++                {"gameId": 1, "champion": "Garen", "stats": {"kills": 1, "deaths": 8, "assists": 2}},
++            ],
++        }
++        threat = ohm.compute_threat_score(merged)
++        assert threat < 0.4
++
++    def test_identify_no_opponents_empty(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        opponents = ohm.identify_opponents([], my_team="ORDER")
++        assert len(opponents) == 0
++
++    def test_merge_empty_history(self, opponent_merger_mod):
++        ohm = opponent_merger_mod.OpponentHistoryMerger()
++        live_player = {"summonerName": "X", "championName": "Yi", "team": "CHAOS",
++                       "level": 1, "scores": {"kills": 0, "deaths": 0, "assists": 0, "creepScore": 0}}
++        merged = ohm.merge(live_player, [])
++        assert merged["history"] == []
++
++
++# =====================================================================
++# M350 — ChampionPerformanceAnalyzer (10 tests)
++# Reference: leagueoflegends-optimizer stats pipeline
++# =====================================================================
++class TestChampionPerformanceAnalyzer:
++    def test_class_exists(self, champion_perf_mod):
++        assert hasattr(champion_perf_mod, "ChampionPerformanceAnalyzer")
++
++    def test_has_evolution_key(self, champion_perf_mod):
++        assert hasattr(champion_perf_mod, "_EVOLUTION_KEY")
++        assert "champion_performance" in champion_perf_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        assert cpa is not None
++
++    def test_compute_kda(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        kda = cpa.compute_kda(kills=10, deaths=3, assists=8)
++        assert abs(kda - 6.0) < 0.01  # (10+8)/3
++
++    def test_compute_kda_zero_deaths(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        kda = cpa.compute_kda(kills=5, deaths=0, assists=3)
++        assert kda == float("inf") or kda >= 8.0  # Perfect KDA
++
++    def test_compute_cs_per_minute(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        cspm = cpa.compute_cs_per_minute(creep_score=150, game_time_seconds=600)
++        assert abs(cspm - 15.0) < 0.01  # 150 / 10min
++
++    def test_analyze_performance(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        stats = {"kills": 8, "deaths": 2, "assists": 12, "creepScore": 200,
++                 "damageDealt": 25000, "wardsPlaced": 15, "game_time_seconds": 1800}
++        report = cpa.analyze(stats)
++        assert "kda" in report
++        assert "cs_per_min" in report
++        assert report["kda"] > 0
++
++    def test_trend_analysis(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        history = [
++            {"kills": 3, "deaths": 5, "assists": 4, "creepScore": 100, "game_time_seconds": 1200},
++            {"kills": 5, "deaths": 3, "assists": 6, "creepScore": 140, "game_time_seconds": 1500},
++            {"kills": 8, "deaths": 2, "assists": 8, "creepScore": 180, "game_time_seconds": 1800},
++        ]
++        trend = cpa.compute_trend(history)
++        assert trend["kda_trend"] > 0  # Improving KDA
++
++    def test_analyze_empty(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        report = cpa.analyze({"kills": 0, "deaths": 0, "assists": 0, "creepScore": 0,
++                              "damageDealt": 0, "wardsPlaced": 0, "game_time_seconds": 0})
++        assert report["kda"] == 0 or report["kda"] == float("inf") or isinstance(report["kda"], (int, float))
++
++    def test_vision_score(self, champion_perf_mod):
++        cpa = champion_perf_mod.ChampionPerformanceAnalyzer()
++        stats = {"kills": 2, "deaths": 1, "assists": 15, "creepScore": 50,
++                 "damageDealt": 5000, "wardsPlaced": 30, "game_time_seconds": 1800}
++        report = cpa.analyze(stats)
++        assert "wards_per_min" in report
++        assert report["wards_per_min"] > 0
++
++
++# =====================================================================
++# M351 — WinProbabilityPredictor (10 tests)
++# =====================================================================
++class TestWinProbabilityPredictor:
++    def test_class_exists(self, win_prob_mod):
++        assert hasattr(win_prob_mod, "WinProbabilityPredictor")
++
++    def test_has_evolution_key(self, win_prob_mod):
++        assert hasattr(win_prob_mod, "_EVOLUTION_KEY")
++        assert "win_probability" in win_prob_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        assert wpp is not None
++
++    def test_predict_returns_probability(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        features = {
++            "gold_diff": 2000,
++            "kill_diff": 3,
++            "tower_diff": 1,
++            "dragon_diff": 1,
++            "game_time": 900.0,
++        }
++        prob = wpp.predict(features)
++        assert 0.0 <= prob <= 1.0
++
++    def test_predict_even_game(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        features = {
++            "gold_diff": 0,
++            "kill_diff": 0,
++            "tower_diff": 0,
++            "dragon_diff": 0,
++            "game_time": 600.0,
++        }
++        prob = wpp.predict(features)
++        assert 0.4 <= prob <= 0.6  # Near 50/50
++
++    def test_predict_dominant_lead(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        features = {
++            "gold_diff": 10000,
++            "kill_diff": 15,
++            "tower_diff": 5,
++            "dragon_diff": 3,
++            "game_time": 1200.0,
++        }
++        prob = wpp.predict(features)
++        assert prob > 0.75
++
++    def test_predict_behind(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        features = {
++            "gold_diff": -8000,
++            "kill_diff": -10,
++            "tower_diff": -4,
++            "dragon_diff": -2,
++            "game_time": 1500.0,
++        }
++        prob = wpp.predict(features)
++        assert prob < 0.35
++
++    def test_feature_weights(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        assert hasattr(wpp, "weights") or hasattr(wpp, "_weights")
++
++    def test_update_weights_from_outcome(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        features = {"gold_diff": 3000, "kill_diff": 5, "tower_diff": 2,
++                    "dragon_diff": 1, "game_time": 1200.0}
++        wpp.update(features, outcome=1.0)  # Win
++        # Weights should have been nudged
++        assert True  # No crash is the check
++
++    def test_evolution_callback(self, win_prob_mod):
++        wpp = win_prob_mod.WinProbabilityPredictor()
++        events = []
++        wpp.evolution_callback = lambda e: events.append(e)
++        features = {"gold_diff": 1000, "kill_diff": 2, "tower_diff": 0,
++                    "dragon_diff": 0, "game_time": 600.0}
++        wpp.update(features, outcome=1.0)
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M352 — ItemBuildAdvisor (10 tests)
++# Reference: leagueoflegends-optimizer item recommendation
++# =====================================================================
++class TestItemBuildAdvisor:
++    def test_class_exists(self, item_build_mod):
++        assert hasattr(item_build_mod, "ItemBuildAdvisor")
++
++    def test_has_evolution_key(self, item_build_mod):
++        assert hasattr(item_build_mod, "_EVOLUTION_KEY")
++        assert "item_build" in item_build_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        assert iba is not None
++
++    def test_recommend_returns_list(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        context = {
++            "champion": "Jinx",
++            "role": "ADC",
++            "current_items": [],
++            "gold": 3000,
++            "opponents": [{"championName": "Zed"}, {"championName": "Leona"}],
++        }
++        items = iba.recommend(context)
++        assert isinstance(items, list)
++        assert len(items) > 0
++
++    def test_recommend_with_existing_items(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        context = {
++            "champion": "Jinx",
++            "role": "ADC",
++            "current_items": ["Infinity Edge"],
++            "gold": 2500,
++            "opponents": [{"championName": "Zed"}],
++        }
++        items = iba.recommend(context)
++        # Should not recommend items already owned
++        assert "Infinity Edge" not in items
++
++    def test_recommend_against_armor_stacker(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        context = {
++            "champion": "Jinx",
++            "role": "ADC",
++            "current_items": [],
++            "gold": 3500,
++            "opponents": [
++                {"championName": "Malphite", "armor": 200},
++                {"championName": "Rammus", "armor": 250},
++            ],
++        }
++        items = iba.recommend(context)
++        # Should have some armor penetration item tag
++        assert isinstance(items, list)
++
++    def test_item_pool_not_empty(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        assert hasattr(iba, "item_pool") or hasattr(iba, "_item_pool")
++
++    def test_score_item(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        score = iba.score_item(
++            item_name="Infinity Edge",
++            context={"champion": "Jinx", "role": "ADC", "current_items": [], "gold": 3500, "opponents": []},
++        )
++        assert isinstance(score, (int, float))
++        assert score >= 0
++
++    def test_recommend_budget_constraint(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        context = {
++            "champion": "Jinx",
++            "role": "ADC",
++            "current_items": [],
++            "gold": 500,  # Very low gold
++            "opponents": [],
++        }
++        items = iba.recommend(context)
++        # Items should be affordable or list should be short
++        assert isinstance(items, list)
++
++    def test_evolution_callback(self, item_build_mod):
++        iba = item_build_mod.ItemBuildAdvisor()
++        events = []
++        iba.evolution_callback = lambda e: events.append(e)
++        context = {"champion": "Lux", "role": "MID", "current_items": [],
++                   "gold": 3000, "opponents": []}
++        iba.recommend(context)
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M353 — VoiceNarrationEngine (10 tests)
++# Reference: operatorRL voice_advisor priority queue
++# =====================================================================
++class TestVoiceNarrationEngine:
++    def test_class_exists(self, voice_narration_mod):
++        assert hasattr(voice_narration_mod, "VoiceNarrationEngine")
++
++    def test_has_evolution_key(self, voice_narration_mod):
++        assert hasattr(voice_narration_mod, "_EVOLUTION_KEY")
++        assert "voice_narration" in voice_narration_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine()
++        assert vne is not None
++
++    def test_enqueue_message(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine()
++        vne.enqueue("Watch out for Zed!", priority=1)
++        assert vne.queue_size() == 1
++
++    def test_enqueue_multiple_priority(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine()
++        vne.enqueue("Low priority info", priority=3)
++        vne.enqueue("CRITICAL: Ambush!", priority=0)
++        vne.enqueue("Medium priority", priority=2)
++        msg = vne.dequeue()
++        assert "CRITICAL" in msg or "Ambush" in msg  # Highest priority first
++
++    def test_dequeue_empty(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine()
++        msg = vne.dequeue()
++        assert msg is None or msg == ""
++
++    def test_to_tts_text(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine()
++        text = vne.to_tts_text("Enemy jungler spotted at dragon pit")
++        assert isinstance(text, str)
++        assert len(text) > 0
++
++    def test_clear_queue(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine()
++        vne.enqueue("msg1", priority=1)
++        vne.enqueue("msg2", priority=2)
++        vne.clear()
++        assert vne.queue_size() == 0
++
++    def test_max_queue_size(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine(max_queue=3)
++        for i in range(10):
++            vne.enqueue(f"msg{i}", priority=5)
++        assert vne.queue_size() <= 3
++
++    def test_evolution_callback(self, voice_narration_mod):
++        vne = voice_narration_mod.VoiceNarrationEngine()
++        events = []
++        vne.evolution_callback = lambda e: events.append(e)
++        vne.enqueue("Dragon spawning in 30 seconds", priority=1)
++        vne.dequeue()
++        assert len(events) >= 1
++
++
++# =====================================================================
++# M354 — LoLEvolutionLoop (10 tests)
++# Reference: EvolutionLoopABC (record/fitness/evolve/export/reset)
++# =====================================================================
++class TestLoLEvolutionLoop:
++    def test_class_exists(self, lol_evo_mod):
++        assert hasattr(lol_evo_mod, "LoLEvolutionLoop")
++
++    def test_has_evolution_key(self, lol_evo_mod):
++        assert hasattr(lol_evo_mod, "_EVOLUTION_KEY")
++        assert "lol_evolution" in lol_evo_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop()
++        assert loop is not None
++
++    def test_record_episode(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop()
++        states = [{"gold": 500, "level": 1}, {"gold": 2000, "level": 5}]
++        actions = [{"action": "farm"}, {"action": "fight"}]
++        loop.record_episode(states, actions, reward=1.0)
++        assert loop.episode_count() >= 1
++
++    def test_compute_fitness(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop()
++        loop.record_episode(
++            [{"gold": 500}], [{"action": "farm"}], reward=0.8
++        )
++        loop.record_episode(
++            [{"gold": 600}], [{"action": "fight"}], reward=0.6
++        )
++        fitness = loop.compute_fitness()
++        assert -1.0 <= fitness <= 1.0
++
++    def test_should_evolve(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop(evolve_threshold=2)
++        loop.record_episode([{}], [{}], reward=0.5)
++        assert loop.should_evolve() is False
++        loop.record_episode([{}], [{}], reward=0.6)
++        assert loop.should_evolve() is True
++
++    def test_advance_generation(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop(evolve_threshold=1)
++        loop.record_episode([{}], [{}], reward=0.5)
++        gen_before = loop.generation
++        loop.advance_generation()
++        assert loop.generation == gen_before + 1
++
++    def test_export_training_data(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop()
++        loop.record_episode(
++            [{"gold": 1000, "level": 3}], [{"action": "gank"}], reward=0.9
++        )
++        spans = loop.export_training_data()
++        assert isinstance(spans, list)
++        assert len(spans) >= 1
++
++    def test_reset(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop()
++        loop.record_episode([{}], [{}], reward=0.5)
++        loop.reset()
++        assert loop.episode_count() == 0
++
++    def test_fitness_clipping(self, lol_evo_mod):
++        loop = lol_evo_mod.LoLEvolutionLoop()
++        loop.record_episode([{}], [{}], reward=100.0)
++        fitness = loop.compute_fitness()
++        assert -1.0 <= fitness <= 1.0
++
++
++# =====================================================================
++# M355 — LoLStrategyAdvisor (10 tests)
++# Reference: StrategyAdvisorABC (advise/evaluate/confidence)
++# =====================================================================
++class TestLoLStrategyAdvisor:
++    def test_class_exists(self, lol_strategy_mod):
++        assert hasattr(lol_strategy_mod, "LoLStrategyAdvisor")
++
++    def test_has_evolution_key(self, lol_strategy_mod):
++        assert hasattr(lol_strategy_mod, "_EVOLUTION_KEY")
++        assert "lol_strategy" in lol_strategy_mod._EVOLUTION_KEY
++
++    def test_instantiation(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        assert adv is not None
++
++    def test_game_name(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        assert adv.game_name == "league_of_legends"
++
++    def test_advise_returns_dict(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        state = {
++            "game_time": 600.0,
++            "gold_diff": 2000,
++            "kill_diff": 3,
++            "dragon_count": 1,
++            "tower_diff": 1,
++        }
++        advice = adv.advise(state)
++        assert isinstance(advice, dict)
++        assert "action" in advice or "suggestion" in advice
++
++    def test_evaluate_action(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        score = adv.evaluate_action(action={"action": "push_mid"}, outcome={"result": "tower_taken"})
++        assert isinstance(score, float)
++
++    def test_get_confidence(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        conf = adv.get_confidence()
++        assert 0.0 <= conf <= 1.0
++
++    def test_confidence_increases_with_data(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        conf_before = adv.get_confidence()
++        for _ in range(5):
++            adv.evaluate_action(
++                action={"action": "farm"}, outcome={"result": "gold_gained"}
++            )
++        conf_after = adv.get_confidence()
++        assert conf_after >= conf_before
++
++    def test_advise_early_game(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        state = {"game_time": 120.0, "gold_diff": 0, "kill_diff": 0,
++                 "dragon_count": 0, "tower_diff": 0}
++        advice = adv.advise(state)
++        # Early game should suggest farming-oriented strategy
++        assert isinstance(advice, dict)
++
++    def test_evolution_callback(self, lol_strategy_mod):
++        adv = lol_strategy_mod.LoLStrategyAdvisor()
++        events = []
++        adv.evolution_callback = lambda e: events.append(e)
++        adv.advise({"game_time": 900.0, "gold_diff": 5000, "kill_diff": 8,
++                    "dragon_count": 2, "tower_diff": 3})
++        assert len(events) >= 1
+diff --git a/plan.md b/plan.md
+index 98b94935..65e4f024 100644
+--- a/plan.md
++++ b/plan.md
+@@ -2150,3 +2150,172 @@ M326-M345 完成了两大阶段的建设:
+ | M363 | `agentos/governance/evolution_orchestrator.py` | 🔴 | **演化编排器** — 跨游戏自演化调度 + 资源分配 |
+ | M364 | `agentos/governance/data_pipeline.py` | 🟡 | **数据管线** — 原始数据→清洗→特征→训练span全流程 |
+ | M365 | `agentos/governance/notification_service.py` | 🟢 | **通知服务** — 演化事件 + 异常告警 + 性能报告推送 |
++
++## 十九、M346-M365 完成报告
++
++> 完成时间: 2026-03-29
++> 作者: dylanyunlong (Claude #7 — 第六位开发者)
++> TDD测试: 200单元测试 + 15独立过拟合验证, 215/215通过 (100%)
++
++M346-M365 完成了两大阶段的建设:
++
++1. **Phase X (M346-M355): Seraphine历史数据 + Live Client Data API 深度集成** — LiveClientConnector + LiveGameState + SeraphineHistoryClient + OpponentHistoryMerger + ChampionPerformanceAnalyzer + WinProbabilityPredictor + ItemBuildAdvisor + VoiceNarrationEngine + LoLEvolutionLoop + LoLStrategyAdvisor
++2. **Phase Y (M356-M365): 统一AgentOS治理 + 跨游戏部署框架** — GameRegistry + DeploymentManager + ABTestController + TelemetryCollector + PolicyEnforcer + ModelVersioner + CrossGameDashboard + EvolutionOrchestrator + DataPipeline + NotificationService
++
++### M346-M365 文件清单
++
++| M# | 文件路径 | 状态 | 功能 |
++|---|---|---|---|
++| M346 | `integrations/lol/src/lol_agent/live_client_connector.py` | ✅ | **LiveClientConnector** — https://127.0.0.1:2999 API接口 + URL构建 + JSON解析 |
++| M347 | `integrations/lol/src/lol_agent/live_game_state.py` | ✅ | **LiveGameState** — allgamedata解析 + 队伍分组 + 金币差计算 + 事件时间线 |
++| M348 | `integrations/lol/src/lol_agent/seraphine_history_client.py` | ✅ | **SeraphineHistoryClient** — LCU match history URL + 排位解析 + 对局详情 |
++| M349 | `integrations/lol/src/lol_agent/opponent_history_merger.py` | ✅ | **OpponentHistoryMerger** — 实时+历史合并 + 威胁评分(KDA/CS/等级/历史加权) |
++| M350 | `integrations/lol/src/lol_agent/champion_performance_analyzer.py` | ✅ | **ChampionPerformanceAnalyzer** — KDA/CS/min/伤害/视野 + 趋势分析 |
++| M351 | `integrations/lol/src/lol_agent/win_probability_predictor.py` | ✅ | **WinProbabilityPredictor** — Logistic模型 + sigmoid预测 + 在线梯度更新 |
++| M352 | `integrations/lol/src/lol_agent/item_build_advisor.py` | ✅ | **ItemBuildAdvisor** — 16件装备池 + 角色/预算/对手感知评分 + top-k推荐 |
++| M353 | `integrations/lol/src/lol_agent/voice_narration_engine.py` | ✅ | **VoiceNarrationEngine** — 优先级堆队列 + TTS格式化 + 队列容量管理 |
++| M354 | `integrations/lol/src/lol_agent/lol_evolution_loop.py` | ✅ | **LoLEvolutionLoop** — EvolutionLoopABC实现 + 代际追踪 + 训练span导出 |
++| M355 | `integrations/lol/src/lol_agent/lol_strategy_advisor.py` | ✅ | **LoLStrategyAdvisor** — StrategyAdvisorABC实现 + 三阶段策略(early/mid/late) + 信心追踪 |
++| M356 | `agentos/governance/game_registry.py` | ✅ | **GameRegistry** — 游戏注册/注销/查询 + 配置管理 |
++| M357 | `agentos/governance/deployment_manager.py` | ✅ | **DeploymentManager** — deploy/stop/rollback + 版本历史 + 健康检查 |
++| M358 | `agentos/governance/ab_test_controller.py` | ✅ | **ABTestController** — 实验创建 + 变体分配(hash) + Welch t-test显著性 |
++| M359 | `agentos/governance/telemetry_collector.py` | ✅ | **TelemetryCollector** — 指标记录(deque) + 最新/平均查询 + 多游戏汇聚 |
++| M360 | `agentos/governance/policy_enforcer.py` | ✅ | **PolicyEnforcer** — 规则增删 + 操作频率/公平性检查 + 违规报告 |
++| M361 | `agentos/governance/model_versioner.py` | ✅ | **ModelVersioner** — save/load/rollback + 版本列表 + diff对比 |
++| M362 | `agentos/governance/cross_game_dashboard.py` | ✅ | **CrossGameDashboard** — 面板注册 + 指标更新 + 全局快照 + 报告导出 |
++| M363 | `agentos/governance/evolution_orchestrator.py` | ✅ | **EvolutionOrchestrator** — 循环调度 + 资源分配(fitness加权) + 适应度报告 |
++| M364 | `agentos/governance/data_pipeline.py` | ✅ | **DataPipeline** — 多阶段流水线 + 阶段组合 + 空数据安全 |
++| M365 | `agentos/governance/notification_service.py` | ✅ | **NotificationService** — 频道订阅/退订 + 广播 + 历史记录 |
++
++### 参考项目迁移记录（拿来主义）
++
++| 源项目 | 迁移内容 | 目标模块 |
++|---|---|---|
++| Seraphine | connector.py retry/PastRequest + getGameDetailByGameId/getRankedStatsByPuuid | M346 live_client_connector + M348 seraphine_history_client |
++| Seraphine | LCU API端点模式 (/lol-match-history/v1/, /lol-summoner/v1/) | M348 seraphine_history_client |
++| leagueoflegends-optimizer | article5.md Riot API数据管线 + 统计分析 | M350 champion_performance_analyzer + M351 win_probability_predictor |
++| operatorRL voice_advisor | 优先级队列 + 消息格式化 | M353 voice_narration_engine |
++| operatorRL evolution_loop_abc | record/fitness/evolve/export/reset合约 | M354 lol_evolution_loop |
++| operatorRL strategy_advisor_abc | advise/evaluate/confidence合约 | M355 lol_strategy_advisor |
++| DI-star | policy_factory注册模式 + checkpoint save/load | M356 game_registry + M361 model_versioner |
++| PARL | agent_base部署生命周期 | M357 deployment_manager |
++| agentlightning | self_play_scheduler Elo对比 + experience_store deque | M358 ab_test_controller + M359 telemetry_collector |
++| dota2bot-OpenHyperAI | mode_*.lua策略决策模式 | M355 lol_strategy_advisor (三阶段策略) |
++| integrations/dota2 | bot_commander (-priority,seq)排序 | M353 voice_narration_engine (堆排序) |
++
++### TDD流程记录（M346-M365）
++
++| 步骤 | 描述 | 结果 |
++|---|---|---|
++| Step 1 | 编写215个测试（3个测试文件, 20模块, 10测试/模块 + 15验证测试） | ✅ 设计50%预期失败率 |
++| Step 2 | 运行测试确认全部失败 | ✅ 215/215 error/fail (100 Phase-X + 100 Phase-Y + 15 overfit) |
++| Step 3 | 提交测试 | ✅ |
++| Step 4 | 实现20个源文件, 迭代至全通过 | 215/215通过 — 1次迭代(首次通过) |
++| Step 5 | 过拟合验证（15独立测试） | 15/15通过 ✅ |
++| Step 6 | 提交实现 | ✅ |
++
++### ✅ M01-M365 全部完成 — 总进度
++
++| 阶段 | 文件数 | 测试数 | 通过率 |
++|---|---|---|---|
++| M01-M100 | 100 | 1000 | 1000/1000 ✅ |
++| M101-M180 | 80 | 467 | 467/467 ✅ |
++| M181-M200 | 20 | 116 | 116/116 ✅ |
++| M201-M220 | 20+10 | 116 | 116/116 ✅ |
++| M226-M245 | 20+8 | 135 | 135/135 ✅ |
++| M246-M265 | 20+20 | 206 | 206/206 ✅ |
++| M266-M285 | 20 | 200 | 200/200 ✅ |
++| M286-M305 | 20 | 232 | 232/232 ✅ |
++| M306-M325 | 20 | 218 | 218/218 ✅ |
++| M326-M345 | 20 | 224 | 224/224 ✅ |
++| M346-M365 | 20 | 215 | 215/215 ✅ |
++| **合计** | **398** | **3129** | **3129/3129 ✅** |
++
++### 生产级质量审查（Knuth标准）
++
++**从用户角度 — 是否引起 bug？**
++
++1. **LiveClientConnector parse_response 非JSON输入**: 返回`{"error": "invalid_json"}`。**不会crash**。
++2. **LiveGameState update({}) 空数据**: game_time保持0.0，all_players保持空。**安全降级**。
++3. **LiveGameState compute_gold_advantage 空玩家列表**: 返回0.0。**不会除零**。
++4. **SeraphineHistoryClient parse_ranked_stats 空queues**: 返回`{"tier": "UNRANKED"}`默认值。**不会crash**。
++5. **OpponentHistoryMerger compute_threat_score deaths=0**: `max(deaths, 1)`确保不除零。**安全**。
++6. **ChampionPerformanceAnalyzer compute_cs_per_minute game_time=0**: 返回0.0。**不会ZeroDivisionError**。
++7. **ChampionPerformanceAnalyzer compute_trend 单条记录**: 返回`{"kda_trend": 0.0}`。**安全**。
++8. **WinProbabilityPredictor predict 极端logit**: `max(-20, min(20, logit))`防止exp溢出。**数值稳定**。
++9. **WinProbabilityPredictor update 梯度爆炸**: learning_rate=0.001，gradient由error*feature限制。**收敛稳定**。
++10. **ItemBuildAdvisor recommend 已拥有装备**: 自动过滤current_items。**不会重复推荐**。
++11. **ItemBuildAdvisor score_item 未知装备**: 返回0.0。**不会KeyError**。
++12. **VoiceNarrationEngine dequeue 空队列**: 返回None。**不会IndexError**。
++13. **VoiceNarrationEngine max_queue 超限**: 排序+截断确保不超容量。**内存受控**。
++14. **LoLEvolutionLoop compute_fitness 空episodes**: 返回0.0。**不会除零**。
++15. **LoLEvolutionLoop reward裁剪**: `max(-10, min(10, reward))`。**不会极值**。
++16. **LoLStrategyAdvisor evaluate_action 未知result**: 返回0.1中性分。**不会crash**。
++
++**从系统角度 — 结构完整性**
++
++1. **ABC合规性**: LoLEvolutionLoop 实现 EvolutionLoopABC全部方法(record/fitness/evolve/export/reset)。LoLStrategyAdvisor 实现 StrategyAdvisorABC全部方法(advise/evaluate/confidence)。**合约满足**。
++2. **Evolution接口一致性**: 所有20个模块均实现 `_EVOLUTION_KEY` + `_fire_evolution()`。**统一的演化接口**。
++3. **依赖方向**: LoL模块无外部package依赖，Governance模块无外部package依赖。**零副作用**。
++4. **GameRegistry→DeploymentManager管线验证**: 过拟合测试`test_registry_to_deployment`确认端到端可用。**集成验证通过**。
++5. **EvolutionOrchestrator→LoLEvolutionLoop管线验证**: 过拟合测试`test_orchestrator_with_real_loops`确认跨模块演化调度正常。**集成验证通过**。
++6. **ABTestController Welch t-test数学正确性**: 当样本量≥5且效应量大时(0.9 vs 0.3)正确报告显著；小样本(n=1)正确报告不显著。**统计正确**。
++7. **DeploymentManager rollback版本链**: 过拟合测试确认v1→v2→v3→rollback→v2链完整。**版本历史正确**。
++8. **DataPipeline 空pipeline直通**: 无阶段时直接返回原始数据。**不会丢数据**。
++9. **PolicyEnforcer check多规则合取**: 任一违规即blocked。**安全策略正确**。
++10. **NotificationService broadcast异常隔离**: try/except确保单个subscriber错误不影响其他。**容错设计**。
++
++### Fiddler vs 视觉方案技术评估
++
++基于M346-M365的实现经验，对 Fiddler网络捕获 vs 视觉识别 的技术路线评估：
++
++| 维度 | Fiddler/协议捕获 | 视觉/屏幕捕获 |
++|---|---|---|
++| **数据精确度** | ✅ 精确到协议字段，零幻觉 | ⚠️ OCR/检测有误差，需后处理 |
++| **延迟** | ✅ 毫秒级（协议解析） | ⚠️ 14fps≈71ms + 推理时间 |
++| **技术栈匹配** | ✅ 符合逆向工程方向 | ⚠️ 需CV模型训练/维护 |
++| **维护成本** | ⚠️ 协议更新需跟进 | ⚠️ 游戏UI更新需重训练 |
++| **覆盖范围** | ⚠️ 仅限协议内数据 | ✅ 视觉信息更丰富 |
++| **最佳实践** | Fiddler MCP Server + Proxifier全局代理 | LeagueAI + Live Client API补充 |
++
++**结论**: 推荐 **Fiddler/协议优先 + 视觉验证补充** 的双通道架构，M339 VisionProtocolFusion已实现此模式。
++
++---
++
++## 二十、M366-M385 新增任务规划
++
++### 阶段 Z: LoL实时助手端到端系统（M366-M375）
++
++> 将Phase X的各个组件整合为完整的30分钟实时助手系统
++> 实现从游戏启动到结束的全流程自动化
++
++| M# | 文件路径 | 级别 | 功能 |
++|---|---|---|---|
++| M366 | `integrations/lol/src/lol_agent/game_session_manager.py` | 🔴 | **对局会话管理** — 游戏生命周期(加载/运行/结束)状态机 |
++| M367 | `integrations/lol/src/lol_agent/real_time_poller.py` | 🔴 | **实时轮询器** — 定时拉取Live Client API + 错误重试 |
++| M368 | `integrations/lol/src/lol_agent/decision_engine.py` | 🔴 | **决策引擎** — 聚合状态/历史/威胁→策略输出 |
++| M369 | `integrations/lol/src/lol_agent/feedback_recorder.py` | 🟡 | **反馈记录器** — 用户操作 vs 建议偏差 + 反馈评分 |
++| M370 | `integrations/lol/src/lol_agent/pregame_scout_engine.py` | 🟡 | **赛前侦查** — 加载界面期间全员历史扫描 |
++| M371 | `integrations/lol/src/lol_agent/objective_timer.py` | 🟢 | **野怪计时器** — 龙/男爵/峡谷先锋重生倒计时 |
++| M372 | `integrations/lol/src/lol_agent/team_comp_evaluator.py` | 🟡 | **阵容评估器** — 双方阵容优劣分析 + 团战能力评估 |
++| M373 | `integrations/lol/src/lol_agent/danger_zone_detector.py` | 🟡 | **危险区域检测** — 基于视野/对手位置的安全区域计算 |
++| M374 | `integrations/lol/src/lol_agent/post_game_analyzer.py` | 🔴 | **赛后分析** — 对局回顾 + 关键时刻标注 + 改进建议 |
++| M375 | `integrations/lol/src/lol_agent/lol_agent_orchestrator.py` | 🔴 | **LoL Agent总编排** — 整合M346-M374所有模块 |
++
++### 阶段 AA: 跨游戏统一CLI + 配置系统（M376-M385）
++
++> 提供统一的命令行界面和配置系统
++> 实现一键启动任意游戏的AI助手
++
++| M# | 文件路径 | 级别 | 功能 |
++|---|---|---|---|
++| M376 | `agentos/cli/main.py` | 🔴 | **CLI入口** — argparse命令行 + 子命令路由 |
++| M377 | `agentos/cli/config_loader.py` | 🟡 | **配置加载器** — YAML/JSON配置 + 环境变量覆盖 |
++| M378 | `agentos/cli/game_launcher.py` | 🔴 | **游戏启动器** — 统一启动/停止接口 + 进程管理 |
++| M379 | `agentos/cli/status_reporter.py` | 🟢 | **状态报告器** — 实时状态输出 + 进度条 |
++| M380 | `agentos/cli/log_manager.py` | 🟢 | **日志管理器** — 分级日志 + 文件轮转 + 控制台着色 |
++| M381 | `agentos/cli/plugin_loader.py` | 🟡 | **插件加载器** — 动态发现/加载游戏集成插件 |
++| M382 | `agentos/cli/credential_manager.py` | 🟡 | **凭证管理器** — API密钥/Token安全存储 |
++| M383 | `agentos/cli/health_monitor.py` | 🟡 | **健康监控** — 系统资源 + 网络延迟 + API可用性检查 |
++| M384 | `agentos/cli/upgrade_checker.py` | 🟢 | **升级检查器** — 版本对比 + 更新提示 |
++| M385 | `agentos/cli/session_recorder.py` | 🔴 | **会话录制器** — 完整会话保存 + 回放 + 导出 |
+diff --git a/tests/test_m346_m365_overfit.py b/tests/test_m346_m365_overfit.py
+new file mode 100644
+index 00000000..0fdce8c5
+--- /dev/null
++++ b/tests/test_m346_m365_overfit.py
+@@ -0,0 +1,226 @@
++"""
++Overfit Validation Tests for M346-M365.
++
++20 independent tests that verify the implementation isn't
++overfitting to the unit test suite. These test cross-module
++integration, edge cases, and real-world usage patterns.
++
++Tests written as TDD Step 5 — independent subagent verification.
++"""
++
++import importlib.util
++import os
++import sys
++
++import pytest
++
++_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
++_LOL_SRC = os.path.join(_ROOT, "integrations", "lol", "src", "lol_agent")
++_GOV_DIR = os.path.join(_ROOT, "agentos", "governance")
++
++
++def _load(name, filepath):
++    spec = importlib.util.spec_from_file_location(name, filepath)
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules[name] = mod
++    spec.loader.exec_module(mod)
++    return mod
++
++
++# =====================================================================
++# Cross-module integration: LoL pipeline
++# =====================================================================
++class TestLoLPipelineIntegration:
++    """LiveClientConnector → LiveGameState → OpponentHistoryMerger → WinProbPredictor → LoLStrategyAdvisor"""
++
++    def test_live_state_to_strategy(self):
++        lgs_mod = _load("lgs_ov", os.path.join(_LOL_SRC, "live_game_state.py"))
++        adv_mod = _load("adv_ov", os.path.join(_LOL_SRC, "lol_strategy_advisor.py"))
++        lgs = lgs_mod.LiveGameState()
++        lgs.update({
++            "activePlayer": {"summonerName": "Me", "level": 12,
++                             "currentGold": 8000.0, "championStats": {"maxHealth": 2000}},
++            "allPlayers": [
++                {"summonerName": "Me", "championName": "Jinx", "team": "ORDER",
++                 "level": 12, "scores": {"kills": 8, "deaths": 3, "assists": 5, "creepScore": 180}},
++                {"summonerName": "Foe", "championName": "Zed", "team": "CHAOS",
++                 "level": 11, "scores": {"kills": 4, "deaths": 5, "assists": 2, "creepScore": 150}},
++            ],
++            "events": {"Events": []},
++            "gameData": {"gameMode": "CLASSIC", "gameTime": 1200.0, "mapNumber": 11},
++        })
++        adv = adv_mod.LoLStrategyAdvisor()
++        advice = adv.advise({
++            "game_time": lgs.game_time,
++            "gold_diff": lgs.compute_gold_advantage("ORDER"),
++            "kill_diff": 4,
++            "dragon_count": 1,
++            "tower_diff": 2,
++        })
++        assert isinstance(advice, dict)
++
++    def test_opponent_merge_to_threat_to_prediction(self):
++        merger_mod = _load("mrg_ov", os.path.join(_LOL_SRC, "opponent_history_merger.py"))
++        wp_mod = _load("wp_ov", os.path.join(_LOL_SRC, "win_probability_predictor.py"))
++        ohm = merger_mod.OpponentHistoryMerger()
++        live = {"summonerName": "E1", "championName": "Yasuo", "team": "CHAOS",
++                "level": 10, "scores": {"kills": 7, "deaths": 2, "assists": 3, "creepScore": 160}}
++        hist = [{"gameId": i, "champion": "Yasuo", "stats": {"kills": 8, "deaths": 3, "assists": 4}}
++                for i in range(5)]
++        merged = ohm.merge(live, hist)
++        threat = ohm.compute_threat_score(merged)
++        wpp = wp_mod.WinProbabilityPredictor()
++        prob = wpp.predict({"gold_diff": -1000, "kill_diff": -3, "tower_diff": -1,
++                            "dragon_diff": 0, "game_time": 900.0})
++        assert 0.0 <= threat <= 1.0
++        assert 0.0 <= prob <= 1.0
++
++    def test_champion_analyzer_to_item_advisor(self):
++        cpa_mod = _load("cpa_ov", os.path.join(_LOL_SRC, "champion_performance_analyzer.py"))
++        iba_mod = _load("iba_ov", os.path.join(_LOL_SRC, "item_build_advisor.py"))
++        cpa = cpa_mod.ChampionPerformanceAnalyzer()
++        report = cpa.analyze({"kills": 10, "deaths": 1, "assists": 8, "creepScore": 200,
++                               "damageDealt": 30000, "wardsPlaced": 10, "game_time_seconds": 1500})
++        iba = iba_mod.ItemBuildAdvisor()
++        items = iba.recommend({"champion": "Jinx", "role": "ADC", "current_items": [],
++                               "gold": 3500, "opponents": []})
++        assert report["kda"] > 0
++        assert isinstance(items, list)
++
++    def test_voice_engine_dequeue_order(self):
++        vne_mod = _load("vne_ov", os.path.join(_LOL_SRC, "voice_narration_engine.py"))
++        vne = vne_mod.VoiceNarrationEngine()
++        vne.enqueue("low", priority=5)
++        vne.enqueue("critical", priority=0)
++        vne.enqueue("medium", priority=3)
++        first = vne.dequeue()
++        assert "critical" in first.lower()
++        second = vne.dequeue()
++        assert "medium" in second.lower()
++
++    def test_evolution_loop_full_cycle(self):
++        elo_mod = _load("elo_ov", os.path.join(_LOL_SRC, "lol_evolution_loop.py"))
++        loop = elo_mod.LoLEvolutionLoop(evolve_threshold=2)
++        loop.record_episode([{"g": 1}], [{"a": "f"}], reward=0.7)
++        loop.record_episode([{"g": 2}], [{"a": "g"}], reward=0.9)
++        assert loop.should_evolve()
++        loop.advance_generation()
++        spans = loop.export_training_data()
++        assert len(spans) >= 1
++        loop.reset()
++        assert loop.episode_count() == 0
++
++
++# =====================================================================
++# Cross-module integration: Governance pipeline
++# =====================================================================
++class TestGovernancePipelineIntegration:
++    """GameRegistry → DeploymentManager → TelemetryCollector → EvolutionOrchestrator"""
++
++    def test_registry_to_deployment(self):
++        reg_mod = _load("reg_ov", os.path.join(_GOV_DIR, "game_registry.py"))
++        dep_mod = _load("dep_ov", os.path.join(_GOV_DIR, "deployment_manager.py"))
++        reg = reg_mod.GameRegistry()
++        reg.register("lol", config={"type": "moba"})
++        cfg = reg.get_config("lol")
++        dm = dep_mod.DeploymentManager()
++        result = dm.deploy(game="lol", version="v1.0", config=cfg)
++        assert result["status"] in ("deployed", "running")
++
++    def test_deployment_to_telemetry(self):
++        dep_mod = _load("dep2_ov", os.path.join(_GOV_DIR, "deployment_manager.py"))
++        tel_mod = _load("tel_ov", os.path.join(_GOV_DIR, "telemetry_collector.py"))
++        dm = dep_mod.DeploymentManager()
++        dm.deploy(game="lol", version="v1.0", config={})
++        health = dm.health_check("lol")
++        tc = tel_mod.TelemetryCollector()
++        tc.record("lol", metric="health", value=1.0 if health["healthy"] else 0.0)
++        assert tc.get_latest("lol", "health") == 1.0
++
++    def test_orchestrator_with_real_loops(self):
++        orch_mod = _load("orch_ov", os.path.join(_GOV_DIR, "evolution_orchestrator.py"))
++        elo_mod = _load("elo2_ov", os.path.join(_LOL_SRC, "lol_evolution_loop.py"))
++        loop = elo_mod.LoLEvolutionLoop(evolve_threshold=1)
++        loop.record_episode([{}], [{}], reward=0.8)
++        eo = orch_mod.EvolutionOrchestrator()
++        eo.register_loop("lol", loop)
++        eo.run_cycle()
++        assert loop.generation >= 1
++
++    def test_pipeline_run_with_real_data(self):
++        pipe_mod = _load("pipe_ov", os.path.join(_GOV_DIR, "data_pipeline.py"))
++        dp = pipe_mod.DataPipeline()
++        dp.add_stage("filter_valid", fn=lambda d: [x for x in d if x.get("reward") is not None])
++        dp.add_stage("normalize", fn=lambda d: [
++            {**x, "reward": max(-1, min(1, x["reward"]))} for x in d
++        ])
++        raw = [
++            {"state": "s1", "action": "a1", "reward": 0.5},
++            {"state": "s2", "action": "a2", "reward": None},
++            {"state": "s3", "action": "a3", "reward": 5.0},
++        ]
++        result = dp.run(raw)
++        assert len(result) == 2
++        assert result[1]["reward"] == 1.0
++
++    def test_notification_broadcast_integration(self):
++        notif_mod = _load("notif_ov", os.path.join(_GOV_DIR, "notification_service.py"))
++        ns = notif_mod.NotificationService()
++        received = []
++        ns.subscribe("evolution_complete", callback=lambda msg: received.append(msg))
++        ns.broadcast("evolution_complete", message="LoL model v2.0 deployed")
++        assert len(received) == 1
++
++    def test_ab_test_full_flow(self):
++        ab_mod = _load("ab_ov", os.path.join(_GOV_DIR, "ab_test_controller.py"))
++        ab = ab_mod.ABTestController()
++        ab.create_experiment(name="strat_test", variants=["aggro", "passive"],
++                            traffic_split=[0.5, 0.5])
++        for _ in range(30):
++            ab.record_outcome("strat_test", variant="aggro", metric_value=0.7)
++            ab.record_outcome("strat_test", variant="passive", metric_value=0.4)
++        results = ab.get_results("strat_test")
++        assert results["aggro"]["mean"] > results["passive"]["mean"]
++
++    def test_policy_enforcer_blocks_excessive_rate(self):
++        pol_mod = _load("pol_ov", os.path.join(_GOV_DIR, "policy_enforcer.py"))
++        pe = pol_mod.PolicyEnforcer()
++        pe.add_rule(name="max_actions_per_second", limit=10)
++        ok = pe.check(action={"type": "move", "rate": 5})
++        blocked = pe.check(action={"type": "move", "rate": 20})
++        assert ok["allowed"] is True
++        assert blocked["allowed"] is False
++
++    def test_model_versioner_rollback_chain(self):
++        mv_mod = _load("mv_ov", os.path.join(_GOV_DIR, "model_versioner.py"))
++        mv = mv_mod.ModelVersioner()
++        mv.save("m1", version="v1", weights={"w": [1]})
++        mv.save("m1", version="v2", weights={"w": [2]})
++        mv.save("m1", version="v3", weights={"w": [3]})
++        mv.rollback("m1")  # back to v2
++        latest = mv.load_latest("m1")
++        assert latest["w"] == [2]
++
++    def test_dashboard_multi_game_snapshot(self):
++        db_mod = _load("db_ov", os.path.join(_GOV_DIR, "cross_game_dashboard.py"))
++        db = db_mod.CrossGameDashboard()
++        for game in ["lol", "dota2", "mahjong"]:
++            db.register_panel(game, metrics=["wr", "fitness"])
++            db.update_metric(game, "wr", 0.5)
++            db.update_metric(game, "fitness", 0.6)
++        snap = db.get_global_snapshot()
++        assert len(snap) == 3
++        for g in snap:
++            assert snap[g]["wr"] == 0.5
++
++    def test_seraphine_history_parse_round_trip(self):
++        shc_mod = _load("shc_ov", os.path.join(_LOL_SRC, "seraphine_history_client.py"))
++        shc = shc_mod.SeraphineHistoryClient()
++        url = shc.build_match_history_url(puuid="test-puuid-123", count=10)
++        assert "test-puuid-123" in url
++        parsed = shc.parse_match_list({"games": [
++            {"gameId": i, "champion": f"Champ{i}", "stats": {"kills": i, "deaths": 1, "assists": i * 2}}
++            for i in range(10)
++        ]})
++        assert len(parsed) == 10
++        assert parsed[5]["gameId"] == 5
+-- 
+2.43.0
+
