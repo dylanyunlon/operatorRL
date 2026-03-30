@@ -3307,3 +3307,263 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 **M585** `agentlightning/deployment/deployment_event_bus.py` — **部署事件总线**
 
 查看 **agentos/governance** 上现有 **evolution_callback模式** 在所有模块中的使用方式，理解其模式，特别是每个模块独立fire event、通过callback单点通知的扇出方式如何限制了多订阅者场景。可以从 **`agentlightning/deployment/deployment_orchestrator.py`（M565）** 这个好例子开始——它的step→evolution event展示了部署事件的基本发射模式。然后，遵循该模式实现一个新的 **DeploymentEventBus**，让 **所有部署相关模块（M556-M565）** 可以 **通过统一的事件总线发布和订阅部署事件**（支持topic过滤、多订阅者、事件持久化队列），并能 **为事件重播、审计日志和自动化触发提供基础设施**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+### 阶段 AR: 历史战斗数据驱动的实时对战智能 — Seraphine深度历史集成（M586-M605） ✅ COMPLETED
+
+本阶段构建基于Seraphine历史战绩数据的深度分析管线，包括召唤师战绩爬取、战绩深度解析、
+英雄胜率矩阵、位置表现追踪、游戏节奏分析、出装路径分析、视野模式分析、死亡热力图、
+团战参与分析、经济效率追踪、召唤师技能模式、翻盘模式检测、Ban/Pick智能、历史对位预测、
+连胜动量分析、游戏疲劳检测、历史特征向量构建、多队列表现拆分、深度历史管线编排和
+历史驱动教练顾问。TDD: 204 tests all passing.
+
+---
+
+**M586** `integrations/lol-history/src/lol_history/summoner_match_crawler.py` — **召唤师战绩爬取器** ✅
+
+查看 **integrations/lol-history/src/lol_history/seraphine_lcu_deep_client.py** 上现有 **LCU endpoint URL构建和分页请求方式** 的实现方式，理解其模式，特别是build_url如何与parse_response分离。可以从 **`seraphine_bridge.py`** 这个好例子开始——它的build_match_history_url展示了puuid+begIndex+endIndex的分页URL构建。然后，遵循该模式实现一个新的 **SummonerMatchCrawler**，让 **seraphine_deep_history_pipeline（M604）** 可以 **系统性地爬取任意召唤师的全量战绩（分页计划、响应解析、去重、进度追踪）**，并能 **通过evolution_callback上报爬取事件**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M587** `integrations/lol-history/src/lol_history/match_detail_deep_parser.py` — **战绩详情深度解析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/game_detail_parser.py** 上现有 **participant stats字段提取和KDA计算方式** 的实现方式，理解其模式。可以从 **`match_analyzer.py`** 这个好例子开始——它展示了raw match → structured stats的转换。然后，遵循该模式实现一个新的 **MatchDetailDeepParser**，让 **seraphine_deep_history_pipeline（M604）** 可以 **将API原始响应深度解析为标准化的participant/metadata/items/team_totals结构**，并能 **容错处理缺失字段**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M588** `integrations/lol-history/src/lol_history/champion_winrate_matrix.py` — **英雄胜率矩阵** ✅
+
+查看 **integrations/lol-history/src/lol_history/matchup_database.py** 上现有 **(champion, opponent) → {wins, games}** 的对位存储方式，理解其模式。可以从 **`history_match_aggregator.py`** 这个好例子开始——它的by_champion分组聚合展示了英雄维度统计。然后，遵循该模式实现一个新的 **ChampionWinrateMatrix**，让 **M604管线** 可以 **构建完整的英雄胜率矩阵（per-champion stats + champion-vs-champion matchups）**，并能 **按胜率排序查询top/worst英雄和对位**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M589** `integrations/lol-history/src/lol_history/role_performance_tracker.py` — **位置表现追踪器** ✅
+
+查看 **integrations/lol-history/src/lol_history/player_profiler.py** 上现有 **多维度聚合方式** 的实现方式。可以从 **`history_match_aggregator.py`** 的by_champion分组模式开始——改为by_role(TOP/JG/MID/ADC/SUP)分组。然后，遵循该模式实现一个新的 **RolePerformanceTracker**，让 **M604管线** 可以 **按位置拆分表现数据（胜率/KDA/CSpm/GPM/死亡数）**，并能 **识别最强位置和各位置的表现差异**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M590** `integrations/lol-history/src/lol_history/game_pace_analyzer.py` — **游戏节奏分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/game_timeline_analyzer.py** 上现有 **时间轴切分和detect_gold_swings方式** 的实现方式。然后，遵循该模式实现一个新的 **GamePaceAnalyzer**，让 **M604管线** 可以 **分类游戏节奏（fast/normal/slow）、分析早期攻击性、追踪节奏趋势（越来越快/越来越慢）**，并能 **按early/mid/late阶段分解时间线数据**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M591** `integrations/lol-history/src/lol_history/item_build_path_analyzer.py` — **出装路径分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/opgg_build_fetcher.py** 上现有 **出装数据解析方式** 的实现方式。可以从 **`matchup_database.py`** 的record→query模式开始。然后，遵循该模式实现一个新的 **ItemBuildPathAnalyzer**，让 **M604管线** 可以 **记录并分析每个英雄的出装路径（最常见build、各build胜率、首件物品统计、物品频率）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M592** `integrations/lol-history/src/lol_history/ward_pattern_analyzer.py` — **视野模式分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/live_match_history_correlator.py** 上现有 **phase分割方式（EARLY_PHASE_END=900等）** 的实现方式。然后，遵循该模式实现一个新的 **WardPatternAnalyzer**，让 **M604管线** 可以 **分析视野投入模式（每分钟插眼数、控制守卫比例、视野评级、按时间段分析）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M593** `integrations/lol-history/src/lol_history/death_heatmap_generator.py` — **死亡热力图生成器** ✅
+
+查看 **integrations/lol-history/src/lol_history/lane_state_tracker.py** 上现有 **空间位置数据处理方式** 的实现方式。然后，遵循该模式实现一个新的 **DeathHeatmapGenerator**，让 **M604管线** 可以 **将死亡位置数据映射到网格热力图（支持按phase/champion过滤、热点检测、危险区域标注）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M594** `integrations/lol-history/src/lol_history/team_fight_participation_analyzer.py` — **团战参与分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/combat_outcome_predictor.py** 上现有 **团战建模方式** 的实现方式。然后，遵循该模式实现一个新的 **TeamFightParticipationAnalyzer**，让 **M604管线** 可以 **追踪击杀参与率、团战评级（excellent/good/average/poor）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M595** `integrations/lol-history/src/lol_history/gold_efficiency_tracker.py` — **经济效率追踪器** ✅
+
+查看 **integrations/lol-history/src/lol_history/history_match_aggregator.py** 上现有 **GPM计算方式** 的实现方式。然后，遵循该模式实现一个新的 **GoldEfficiencyTracker**，让 **M604管线** 可以 **追踪GPM、CSpm、gold-per-CS效率、经济评级**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M596** `integrations/lol-history/src/lol_history/summoner_spell_pattern_analyzer.py` — **召唤师技能模式分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/champion_tendency_analyzer.py** 上现有 **偏好建模方式** 的实现方式。然后，遵循该模式实现一个新的 **SummonerSpellPatternAnalyzer**，让 **M604管线** 可以 **追踪召唤师技能组合偏好（最常用组合、各组合胜率、按英雄/位置分析、推荐技能）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M597** `integrations/lol-history/src/lol_history/comeback_pattern_detector.py` — **翻盘模式检测器** ✅
+
+查看 **integrations/lol-history/src/lol_history/win_condition_analyzer.py** 上现有 **胜利条件逻辑** 的实现方式。然后，遵循该模式实现一个新的 **ComebackPatternDetector**，让 **M604管线** 可以 **从金差数据检测翻盘和被翻盘模式（15分钟金差→最终结果、翻盘触发因素、翻盘率统计）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M598** `integrations/lol-history/src/lol_history/ban_pick_intelligence.py` — **Ban/Pick智能系统** ✅
+
+查看 **integrations/lol-history/src/lol_history/draft_phase_intelligence.py** 上现有 **BP阶段逻辑** 的实现方式。然后，遵循该模式实现一个新的 **BanPickIntelligence**，让 **M604管线** 可以 **追踪ban/pick模式（ban频率、pick胜率、英雄协同分析、counter ban建议）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M599** `integrations/lol-history/src/lol_history/historical_matchup_predictor.py` — **历史对位预测器** ✅
+
+查看 **integrations/lol-history/src/lol_history/matchup_database.py** + **combat_outcome_predictor.py** 上现有 **对位建模方式** 的实现方式。然后，遵循该模式实现一个新的 **HistoricalMatchupPredictor**，让 **M604管线** 可以 **基于个人历史对位数据预测对位胜率（支持按role过滤、team级预测、hardest matchup查询、batch录入）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M600** `integrations/lol-history/src/lol_history/streak_momentum_analyzer.py` — **连胜/连败动量分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/cross_game_pattern_miner.py** 上现有 **跨局模式挖掘方式** 的实现方式。可以从 **`live_match_history_correlator.py`** 的detect_streak_pattern开始。然后，遵循该模式实现一个新的 **StreakMomentumAnalyzer**，让 **M604管线** 可以 **追踪连胜/连败状态、计算指数衰减动量评分、提供排队建议（是否应该休息）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M601** `integrations/lol-history/src/lol_history/playtime_fatigue_detector.py` — **游戏疲劳检测器** ✅
+
+查看 **integrations/lol/src/lol_agent/tilt_detector.py** 上现有 **心态建模模式** 的实现方式。可以从 **`opponent_behavior_modeler.py`** 的detect_tilt_indicators开始。然后，遵循该模式实现一个新的 **PlaytimeFatigueDetector**，让 **M604管线** 可以 **从session时长和表现衰减检测玩家疲劳（session记录、performance decay趋势、休息建议、最优session长度）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M602** `integrations/lol-history/src/lol_history/historical_feature_vector_builder.py` — **历史特征向量构建器** ✅
+
+查看 **integrations/lol/src/lol_agent/state_encoder.py** 上现有 **_FEATURE_NAMES列表和特征归一化方式** 的实现方式。可以从 **`agentlightning/inference/game_state_preprocessor.py`（M553）** 的FeatureSpec注册模式开始。然后，遵循该模式实现一个新的 **HistoricalFeatureVectorBuilder**，让 **M604管线** 可以 **将历史统计数据构建为固定维度特征向量（支持feature注册、minmax/zscore归一化、缺失值默认、批量构建）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M603** `integrations/lol-history/src/lol_history/multi_queue_performance_splitter.py` — **多队列表现拆分器** ✅
+
+查看 **integrations/lol-history/src/lol_history/ranked_tracker.py** 上现有 **排位/匹配分离方式** 的实现方式。可以从 **`role_performance_tracker.py`（M589）** 的per-role分组模式开始——改为per-queue(RANKED_SOLO/NORMAL/ARAM)分组。然后，遵循该模式实现一个新的 **MultiQueuePerformanceSplitter**，让 **M604管线** 可以 **按队列类型拆分并比较表现数据**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M604** `integrations/lol-history/src/lol_history/seraphine_deep_history_pipeline.py` — **Seraphine深度历史管线** ✅
+
+查看 **integrations/lol-history/src/lol_history/seraphine_history_orchestrator.py** 上现有 **M506-M524模块统一编排方式** 的实现方式，理解其模式，特别是register→initialize→run的生命周期如何与各子模块解耦。可以从 **`agentos/governance/data_pipeline.py`** 的add_stage→run→get_results链式调用开始。然后，遵循该模式实现一个新的 **SeraphineDeepHistoryPipeline**，让 **所有M586-M603模块** 可以 **通过统一管线接口处理match_history数据**，并能 **隔离模块故障、追踪每个模块耗时、缓存最新结果、通过evolution_callback上报管线事件**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M605** `integrations/lol-history/src/lol_history/history_driven_coaching_advisor.py` — **历史驱动教练顾问** ✅
+
+查看 **integrations/lol-history/src/lol_history/real_time_coaching_engine.py** 上现有 **教练模式** 的实现方式——它基于live state + historical context生成structured advice。可以从 **`decision_engine.py`** 的advantage→suggestion转换开始。然后，遵循该模式实现一个新的 **HistoryDrivenCoachingAdvisor**，让 **lol_agent_orchestrator** 可以 **在pregame/ingame/postgame三个阶段基于历史数据生成个性化教练建议**（pregame考虑连胜/疲劳/对位历史，ingame根据当前状态+历史模式调整，postgame识别改进方向），并能 **优先级排序确保最重要的建议排在前面**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+### 阶段 AS: 历史数据到在线学习的闭环 — 数据回流与持续优化（M606-M625）
+
+下一阶段将聚焦：将历史分析数据转化为在线学习信号（M586-M605的输出→训练管线的输入），
+包括历史特征到训练数据的转换、赛后自动评估、策略漂移检测、对手建模持久化、
+英雄池推荐引擎、分段胜率追踪、对局复盘自动化、教练建议效果评估、以及全链路
+数据回流编排。
+
+---
+
+**M606** `integrations/lol-history/src/lol_history/history_to_training_exporter.py` — **历史数据到训练集导出器**
+
+查看 **integrations/lol-history/src/lol_history/historical_training_exporter.py** 上现有 **训练数据导出方式** 的实现方式，理解其模式，特别是match数据如何转换为(state, action, reward)三元组。可以从 **`historical_feature_vector_builder.py`（M602）** 这个好例子开始——它的register_feature→build_vector展示了raw data到fixed-dim vector的转换。然后，遵循该模式实现一个新的 **HistoryToTrainingExporter**，让 **agentlightning训练管线** 可以 **将M586-M605的分析结果批量导出为训练数据集**（state vectors + reward labels），并能 **按时间窗口/英雄/位置过滤、追踪导出统计**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M607** `integrations/lol-history/src/lol_history/postgame_auto_evaluator.py` — **赛后自动评估器**
+
+查看 **integrations/lol/src/lol_agent/post_game_analyzer.py** 上现有 **赛后分析方式** 的实现方式，理解其模式。可以从 **`history_driven_coaching_advisor.py`（M605）** 这个好例子开始——它的generate_postgame_advice展示了多维度赛后评估。然后，遵循该模式实现一个新的 **PostgameAutoEvaluator**，让 **postgame_evolution_pipeline** 可以 **自动对比AI建议vs实际执行的偏差**（建议了什么、执行了什么、结果如何），并能 **将偏差数据回流训练管线用于策略校正**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M608** `integrations/lol-history/src/lol_history/strategy_drift_detector.py` — **策略漂移检测器**
+
+查看 **agentos/governance/fitness_aggregator.py** 上现有 **get_trend趋势分析方式** 的实现方式，理解其模式，特别是历史数据如何推断趋势方向。可以从 **`streak_momentum_analyzer.py`（M600）** 这个好例子开始——它的compute_momentum展示了指数衰减权重的趋势计算。然后，遵循该模式实现一个新的 **StrategyDriftDetector**，让 **evolution_orchestrator** 可以 **检测模型策略是否偏离了历史最优模式**（出装路径漂移、位置偏好变化、节奏风格变化），并能 **在检测到显著漂移时触发重新训练建议**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M609** `integrations/lol-history/src/lol_history/opponent_model_persistence.py` — **对手模型持久化**
+
+查看 **integrations/lol-history/src/lol_history/opponent_behavior_modeler.py** 上现有 **build_behavior_model方式** 的实现方式，理解其模式，特别是model如何从match list构建但不持久化。可以从 **`agentos/governance/model_versioner.py`** 这个好例子开始——它的save→load→list_versions展示了模型持久化的基本模式。然后，遵循该模式实现一个新的 **OpponentModelPersistence**，让 **opponent_model_tracker（M573）** 可以 **将对手行为模型序列化存储并在下次遇到同一对手时加载**，并能 **版本管理对手模型、追踪模型更新历史**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M610** `integrations/lol-history/src/lol_history/champion_pool_recommender.py` — **英雄池推荐引擎**
+
+查看 **integrations/lol-history/src/lol_history/champion_pool_tracker.py** 上现有 **英雄池追踪方式** 的实现方式，理解其模式。可以从 **`champion_winrate_matrix.py`（M588）** 这个好例子开始——它的get_top_champions + get_worst_matchups展示了英雄维度的强弱分析。然后，遵循该模式实现一个新的 **ChampionPoolRecommender**，让 **pregame_pipeline** 可以 **基于历史数据推荐应该练习的新英雄**（填补英雄池弱点、对位覆盖度、meta适应性），并能 **按位置给出具体推荐理由**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M611** `integrations/lol-history/src/lol_history/segmented_winrate_tracker.py` — **分段胜率追踪器**
+
+查看 **integrations/lol-history/src/lol_history/winrate_tracker.py** 上现有 **胜率追踪方式** 的实现方式，理解其模式。可以从 **`game_pace_analyzer.py`（M590）** 这个好例子开始——它的compute_pace_trend展示了时间序列的半分法趋势分析。然后，遵循该模式实现一个新的 **SegmentedWinrateTracker**，让 **M604管线** 可以 **按时间段（日/周/月/赛季）追踪胜率变化趋势**，并能 **检测胜率拐点、计算移动平均、生成胜率曲线数据**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M612** `integrations/lol-history/src/lol_history/replay_decision_auditor.py` — **对局复盘决策审计器**
+
+查看 **integrations/lol-history/src/lol_history/match_replay_analyzer.py** 上现有 **复盘分析方式** 的实现方式，理解其模式。可以从 **`history_driven_coaching_advisor.py`（M605）** 这个好例子开始——它的generate_ingame_advice展示了基于state的决策评估。然后，遵循该模式实现一个新的 **ReplayDecisionAuditor**，让 **postgame_evolution_pipeline** 可以 **逐帧回放游戏决策并与AI最优决策对比**，并能 **标注关键决策点（正确/错误/可优化）、生成决策审计报告**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M613** `integrations/lol-history/src/lol_history/coaching_effectiveness_tracker.py` — **教练建议效果评估器**
+
+查看 **integrations/lol-history/src/lol_history/history_driven_coaching_advisor.py（M605）** 上现有 **教练建议生成方式** 的实现方式，理解其模式。可以从 **`agentlightning/deployment/canary_metric_evaluator.py`（M584）** 这个好例子开始——它的multi-signal评估展示了多维度效果评估。然后，遵循该模式实现一个新的 **CoachingEffectivenessTracker**，让 **evolution_orchestrator** 可以 **追踪教练建议的实际效果**（给了某建议后玩家表现是否改善），并能 **基于效果数据优化建议权重、淘汰无效建议**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M614** `integrations/lol-history/src/lol_history/live_history_fusion_engine.py` — **实时-历史融合引擎**
+
+查看 **integrations/lol-history/src/lol_history/live_match_history_correlator.py** 上现有 **live state × history correlation方式** 的实现方式，理解其模式。可以从 **`extensions/protocol_decoder/src/dual_channel_fuser.py`** 这个好例子开始——它展示了双源数据实时融合。然后，遵循该模式实现一个新的 **LiveHistoryFusionEngine**，让 **推理管线** 可以 **将M586-M605的历史分析结果与实时游戏状态实时融合为增强特征向量**，并能 **动态调整历史特征权重（游戏越往后历史特征权重越低、实时特征权重越高）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M615** `integrations/lol-history/src/lol_history/game_event_pattern_library.py` — **游戏事件模式库**
+
+查看 **integrations/lol-history/src/lol_history/cross_game_pattern_miner.py** 上现有 **跨局模式挖掘方式** 的实现方式，理解其模式。可以从 **`comeback_pattern_detector.py`（M597）** 这个好例子开始——它的analyze_game展示了单局模式检测。然后，遵循该模式实现一个新的 **GameEventPatternLibrary**，让 **M604管线** 可以 **从历史数据中提取常见事件模式**（一血后的推塔节奏、龙魂后的团战频率、Baron后的推进路径），并能 **将模式存储为可查询的知识库供决策引擎使用**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M616** `integrations/lol-history/src/lol_history/elo_progression_tracker.py` — **Elo/段位进度追踪器**
+
+查看 **integrations/lol-history/src/lol_history/rank_tier_resolver.py** 上现有 **段位解析方式** 的实现方式，理解其模式。可以从 **`segmented_winrate_tracker.py`（M611）** 这个好例子开始——它的时间序列追踪展示了趋势分析基础。然后，遵循该模式实现一个新的 **EloProgressionTracker**，让 **M604管线** 可以 **追踪Elo/LP/段位随时间的变化曲线**，并能 **预测到达目标段位需要的局数、检测段位瓶颈期**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M617** `integrations/lol-history/src/lol_history/historical_reward_reshaper.py` — **历史奖励重塑器**
+
+查看 **integrations/lol/src/lol_agent/reward_shaper.py** 上现有 **compute_reward多维度评分方式** 的实现方式，理解其模式，特别是win/kda/cs/vision四维如何加权聚合为composite reward。可以从 **`gold_efficiency_tracker.py`（M595）** 这个好例子开始——它的多维度效率评估展示了加权聚合。然后，遵循该模式实现一个新的 **HistoricalRewardReshaper**，让 **训练管线** 可以 **基于历史数据动态调整reward shaping权重**（历史数据中哪个维度与胜率相关性最高就加大其权重），并能 **生成自适应的reward config供下一轮训练使用**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M618** `integrations/lol-history/src/lol_history/patch_adaptation_analyzer.py` — **版本适应分析器**
+
+查看 **integrations/lol-history/src/lol_history/meta_shift_tracker.py** 上现有 **meta变化追踪方式** 的实现方式，理解其模式。可以从 **`patch_timeline.py`** 这个好例子开始——它展示了版本时间线数据的结构。然后，遵循该模式实现一个新的 **PatchAdaptationAnalyzer**，让 **M604管线** 可以 **分析玩家在版本更新后的适应速度**（新版本前后胜率对比、英雄池调整速度、出装路径更新速度），并能 **在新版本发布时主动提示需要调整的策略**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M619** `integrations/lol-history/src/lol_history/team_synergy_evolution_tracker.py` — **团队协作进化追踪器**
+
+查看 **integrations/lol-history/src/lol_history/team_synergy_scorer.py** 上现有 **团队协作评分方式** 的实现方式，理解其模式。可以从 **`ban_pick_intelligence.py`（M598）** 这个好例子开始——它的get_pick_synergy展示了双英雄协同分析。然后，遵循该模式实现一个新的 **TeamSynergyEvolutionTracker**，让 **M604管线** 可以 **追踪与常见队友的协同表现变化趋势**（特定双人组合胜率、团队配合改善/退化），并能 **推荐最佳队友组合**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M620** `integrations/lol-history/src/lol_history/historical_action_space_profiler.py` — **历史动作空间画像器**
+
+查看 **integrations/lol/src/lol_agent/action_space_mapper.py** 上现有 **动作空间映射方式** 的实现方式，理解其模式。可以从 **`item_build_path_analyzer.py`（M591）** 这个好例子开始——它展示了决策序列（出装路径）的统计分析。然后，遵循该模式实现一个新的 **HistoricalActionSpaceProfiler**，让 **训练管线** 可以 **从历史数据中画像玩家的实际动作分布**（哪些动作经常做、哪些几乎不做），并能 **用于训练时的动作空间裁剪（排除历史上从未选择的动作以加速收敛）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M621** `integrations/lol-history/src/lol_history/loss_pattern_classifier.py` — **失败模式分类器**
+
+查看 **integrations/lol-history/src/lol_history/opponent_behavior_modeler.py** 上现有 **classify_playstyle多维分类方式** 的实现方式，理解其模式。可以从 **`comeback_pattern_detector.py`（M597）** 这个好例子开始——它的analyze_game展示了单局结果分类。然后，遵循该模式实现一个新的 **LossPatternClassifier**，让 **M604管线** 可以 **将输掉的游戏分类为不同失败模式**（被solo kill连杀、团战失利、对线崩盘、后期决策失误、vision不足被gank），并能 **统计各失败模式频率帮助针对性训练**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M622** `integrations/lol-history/src/lol_history/objective_control_analyzer.py` — **资源控制分析器**
+
+查看 **integrations/lol-history/src/lol_history/objective_priority_engine.py** 上现有 **资源优先级计算方式** 的实现方式，理解其模式。可以从 **`game_timeline_analyzer.py`** 的detect_gold_swings开始——资源争夺往往伴随金差变化。然后，遵循该模式实现一个新的 **ObjectiveControlAnalyzer**，让 **M604管线** 可以 **分析历史对局中的资源控制表现**（龙、峡谷先锋、Baron的争夺胜率和时机），并能 **识别资源控制的弱点维度**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M623** `integrations/lol-history/src/lol_history/historical_alert_engine.py` — **历史数据告警引擎**
+
+查看 **agentlightning/inference/latency_monitor.py（M548）** 上现有 **阈值告警+冷却去重方式** 的实现方式，理解其模式。可以从 **`playtime_fatigue_detector.py`（M601）** 这个好例子开始——它的detect_fatigue展示了多条件告警。然后，遵循该模式实现一个新的 **HistoricalAlertEngine**，让 **M604管线** 可以 **基于历史数据变化自动触发告警**（连败告警、胜率异常下降、段位回退、新英雄初次上手），并能 **支持告警规则注册、冷却间隔去重、evolution_callback通知**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M624** `integrations/lol-history/src/lol_history/history_data_quality_checker.py` — **历史数据质量检查器**
+
+查看 **agentlightning/inference/game_state_preprocessor.py（M553）** 上现有 **schema验证和异常追踪方式** 的实现方式，理解其模式。可以从 **`match_detail_deep_parser.py`（M587）** 这个好例子开始——它的容错解析展示了缺失字段处理。然后，遵循该模式实现一个新的 **HistoryDataQualityChecker**，让 **M604管线** 可以 **在处理前验证match history数据质量**（schema检查、字段完整性、数值范围合理性、时间戳一致性），并能 **生成数据质量报告、标记可疑数据供人工审查**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M625** `integrations/lol-history/src/lol_history/history_feedback_loop_orchestrator.py` — **历史数据反馈闭环编排器**
+
+查看 **integrations/lol-history/src/lol_history/seraphine_deep_history_pipeline.py（M604）** 上现有 **管线编排方式** 的实现方式，理解其模式。可以从 **`agentlightning/deployment/deployment_orchestrator.py`（M565）** 这个好例子开始——它的step→rollback链展示了全流程编排。然后，遵循该模式实现一个新的 **HistoryFeedbackLoopOrchestrator**，让 **整个历史数据反馈闭环** 可以 **通过一个入口完成从数据采集→分析→特征化→训练导出→效果评估的全流程**（支持步骤链注册、失败重试、部分结果缓存），并能 **追踪每次闭环执行的耗时和成功率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
