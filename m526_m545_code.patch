@@ -1,0 +1,1136 @@
+diff --git a/agentlightning/inference/__init__.py b/agentlightning/inference/__init__.py
+index 084ae6a9..d36759fe 100644
+--- a/agentlightning/inference/__init__.py
++++ b/agentlightning/inference/__init__.py
+@@ -1 +1 @@
+-"""Inference pipeline modules for agentlightning."""
++# agentlightning/inference — Inference-time components
+diff --git a/agentlightning/inference/action_sampler.py b/agentlightning/inference/action_sampler.py
+new file mode 100644
+index 00000000..3dda8fdf
+--- /dev/null
++++ b/agentlightning/inference/action_sampler.py
+@@ -0,0 +1,52 @@
++"""Action Sampler — greedy/temperature/topk/beam. Ref: dota2bot Consider*Action, decision_engine.py"""
++from __future__ import annotations
++import logging, math, random, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.inference.action_sampler.v1"
++def _softmax(logits: List[float], temp: float = 1.0) -> List[float]:
++    if temp <= 0: temp = 1e-8
++    sc = [x/temp for x in logits]; mx = max(sc); exps = [math.exp(s-mx) for s in sc]; t = sum(exps) or 1.0; return [e/t for e in exps]
++
++class ActionSampler:
++    def __init__(self, mode: str = "greedy", temperature: float = 1.0, top_k: int = 5, beam_width: int = 3) -> None:
++        self.mode = mode; self.temperature = temperature; self.top_k = top_k; self.beam_width = beam_width
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def sample(self, logits: List[float]) -> int:
++        if not logits: raise ValueError("Cannot sample from empty logits")
++        if self.mode == "greedy": a = max(range(len(logits)), key=lambda i: logits[i])
++        elif self.mode == "temperature": a = self._temp(logits)
++        elif self.mode == "topk": a = self._topk(logits)
++        else: a = max(range(len(logits)), key=lambda i: logits[i])
++        self._fire({"event": "action_sampled", "mode": self.mode, "action": a}); return a
++    def _temp(self, logits: List[float]) -> int:
++        probs = _softmax(logits, self.temperature); r = random.random(); c = 0.0
++        for i, p in enumerate(probs):
++            c += p
++            if c >= r: return i
++        return len(probs)-1
++    def _topk(self, logits: List[float]) -> int:
++        indexed = sorted(enumerate(logits), key=lambda x: -x[1]); top = indexed[:self.top_k]
++        tl = [x[1] for x in top]; ti = [x[0] for x in top]; probs = _softmax(tl, self.temperature); r = random.random(); c = 0.0
++        for i, p in enumerate(probs):
++            c += p
++            if c >= r: return ti[i]
++        return ti[-1]
++    def beam_search(self, logits_seq: List[List[float]]) -> List[int]:
++        if not logits_seq: return []
++        beams = [(0.0, [])]
++        for logits in logits_seq:
++            cands = []; probs = _softmax(logits, self.temperature)
++            for sc, seq in beams:
++                for i, p in enumerate(probs): cands.append((sc+math.log(p+1e-10), seq+[i]))
++            cands.sort(key=lambda x: -x[0]); beams = cands[:self.beam_width]
++        return beams[0][1] if beams else []
++    def set_mode(self, mode: str, **kw: Any) -> None:
++        self.mode = mode
++        if "temperature" in kw: self.temperature = kw["temperature"]
++        if "top_k" in kw: self.top_k = kw["top_k"]
++    def get_probabilities(self, logits: List[float], temperature: float = 1.0) -> List[float]: return _softmax(logits, temperature)
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/inference/attention_mechanism.py b/agentlightning/inference/attention_mechanism.py
+new file mode 100644
+index 00000000..83dab974
+--- /dev/null
++++ b/agentlightning/inference/attention_mechanism.py
+@@ -0,0 +1,44 @@
++"""Attention Mechanism — Multi-head + explain. Ref: DI-star Transformer, state_encoder.py"""
++from __future__ import annotations
++import logging, math, time
++from typing import Any, Callable, Dict, List, Optional, Tuple
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.inference.attention_mechanism.v1"
++def _sv(scores):
++    if not scores: return []
++    mx = max(scores); exps = [math.exp(s-mx) for s in scores]; t = sum(exps) or 1.0; return [e/t for e in exps]
++
++class AttentionMechanism:
++    def __init__(self, embed_dim: int = 64, num_heads: int = 4) -> None:
++        self.embed_dim = embed_dim; self.num_heads = num_heads; self._last_weights = None
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def forward(self, queries, keys, values) -> Tuple[List[List[float]], List[List[float]]]:
++        if not queries or not keys or not values: raise ValueError("Empty input")
++        qd = len(queries[0])
++        if qd % self.num_heads != 0: raise ValueError(f"embed_dim {qd} not divisible by num_heads {self.num_heads}")
++        hd = qd // self.num_heads; scale = math.sqrt(hd) or 1.0; nq, nk = len(queries), len(keys)
++        ao = [[0.0]*qd for _ in range(nq)]; aw = [[0.0]*nk for _ in range(nq)]
++        for h in range(self.num_heads):
++            lo = h*hd
++            for qi in range(nq):
++                scores = [sum(queries[qi][lo+d]*keys[ki][lo+d] for d in range(hd))/scale for ki in range(nk)]
++                wts = _sv(scores)
++                for ki in range(nk):
++                    aw[qi][ki] += wts[ki]/self.num_heads
++                    for d in range(hd): ao[qi][lo+d] += wts[ki]*values[ki][lo+d]
++        self._last_weights = aw; self._fire({"event": "attention_computed", "num_queries": nq}); return ao, aw
++    def get_attention_map(self): return self._last_weights
++    def explain(self, element_names=None) -> str:
++        if self._last_weights is None: return "No attention computed yet"
++        if element_names is None: element_names = [f"element_{i}" for i in range(len(self._last_weights[0]))]
++        lines = []
++        for qi, w in enumerate(self._last_weights):
++            ranked = sorted(zip(element_names, w), key=lambda x: -x[1])[:3]
++            lines.append(f"Query {qi}: focus on " + ", ".join(f"{n}({v:.2f})" for n, v in ranked))
++        return "; ".join(lines)
++    def save_checkpoint(self): return {"embed_dim": self.embed_dim, "num_heads": self.num_heads}
++    def load_checkpoint(self, ckpt): self.embed_dim = ckpt.get("embed_dim", self.embed_dim); self.num_heads = ckpt.get("num_heads", self.num_heads)
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
+diff --git a/agentlightning/inference/decision_tree_fallback.py b/agentlightning/inference/decision_tree_fallback.py
+new file mode 100644
+index 00000000..16c97ca2
+--- /dev/null
++++ b/agentlightning/inference/decision_tree_fallback.py
+@@ -0,0 +1,36 @@
++"""Decision Tree Fallback — Rule-based when NN confidence low. Ref: dota2bot hero_axe.lua, decision_engine.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.inference.decision_tree_fallback.v1"
++
++class DecisionTreeFallback:
++    def __init__(self, confidence_threshold: float = 0.5) -> None:
++        self.confidence_threshold = confidence_threshold; self.rules: List[Dict[str, Any]] = []; self._fallback_log: List[Dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def add_rule(self, name: str, condition, action: str, priority: int = 0) -> None:
++        self.rules.append({"name": name, "condition": condition, "action": action, "priority": priority}); self.rules.sort(key=lambda r: -r["priority"])
++    def remove_rule(self, name: str) -> None: self.rules = [r for r in self.rules if r["name"] != name]
++    def maybe_fallback(self, state: Dict[str, Any], nn_confidence: float) -> Dict[str, Any]:
++        if nn_confidence >= self.confidence_threshold: return {"triggered": False, "action": None, "rule": None}
++        for rule in self.rules:
++            try:
++                if rule["condition"](state):
++                    entry = {"state": dict(state), "nn_confidence": nn_confidence, "rule": rule["name"], "action": rule["action"], "timestamp": time.time()}
++                    self._fallback_log.append(entry)
++                    self._fire({"event": "fallback_triggered", "rule": rule["name"], "confidence": nn_confidence})
++                    return {"triggered": True, "action": rule["action"], "rule": rule["name"]}
++            except Exception as e: logger.warning("Rule '%s' error: %s", rule["name"], e)
++        return {"triggered": False, "action": None, "rule": None}
++    def get_fallback_log(self): return list(self._fallback_log)
++    def get_blind_spots(self):
++        if not self._fallback_log: return []
++        rc: Dict[str, int] = {}; rs: Dict[str, List] = {}
++        for e in self._fallback_log:
++            r = e.get("rule", "unknown"); rc[r] = rc.get(r,0)+1; rs.setdefault(r, []).append(e["state"])
++        return [{"rule": r, "trigger_count": c, "sample_states": rs[r][:5]} for r, c in rc.items() if c >= 1]
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
+diff --git a/agentlightning/inference/model_ensemble.py b/agentlightning/inference/model_ensemble.py
+new file mode 100644
+index 00000000..a54e166b
+--- /dev/null
++++ b/agentlightning/inference/model_ensemble.py
+@@ -0,0 +1,49 @@
++"""Model Ensemble — Vote/weighted_avg fusion. Ref: Akagi mjai_bot, adapter/base.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.inference.model_ensemble.v1"
++
++class ModelEnsemble:
++    def __init__(self, fusion: str = "weighted_avg") -> None:
++        self.fusion = fusion; self._models: Dict[str, Dict[str, Any]] = {}; self._performance: Dict[str, List[float]] = {}; self._last_contributions: Dict[str, List[float]] = {}
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def model_count(self) -> int: return len(self._models)
++    def add_model(self, mid: str, predict_fn, weight: float = 1.0) -> None: self._models[mid] = {"predict_fn": predict_fn, "weight": weight}; self._performance[mid] = []
++    def remove_model(self, mid: str) -> None: self._models.pop(mid, None); self._performance.pop(mid, None)
++    def list_models(self) -> List[str]: return list(self._models.keys())
++    def get_weight(self, mid: str) -> float: return self._models.get(mid, {}).get("weight", 0.0)
++    def predict(self, state: Any) -> List[float]:
++        if not self._models: raise ValueError("No models in ensemble")
++        outputs = {}
++        for mid, info in self._models.items():
++            try: outputs[mid] = info["predict_fn"](state)
++            except: pass
++        if not outputs: raise ValueError("All models failed")
++        if self.fusion == "vote": result = self._vote(outputs)
++        else: result = self._wavg(outputs)
++        self._last_contributions = dict(outputs); self._fire({"event": "ensemble_predict", "models_used": len(outputs)}); return result
++    def _vote(self, outputs):
++        dim = len(next(iter(outputs.values()))); avg = [0.0]*dim
++        for o in outputs.values():
++            for i in range(min(dim,len(o))): avg[i] += o[i]
++        return [v/len(outputs) for v in avg]
++    def _wavg(self, outputs):
++        dim = len(next(iter(outputs.values()))); r = [0.0]*dim; tw = 0.0
++        for mid, o in outputs.items():
++            w = self._models[mid]["weight"]; tw += w
++            for i in range(min(dim,len(o))): r[i] += o[i]*w
++        return [v/tw for v in r] if tw > 0 else r
++    def record_performance(self, mid: str, score: float) -> None:
++        if mid in self._performance: self._performance[mid].append(score)
++    def update_weights_from_performance(self) -> None:
++        for mid in self._models:
++            sc = self._performance.get(mid, [])
++            if sc: self._models[mid]["weight"] = max(sum(sc[-10:])/len(sc[-10:]), 0.01)
++    def get_contributions(self): return dict(self._last_contributions)
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
+diff --git a/agentlightning/inference/state_encoder_network.py b/agentlightning/inference/state_encoder_network.py
+new file mode 100644
+index 00000000..6bde4e55
+--- /dev/null
++++ b/agentlightning/inference/state_encoder_network.py
+@@ -0,0 +1,67 @@
++"""State Encoder Network — numeric/categorical/sequence. Ref: DI-star model.py, state_encoder.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.inference.state_encoder_network.v1"
++
++class StateEncoderNetwork:
++    def __init__(self, output_dim: int = 64) -> None:
++        self.output_dim = output_dim; self.features: Dict[str, Dict[str, Any]] = {}
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def register_feature(self, name: str, ftype: str = "numeric", input_dim: int = 1, num_categories: int = 10, seq_dim: int = 4) -> None:
++        if ftype == "numeric":
++            w = [[0.01*((i*7+j*13)%17-8)/8.0 for j in range(self.output_dim)] for i in range(input_dim)]
++            self.features[name] = {"ftype": ftype, "input_dim": input_dim, "weights": w}
++        elif ftype == "categorical":
++            t = [[0.01*((i*11+j*3)%19-9)/9.0 for j in range(self.output_dim)] for i in range(num_categories)]
++            self.features[name] = {"ftype": ftype, "num_categories": num_categories, "table": t}
++        elif ftype == "sequence":
++            w = [[0.01*((i*5+j*7)%13-6)/6.0 for j in range(self.output_dim)] for i in range(seq_dim)]
++            self.features[name] = {"ftype": ftype, "seq_dim": seq_dim, "weights": w}
++    def encode(self, state: Dict[str, Any]) -> List[float]:
++        if not self.features: raise ValueError("No features registered")
++        if not state: raise ValueError("Empty state")
++        emb = [0.0]*self.output_dim; count = 0
++        for name, value in state.items():
++            if name not in self.features: continue
++            f = self.features[name]; ft = f["ftype"]
++            if ft == "numeric": sub = self._enc_num(value, f["weights"])
++            elif ft == "categorical": sub = self._enc_cat(value, f["table"])
++            elif ft == "sequence": sub = self._enc_seq(value, f["weights"])
++            else: continue
++            for i in range(self.output_dim): emb[i] += sub[i]
++            count += 1
++        if count > 0: emb = [v/count for v in emb]
++        self._fire({"event": "state_encoded", "features_used": count}); return emb
++    def _enc_num(self, values, weights):
++        if not isinstance(values, list): values = [values]
++        r = [0.0]*self.output_dim
++        for i, v in enumerate(values):
++            if i < len(weights):
++                for j in range(self.output_dim): r[j] += float(v)*weights[i][j]
++        return r
++    def _enc_cat(self, value, table): return list(table[int(value) % len(table)])
++    def _enc_seq(self, values, weights):
++        if not isinstance(values, list) or not values: return [0.0]*self.output_dim
++        sl = len(values); dim = len(values[0]) if isinstance(values[0], list) else 1; avg = [0.0]*dim
++        for step in values:
++            if isinstance(step, list):
++                for k in range(min(dim, len(step))): avg[k] += step[k]
++            else: avg[0] += float(step)
++        avg = [v/sl for v in avg]; r = [0.0]*self.output_dim
++        for i in range(min(dim, len(weights))):
++            for j in range(self.output_dim): r[j] += avg[i]*weights[i][j]
++        return r
++    def detect_feature_type(self, value: Any) -> str:
++        if isinstance(value, int): return "categorical"
++        if isinstance(value, list):
++            if value and isinstance(value[0], list): return "sequence"
++            return "numeric"
++        return "numeric"
++    def save_checkpoint(self) -> Dict[str, Any]: return {"output_dim": self.output_dim, "features": dict(self.features)}
++    def load_checkpoint(self, ckpt: Dict[str, Any]) -> None: self.output_dim = ckpt.get("output_dim", self.output_dim); self.features = dict(ckpt.get("features", {}))
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/trainer/curriculum_learning_engine.py b/agentlightning/trainer/curriculum_learning_engine.py
+new file mode 100644
+index 00000000..20707469
+--- /dev/null
++++ b/agentlightning/trainer/curriculum_learning_engine.py
+@@ -0,0 +1,39 @@
++"""Curriculum Learning Engine — Difficulty progression with retreat. Ref: curriculum_manager.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.curriculum_learning_engine.v1"
++
++class CurriculumLearningEngine:
++    def __init__(self, retreat_window: int = 3, retreat_threshold: float = 0.3) -> None:
++        self.current_level: int = 0; self.retreat_window = retreat_window; self.retreat_threshold = retreat_threshold
++        self._levels: List[Dict[str, Any]] = []; self._performance_history: List[Dict[str, Any]] = []; self._consecutive_low: int = 0
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def level_count(self) -> int: return len(self._levels)
++    def register_level(self, index: int, name: str, threshold: float, **cfg: Any) -> None:
++        entry = {"index": index, "name": name, "threshold": threshold}; entry.update(cfg)
++        while len(self._levels) <= index: self._levels.append({})
++        self._levels[index] = entry
++    def evaluate_and_advance(self, performance: float) -> None:
++        self._performance_history.append({"performance": performance, "level": self.current_level, "timestamp": time.time()})
++        if performance < self.retreat_threshold: self._consecutive_low += 1
++        else: self._consecutive_low = 0
++        if self._consecutive_low >= self.retreat_window and self.current_level > 0:
++            self.current_level -= 1; self._consecutive_low = 0
++            self._fire({"event": "level_retreated", "current_level": self.current_level}); return
++        if self.current_level < len(self._levels):
++            thr = self._levels[self.current_level].get("threshold", 1.0)
++            if performance >= thr and self.current_level < len(self._levels) - 1:
++                self.current_level += 1; self._consecutive_low = 0
++                self._fire({"event": "level_advanced", "current_level": self.current_level})
++    def get_current_config(self) -> Dict[str, Any]:
++        if not self._levels or self.current_level >= len(self._levels): return {}
++        return dict(self._levels[self.current_level])
++    def generate_progress_report(self) -> Dict[str, Any]:
++        return {"current_level": self.current_level, "total_levels": len(self._levels), "history": list(self._performance_history[-20:]), "consecutive_low": self._consecutive_low}
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/trainer/experience_replay_manager.py b/agentlightning/trainer/experience_replay_manager.py
+new file mode 100644
+index 00000000..55d80c67
+--- /dev/null
++++ b/agentlightning/trainer/experience_replay_manager.py
+@@ -0,0 +1,55 @@
++"""Experience Replay Manager — PER + HER. Ref: experience_store.py, DI-star data_helper.py"""
++from __future__ import annotations
++import logging, random, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.experience_replay_manager.v1"
++
++class ExperienceReplayManager:
++    def __init__(self, capacity: int = 10000, alpha: float = 0.6, beta: float = 0.4) -> None:
++        self.capacity = capacity; self.alpha = alpha; self.beta = beta
++        self._buffer: List[Dict[str, Any]] = []; self._priorities: List[float] = []
++        self._max_priority: float = 1.0; self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def __len__(self) -> int: return len(self._buffer)
++    def add(self, state: Any, action: Any, reward: float, next_state: Any, done: bool, td_error: float = 1.0, **extra: Any) -> None:
++        entry = {"state": state, "action": action, "reward": reward, "next_state": next_state, "done": done, "td_error": abs(td_error), **extra}
++        priority = (abs(td_error) + 1e-6) ** self.alpha
++        if len(self._buffer) >= self.capacity: self._buffer.pop(0); self._priorities.pop(0)
++        self._buffer.append(entry); self._priorities.append(priority)
++        self._max_priority = max(self._max_priority, priority)
++        self._fire({"event": "experience_added", "size": len(self._buffer)})
++    def prioritized_sample(self, batch_size: int) -> List[Dict[str, Any]]:
++        if not self._buffer: return []
++        n = min(batch_size, len(self._buffer)); total_p = sum(self._priorities)
++        if total_p <= 0: return random.sample(self._buffer, n)
++        probs = [p / total_p for p in self._priorities]; indices = []
++        for _ in range(n):
++            r = random.random(); cumsum = 0.0
++            for i, p in enumerate(probs):
++                cumsum += p
++                if cumsum >= r: indices.append(i); break
++            else: indices.append(len(probs) - 1)
++        return [self._buffer[i] for i in indices]
++    def uniform_sample(self, batch_size: int) -> List[Dict[str, Any]]:
++        n = min(batch_size, len(self._buffer)); return random.sample(self._buffer, n) if n else []
++    def update_priority(self, index: int, new_td_error: float) -> None:
++        if 0 <= index < len(self._buffer):
++            self._buffer[index]["td_error"] = abs(new_td_error)
++            self._priorities[index] = (abs(new_td_error) + 1e-6) ** self.alpha
++            self._max_priority = max(self._max_priority, self._priorities[index])
++    def get_priority(self, index: int) -> float: return self._priorities[index] if 0 <= index < len(self._priorities) else 0.0
++    def her_relabel(self, trajectory: List[Dict[str, Any]], achieved_goal: str, success_reward: float = 1.0) -> List[Dict[str, Any]]:
++        relabeled = []
++        for i, step in enumerate(trajectory):
++            ns = dict(step); ns["goal"] = achieved_goal
++            if i == len(trajectory) - 1: ns["reward"] = success_reward
++            relabeled.append(ns)
++        return relabeled
++    def get_statistics(self) -> Dict[str, Any]:
++        if not self._buffer: return {"size": 0, "mean_td_error": 0.0, "max_td_error": 0.0}
++        td = [e["td_error"] for e in self._buffer]
++        return {"size": len(self._buffer), "mean_td_error": sum(td)/len(td), "max_td_error": max(td), "min_td_error": min(td)}
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as exc: logger.warning("cb err: %s", exc)
+diff --git a/agentlightning/trainer/imitation_learning_pipeline.py b/agentlightning/trainer/imitation_learning_pipeline.py
+new file mode 100644
+index 00000000..68a3f5a1
+--- /dev/null
++++ b/agentlightning/trainer/imitation_learning_pipeline.py
+@@ -0,0 +1,48 @@
++"""Imitation Learning Pipeline — BC + DAgger. Ref: DI-star replay_decoder.py, distar_adapter.py"""
++from __future__ import annotations
++import logging, random, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.imitation_learning_pipeline.v1"
++
++class ImitationLearningPipeline:
++    def __init__(self, mode: str = "bc", lr: float = 1e-3, initial_mix_ratio: float = 1.0, decay_rate: float = 0.05) -> None:
++        self.mode = mode; self.lr = lr; self.initial_mix_ratio = initial_mix_ratio; self.current_mix_ratio = initial_mix_ratio; self.decay_rate = decay_rate
++        self.global_step: int = 0; self._total_loss: float = 0.0; self._expert_trajectories: List[List[Dict[str, Any]]] = []
++        self._weights: List[float] = []; self._initialized: bool = False; self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def expert_count(self) -> int: return len(self._expert_trajectories)
++    def add_expert_trajectory(self, traj: List[Dict[str, Any]]) -> None: self._expert_trajectories.append(traj)
++    def extract_features(self, raw: Dict[str, Any]) -> Dict[str, Any]: return {"state": raw.get("state", []), "action": raw.get("action", 0)}
++    def train_step(self) -> Dict[str, Any]:
++        if not self._expert_trajectories: raise ValueError("No expert trajectories")
++        pairs = [self.extract_features(s) for t in self._expert_trajectories for s in t]
++        if not pairs: return {"loss": 0.0, "step": self.global_step}
++        batch = random.sample(pairs, min(32, len(pairs))); loss = 0.0
++        for p in batch:
++            s, a = p["state"], p["action"]
++            if not self._initialized and s:
++                d = len(s) if isinstance(s, list) else 1; self._weights = [0.01]*d; self._initialized = True
++            pred = sum(w*x for w, x in zip(self._weights, s)) if self._initialized and isinstance(s, list) else 0.0
++            loss += (pred - float(a))**2
++        loss /= max(len(batch), 1)
++        if self._initialized:
++            for p in batch:
++                s, a = p["state"], p["action"]
++                if isinstance(s, list):
++                    pred = sum(w*x for w, x in zip(self._weights, s)); err = pred - float(a)
++                    for j in range(len(self._weights)):
++                        if j < len(s): self._weights[j] -= self.lr * 2 * err * s[j] / len(batch)
++        if self.mode == "dagger": self.current_mix_ratio = max(0.0, self.current_mix_ratio - self.decay_rate)
++        self.global_step += 1; self._total_loss += loss
++        metrics = {"loss": loss, "step": self.global_step, "mode": self.mode, "mix_ratio": self.current_mix_ratio}
++        self._fire({"event": "train_step", **metrics}); return metrics
++    def save_checkpoint(self) -> Dict[str, Any]:
++        return {"global_step": self.global_step, "mode": self.mode, "lr": self.lr, "mix_ratio": self.current_mix_ratio, "weights": list(self._weights), "total_loss": self._total_loss}
++    def load_checkpoint(self, ckpt: Dict[str, Any]) -> None:
++        self.global_step = ckpt.get("global_step",0); self.mode = ckpt.get("mode",self.mode); self._weights = list(ckpt.get("weights",[])); self._total_loss = ckpt.get("total_loss",0.0); self._initialized = bool(self._weights)
++    def get_metrics(self) -> Dict[str, Any]: return {"global_step": self.global_step, "mode": self.mode, "avg_loss": self._total_loss/max(self.global_step,1)}
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/trainer/meta_learning_optimizer.py b/agentlightning/trainer/meta_learning_optimizer.py
+new file mode 100644
+index 00000000..c40981f3
+--- /dev/null
++++ b/agentlightning/trainer/meta_learning_optimizer.py
+@@ -0,0 +1,61 @@
++"""Meta-Learning Optimizer — MAML/Reptile. Ref: DI-star rl_learner.py optimizer, lol_trainer.py"""
++from __future__ import annotations
++import logging, math, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.meta_learning_optimizer.v1"
++
++class MetaLearningOptimizer:
++    def __init__(self, mode: str = "maml", inner_steps: int = 5, inner_lr: float = 0.01, meta_lr: float = 0.001) -> None:
++        self.mode = mode; self.inner_steps = inner_steps; self.inner_lr = inner_lr; self.meta_lr = meta_lr
++        self._meta_params: Dict[str, List[float]] = {}; self.tasks: Dict[str, List[Dict[str, Any]]] = {}
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def set_meta_params(self, params: Dict[str, List[float]]) -> None: self._meta_params = {k: list(v) for k, v in params.items()}
++    def get_meta_params(self) -> Dict[str, List[float]]: return {k: list(v) for k, v in self._meta_params.items()}
++    def register_task(self, name: str, data: List[Dict[str, Any]]) -> None: self.tasks[name] = data
++    def inner_adapt(self, task_name: str) -> Dict[str, List[float]]:
++        if task_name not in self.tasks: return dict(self._meta_params)
++        data = self.tasks[task_name]; adapted = {k: list(v) for k, v in self._meta_params.items()}
++        for _ in range(self.inner_steps):
++            for sample in data:
++                s = sample.get("s", sample.get("state", [0.0])); r = sample.get("r", sample.get("reward", 0.0))
++                if not isinstance(s, list): s = [s]
++                for key in adapted:
++                    for i in range(len(adapted[key])):
++                        si = s[i % len(s)] if s else 0.0; adapted[key][i] -= self.inner_lr * (-r * si * 0.1)
++        return adapted
++    def meta_update(self, task_names: List[str]) -> Dict[str, Any]:
++        if not task_names or not self._meta_params: return {"meta_loss": 0.0}
++        if self.mode == "maml": return self._maml(task_names)
++        elif self.mode == "reptile": return self._reptile(task_names)
++        return {"meta_loss": 0.0}
++    def _maml(self, tasks: List[str]) -> Dict[str, Any]:
++        mg = {k: [0.0]*len(v) for k, v in self._meta_params.items()}; tl = 0.0
++        for t in tasks:
++            ad = self.inner_adapt(t)
++            for k in self._meta_params:
++                for i in range(len(self._meta_params[k])): d = ad[k][i]-self._meta_params[k][i]; mg[k][i] += d; tl += d**2
++        n = max(len(tasks),1)
++        for k in self._meta_params:
++            for i in range(len(self._meta_params[k])): self._meta_params[k][i] += self.meta_lr * mg[k][i] / n
++        m = {"meta_loss": tl/n, "tasks": len(tasks)}; self._fire({"event": "meta_update", **m}); return m
++    def _reptile(self, tasks: List[str]) -> Dict[str, Any]:
++        tl = 0.0
++        for t in tasks:
++            ad = self.inner_adapt(t)
++            for k in self._meta_params:
++                for i in range(len(self._meta_params[k])): d = ad[k][i]-self._meta_params[k][i]; self._meta_params[k][i] += self.meta_lr*d; tl += d**2
++        n = max(len(tasks),1); m = {"meta_loss": tl/n, "tasks": len(tasks)}; self._fire({"event": "meta_update", **m}); return m
++    def adaptation_distance(self, task_name: str) -> float:
++        ad = self.inner_adapt(task_name); d = 0.0
++        for k in self._meta_params:
++            for i in range(len(self._meta_params[k])): d += (ad[k][i]-self._meta_params[k][i])**2
++        return math.sqrt(d)
++    def save_checkpoint(self) -> Dict[str, Any]: return {"mode": self.mode, "inner_steps": self.inner_steps, "inner_lr": self.inner_lr, "meta_lr": self.meta_lr, "meta_params": {k: list(v) for k, v in self._meta_params.items()}}
++    def load_checkpoint(self, ckpt: Dict[str, Any]) -> None:
++        self.mode = ckpt.get("mode",self.mode); self.inner_steps = ckpt.get("inner_steps",self.inner_steps); self.inner_lr = ckpt.get("inner_lr",self.inner_lr); self.meta_lr = ckpt.get("meta_lr",self.meta_lr)
++        self._meta_params = {k: list(v) for k, v in ckpt.get("meta_params",{}).items()}
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/trainer/multi_agent_coordinator.py b/agentlightning/trainer/multi_agent_coordinator.py
+new file mode 100644
+index 00000000..ae82d5e4
+--- /dev/null
++++ b/agentlightning/trainer/multi_agent_coordinator.py
+@@ -0,0 +1,38 @@
++"""Multi-Agent Coordinator — Team coordination for 5v5. Ref: self_play_scheduler.py, evolution_orchestrator.py"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.multi_agent_coordinator.v1"
++
++class MultiAgentCoordinator:
++    def __init__(self) -> None:
++        self._agents: Dict[str, Dict[str, Any]] = {}; self._messages: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def agent_count(self) -> int: return len(self._agents)
++    def register_agent(self, agent_id: str, role: str = "UNKNOWN", **cfg: Any) -> None:
++        self._agents[agent_id] = {"role": role, "config": cfg, "registered_at": time.time()}; self._messages[agent_id] = []
++        self._fire({"event": "agent_registered", "agent_id": agent_id, "role": role})
++    def remove_agent(self, agent_id: str) -> None: self._agents.pop(agent_id, None); self._messages.pop(agent_id, None)
++    def get_role(self, agent_id: str) -> str: return self._agents.get(agent_id, {}).get("role", "UNKNOWN")
++    def list_roles(self) -> List[str]: return [a["role"] for a in self._agents.values()]
++    def broadcast(self, message: Dict[str, Any]) -> List[str]:
++        r = []
++        for aid in self._agents: self._messages[aid].append({"from": "_broadcast", "payload": message, "timestamp": time.time()}); r.append(aid)
++        return r
++    def send_message(self, from_agent: str, to_agent: str, message: Dict[str, Any]) -> None:
++        self._messages[to_agent].append({"from": from_agent, "payload": message, "timestamp": time.time()})
++    def get_messages(self, agent_id: str) -> List[Dict[str, Any]]:
++        msgs = list(self._messages.get(agent_id, [])); self._messages[agent_id] = []; return msgs
++    def select_joint_action(self, proposals: Dict[str, Dict[str, Any]]) -> Dict[str, str]:
++        return {aid: p.get("action", "wait") for aid, p in proposals.items()}
++    def distribute_reward(self, team_reward: float, contributions: Optional[Dict[str, float]] = None) -> Dict[str, float]:
++        if contributions is None: n = max(len(self._agents), 1); return {aid: team_reward/n for aid in self._agents}
++        tc = sum(contributions.values()) or 1.0; return {aid: team_reward*(contributions.get(aid,0.0)/tc) for aid in self._agents}
++    def get_team_state(self) -> Dict[str, Any]: return {"agents": [{"id": a, "role": i["role"]} for a, i in self._agents.items()], "agent_count": len(self._agents)}
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/trainer/policy_gradient_trainer.py b/agentlightning/trainer/policy_gradient_trainer.py
+new file mode 100644
+index 00000000..27cb7abf
+--- /dev/null
++++ b/agentlightning/trainer/policy_gradient_trainer.py
+@@ -0,0 +1,51 @@
++"""Policy Gradient Trainer — PPO/REINFORCE + GAE. Ref: multi_game_ppo.py, lol_trainer.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.policy_gradient_trainer.v1"
++
++class PolicyGradientTrainer:
++    def __init__(self, mode: str = "ppo", lr: float = 3e-4, gamma: float = 0.99, gae_lambda: float = 0.95, clip_eps: float = 0.2) -> None:
++        self.mode = mode; self.lr = lr; self.gamma = gamma; self.gae_lambda = gae_lambda; self.clip_eps = clip_eps
++        self.global_step: int = 0; self._total_loss: float = 0.0; self._metrics_buffer: List[Dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def train_step(self, batch: Dict[str, Any]) -> Dict[str, Any]:
++        if not batch or "rewards" not in batch: raise ValueError("Batch must contain 'rewards'")
++        rewards = batch["rewards"]; lp = batch.get("log_probs", [-1.0]*len(rewards)); vals = batch.get("values", [0.0]*len(rewards))
++        dones = batch.get("dones", [False]*len(rewards)); adv = self.compute_gae(rewards, vals + [0.0], dones)
++        rets = [a + v for a, v in zip(adv, vals)]
++        if self.mode == "ppo":
++            ratios = [1.0 + 0.01*l for l in lp]; loss = self._compute_ppo_loss(ratios, adv)
++        elif self.mode == "reinforce": loss = self._compute_reinforce_loss(lp, rets)
++        else: loss = sum(abs(r) for r in rewards) / max(len(rewards), 1)
++        self.global_step += 1; self._total_loss += loss
++        metrics = {"loss": loss, "step": self.global_step, "mode": self.mode, "batch_size": len(rewards), "avg_reward": sum(rewards)/max(len(rewards),1), "avg_advantage": sum(adv)/max(len(adv),1)}
++        self._metrics_buffer.append(metrics); self._fire({"event": "train_step", **metrics}); return metrics
++    def compute_gae(self, rewards: List[float], values: List[float], dones: Optional[List[bool]] = None) -> List[float]:
++        n = len(rewards); dones = dones or [False]*n; adv = [0.0]*n; last = 0.0
++        for t in reversed(range(n)):
++            nv = values[t+1] if t+1 < len(values) else 0.0; mask = 0.0 if (t < len(dones) and dones[t]) else 1.0
++            delta = rewards[t] + self.gamma * nv * mask - values[t]; last = delta + self.gamma * self.gae_lambda * mask * last; adv[t] = last
++        return adv
++    def _compute_ppo_loss(self, ratios: List[float], advantages: List[float]) -> float:
++        if not ratios: return 0.0
++        t = 0.0
++        for r, a in zip(ratios, advantages):
++            cl = max(min(r, 1.0+self.clip_eps), 1.0-self.clip_eps); t += -min(r*a, cl*a)
++        return t / len(ratios)
++    def _compute_reinforce_loss(self, log_probs: List[float], returns: List[float]) -> float:
++        if not log_probs: return 0.0
++        return sum(-lp*r for lp, r in zip(log_probs, returns)) / len(log_probs)
++    def set_mode(self, mode: str) -> None: self.mode = mode
++    def save_checkpoint(self) -> Dict[str, Any]:
++        return {"global_step": self.global_step, "mode": self.mode, "lr": self.lr, "gamma": self.gamma, "gae_lambda": self.gae_lambda, "clip_eps": self.clip_eps, "total_loss": self._total_loss}
++    def load_checkpoint(self, ckpt: Dict[str, Any]) -> None:
++        self.global_step = ckpt.get("global_step", 0); self.mode = ckpt.get("mode", self.mode); self.lr = ckpt.get("lr", self.lr)
++        self.gamma = ckpt.get("gamma", self.gamma); self.gae_lambda = ckpt.get("gae_lambda", self.gae_lambda)
++        self.clip_eps = ckpt.get("clip_eps", self.clip_eps); self._total_loss = ckpt.get("total_loss", 0.0)
++    def get_metrics(self) -> Dict[str, Any]: return {"global_step": self.global_step, "mode": self.mode, "avg_loss": self._total_loss / max(self.global_step, 1)}
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb err: %s", e)
+diff --git a/agentlightning/trainer/rl_reward_designer.py b/agentlightning/trainer/rl_reward_designer.py
+new file mode 100644
+index 00000000..6b4b3a3b
+--- /dev/null
++++ b/agentlightning/trainer/rl_reward_designer.py
+@@ -0,0 +1,93 @@
++"""
++RL Reward Designer — Dynamic multi-dimensional reward shaping.
++Location: agentlightning/trainer/rl_reward_designer.py
++Reference: DI-star/rl_learner.py ReinforcementLoss, integrations/lol/reward_shaper.py
++"""
++from __future__ import annotations
++import logging, math, time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.rl_reward_designer.v1"
++
++def _clamp(v: float, lo: float, hi: float) -> float:
++    return max(lo, min(hi, v))
++
++def _normalize(v: float, lo: float, hi: float) -> float:
++    if hi <= lo: return 0.0
++    return _clamp((v - lo) / (hi - lo), 0.0, 1.0)
++
++def _softmax_weights(scores: Dict[str, float]) -> Dict[str, float]:
++    if not scores: return {}
++    mx = max(scores.values())
++    exps = {k: math.exp(v - mx) for k, v in scores.items()}
++    t = sum(exps.values()) or 1.0
++    return {k: v / t for k, v in exps.items()}
++
++class RlRewardDesigner:
++    """Dynamic multi-dimensional reward designer with weakness-driven auto-adjustment."""
++    def __init__(self) -> None:
++        self.dimensions: Dict[str, Dict[str, Any]] = {}
++        self._game_index: Dict[str, List[str]] = defaultdict(list)
++        self._reward_history: List[Dict[str, Any]] = []
++        self._weight_history: List[Dict[str, float]] = []
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++
++    def register_dimension(self, name: str, weight: float = 1.0, bounds: Tuple[float, float] = (0.0, 1.0), game: str = "_global") -> None:
++        key = f"{game}::{name}" if game != "_global" else name
++        self.dimensions[key] = {"name": name, "weight": weight, "bounds": bounds, "game": game}
++        self._game_index[game].append(key)
++
++    def compute_reward(self, raw_values: Dict[str, float], game: str = "_global") -> float:
++        total_w, weighted_sum = 0.0, 0.0
++        for key, dim in self.dimensions.items():
++            dn = dim["name"]
++            if dn not in raw_values: continue
++            if dim["game"] not in ("_global", game): continue
++            lo, hi = dim["bounds"]
++            normed = _normalize(raw_values[dn], lo, hi)
++            w = dim["weight"]
++            weighted_sum += normed * w
++            total_w += w
++        reward = _clamp(weighted_sum / total_w if total_w > 0 else 0.0, 0.0, 1.0)
++        self._reward_history.append({"reward": reward, "raw": dict(raw_values), "game": game, "timestamp": time.time()})
++        self._fire_evolution({"event": "reward_computed", "reward": reward, "game": game})
++        return reward
++
++    def adjust_weights(self, performance: Dict[str, float], adjustment_rate: float = 0.3) -> None:
++        if not performance: return
++        inv_scores: Dict[str, float] = {}
++        for key, dim in self.dimensions.items():
++            if dim["name"] in performance:
++                inv_scores[key] = 1.0 / _clamp(performance[dim["name"]], 0.01, 1.0)
++        if not inv_scores: return
++        target_dist = _softmax_weights(inv_scores)
++        total_current = sum(self.dimensions[k]["weight"] for k in inv_scores) or 1.0
++        for key in inv_scores:
++            cur_w = self.dimensions[key]["weight"]
++            tgt_w = target_dist[key] * total_current * len(inv_scores)
++            self.dimensions[key]["weight"] = max(cur_w * (1 - adjustment_rate) + tgt_w * adjustment_rate, 0.01)
++        self._weight_history.append(self.get_weight_snapshot())
++        self._fire_evolution({"event": "weights_adjusted", "new_weights": self.get_weight_snapshot()})
++
++    def list_games(self) -> List[str]:
++        return [g for g in self._game_index if g != "_global"]
++
++    def get_weight_snapshot(self) -> Dict[str, float]:
++        return {(d["name"] if d["game"] == "_global" else f"{d['game']}::{d['name']}"): d["weight"] for k, d in self.dimensions.items()}
++
++    def global_weight_sum(self) -> float:
++        return sum(d["weight"] for d in self.dimensions.values())
++
++    def save_checkpoint(self) -> Dict[str, Any]:
++        return {"dimensions": {k: dict(v) for k, v in self.dimensions.items()}, "game_index": {k: list(v) for k, v in self._game_index.items()}}
++
++    def load_checkpoint(self, ckpt: Dict[str, Any]) -> None:
++        self.dimensions = {k: dict(v) for k, v in ckpt.get("dimensions", {}).items()}
++        self._game_index = defaultdict(list)
++        for k, v in ckpt.get("game_index", {}).items(): self._game_index[k] = list(v)
++
++    def _fire_evolution(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as exc: logger.warning("Evolution callback error: %s", exc)
+diff --git a/agentlightning/trainer/self_play_arena.py b/agentlightning/trainer/self_play_arena.py
+new file mode 100644
+index 00000000..f7e4c069
+--- /dev/null
++++ b/agentlightning/trainer/self_play_arena.py
+@@ -0,0 +1,37 @@
++"""Self-Play Arena — Tournament with Elo. Ref: self_play_scheduler.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional, Tuple
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.self_play_arena.v1"
++_K = 32.0
++
++class SelfPlayArena:
++    def __init__(self, mode: str = "round_robin") -> None:
++        self.mode = mode; self._policies: Dict[str, float] = {}; self.match_history: List[Dict[str, Any]] = []; self._trajectories: List[Dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def pool_size(self) -> int: return len(self._policies)
++    def add_policy(self, pid: str, elo: float = 1000.0) -> None: self._policies[pid] = elo
++    def get_elo(self, pid: str) -> float: return self._policies.get(pid, 0.0)
++    def get_rankings(self) -> List[Tuple[str, float]]: return sorted(self._policies.items(), key=lambda x: -x[1])
++    def schedule_round(self) -> List[Dict[str, str]]:
++        ids = list(self._policies.keys())
++        if len(ids) < 2: return []
++        if self.mode == "round_robin": return [{"player_a": ids[i], "player_b": ids[j]} for i in range(len(ids)) for j in range(i+1, len(ids))]
++        elif self.mode == "elimination":
++            si = [p for p, _ in self.get_rankings()]; return [{"player_a": si[i], "player_b": si[i+1]} for i in range(0, len(si)-1, 2)]
++        return []
++    def record_result(self, player_a: str, player_b: str, winner: str, trajectory: Optional[List[Dict[str, Any]]] = None) -> None:
++        ea_r, eb_r = self._policies.get(player_a,1000), self._policies.get(player_b,1000)
++        ea = 1.0/(1.0+10**((eb_r-ea_r)/400.0)); sa = 1.0 if winner == player_a else 0.0
++        self._policies[player_a] = ea_r + _K*(sa-ea); self._policies[player_b] = eb_r + _K*((1-sa)-(1-ea))
++        rec = {"player_a": player_a, "player_b": player_b, "winner": winner, "elo_a_after": self._policies[player_a], "elo_b_after": self._policies[player_b], "timestamp": time.time()}
++        self.match_history.append(rec)
++        if trajectory: self._trajectories.append({"match": rec, "trajectory": trajectory})
++        self._fire({"event": "result_recorded", **rec})
++    def get_trajectories(self) -> List[Dict[str, Any]]: return list(self._trajectories)
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/trainer/training_checkpoint_manager.py b/agentlightning/trainer/training_checkpoint_manager.py
+new file mode 100644
+index 00000000..100c781c
+--- /dev/null
++++ b/agentlightning/trainer/training_checkpoint_manager.py
+@@ -0,0 +1,38 @@
++"""Training Checkpoint Manager — Auto-save + A/B compare. Ref: model_versioner.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.training_checkpoint_manager.v1"
++
++class TrainingCheckpointManager:
++    def __init__(self, auto_save_interval: int = 0) -> None:
++        self.auto_save_interval = auto_save_interval; self._store: Dict[str, List[Dict[str, Any]]] = {}
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def checkpoint_count(self) -> int: return sum(len(v) for v in self._store.values())
++    def save(self, run_id: str, step: int, data: Dict[str, Any]) -> None:
++        if run_id not in self._store: self._store[run_id] = []
++        self._store[run_id].append({"step": step, "data": data, "saved_at": time.time()})
++        self._fire({"event": "checkpoint_saved", "run_id": run_id, "step": step})
++    def load(self, run_id: str, step: int) -> Dict[str, Any]:
++        if run_id not in self._store: raise KeyError(f"Run '{run_id}' not found")
++        for e in self._store[run_id]:
++            if e["step"] == step: return e["data"]
++        raise KeyError(f"Step {step} not found for run '{run_id}'")
++    def load_latest(self, run_id: str) -> Dict[str, Any]:
++        if run_id not in self._store or not self._store[run_id]: raise KeyError(f"Run '{run_id}' not found or empty")
++        return self._store[run_id][-1]["data"]
++    def list_checkpoints(self, run_id: str) -> List[int]: return [e["step"] for e in self._store.get(run_id, [])]
++    def delete(self, run_id: str, step: int) -> None:
++        if run_id in self._store: self._store[run_id] = [e for e in self._store[run_id] if e["step"] != step]
++    def maybe_save(self, run_id: str, step: int, data: Dict[str, Any]) -> bool:
++        if self.auto_save_interval <= 0: return False
++        if step % self.auto_save_interval == 0: self.save(run_id, step, data); return True
++        return False
++    def ab_compare(self, run_id: str, step_a: int, step_b: int, eval_fn) -> Dict[str, Any]:
++        da, db = self.load(run_id, step_a), self.load(run_id, step_b); sa, sb = eval_fn(da), eval_fn(db)
++        return {"step_a": step_a, "score_a": sa, "step_b": step_b, "score_b": sb, "winner_step": step_a if sa >= sb else step_b}
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentlightning/trainer/value_network_trainer.py b/agentlightning/trainer/value_network_trainer.py
+new file mode 100644
+index 00000000..4b167b96
+--- /dev/null
++++ b/agentlightning/trainer/value_network_trainer.py
+@@ -0,0 +1,49 @@
++"""Value Network Trainer — TD(lambda) value approximation. Ref: DI-star rl_learner.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentlightning.trainer.value_network_trainer.v1"
++
++class ValueNetworkTrainer:
++    def __init__(self, lr: float = 1e-3, gamma: float = 0.99, td_lambda: float = 0.95, hidden_dim: int = 64) -> None:
++        self.lr = lr; self.gamma = gamma; self.td_lambda = td_lambda; self.hidden_dim = hidden_dim
++        self.global_step: int = 0; self._total_loss: float = 0.0
++        self._weights: List[float] = []; self._bias: float = 0.0; self._initialized: bool = False
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def _ensure_init(self, dim: int) -> None:
++        if not self._initialized or len(self._weights) != dim: self._weights = [0.01]*dim; self._bias = 0.0; self._initialized = True
++    def predict(self, states: List[List[float]]) -> List[float]:
++        if not states: return []
++        self._ensure_init(len(states[0]))
++        return [sum(w*x for w, x in zip(self._weights, s)) + self._bias for s in states]
++    def train_step(self, batch: Dict[str, Any]) -> Dict[str, Any]:
++        if not batch or "states" not in batch or "td_targets" not in batch: raise ValueError("Batch must contain 'states' and 'td_targets'")
++        states, targets = batch["states"], batch["td_targets"]
++        if not states: return {"value_loss": 0.0, "step": self.global_step}
++        dim = len(states[0]); self._ensure_init(dim); preds = self.predict(states)
++        loss = sum((p-t)**2 for p, t in zip(preds, targets)) / len(states)
++        for i in range(len(states)):
++            err = preds[i] - targets[i]
++            for j in range(dim): self._weights[j] -= self.lr * 2.0 * err * states[i][j] / len(states)
++            self._bias -= self.lr * 2.0 * err / len(states)
++        self.global_step += 1; self._total_loss += loss
++        metrics = {"value_loss": loss, "step": self.global_step, "batch_size": len(states)}
++        self._fire({"event": "train_step", **metrics}); return metrics
++    def compute_td_lambda_targets(self, rewards: List[float], values: List[float]) -> List[float]:
++        n = len(rewards); targets = [0.0]*n; last = 0.0
++        for t in reversed(range(n)):
++            nv = values[t+1] if t+1 < len(values) else 0.0
++            td_t = rewards[t] + self.gamma * nv; last = td_t * (1-self.td_lambda) + (rewards[t] + self.gamma * last) * self.td_lambda; targets[t] = last
++        return targets
++    def get_prediction_errors(self, states: List[List[float]], targets: List[float]) -> List[float]:
++        preds = self.predict(states); return [abs(p-t) for p, t in zip(preds, targets)]
++    def save_checkpoint(self) -> Dict[str, Any]:
++        return {"global_step": self.global_step, "lr": self.lr, "gamma": self.gamma, "td_lambda": self.td_lambda, "weights": list(self._weights), "bias": self._bias, "total_loss": self._total_loss}
++    def load_checkpoint(self, ckpt: Dict[str, Any]) -> None:
++        self.global_step = ckpt.get("global_step",0); self.lr = ckpt.get("lr",self.lr); self._weights = list(ckpt.get("weights",[])); self._bias = ckpt.get("bias",0.0)
++        self._total_loss = ckpt.get("total_loss",0.0); self._initialized = bool(self._weights)
++    def _fire(self, payload: Dict[str, Any]) -> None:
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except Exception as e: logger.warning("cb: %s", e)
+diff --git a/agentos/governance/distributed_training_coordinator.py b/agentos/governance/distributed_training_coordinator.py
+new file mode 100644
+index 00000000..205f6643
+--- /dev/null
++++ b/agentos/governance/distributed_training_coordinator.py
+@@ -0,0 +1,55 @@
++"""Distributed Training Coordinator — Parameter server + fault detection. Ref: DI-star ctools/worker/, client_server.py"""
++from __future__ import annotations
++import logging, time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentos.governance.distributed_training_coordinator.v1"
++
++class DistributedTrainingCoordinator:
++    def __init__(self, heartbeat_timeout: float = 30.0) -> None:
++        self.heartbeat_timeout = heartbeat_timeout; self._workers: Dict[str, Dict[str, Any]] = {}
++        self._pending_gradients: List[Dict[str, Any]] = []; self._current_params: Dict[str, List[float]] = {}
++        self._tasks: Dict[str, List[str]] = defaultdict(list); self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def worker_count(self) -> int: return len(self._workers)
++    @property
++    def pending_gradient_count(self) -> int: return len(self._pending_gradients)
++    def register_worker(self, worker_id: str, capacity: float = 1.0) -> None:
++        self._workers[worker_id] = {"capacity": capacity, "last_heartbeat": time.time(), "params": None, "status": "active"}
++        self._fire({"event": "worker_registered", "worker_id": worker_id})
++    def remove_worker(self, wid: str) -> None: self._workers.pop(wid, None); self._tasks.pop(wid, None)
++    def heartbeat(self, wid: str) -> None:
++        if wid in self._workers: self._workers[wid]["last_heartbeat"] = time.time()
++    def submit_gradients(self, wid: str, gradients: Dict[str, List[float]]) -> None:
++        self._pending_gradients.append({"worker_id": wid, "gradients": gradients, "timestamp": time.time()})
++    def aggregate_gradients(self) -> Dict[str, List[float]]:
++        if not self._pending_gradients: return {}
++        all_keys = set(); [all_keys.update(pg["gradients"].keys()) for pg in self._pending_gradients]
++        agg = {}
++        for key in all_keys:
++            vecs = [pg["gradients"][key] for pg in self._pending_gradients if key in pg["gradients"]]
++            if not vecs: continue
++            dim = max(len(v) for v in vecs); avg = [0.0]*dim
++            for v in vecs:
++                for i in range(min(len(v), dim)): avg[i] += v[i]
++            agg[key] = [x/len(vecs) for x in avg]
++        self._pending_gradients.clear(); return agg
++    def broadcast_params(self, params: Dict[str, List[float]]) -> None:
++        self._current_params = {k: list(v) for k, v in params.items()}
++        for wid in self._workers: self._workers[wid]["params"] = {k: list(v) for k, v in params.items()}
++    def get_worker_params(self, wid: str): return self._workers[wid].get("params") if wid in self._workers else None
++    def detect_failed_workers(self, current_time: Optional[float] = None) -> List[str]:
++        now = current_time if current_time is not None else time.time()
++        return [wid for wid, info in self._workers.items() if now - info["last_heartbeat"] > self.heartbeat_timeout]
++    def assign_task(self, wid: str, task_id: str) -> None: self._tasks[wid].append(task_id)
++    def reassign_task(self, task_id: str, from_worker: str, to_worker: str) -> None:
++        if from_worker in self._tasks: self._tasks[from_worker] = [t for t in self._tasks[from_worker] if t != task_id]
++        self._tasks[to_worker].append(task_id)
++    def get_tasks(self, wid: str) -> List[str]: return list(self._tasks.get(wid, []))
++    def get_cluster_status(self) -> Dict[str, Any]:
++        return {"total_workers": len(self._workers), "total_capacity": sum(w["capacity"] for w in self._workers.values()), "pending_gradients": len(self._pending_gradients)}
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
+diff --git a/agentos/governance/evolution_fitness_landscape.py b/agentos/governance/evolution_fitness_landscape.py
+new file mode 100644
+index 00000000..6646e3a1
+--- /dev/null
++++ b/agentos/governance/evolution_fitness_landscape.py
+@@ -0,0 +1,53 @@
++"""Evolution Fitness Landscape — Multi-dim landscape + plateau detection. Ref: fitness_aggregator.py"""
++from __future__ import annotations
++import logging, math, time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentos.governance.evolution_fitness_landscape.v1"
++
++class EvolutionFitnessLandscape:
++    def __init__(self, plateau_window: int = 5, plateau_threshold: float = 0.02) -> None:
++        self.plateau_window = plateau_window; self.plateau_threshold = plateau_threshold
++        self._dimensions: Dict[str, float] = {}; self._history: Dict[str, List[float]] = defaultdict(list)
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def dimension_count(self) -> int: return len(self._dimensions)
++    def register_dimension(self, name: str, weight: float = 1.0) -> None: self._dimensions[name] = weight
++    def report(self, dimension: str, fitness: float) -> None:
++        clamped = max(0.0, min(1.0, fitness)); self._history[dimension].append(clamped)
++        self._fire({"event": "fitness_reported", "dimension": dimension, "fitness": clamped})
++    def get_history(self, dimension: str) -> List[float]: return list(self._history.get(dimension, []))
++    def build_landscape(self) -> Dict[str, Dict[str, Any]]:
++        return {d: {"latest": self._history.get(d, [0.0])[-1] if self._history.get(d) else 0.0, "weight": self._dimensions[d], "history_len": len(self._history.get(d, []))} for d in self._dimensions}
++    def global_fitness(self) -> float:
++        tw, ws = 0.0, 0.0
++        for d, w in self._dimensions.items():
++            h = self._history.get(d, [])
++            if h: ws += h[-1]*w; tw += w
++        return ws/tw if tw > 0 else 0.0
++    def detect_plateaus(self) -> List[str]:
++        r = []
++        for d in self._dimensions:
++            h = self._history.get(d, [])
++            if len(h) < self.plateau_window: continue
++            win = h[-self.plateau_window:]
++            if max(win) - min(win) < self.plateau_threshold: r.append(d)
++        return r
++    def recommend_evolution_direction(self) -> Dict[str, Any]:
++        if not self._dimensions: return {"dimension": None, "reason": "no dimensions"}
++        worst, wf = None, 2.0
++        for d in self._dimensions:
++            h = self._history.get(d, []); latest = h[-1] if h else 0.0
++            if latest < wf: wf = latest; worst = d
++        return {"dimension": worst, "current_fitness": wf, "reason": "lowest fitness"}
++    def plan_evolution_path(self, target: Dict[str, float]) -> List[Dict[str, Any]]:
++        gaps = []
++        for d, tv in target.items():
++            h = self._history.get(d, []); cur = h[-1] if h else 0.0; gap = tv - cur
++            if gap > 0: gaps.append({"dimension": d, "current": cur, "target": tv, "gap": gap})
++        gaps.sort(key=lambda g: -g["gap"]); return gaps
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
+diff --git a/agentos/governance/hyperparameter_tuner.py b/agentos/governance/hyperparameter_tuner.py
+new file mode 100644
+index 00000000..32d66a85
+--- /dev/null
++++ b/agentos/governance/hyperparameter_tuner.py
+@@ -0,0 +1,60 @@
++"""Hyperparameter Tuner — Grid/random/bayesian + early stop. Ref: DI-star rl_learner.py cfg, lol_trainer.py"""
++from __future__ import annotations
++import itertools, logging, random, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentos.governance.hyperparameter_tuner.v1"
++
++class HyperparameterTuner:
++    def __init__(self, strategy: str = "grid", max_trials: int = 20, early_stop_patience: int = 5) -> None:
++        self.strategy = strategy; self.max_trials = max_trials; self.early_stop_patience = early_stop_patience
++        self.search_space: Dict[str, Dict[str, Any]] = {}; self.trial_history: List[Dict[str, Any]] = []
++        self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    def define_param(self, name: str, values=None, low=None, high=None) -> None: self.search_space[name] = {"values": values, "low": low, "high": high}
++    def generate_configs(self) -> List[Dict[str, Any]]:
++        if self.strategy == "grid": return self._grid()
++        elif self.strategy == "random": return self._rand()
++        elif self.strategy == "bayesian": return [self.suggest_next() for _ in range(self.max_trials)]
++        return []
++    def _grid(self):
++        names = list(self.search_space.keys()); vl = []
++        for n in names:
++            sp = self.search_space[n]
++            if sp["values"]: vl.append(sp["values"])
++            elif sp["low"] is not None and sp["high"] is not None:
++                lo, hi = sp["low"], sp["high"]; vl.append([lo+(hi-lo)*i/4 for i in range(5)])
++            else: vl.append([None])
++        return [dict(zip(names, combo)) for combo in itertools.product(*vl)]
++    def _rand(self):
++        configs = []
++        for _ in range(self.max_trials):
++            c = {}
++            for n, sp in self.search_space.items():
++                if sp["values"]: c[n] = random.choice(sp["values"])
++                elif sp["low"] is not None: c[n] = random.uniform(sp["low"], sp["high"])
++            configs.append(c)
++        return configs
++    def suggest_next(self):
++        c = {}; best = self.get_best_config()
++        for n, sp in self.search_space.items():
++            if sp["low"] is not None:
++                lo, hi = sp["low"], sp["high"]
++                if best and n in best.get("config", {}):
++                    center = best["config"][n]; val = max(lo, min(hi, center + random.gauss(0, (hi-lo)*0.2)))
++                else: val = random.uniform(lo, hi)
++                c[n] = val
++            elif sp["values"]: c[n] = random.choice(sp["values"])
++        return c
++    def record_trial(self, config, score: float, steps: int = 0) -> None:
++        self.trial_history.append({"config": dict(config), "score": score, "steps": steps, "timestamp": time.time()})
++        self._fire({"event": "trial_recorded", "score": score})
++    def get_best_config(self): return max(self.trial_history, key=lambda t: t["score"]) if self.trial_history else None
++    def apply_best(self): best = self.get_best_config(); return dict(best["config"]) if best else {}
++    def should_early_stop(self, config) -> bool:
++        r = self.trial_history[-self.early_stop_patience:]
++        if len(r) < self.early_stop_patience: return False
++        return max(t["score"] for t in r) - min(t["score"] for t in r) < 0.01
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
+diff --git a/agentos/governance/model_registry.py b/agentos/governance/model_registry.py
+new file mode 100644
+index 00000000..034a88bf
+--- /dev/null
++++ b/agentos/governance/model_registry.py
+@@ -0,0 +1,42 @@
++"""Model Registry — Publish/query/load/lineage. Ref: model_versioner.py, registry.py"""
++from __future__ import annotations
++import logging, time
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentos.governance.model_registry.v1"
++
++class ModelRegistry:
++    def __init__(self) -> None: self._models: Dict[str, Dict[str, Any]] = {}; self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def model_count(self) -> int: return len(self._models)
++    def publish(self, name: str, game: str, stage: str, elo: float, weights: Dict[str, Any], parent: Optional[str] = None) -> None:
++        self._models[name] = {"name": name, "game": game, "stage": stage, "elo": elo, "weights": weights, "parent": parent, "published_at": time.time()}
++        self._fire({"event": "model_published", "name": name, "game": game, "stage": stage})
++    def query(self, game=None, stage=None, min_elo=None, max_elo=None) -> List[Dict[str, Any]]:
++        r = []
++        for i in self._models.values():
++            if game and i["game"] != game: continue
++            if stage and i["stage"] != stage: continue
++            if min_elo and i["elo"] < min_elo: continue
++            if max_elo and i["elo"] > max_elo: continue
++            r.append(dict(i))
++        return r
++    def load(self, name: str) -> Dict[str, Any]:
++        if name not in self._models: raise KeyError(f"Model '{name}' not found")
++        return self._models[name]["weights"]
++    def get_info(self, name: str) -> Dict[str, Any]:
++        if name not in self._models: raise KeyError(f"Model '{name}' not found")
++        return dict(self._models[name])
++    def set_status(self, name: str, stage: str) -> None:
++        if name not in self._models: raise KeyError(f"Model '{name}' not found")
++        self._models[name]["stage"] = stage
++    def get_lineage(self, name: str) -> List[str]:
++        chain, current, visited = [], name, set()
++        while current and current not in visited:
++            visited.add(current); chain.append(current)
++            current = self._models[current].get("parent") if current in self._models else None
++        chain.reverse(); return chain
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
+diff --git a/agentos/governance/training_dashboard.py b/agentos/governance/training_dashboard.py
+new file mode 100644
+index 00000000..e6af5c60
+--- /dev/null
++++ b/agentos/governance/training_dashboard.py
+@@ -0,0 +1,42 @@
++"""Training Dashboard — Unified metrics + anomaly detection + trends. Ref: fitness_aggregator.py, evolution_metrics_exporter.py"""
++from __future__ import annotations
++import logging, math, time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional
++logger = logging.getLogger(__name__)
++_EVOLUTION_KEY = "agentos.governance.training_dashboard.v1"
++
++class TrainingDashboard:
++    def __init__(self) -> None: self._metrics: Dict[str, List[Dict[str, Any]]] = defaultdict(list); self.evolution_callback: Optional[Callable[[Dict], None]] = None
++    @property
++    def metric_count(self) -> int: return len(self._metrics)
++    def record(self, name: str, value: float, step: int = 0, timestamp: Optional[float] = None) -> None:
++        ts = timestamp if timestamp is not None else time.time(); self._metrics[name].append({"value": value, "step": step, "timestamp": ts})
++        self._fire({"event": "metric_recorded", "name": name, "value": value, "step": step})
++    def get_history(self, name: str) -> List[Dict[str, Any]]: return list(self._metrics.get(name, []))
++    def query(self, name: str, from_time: Optional[float] = None, to_time: Optional[float] = None) -> List[Dict[str, Any]]:
++        return [e for e in self._metrics.get(name, []) if (from_time is None or e["timestamp"] >= from_time) and (to_time is None or e["timestamp"] <= to_time)]
++    def get_trend(self, name: str) -> str:
++        h = self._metrics.get(name, [])
++        if len(h) < 3: return "insufficient_data"
++        r = [e["value"] for e in h[-5:]]
++        if all(r[i] <= r[i+1] for i in range(len(r)-1)): return "improving"
++        if all(r[i] >= r[i+1] for i in range(len(r)-1)): return "declining"
++        return "stable"
++    def detect_anomalies(self, name: str, z_threshold: float = 3.0) -> List[Dict[str, Any]]:
++        h = self._metrics.get(name, [])
++        if len(h) < 5: return []
++        vals = [e["value"] for e in h]; mean = sum(vals)/len(vals); var = sum((v-mean)**2 for v in vals)/len(vals); std = math.sqrt(var) if var > 0 else 1.0
++        return [{**e, "z_score": abs(e["value"]-mean)/std} for e in h if abs(e["value"]-mean)/std > z_threshold]
++    def generate_report(self, fmt: str = "text") -> Any:
++        data = {}
++        for name, h in self._metrics.items():
++            if not h: continue
++            vals = [e["value"] for e in h]; data[name] = {"count": len(vals), "latest": vals[-1], "mean": sum(vals)/len(vals), "min": min(vals), "max": max(vals), "trend": self.get_trend(name)}
++        if fmt == "json": return data
++        lines = ["=== Training Dashboard Report ==="] + [f"{n}: latest={i['latest']:.4f} mean={i['mean']:.4f} trend={i['trend']} ({i['count']} records)" for n, i in data.items()]
++        return "\n".join(lines)
++    def _fire(self, payload):
++        if self.evolution_callback:
++            try: self.evolution_callback({"source": _EVOLUTION_KEY, "timestamp": time.time(), **payload})
++            except: pass
