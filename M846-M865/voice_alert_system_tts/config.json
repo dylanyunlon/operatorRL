@@ -1,0 +1,11 @@
+{
+  "module_id": "M862",
+  "module_name": "voice_alert_system_tts",
+  "class_name": "VoiceAlertSystemTTS",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M861"
+  ],
+  "enabled": true
+}

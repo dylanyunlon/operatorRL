@@ -1,0 +1,14 @@
+{
+  "module_id": "M864",
+  "module_name": "dashboard_data_aggregation_api",
+  "class_name": "DashboardDataAggregationAPI",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M847",
+    "M848",
+    "M849",
+    "M850"
+  ],
+  "enabled": true
+}

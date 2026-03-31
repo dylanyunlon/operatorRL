@@ -1,0 +1,11 @@
+{
+  "module_id": "M848",
+  "module_name": "summoner_deep_profiler",
+  "class_name": "SummonerDeepProfiler",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M847"
+  ],
+  "enabled": true
+}

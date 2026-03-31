@@ -1,0 +1,12 @@
+{
+  "module_id": "M860",
+  "module_name": "cross_match_pattern_miner",
+  "class_name": "CrossMatchPatternMiner",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M847",
+    "M849"
+  ],
+  "enabled": true
+}

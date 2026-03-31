@@ -1,0 +1,12 @@
+{
+  "module_id": "M852",
+  "module_name": "opponent_scouting_engine",
+  "class_name": "OpponentScoutingEngine",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M847",
+    "M848"
+  ],
+  "enabled": true
+}

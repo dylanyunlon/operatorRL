@@ -1,0 +1,11 @@
+{
+  "module_id": "M855",
+  "module_name": "rune_item_build_optimizer",
+  "class_name": "RuneItemBuildOptimizer",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M850"
+  ],
+  "enabled": true
+}

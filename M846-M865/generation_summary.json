@@ -1,0 +1,671 @@
+{
+  "generated_at": "2026-03-31T12:11:30.684466",
+  "total_files": 80,
+  "total_python_lines": 22481,
+  "modules": [
+    {
+      "id": "M846",
+      "name": "logging_orchestrator",
+      "class": "LoggingOrchestrator",
+      "deps": []
+    },
+    {
+      "id": "M847",
+      "name": "historical_match_crawler",
+      "class": "HistoricalMatchCrawler",
+      "deps": [
+        "M846"
+      ]
+    },
+    {
+      "id": "M848",
+      "name": "summoner_deep_profiler",
+      "class": "SummonerDeepProfiler",
+      "deps": [
+        "M846",
+        "M847"
+      ]
+    },
+    {
+      "id": "M849",
+      "name": "match_timeline_reconstructor",
+      "class": "MatchTimelineReconstructor",
+      "deps": [
+        "M846",
+        "M847"
+      ]
+    },
+    {
+      "id": "M850",
+      "name": "champion_mastery_analyzer",
+      "class": "ChampionMasteryAnalyzer",
+      "deps": [
+        "M846"
+      ]
+    },
+    {
+      "id": "M851",
+      "name": "team_comp_historical_evaluator",
+      "class": "TeamCompHistoricalEvaluator",
+      "deps": [
+        "M846",
+        "M850"
+      ]
+    },
+    {
+      "id": "M852",
+      "name": "opponent_scouting_engine",
+      "class": "OpponentScoutingEngine",
+      "deps": [
+        "M846",
+        "M847",
+        "M848"
+      ]
+    },
+    {
+      "id": "M853",
+      "name": "ranked_progression_tracker",
+      "class": "RankedProgressionTracker",
+      "deps": [
+        "M846",
+        "M847"
+      ]
+    },
+    {
+      "id": "M854",
+      "name": "game_flow_session_monitor",
+      "class": "GameFlowSessionMonitor",
+      "deps": [
+        "M846",
+        "M847"
+      ]
+    },
+    {
+      "id": "M855",
+      "name": "rune_item_build_optimizer",
+      "class": "RuneItemBuildOptimizer",
+      "deps": [
+        "M846",
+        "M850"
+      ]
+    },
+    {
+      "id": "M856",
+      "name": "ban_pick_suggestion_engine",
+      "class": "BanPickSuggestionEngine",
+      "deps": [
+        "M846",
+        "M850",
+        "M851",
+        "M852"
+      ]
+    },
+    {
+      "id": "M857",
+      "name": "vision_score_analyzer",
+      "class": "VisionScoreAnalyzer",
+      "deps": [
+        "M846",
+        "M849"
+      ]
+    },
+    {
+      "id": "M858",
+      "name": "objective_control_predictor",
+      "class": "ObjectiveControlPredictor",
+      "deps": [
+        "M846",
+        "M849"
+      ]
+    },
+    {
+      "id": "M859",
+      "name": "network_protocol_decoder",
+      "class": "NetworkProtocolDecoder",
+      "deps": [
+        "M846"
+      ]
+    },
+    {
+      "id": "M860",
+      "name": "cross_match_pattern_miner",
+      "class": "CrossMatchPatternMiner",
+      "deps": [
+        "M846",
+        "M847",
+        "M849"
+      ]
+    },
+    {
+      "id": "M861",
+      "name": "realtime_strategy_recommender",
+      "class": "RealtimeStrategyRecommender",
+      "deps": [
+        "M846",
+        "M851",
+        "M858",
+        "M860"
+      ]
+    },
+    {
+      "id": "M862",
+      "name": "voice_alert_system_tts",
+      "class": "VoiceAlertSystemTTS",
+      "deps": [
+        "M846",
+        "M861"
+      ]
+    },
+    {
+      "id": "M863",
+      "name": "performance_regression_detector",
+      "class": "PerformanceRegressionDetector",
+      "deps": [
+        "M846",
+        "M860"
+      ]
+    },
+    {
+      "id": "M864",
+      "name": "dashboard_data_aggregation_api",
+      "class": "DashboardDataAggregationAPI",
+      "deps": [
+        "M846",
+        "M847",
+        "M848",
+        "M849",
+        "M850"
+      ]
+    },
+    {
+      "id": "M865",
+      "name": "plan_update_project_integrator",
+      "class": "PlanUpdateProjectIntegrator",
+      "deps": [
+        "M846"
+      ]
+    }
+  ],
+  "file_inventory": [
+    {
+      "file": "logging_orchestrator/logging_orchestrator.py",
+      "lines": 1013,
+      "type": "Python",
+      "bytes": 36076
+    },
+    {
+      "file": "logging_orchestrator/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 286
+    },
+    {
+      "file": "logging_orchestrator/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 923
+    },
+    {
+      "file": "logging_orchestrator/config.json",
+      "lines": 8,
+      "type": "Config",
+      "bytes": 168
+    },
+    {
+      "file": "historical_match_crawler/historical_match_crawler.py",
+      "lines": 1119,
+      "type": "Python",
+      "bytes": 41131
+    },
+    {
+      "file": "historical_match_crawler/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 313
+    },
+    {
+      "file": "historical_match_crawler/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 938
+    },
+    {
+      "file": "historical_match_crawler/config.json",
+      "lines": 10,
+      "type": "Config",
+      "bytes": 189
+    },
+    {
+      "file": "summoner_deep_profiler/summoner_deep_profiler.py",
+      "lines": 1213,
+      "type": "Python",
+      "bytes": 45195
+    },
+    {
+      "file": "summoner_deep_profiler/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 297
+    },
+    {
+      "file": "summoner_deep_profiler/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 923
+    },
+    {
+      "file": "summoner_deep_profiler/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 197
+    },
+    {
+      "file": "match_timeline_reconstructor/match_timeline_reconstructor.py",
+      "lines": 1135,
+      "type": "Python",
+      "bytes": 42635
+    },
+    {
+      "file": "match_timeline_reconstructor/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 345
+    },
+    {
+      "file": "match_timeline_reconstructor/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 967
+    },
+    {
+      "file": "match_timeline_reconstructor/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 209
+    },
+    {
+      "file": "champion_mastery_analyzer/champion_mastery_analyzer.py",
+      "lines": 1153,
+      "type": "Python",
+      "bytes": 42829
+    },
+    {
+      "file": "champion_mastery_analyzer/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 321
+    },
+    {
+      "file": "champion_mastery_analyzer/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 1024
+    },
+    {
+      "file": "champion_mastery_analyzer/config.json",
+      "lines": 10,
+      "type": "Config",
+      "bytes": 191
+    },
+    {
+      "file": "team_comp_historical_evaluator/team_comp_historical_evaluator.py",
+      "lines": 1101,
+      "type": "Python",
+      "bytes": 41203
+    },
+    {
+      "file": "team_comp_historical_evaluator/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 356
+    },
+    {
+      "file": "team_comp_historical_evaluator/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 1111
+    },
+    {
+      "file": "team_comp_historical_evaluator/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 212
+    },
+    {
+      "file": "opponent_scouting_engine/opponent_scouting_engine.py",
+      "lines": 1163,
+      "type": "Python",
+      "bytes": 43422
+    },
+    {
+      "file": "opponent_scouting_engine/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 313
+    },
+    {
+      "file": "opponent_scouting_engine/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 939
+    },
+    {
+      "file": "opponent_scouting_engine/config.json",
+      "lines": 12,
+      "type": "Config",
+      "bytes": 213
+    },
+    {
+      "file": "ranked_progression_tracker/ranked_progression_tracker.py",
+      "lines": 1159,
+      "type": "Python",
+      "bytes": 43414
+    },
+    {
+      "file": "ranked_progression_tracker/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 329
+    },
+    {
+      "file": "ranked_progression_tracker/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 929
+    },
+    {
+      "file": "ranked_progression_tracker/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 205
+    },
+    {
+      "file": "game_flow_session_monitor/game_flow_session_monitor.py",
+      "lines": 1053,
+      "type": "Python",
+      "bytes": 38619
+    },
+    {
+      "file": "game_flow_session_monitor/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 316
+    },
+    {
+      "file": "game_flow_session_monitor/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 818
+    },
+    {
+      "file": "game_flow_session_monitor/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 202
+    },
+    {
+      "file": "rune_item_build_optimizer/rune_item_build_optimizer.py",
+      "lines": 1144,
+      "type": "Python",
+      "bytes": 42655
+    },
+    {
+      "file": "rune_item_build_optimizer/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 316
+    },
+    {
+      "file": "rune_item_build_optimizer/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 1137
+    },
+    {
+      "file": "rune_item_build_optimizer/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 202
+    },
+    {
+      "file": "ban_pick_suggestion_engine/ban_pick_suggestion_engine.py",
+      "lines": 1109,
+      "type": "Python",
+      "bytes": 40812
+    },
+    {
+      "file": "ban_pick_suggestion_engine/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 324
+    },
+    {
+      "file": "ban_pick_suggestion_engine/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 981
+    },
+    {
+      "file": "ban_pick_suggestion_engine/config.json",
+      "lines": 13,
+      "type": "Config",
+      "bytes": 228
+    },
+    {
+      "file": "vision_score_analyzer/vision_score_analyzer.py",
+      "lines": 1179,
+      "type": "Python",
+      "bytes": 44678
+    },
+    {
+      "file": "vision_score_analyzer/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 289
+    },
+    {
+      "file": "vision_score_analyzer/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 1008
+    },
+    {
+      "file": "vision_score_analyzer/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 195
+    },
+    {
+      "file": "objective_control_predictor/objective_control_predictor.py",
+      "lines": 1160,
+      "type": "Python",
+      "bytes": 43681
+    },
+    {
+      "file": "objective_control_predictor/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 337
+    },
+    {
+      "file": "objective_control_predictor/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 1004
+    },
+    {
+      "file": "objective_control_predictor/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 207
+    },
+    {
+      "file": "network_protocol_decoder/network_protocol_decoder.py",
+      "lines": 1040,
+      "type": "Python",
+      "bytes": 37692
+    },
+    {
+      "file": "network_protocol_decoder/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 313
+    },
+    {
+      "file": "network_protocol_decoder/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 859
+    },
+    {
+      "file": "network_protocol_decoder/config.json",
+      "lines": 10,
+      "type": "Config",
+      "bytes": 189
+    },
+    {
+      "file": "cross_match_pattern_miner/cross_match_pattern_miner.py",
+      "lines": 1166,
+      "type": "Python",
+      "bytes": 43912
+    },
+    {
+      "file": "cross_match_pattern_miner/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 316
+    },
+    {
+      "file": "cross_match_pattern_miner/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 985
+    },
+    {
+      "file": "cross_match_pattern_miner/config.json",
+      "lines": 12,
+      "type": "Config",
+      "bytes": 214
+    },
+    {
+      "file": "realtime_strategy_recommender/realtime_strategy_recommender.py",
+      "lines": 1191,
+      "type": "Python",
+      "bytes": 44289
+    },
+    {
+      "file": "realtime_strategy_recommender/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 353
+    },
+    {
+      "file": "realtime_strategy_recommender/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 1025
+    },
+    {
+      "file": "realtime_strategy_recommender/config.json",
+      "lines": 13,
+      "type": "Config",
+      "bytes": 235
+    },
+    {
+      "file": "voice_alert_system_tts/voice_alert_system_tts.py",
+      "lines": 1019,
+      "type": "Python",
+      "bytes": 36653
+    },
+    {
+      "file": "voice_alert_system_tts/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 292
+    },
+    {
+      "file": "voice_alert_system_tts/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 878
+    },
+    {
+      "file": "voice_alert_system_tts/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 196
+    },
+    {
+      "file": "performance_regression_detector/performance_regression_detector.py",
+      "lines": 1180,
+      "type": "Python",
+      "bytes": 44340
+    },
+    {
+      "file": "performance_regression_detector/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 369
+    },
+    {
+      "file": "performance_regression_detector/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 997
+    },
+    {
+      "file": "performance_regression_detector/config.json",
+      "lines": 11,
+      "type": "Config",
+      "bytes": 215
+    },
+    {
+      "file": "dashboard_data_aggregation_api/dashboard_data_aggregation_api.py",
+      "lines": 1107,
+      "type": "Python",
+      "bytes": 40647
+    },
+    {
+      "file": "dashboard_data_aggregation_api/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 356
+    },
+    {
+      "file": "dashboard_data_aggregation_api/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 896
+    },
+    {
+      "file": "dashboard_data_aggregation_api/config.json",
+      "lines": 14,
+      "type": "Config",
+      "bytes": 248
+    },
+    {
+      "file": "plan_update_project_integrator/plan_update_project_integrator.py",
+      "lines": 1077,
+      "type": "Python",
+      "bytes": 39739
+    },
+    {
+      "file": "plan_update_project_integrator/__init__.py",
+      "lines": 7,
+      "type": "Python",
+      "bytes": 356
+    },
+    {
+      "file": "plan_update_project_integrator/README.md",
+      "lines": 35,
+      "type": "Doc",
+      "bytes": 918
+    },
+    {
+      "file": "plan_update_project_integrator/config.json",
+      "lines": 10,
+      "type": "Config",
+      "bytes": 200
+    }
+  ]
+}

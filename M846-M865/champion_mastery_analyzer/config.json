@@ -1,0 +1,10 @@
+{
+  "module_id": "M850",
+  "module_name": "champion_mastery_analyzer",
+  "class_name": "ChampionMasteryAnalyzer",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846"
+  ],
+  "enabled": true
+}

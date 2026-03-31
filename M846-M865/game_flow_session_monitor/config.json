@@ -1,0 +1,11 @@
+{
+  "module_id": "M854",
+  "module_name": "game_flow_session_monitor",
+  "class_name": "GameFlowSessionMonitor",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M847"
+  ],
+  "enabled": true
+}

@@ -1,0 +1,10 @@
+{
+  "module_id": "M847",
+  "module_name": "historical_match_crawler",
+  "class_name": "HistoricalMatchCrawler",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846"
+  ],
+  "enabled": true
+}

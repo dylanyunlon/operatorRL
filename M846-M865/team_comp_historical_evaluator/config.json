@@ -1,0 +1,11 @@
+{
+  "module_id": "M851",
+  "module_name": "team_comp_historical_evaluator",
+  "class_name": "TeamCompHistoricalEvaluator",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M850"
+  ],
+  "enabled": true
+}

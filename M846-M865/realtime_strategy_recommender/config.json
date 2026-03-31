@@ -1,0 +1,13 @@
+{
+  "module_id": "M861",
+  "module_name": "realtime_strategy_recommender",
+  "class_name": "RealtimeStrategyRecommender",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M851",
+    "M858",
+    "M860"
+  ],
+  "enabled": true
+}

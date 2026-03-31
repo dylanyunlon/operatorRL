@@ -1,0 +1,947 @@
+{
+  "run_timestamp": 1774960098.6575422,
+  "total_passed": 200,
+  "total_failed": 0,
+  "module_results": [
+    {
+      "module": "M846",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M847",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M848",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M849",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M850",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M851",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M852",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M853",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M854",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M855",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M856",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M857",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M858",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M859",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M860",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M861",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M862",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M863",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M864",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "module": "M865",
+      "tests": [
+        {
+          "name": "init",
+          "status": "PASS"
+        },
+        {
+          "name": "config_validation",
+          "status": "PASS"
+        },
+        {
+          "name": "cache",
+          "status": "PASS"
+        },
+        {
+          "name": "rate_limiter",
+          "status": "PASS"
+        },
+        {
+          "name": "metrics",
+          "status": "PASS"
+        },
+        {
+          "name": "events",
+          "status": "PASS"
+        },
+        {
+          "name": "reset",
+          "status": "PASS"
+        },
+        {
+          "name": "shutdown",
+          "status": "PASS"
+        },
+        {
+          "name": "repr",
+          "status": "PASS"
+        },
+        {
+          "name": "event_callback",
+          "status": "PASS"
+        }
+      ],
+      "passed": 10,
+      "failed": 0
+    }
+  ]
+}

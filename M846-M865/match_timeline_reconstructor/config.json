@@ -1,0 +1,11 @@
+{
+  "module_id": "M849",
+  "module_name": "match_timeline_reconstructor",
+  "class_name": "MatchTimelineReconstructor",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M847"
+  ],
+  "enabled": true
+}

@@ -1,0 +1,11 @@
+{
+  "module_id": "M863",
+  "module_name": "performance_regression_detector",
+  "class_name": "PerformanceRegressionDetector",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M860"
+  ],
+  "enabled": true
+}

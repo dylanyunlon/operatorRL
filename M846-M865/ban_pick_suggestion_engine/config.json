@@ -1,0 +1,13 @@
+{
+  "module_id": "M856",
+  "module_name": "ban_pick_suggestion_engine",
+  "class_name": "BanPickSuggestionEngine",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M850",
+    "M851",
+    "M852"
+  ],
+  "enabled": true
+}

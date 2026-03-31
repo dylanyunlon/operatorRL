@@ -1,0 +1,10 @@
+{
+  "module_id": "M859",
+  "module_name": "network_protocol_decoder",
+  "class_name": "NetworkProtocolDecoder",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846"
+  ],
+  "enabled": true
+}

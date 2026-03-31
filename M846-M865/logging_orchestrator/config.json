@@ -1,0 +1,8 @@
+{
+  "module_id": "M846",
+  "module_name": "logging_orchestrator",
+  "class_name": "LoggingOrchestrator",
+  "version": "1.0.0",
+  "dependencies": [],
+  "enabled": true
+}

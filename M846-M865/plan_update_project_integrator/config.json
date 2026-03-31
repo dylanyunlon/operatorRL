@@ -1,0 +1,10 @@
+{
+  "module_id": "M865",
+  "module_name": "plan_update_project_integrator",
+  "class_name": "PlanUpdateProjectIntegrator",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846"
+  ],
+  "enabled": true
+}

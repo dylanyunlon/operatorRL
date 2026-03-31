@@ -1,0 +1,11 @@
+{
+  "module_id": "M853",
+  "module_name": "ranked_progression_tracker",
+  "class_name": "RankedProgressionTracker",
+  "version": "1.0.0",
+  "dependencies": [
+    "M846",
+    "M847"
+  ],
+  "enabled": true
+}
