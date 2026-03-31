@@ -3636,3 +3636,256 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 **M645** `integrations/lol-history/src/lol_history/history_intelligence_orchestrator.py` — **历史情报总编排器**
 查看 seraphine_history_orchestrator.py，遵循history_feedback_loop_orchestrator.py（M625）模式实现总编排。
 
+
+---
+
+### 阶段 AU: Fiddler深度协议分析 + 实战推理链 — 从协议捕获到决策输出的端到端管线（M646-M665）
+
+> **主题**: 将Fiddler协议捕获能力深度整合到实战推理链中，构建从原始HTTP数据包到玩家可听的语音决策指令的完整端到端管线。涵盖协议指纹库、会话状态机、流量分类、延迟追踪、序列分析、游戏状态投影、重放同步、推理链构建、异常到教练翻译、特征桥接、数据包优先级、健康基线、置信度评分、样本转换、事件映射、语音指令、MCP适配、遥测导出、以及总编排。
+
+---
+
+**M646** `extensions/fiddler_bridge/src/fiddler_protocol_fingerprint_library.py` — **Fiddler协议指纹库** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **endpoint dispatch + decode方式** 的实现方式，理解其模式，特别是endpoint→handler的O(1) dict映射如何保证前向兼容。可以从 **`game_event_pattern_library.py`（M615）** 这个好例子开始——它的store→query模式展示了可查询知识库的构建。然后，遵循该模式实现一个新的 **FiddlerProtocolFingerprintLibrary**，让 **协议分析管线** 可以 **从Fiddler捕获的数据包中提取并注册协议指纹（URL模式+响应结构+延迟特征）**，并能 **快速匹配新数据包到已知指纹、统计匹配命中率、淘汰过时指纹**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M647** `extensions/fiddler_bridge/src/fiddler_session_state_machine.py` — **Fiddler会话状态机** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_live_capture.py** 上现有 **会话生命周期管理方式** 的实现方式，理解其模式，特别是start→capture→stop的状态转换如何与线程安全结合。可以从 **`history_feedback_loop_orchestrator.py`（M625）** 这个好例子开始——它的register_step→run→get_status链展示了有限状态的生命周期管理。然后，遵循该模式实现一个新的 **FiddlerSessionStateMachine**，让 **Fiddler捕获引擎** 可以 **通过有限状态机（IDLE→CONNECTING→CAPTURING→PAUSED→STOPPED）管理会话生命周期**，并能 **注册状态转换钩子、记录状态转换历史、防止非法状态跳转**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M648** `extensions/protocol_decoder/src/protocol_traffic_classifier.py` — **协议流量分类器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **endpoint分类方式** 的实现方式，理解其模式。可以从 **`loss_pattern_classifier.py`（M621）** 这个好例子开始——它的多维分类 + 频率统计展示了分类器的基本模式。然后，遵循该模式实现一个新的 **ProtocolTrafficClassifier**，让 **协议解码管线** 可以 **将解码后的协议流量分类为游戏相关类别（gamestate/combat/shop/vision/movement/chat/system）**，并能 **统计各类别分布、支持自定义分类规则注册、追踪未分类流量比例**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M649** `extensions/protocol_decoder/src/protocol_latency_tracker.py` — **实时协议延迟追踪器** ✅
+
+查看 **agentlightning/inference/latency_monitor.py（M548）** 上现有 **延迟监控和阈值告警方式** 的实现方式，理解其模式。可以从 **fiddler_anomaly_detector.py** 的_RateTracker滑动窗口开始。然后，遵循该模式实现一个新的 **ProtocolLatencyTracker**，让 **协议健康监控** 可以 **按endpoint追踪协议延迟的p50/p90/p99分位数**，并能 **检测延迟退化趋势、按endpoint独立重置、支持evolution_callback通知**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M650** `extensions/protocol_decoder/src/protocol_sequence_analyzer.py` — **协议序列分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/cross_game_pattern_miner.py** 上现有 **跨局模式挖掘方式** 的实现方式，理解其模式。可以从 **fiddler_replay_recorder.py** 的时间序列记录模式开始。然后，遵循该模式实现一个新的 **ProtocolSequenceAnalyzer**，让 **推理管线** 可以 **分析协议消息的时间序列并检测重复模式（如固定顺序的API调用序列）**，并能 **基于历史序列预测下一个最可能的消息类型**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M651** `extensions/fiddler_bridge/src/fiddler_gamestate_projector.py` — **Fiddler到游戏状态投影器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **decode→normalized dict转换方式** 的实现方式，理解其模式。可以从 **`game_state_preprocessor.py`（M553）** 这个好例子开始——它的FeatureSpec注册 + 归一化展示了raw data到结构化state的转换。然后，遵循该模式实现一个新的 **FiddlerGamestateProjector**，让 **推理管线** 可以 **将原始Fiddler捕获数据包投影为结构化的游戏状态快照**，并能 **追踪字段覆盖率、支持自定义字段映射规则注册**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M652** `extensions/protocol_decoder/src/protocol_replay_synchronizer.py` — **协议重放同步器** ✅
+
+查看 **extensions/protocol_decoder/src/protocol_replay_engine.py** 上现有 **重放引擎方式** 的实现方式，理解其模式。可以从 **`replay_decision_auditor.py`（M612）** 这个好例子开始——它的逐帧回放 + 决策对比展示了时间同步的审计模式。然后，遵循该模式实现一个新的 **ProtocolReplaySynchronizer**，让 **赛后复盘管线** 可以 **按游戏时间轴同步回放协议记录**，并能 **精确seek到任意游戏时间点、提取时间范围内的所有协议帧**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M653** `integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py` — **实时推理链构建器** ✅
+
+查看 **agentlightning/inference/inference_pipeline_builder.py** 上现有 **推理管线构建方式** 的实现方式，理解其模式。可以从 **`live_history_fusion_engine.py`（M614）** 这个好例子开始——它的双源融合 + 动态权重展示了多阶段推理链的构建。然后，遵循该模式实现一个新的 **RealtimeInferenceChainBuilder**，让 **端到端推理管线** 可以 **通过add_stage→build→run链式接口构建推理链**，并能 **追踪每个阶段的执行耗时、在新游戏开始时重置链状态**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M654** `integrations/lol-history/src/lol_history/protocol_anomaly_coaching_translator.py` — **协议异常到教练建议转换器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_anomaly_detector.py** 上现有 **多类型异常检测方式** 的实现方式，理解其模式。可以从 **`history_driven_coaching_advisor.py`（M605）** 这个好例子开始——它的generate_ingame_advice展示了structured advice的生成。然后，遵循该模式实现一个新的 **ProtocolAnomalyCoachingTranslator**，让 **教练引擎** 可以 **将协议异常事件（延迟尖峰/服务器错误/空响应）翻译为可操作的教练建议**，并能 **支持自定义异常→建议映射规则注册、统计翻译频率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M655** `integrations/lol-history/src/lol_history/e2e_inference_pipeline_orchestrator.py` — **端到端推理管线编排器** ✅
+
+查看 **integrations/lol-history/src/lol_history/history_feedback_loop_orchestrator.py（M625）** 上现有 **管线编排方式** 的实现方式，理解其模式，特别是register_step→run→get_status的全流程编排。可以从 **`agentlightning/deployment/deployment_orchestrator.py`（M565）** 这个好例子开始——它的step→rollback链展示了容错编排。然后，遵循该模式实现一个新的 **E2EInferencePipelineOrchestrator**，让 **整个端到端推理管线** 可以 **通过统一入口编排从Fiddler捕获到决策输出的全流程**（模块注册→初始化→推理循环→健康检查→优雅关闭），并能 **隔离模块故障确保管线其余部分继续工作**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M656** `extensions/protocol_decoder/src/protocol_feature_bridge.py` — **协议数据到特征向量桥接器** ✅
+
+查看 **integrations/lol-history/src/lol_history/historical_feature_vector_builder.py（M602）** 上现有 **register_feature→build_vector方式** 的实现方式，理解其模式。可以从 **`extensions/protocol_decoder/src/dual_channel_fuser.py`** 的双源融合开始——它展示了多源数据到统一结构的转换。然后，遵循该模式实现一个新的 **ProtocolFeatureBridge**，让 **推理管线** 可以 **将原始协议数据通过注册的特征提取器转换为固定维度特征向量**，并能 **批量提取、追踪提取覆盖率和错误统计**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M657** `extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py` — **Fiddler数据包优先级排序器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_live_capture.py** 上现有 **URL/content-type过滤方式** 的实现方式，理解其模式。可以从 **`objective_priority_engine.py`** 的资源优先级计算模式开始。然后，遵循该模式实现一个新的 **FiddlerPacketPrioritizer**，让 **Fiddler捕获引擎** 可以 **按游戏相关性为数据包分配优先级评分（combat > shop > vision > movement > system）**，并能 **动态调整优先级规则权重、统计各优先级分布**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M658** `extensions/protocol_decoder/src/protocol_health_baseline_manager.py` — **协议健康基线管理器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_anomaly_detector.py** 上现有 **阈值检测方式** 的实现方式，理解其模式。可以从 **`strategy_drift_detector.py`（M608）** 这个好例子开始——它的add_snapshot→detect_drift展示了基线偏移检测。然后，遵循该模式实现一个新的 **ProtocolHealthBaselineManager**，让 **协议监控管线** 可以 **记录并管理协议健康基线指标**，并能 **将当前指标与基线对比检测偏离、使用指数移动平均渐进更新基线**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M659** `integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py` — **实时决策置信度评估器** ✅
+
+查看 **agentlightning/inference/confidence_calibrator.py（M552）** 上现有 **置信度校准方式** 的实现方式，理解其模式。可以从 **`protocol_latency_tracker.py`（M649）** 这个好例子开始——它的数据质量指标可以作为置信度因子。然后，遵循该模式实现一个新的 **RealtimeDecisionConfidenceScorer**，让 **推理管线** 可以 **基于协议数据质量（延迟、完整性、新鲜度）为实时决策评估置信度分数**，并能 **使用历史准确率数据校准置信度模型**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M660** `extensions/fiddler_bridge/src/fiddler_capture_to_sample_converter.py` — **Fiddler捕获到训练样本转换器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_training_pipeline.py** 上现有 **capture→clean→label→sample四阶段管线** 的实现方式，理解其模式。可以从 **`history_to_training_exporter.py`（M606）** 这个好例子开始——它的批量导出展示了数据到训练样本的转换。然后，遵循该模式实现一个新的 **FiddlerCaptureToSampleConverter**，让 **训练管线** 可以 **将Fiddler捕获会话批量转换为带标签的训练样本**，并能 **支持自定义标注策略、schema验证、转换统计**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M661** `extensions/protocol_decoder/src/protocol_event_game_mapper.py` — **协议事件到游戏事件映射器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **endpoint→handler映射方式** 的实现方式，理解其模式。可以从 **`game_event_pattern_library.py`（M615）** 这个好例子开始——它的事件模式存储展示了事件层级映射。然后，遵循该模式实现一个新的 **ProtocolEventGameMapper**，让 **推理管线** 可以 **将低层协议事件（HTTP请求/响应）映射为高层游戏事件（击杀/死亡/购买/插眼）**，并能 **追踪未映射事件、支持自定义映射规则注册**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M662** `integrations/lol-history/src/lol_history/realtime_voice_command_generator.py` — **实时语音指令生成器** ✅
+
+查看 **integrations/lol-history/src/lol_history/pregame_voice_briefer.py（M631）** 上现有 **语音简报生成方式** 的实现方式，理解其模式。可以从 **`e2e_inference_pipeline_orchestrator.py`（M655）** 这个好例子开始——它的run_cycle输出可以直接转换为语音指令。然后，遵循该模式实现一个新的 **RealtimeVoiceCommandGenerator**，让 **端到端推理管线** 可以 **将推理结果转换为简洁的语音指令文本**，并能 **设置紧急程度阈值、去重近期重复指令、追踪指令生成频率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M663** `extensions/fiddler_bridge/src/fiddler_mcp_server_adapter.py` — **Fiddler MCP服务端适配器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_live_capture.py** 上现有 **流量捕获和缓冲方式** 的实现方式，理解其模式。可以从 **`agentlightning/deployment/game_client_adapter.py`** 的客户端适配模式开始。然后，遵循该模式实现一个新的 **FiddlerMCPServerAdapter**，让 **operatorRL管线** 可以 **通过MCP协议连接到Fiddler Everywhere MCP Server（参考telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server/fiddler-mcp-server）**，并能 **订阅特定流量模式、轮询新数据包、监控连接健康**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M664** `integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py` — **端到端推理遥测导出器** ✅
+
+查看 **agentlightning/inference/inference_telemetry_exporter.py（M582）** 上现有 **遥测导出方式** 的实现方式，理解其模式。可以从 **`history_telemetry_dashboard.py`（M643）** 这个好例子开始——它的遥测聚合展示了多维度监控数据导出。然后，遵循该模式实现一个新的 **E2EInferenceTelemetryExporter**，让 **运维团队** 可以 **从端到端推理管线导出全链路遥测数据**（每个推理cycle的耗时/吞吐/错误率），并能 **支持json/csv/prometheus多种导出格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M665** `integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py` — **协议捕获到决策输出总编排器** ✅
+
+查看 **integrations/lol-history/src/lol_history/history_intelligence_orchestrator.py（M645）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **`e2e_inference_pipeline_orchestrator.py`（M655）** 这个好例子开始——它的register_module→initialize→run_cycle→shutdown展示了全生命周期编排。然后，遵循该模式实现一个新的 **CaptureToDecisionOrchestrator**，让 **整个Fiddler→协议解码→推理→决策→语音的端到端管线** 可以 **通过一个入口完成全流程编排**（M646-M664所有模块的统一注册、初始化、游戏循环、健康检查、优雅关闭），并能 **追踪每次游戏循环的全链路耗时和各阶段成功率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+### 阶段 AV: 多游戏协议适配层 + 跨游戏迁移学习基础（M666-M685）
+
+> **主题**: 将M646-M665构建的Fiddler→决策端到端管线抽象为跨游戏适配层，支持从LoL到Dota2/麻将的协议适配迁移，构建跨游戏的统一推理接口和训练数据格式标准。
+
+---
+
+**M666** `extensions/protocol_decoder/src/game_protocol_adapter_base.py` — **游戏协议适配器基类**
+
+查看 **extensions/protocol_decoder/src/dual_channel_fuser.py** 上现有 **双源融合方式** 的实现方式，理解其模式，特别是ingest→fuse的接口如何与数据源解耦。可以从 **`capture_to_decision_orchestrator.py`（M665）** 这个好例子开始——它的register_stage展示了可插拔的模块注册。然后，遵循该模式实现一个新的 **GameProtocolAdapterBase**，让 **跨游戏适配层** 可以 **定义统一的协议适配接口（connect/decode/normalize/disconnect）**，并能 **被LoL/Dota2/麻将各游戏的具体适配器继承实现**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M667** `extensions/protocol_decoder/src/lol_protocol_adapter.py` — **LoL协议适配器**
+
+查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **LoL Live Client Data解码方式** 的实现方式，理解其模式。可以从 **`game_protocol_adapter_base.py`（M666）** 这个好例子开始——它的统一接口定义展示了适配器模式。然后，遵循该模式实现一个新的 **LolProtocolAdapter**，让 **端到端管线** 可以 **通过统一接口适配LoL的Live Client Data API + Fiddler捕获**，并能 **将LoL特有的数据格式归一化为跨游戏通用格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M668** `extensions/protocol_decoder/src/dota2_protocol_adapter.py` — **Dota2协议适配器**
+
+查看 **dota2bot-OpenHyperAI/** 上现有 **Dota2 Game State Integration方式** 的实现方式，理解其模式。可以从 **`game_protocol_adapter_base.py`（M666）** 这个好例子开始。然后，遵循该模式实现一个新的 **Dota2ProtocolAdapter**，让 **端到端管线** 可以 **通过统一接口适配Dota2的GSI（Game State Integration）协议**，并能 **将Dota2特有的数据格式归一化为跨游戏通用格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M669** `extensions/protocol_decoder/src/mahjong_protocol_adapter.py` — **麻将协议适配器**
+
+查看 **Akagi/mitm/bridge/majsoul/liqi.py** 上现有 **雀魂Protobuf协议解码方式** 的实现方式，理解其模式。可以从 **`game_protocol_adapter_base.py`（M666）** 这个好例子开始。然后，遵循该模式实现一个新的 **MahjongProtocolAdapter**，让 **端到端管线** 可以 **通过统一接口适配雀魂麻将的MITM代理协议**，并能 **将麻将特有的数据格式（mjai协议）归一化为跨游戏通用格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M670** `extensions/protocol_decoder/src/universal_game_state_schema.py` — **通用游戏状态Schema**
+
+查看 **extensions/protocol_decoder/src/protocol_feature_bridge.py（M656）** 上现有 **特征注册方式** 的实现方式，理解其模式。可以从 **`historical_feature_vector_builder.py`（M602）** 这个好例子开始——它的FeatureSpec展示了schema化的字段定义。然后，遵循该模式实现一个新的 **UniversalGameStateSchema**，让 **跨游戏推理层** 可以 **定义并验证统一的游戏状态schema（玩家/对手/地图/资源/时间/事件）**，并能 **按游戏类型映射字段、schema版本管理**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M671** `integrations/lol-history/src/lol_history/cross_game_reward_normalizer.py` — **跨游戏奖励归一化器**
+
+查看 **integrations/lol/src/lol_agent/reward_shaper.py** 上现有 **compute_reward多维度评分方式** 的实现方式，理解其模式。可以从 **`historical_reward_reshaper.py`（M617）** 这个好例子开始——它的自适应权重展示了奖励调整。然后，遵循该模式实现一个新的 **CrossGameRewardNormalizer**，让 **训练管线** 可以 **将不同游戏的奖励信号归一化到统一尺度**，并能 **按游戏类型配置归一化策略**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M672** `extensions/protocol_decoder/src/cross_game_action_space_unifier.py` — **跨游戏动作空间统一器**
+
+查看 **integrations/lol/src/lol_agent/action_space_mapper.py** 上现有 **动作空间映射方式** 的实现方式，理解其模式。可以从 **`historical_action_space_profiler.py`（M620）** 这个好例子开始。然后，遵循该模式实现一个新的 **CrossGameActionSpaceUnifier**，让 **跨游戏推理层** 可以 **将不同游戏的动作空间映射到统一的抽象动作空间**，并能 **支持每个游戏的动作编码/解码**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M673** `integrations/lol-history/src/lol_history/cross_game_training_data_formatter.py` — **跨游戏训练数据格式化器**
+
+查看 **integrations/lol-history/src/lol_history/history_to_training_exporter.py（M606）** 上现有 **训练数据导出方式** 的实现方式，理解其模式。可以从 **`history_export_formatter.py`（M635）** 这个好例子开始——它的多格式导出展示了格式化层。然后，遵循该模式实现一个新的 **CrossGameTrainingDataFormatter**，让 **训练管线** 可以 **将不同游戏的训练数据格式化为统一的(state, action, reward)三元组格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M674** `extensions/protocol_decoder/src/game_adapter_registry.py` — **游戏适配器注册表**
+
+查看 **integrations/lol-history/src/lol_history/seraphine_deep_history_pipeline.py（M604）** 上现有 **模块注册方式** 的实现方式，理解其模式。可以从 **`capture_to_decision_orchestrator.py`（M665）** 的register_stage开始。然后，遵循该模式实现一个新的 **GameAdapterRegistry**，让 **跨游戏管线** 可以 **按游戏类型注册和查找协议适配器**，并能 **支持热插拔新游戏适配器、列出已注册适配器**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M675** `integrations/lol-history/src/lol_history/transfer_learning_feature_aligner.py` — **迁移学习特征对齐器**
+
+查看 **extensions/protocol_decoder/src/protocol_feature_bridge.py（M656）** 上现有 **特征提取方式** 的实现方式，理解其模式。可以从 **`universal_game_state_schema.py`（M670）** 的跨游戏schema开始。然后，遵循该模式实现一个新的 **TransferLearningFeatureAligner**，让 **迁移学习管线** 可以 **将源游戏的特征空间对齐到目标游戏的特征空间**，并能 **计算特征相似度、推荐可迁移特征**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M676** `integrations/lol-history/src/lol_history/cross_game_model_hub.py` — **跨游戏模型中心**
+
+查看 **agentos/governance/model_versioner.py** 上现有 **模型版本管理方式** 的实现方式，理解其模式。可以从 **`opponent_model_persistence.py`（M609）** 这个好例子开始——它的save→load→list_versions展示了持久化模式。然后，遵循该模式实现一个新的 **CrossGameModelHub**，让 **跨游戏管线** 可以 **按游戏类型管理和共享训练好的模型**，并能 **追踪模型血缘（哪个游戏的数据训练、迁移到哪个游戏）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M677** `extensions/protocol_decoder/src/protocol_adapter_test_harness.py` — **协议适配器测试工具**
+
+查看 **integrations/lol-history/src/lol_history/history_regression_test_runner.py（M644）** 上现有 **回归测试方式** 的实现方式，理解其模式。可以从 **`history_data_quality_checker.py`（M624）** 的schema验证开始。然后，遵循该模式实现一个新的 **ProtocolAdapterTestHarness**，让 **适配器开发者** 可以 **对新游戏适配器运行标准化兼容性测试**，并能 **生成兼容性报告、标记不合格的适配器**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M678** `integrations/lol-history/src/lol_history/cross_game_performance_comparator.py` — **跨游戏表现对比器**
+
+查看 **integrations/lol-history/src/lol_history/multi_queue_performance_splitter.py（M603）** 上现有 **多队列拆分方式** 的实现方式，理解其模式——改为per-game拆分。可以从 **`role_performance_tracker.py`（M589）** 的分组统计开始。然后，遵循该模式实现一个新的 **CrossGamePerformanceComparator**，让 **仪表盘** 可以 **对比玩家在不同游戏中的表现指标**，并能 **识别跨游戏的共性优势和弱点**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M679** `extensions/protocol_decoder/src/game_specific_decoder_factory.py` — **游戏特定解码器工厂**
+
+查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **解码器结构** 的实现方式，理解其模式。可以从 **`game_adapter_registry.py`（M674）** 的注册查找模式开始。然后，遵循该模式实现一个新的 **GameSpecificDecoderFactory**，让 **协议解码层** 可以 **按游戏类型工厂化创建对应的协议解码器实例**，并能 **缓存已创建的解码器实例避免重复初始化**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M680** `integrations/lol-history/src/lol_history/cross_game_coaching_template_engine.py` — **跨游戏教练模板引擎**
+
+查看 **integrations/lol-history/src/lol_history/history_driven_coaching_advisor.py（M605）** 上现有 **教练建议生成方式** 的实现方式，理解其模式。可以从 **`protocol_anomaly_coaching_translator.py`（M654）** 的rule→advice映射开始。然后，遵循该模式实现一个新的 **CrossGameCoachingTemplateEngine**，让 **教练系统** 可以 **使用跨游戏通用模板生成教练建议**（positioning、timing、resource management这些跨游戏通用概念），并能 **按游戏特化模板细节**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M681** `extensions/protocol_decoder/src/cross_game_telemetry_aggregator.py` — **跨游戏遥测聚合器**
+
+查看 **integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py（M664）** 上现有 **遥测导出方式** 的实现方式，理解其模式。可以从 **`history_telemetry_dashboard.py`（M643）** 的遥测聚合开始。然后，遵循该模式实现一个新的 **CrossGameTelemetryAggregator**，让 **运维** 可以 **聚合来自不同游戏适配器的遥测数据到统一仪表盘**，并能 **按游戏类型过滤和对比**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M682** `integrations/lol-history/src/lol_history/game_knowledge_transfer_engine.py` — **游戏知识迁移引擎**
+
+查看 **integrations/lol-history/src/lol_history/game_event_pattern_library.py（M615）** 上现有 **知识库方式** 的实现方式，理解其模式。可以从 **`transfer_learning_feature_aligner.py`（M675）** 的特征对齐开始。然后，遵循该模式实现一个新的 **GameKnowledgeTransferEngine**，让 **迁移学习管线** 可以 **将一个游戏中学到的策略知识迁移到另一个游戏**（如MOBA中的地图控制→麻将中的场面控制），并能 **评估迁移效果**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M683** `extensions/protocol_decoder/src/multi_game_session_manager.py` — **多游戏会话管理器**
+
+查看 **extensions/fiddler_bridge/src/fiddler_session_state_machine.py（M647）** 上现有 **会话状态机方式** 的实现方式，理解其模式。可以从 **`agentlightning/inference/inference_session_manager.py`** 的session生命周期开始。然后，遵循该模式实现一个新的 **MultiGameSessionManager**，让 **跨游戏管线** 可以 **同时管理多个游戏的捕获会话**，并能 **按游戏隔离资源、追踪各游戏会话状态**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M684** `integrations/lol-history/src/lol_history/cross_game_evolution_tracker.py` — **跨游戏自演化追踪器**
+
+查看 **agentos/governance/fitness_aggregator.py** 上现有 **get_trend趋势分析方式** 的实现方式，理解其模式。可以从 **`coaching_effectiveness_tracker.py`（M613）** 的效果评估开始。然后，遵循该模式实现一个新的 **CrossGameEvolutionTracker**，让 **自演化系统** 可以 **追踪模型在多个游戏上的演化进度**，并能 **检测跨游戏的正/负迁移效应**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M685** `integrations/lol-history/src/lol_history/multi_game_pipeline_orchestrator.py` — **多游戏管线总编排器**
+
+查看 **integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py（M665）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **`history_feedback_loop_orchestrator.py`（M625）** 的全流程编排开始。然后，遵循该模式实现一个新的 **MultiGamePipelineOrchestrator**，让 **整个跨游戏agentic系统** 可以 **通过一个入口管理所有游戏的端到端管线**（按游戏注册→初始化→路由→监控→关闭），并能 **在游戏之间共享可迁移的模型和知识**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
