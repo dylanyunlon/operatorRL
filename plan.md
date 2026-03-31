@@ -4399,3 +4399,304 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 
 查看 **integrations/lol-history/src/lol_history/history_to_live_fusion_orchestrator.py（M725）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **`history_feedback_loop_orchestrator.py`（M625）** 的全流程编排这个好例子开始。然后，遵循该模式实现一个新的 **IntelTrainingLoopOrchestrator**，让 **整个情报训练闭环** 可以 **通过一个入口编排M726-M744所有模块**（赛后评估→奖励生成→特征构建→训练导出→微调→A/B测试→上线），并能 **追踪训练循环进度和效果**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
 
+
+---
+
+## 三十六、M746-M765 完成报告（第二十四位Claude — Seraphine深层历史数据实时注入）
+
+### 阶段 AZ: Seraphine深层历史数据实时注入 — 将历史战绩直接融入实时决策推理（M746-M765）✅ 全部完成
+
+> **主题**: 将Seraphine项目的深层历史数据能力（LCU WebSocket、SGP端点、champion/rune/item数据库、进程监听）
+> 深度集成到operatorRL的实时决策管线。构建从召唤师身份解析→战绩深度解析→段位情报→
+> 英雄池画像→符文/出装预测→ARAM增伤→赛前情报聚合→语音简报→实时注入的完整管线。
+>
+> **核心洞察**: 历史战斗信息的获取对于当前进行的对战至关重要——了解对手的习惯、弱点、
+> 心态状态，可以在对局开始前就建立信息优势。
+>
+> **参考项目**: github.com/ljszx/Seraphine (connector.py, tools.py, opgg.py, aram.py, listener.py, champions.py)
+
+**M746** `integrations/lol-history/src/lol_history/summoner_identity_resolver.py` — **召唤师身份解析器** ✅
+
+查看 **Seraphine/app/lol/connector.py** 上现有 **getLoginSummonerByPid、getLolClientPid** 的实现方式，理解其模式，特别是puuid↔name↔account_id的多维映射。可以从 **Seraphine/app/lol/tools.py的getNameTagLineFromGame** 这个好例子开始。然后，遵循该模式实现一个新的 **SummonerIdentityResolver**，让 **情报管线** 可以 **通过puuid/name/tag任意标识符解析完整召唤师身份**，并能 **三级缓存（LCU本地→SGP区域→Riot API回退）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M747** `integrations/lol-history/src/lol_history/match_history_deep_enricher.py` — **战绩深度解析器** ✅
+
+查看 **Seraphine/app/lol/tools.py** 上现有 **parseGames** 的实现方式，理解其模式，特别是raw game list→structured game info的字段提取顺序。可以从 **parseRankInfo/parseRankInfoFromSGP** 的双源解析这个好例子开始。然后，遵循该模式实现一个新的 **MatchHistoryDeepEnricher**，让 **原始比赛数据** 可以 **一次调用完成KDA/出装/符文/对位/结果等全维度解析**，并能 **按team_id分离蓝红方（镜像Seraphine separateTeams）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M748** `integrations/lol-history/src/lol_history/rank_tier_intelligence_mapper.py` — **段位情报映射器** ✅
+
+查看 **Seraphine/app/lol/tools.py** 上现有 **parseRankInfo、translateTier** 的实现方式，理解其模式，特别是tier/division/LP→可比较数值分数的转换。可以从 **parseRankInfoFromSGP** 的SGP源解析这个好例子开始。然后，遵循该模式实现一个新的 **RankTierIntelligenceMapper**，让 **段位数据** 可以 **转化为可比较的数值分数（0-1000）并检测异常（代练/衰退/小号）**，并能 **双源支持（LCU + SGP）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M749** `integrations/lol-history/src/lol_history/recent_champions_profiler.py` — **近期英雄画像器** ✅
+
+查看 **Seraphine/app/lol/tools.py** 上现有 **getRecentChampions** 的实现方式，理解其模式，特别是game list→champion frequency的O(n)单遍扫描。可以从 **Seraphine/app/lol/champions.py** 的别名映射这个好例子开始。然后，遵循该模式实现一个新的 **RecentChampionsProfiler**，让 **对手的英雄池** 可以 **通过近期比赛数据量化为深度/多样性/绝活哥检测**，并能 **recency衰减加权（最近5局权重更高）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M750** `integrations/lol-history/src/lol_history/team_composition_intel_analyzer.py` — **阵容情报分析器** ✅
+
+查看 **Seraphine/app/lol/tools.py** 上现有 **separateTeams、getTeammates、getTeamColor** 的实现方式，理解其模式，特别是团队分离和角色排序。可以从 **parseSummonerOrder** 的角色排序逻辑这个好例子开始。然后，遵循该模式实现一个新的 **TeamCompositionIntelAnalyzer**，让 **阵容数据** 可以 **分类为archetypes（skirmish/teamfight/scaling/balanced）并提供选人阶段反馈**，并能 **对比两队阵容优势**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M751** `integrations/lol-history/src/lol_history/lcu_websocket_event_translator.py` — **LCU WebSocket事件翻译器** ✅
+
+查看 **Seraphine/app/lol/connector.py** 上现有 **LcuWebSocket.subscribe、matchUri** 的实现方式，理解其模式，特别是URI订阅+事件类型过滤的观察者模式。可以从 **Seraphine/app/lol/listener.py** 的进程轮询回调这个好例子开始。然后，遵循该模式实现一个新的 **LcuWebSocketEventTranslator**，让 **LCU原始WebSocket事件** 可以 **翻译为operatorRL标准事件格式（champ_select_update, gameflow_phase_change等）**，并能 **URI前缀匹配+订阅过滤**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M752** `integrations/lol-history/src/lol_history/pregame_intel_aggregator.py` — **赛前情报聚合器** ✅
+
+查看 **Seraphine/app/lol/tools.py** 上现有 **getAllyOrderByGameRole、getTeamColor、separateTeams** 的实现方式，理解其模式。可以从 **pregame_scout.py** 的赛前侦查模式这个好例子开始。然后，遵循该模式实现一个新的 **PregameIntelAggregator**，让 **选人阶段的10名玩家** 可以 **通过fan-out/fan-in查询所有情报源得到统一简报**，并能 **按威胁分数排序优先展示**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M753** `integrations/lol-history/src/lol_history/aram_intelligence_enricher.py` — **ARAM情报增强器** ✅
+
+查看 **Seraphine/app/lol/aram.py** 上现有 **AramBuff.getInfoByChampionId** 的实现方式，理解其模式，特别是按championId查询增伤/减伤修正值。可以从 **isAvailable、getDataVersion** 的数据新鲜度检查这个好例子开始。然后，遵循该模式实现一个新的 **AramIntelligenceEnricher**，让 **ARAM队列的英雄数据** 可以 **附加隐藏buff/nerf修正值并调整胜率预测**，并能 **对比两队ARAM隐藏优势**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M754** `integrations/lol-history/src/lol_history/game_flow_state_machine.py` — **游戏流程状态机** ✅
+
+查看 **Seraphine/app/lol/connector.py** 上现有 **gameflow-phase端点监控** 的实现方式，理解其模式。可以从 **Seraphine/app/lol/listener.py** 的LolProcessExistenceListener状态轮询这个好例子开始。然后，遵循该模式实现一个新的 **GameFlowStateMachine**，让 **LoL客户端的生命周期** 可以 **建模为确定性状态机（Lobby→ChampSelect→InProgress→EndOfGame）**，并能 **状态转换钩子自动触发赛前侦查/局内助手/赛后复盘**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M755** `integrations/lol-history/src/lol_history/summoner_spell_pattern_predictor.py` — **召唤师技能预测器** ✅
+
+查看 **Seraphine/app/lol/tools.py** 上现有 **participant spell1Id/spell2Id提取** 的实现方式，理解其模式。可以从 **Seraphine/app/lol/connector.py的getSummonerSpellList** 这个好例子开始。然后，遵循该模式实现一个新的 **SummonerSpellPatternPredictor**，让 **对手的召唤师技能选择** 可以 **从历史匹配数据预测（per-champion-per-role频率统计）**，并能 **追踪实时冷却时间**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M756** `integrations/lol-history/src/lol_history/item_build_path_intelligence.py` — **出装路线情报** ✅
+
+查看 **Seraphine/app/lol/opgg.py** 上现有 **OpggDataParser出装推荐数据** 的实现方式，理解其模式。可以从 **Seraphine/app/lol/connector.py的getItemIconPath** 物品数据库这个好例子开始。然后，遵循该模式实现一个新的 **ItemBuildPathIntelligence**，让 **对手的出装路线** 可以 **从历史匹配数据预测（前3件核心装备签名）并检测实时偏离**，并能 **按champion维度追踪出装胜率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M757** `integrations/lol-history/src/lol_history/sgp_endpoint_data_normalizer.py` — **SGP端点数据标准化器** ✅
+
+查看 **Seraphine/app/lol/connector.py** 上现有 **SGP端点URL和响应格式** 的实现方式，理解其模式。可以从 **Seraphine/app/lol/tools.py的parseRankInfoFromSGP、getTeammatesFromSGPGame** 这个好例子开始。然后，遵循该模式实现一个新的 **SgpEndpointDataNormalizer**，让 **LCU、SGP、Riot API三种数据源的响应** 可以 **标准化为统一格式（字段映射+自动源检测）**，并能 **幂等标准化（已标准化数据不变）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M758** `integrations/lol-history/src/lol_history/live_game_history_correlator_engine.py` — **实时对局历史关联引擎** ✅
+
+查看 **live_history_event_correlator.py（M596）** 上现有 **事件级关联** 的实现方式，理解其模式。可以从 **live_match_history_correlator.py（M558）** 的比赛级关联这个好例子开始。然后，遵循该模式实现一个新的 **LiveGameHistoryCorrelatorEngine**，让 **实时游戏事件** 可以 **与历史模式进行流式关联（per-time-bucket O(1)查找）**，并能 **增量更新关联分数、预测下一事件**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M759** `integrations/lol-history/src/lol_history/rune_selection_intelligence.py` — **符文选择情报** ✅
+
+查看 **Seraphine/app/lol/connector.py** 上现有 **getRuneIconPath、getRuneName、getPerkStyles** 的实现方式，理解其模式。可以从 **Seraphine/app/lol/tools.py** 的perkPrimaryStyle/perkSubStyle提取这个好例子开始。然后，遵循该模式实现一个新的 **RuneSelectionIntelligence**，让 **对手的符文页** 可以 **从历史数据预测（per-champion-per-role频率+胜率）并建议反制符文**，并能 **追踪符文使用分布**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M760** `integrations/lol-history/src/lol_history/multi_queue_performance_analyzer.py` — **多队列表现分析器** ✅
+
+查看 **Seraphine/app/lol/tools.py** 上现有 **parseGames queue_id过滤** 的实现方式，理解其模式。可以从 **Seraphine/app/lol/connector.py的getNameMapByQueueId** 队列标识这个好例子开始。然后，遵循该模式实现一个新的 **MultiQueuePerformanceAnalyzer**，让 **玩家在不同队列（单排/组排/ARAM）的表现** 可以 **独立分析并交叉比较（发现真实水平vs段位差异）**，并能 **检测异常（ARAM专精/段位与表现不符）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M761** `integrations/lol-history/src/lol_history/champion_alias_resolver.py` — **英雄别名解析器** ✅
+
+查看 **Seraphine/app/lol/champions.py** 上现有 **英雄别名/ID数据库** 的实现方式，理解其模式。可以从 **Seraphine/app/lol/connector.py的getChampionNameById、getChampionIdByName** 这个好例子开始。然后，遵循该模式实现一个新的 **ChampionAliasResolver**，让 **任何形式的英雄标识（ID/英文名/中文名/别名）** 可以 **统一解析为champion数据**，并能 **大小写无关+空格标准化+部分匹配**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M762** `integrations/lol-history/src/lol_history/process_lifecycle_monitor.py` — **进程生命周期监控器** ✅
+
+查看 **Seraphine/app/lol/listener.py** 上现有 **LolProcessExistenceListener** 的实现方式，理解其模式，特别是PID轮询、客户端切换检测、msleep(1500)间隔。然后，遵循该模式实现一个新的 **ProcessLifecycleMonitor**，让 **LoL客户端的启动/关闭/切换事件** 可以 **自动检测并触发回调（Observer模式）**，并能 **处理多客户端场景（多开检测）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M763** `integrations/lol-history/src/lol_history/history_injection_live_decision_adapter.py` — **历史注入实时决策适配器** ✅
+
+查看 **live_coaching_history_adapter.py（M576）** 上现有 **教练上下文注入** 的实现方式，理解其模式。可以从 **seraphine_inference_bridge.py（M581）** 的数据→推理管线桥接这个好例子开始。然后，遵循该模式实现一个新的 **HistoryInjectionLiveDecisionAdapter**，让 **历史情报模块的输出** 可以 **通过统一适配器注入实时决策引擎（context budget限制+staleness检测+优先级排序）**，并能 **graceful降级（数据源故障时部分注入）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M764** `integrations/lol-history/src/lol_history/history_intel_voice_briefer.py` — **历史情报语音简报器** ✅
+
+查看 **history_driven_voice_briefer.py（M602）** 上现有 **语音简报生成** 的实现方式，理解其模式。可以从 **pregame_voice_briefer.py（M598）** 的赛前语音输出这个好例子开始。然后，遵循该模式实现一个新的 **HistoryIntelVoiceBriefer**，让 **历史情报** 可以 **转化为≤30秒的语音简报文本（威胁优先+模板化+中文支持）**，并能 **TTS格式化输出**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M765** `integrations/lol-history/src/lol_history/deep_history_injection_orchestrator.py` — **深层历史注入总编排器** ✅
+
+查看 **intel_training_loop_orchestrator.py（M745）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **history_to_live_fusion_orchestrator.py（M725）** 的全流程编排这个好例子开始。然后，遵循该模式实现一个新的 **DeepHistoryInjectionOrchestrator**，让 **整个M746-M764管线** 可以 **通过一个入口按游戏阶段（pregame/ingame/postgame）编排所有模块**，并能 **模块健康追踪+故障隔离+graceful降级**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+### TDD测试统计
+
+| 指标 | 值 |
+|---|---|
+| 测试文件 | `integrations/lol-history/tests/test_m746_m765_deep_injection.py` |
+| 测试用例数 | 28 |
+| 首次运行通过 | 28/28 (100%) |
+| 覆盖模块 | M746, M747, M748, M749, M754, M755, M762, M765 |
+
+### 引用来源（拿来主義迁移记录）
+
+| 源文件 | 提取的模式 | 应用到模块 |
+|---|---|---|
+| Seraphine/app/lol/connector.py | LcuWebSocket.subscribe/matchUri, getLoginSummonerByPid | M746, M751 |
+| Seraphine/app/lol/tools.py | parseGames, getRecentChampions, separateTeams, parseRankInfo | M747, M748, M749, M750 |
+| Seraphine/app/lol/opgg.py | OpggDataParser build data patterns | M756 |
+| Seraphine/app/lol/aram.py | AramBuff.getInfoByChampionId, isAvailable | M753 |
+| Seraphine/app/lol/listener.py | LolProcessExistenceListener PID polling | M762 |
+| Seraphine/app/lol/champions.py | champion alias/id mapping | M761 |
+
+### 生产级质量审查（Knuth标准）
+
+**用户角度：**
+1. ✅ 所有模块返回`{"status": "ok", ...}`统一格式，前端不需要per-module error handling。
+2. ✅ 缓存TTL+max_cache防止内存泄漏（SummonerIdentityResolver）。
+3. ✅ 语音简报限制在30秒/75词以内，不会在对局中分散注意力。
+4. ⚠️ 潜在风险：GameFlowStateMachine允许无效转换（logged but accepted）——LCU可能跳过阶段，
+   严格校验会导致误拒。当前策略是宽容接受+日志警告，这是正确的。
+
+**系统角度：**
+1. ✅ 所有模块stateless或bounded-state（deque/OrderedDict with maxlen/max_cache）。
+2. ✅ 模块间零直接依赖——全部通过Orchestrator的register/process解耦。
+3. ✅ 每个模块独立可测试（get_stats返回完整内部状态）。
+4. ⚠️ LiveGameHistoryCorrelatorEngine的_compute_similarity使用欧几里得距离，
+   对于minimap坐标有效但对于不同分辨率的replay数据可能需要标准化。
+   当前threshold (2000) 适用于标准SR地图尺寸(14870x14870)。
+
+---
+
+## 三十七、M766-M785 新增任务规划
+
+### 阶段 BA: 实时对战辅助端到端集成 + 自演化反馈闭环加固（M766-M785）
+
+> **主题**: 将M746-M765的历史数据注入管线与实时对战辅助系统（Live Client Data API + Fiddler协议捕获）
+> 进行端到端集成，构建从游戏启动→赛前简报→实时建议→赛后复盘→训练数据回流→模型更新的完整闭环。
+> 同时加固自演化反馈循环的可靠性和可观测性。
+
+**M766** `integrations/lol-history/src/lol_history/live_client_data_poller.py` — **Live Client Data轮询器**
+
+查看 **integrations/lol-fiddler-agent/src/lol_fiddler_agent/network/live_client_data.py** 上现有 **Live Client Data API对接** 的实现方式，理解其模式，特别是https://127.0.0.1:2999/liveclientdata/端点的轮询。可以从 **Seraphine/app/lol/listener.py** 的轮询间隔控制这个好例子开始。然后，遵循该模式实现一个新的 **LiveClientDataPoller**，让 **实时游戏数据（allgamedata, activeplayer, playerlist, eventdata）** 可以 **按配置间隔轮询并推送到事件总线**，并能 **自动检测游戏开始/结束、SSL证书跳过、连接重试**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M767** `integrations/lol-history/src/lol_history/live_game_event_stream_processor.py` — **实时游戏事件流处理器**
+
+查看 **seraphine_event_stream_processor.py（M524）** 上现有 **事件流处理方式** 的实现方式，理解其模式。可以从 **lcu_websocket_event_translator.py（M751）** 的事件翻译这个好例子开始。然后，遵循该模式实现一个新的 **LiveGameEventStreamProcessor**，让 **Live Client Data的事件数据** 可以 **流式处理（击杀/死亡/助攻/物品购买/野怪击杀/防御塔/龙/男爵）**，并能 **事件去重+时间窗口聚合+下游分发**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M768** `integrations/lol-history/src/lol_history/realtime_gold_xp_tracker.py` — **实时金币经验追踪器**
+
+查看 **gold_efficiency_tracker.py** 上现有 **金币效率追踪** 的实现方式，理解其模式。可以从 **live_game_state_enricher.py** 的状态增强这个好例子开始。然后，遵循该模式实现一个新的 **RealtimeGoldXpTracker**，让 **每个玩家的金币和经验** 可以 **实时追踪并计算差值/趋势/效率**，并能 **检测金币spike事件（击杀赏金/关机赏金/平板）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M769** `integrations/lol-history/src/lol_history/realtime_minimap_tracker.py` — **实时小地图追踪器**
+
+查看 **minimap_annotator.py** 上现有 **小地图标注** 的实现方式，理解其模式。可以从 **danger_zone_detector.py** 的危险区域检测这个好例子开始。然后，遵循该模式实现一个新的 **RealtimMinimapTracker**，让 **玩家位置数据** 可以 **实时追踪并计算移动轨迹/聚集/分散/MIA检测**，并能 **与历史热力图关联预测gank路径**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M770** `integrations/lol-history/src/lol_history/ingame_decision_suggestion_engine.py` — **局内决策建议引擎**
+
+查看 **decision_engine.py** 上现有 **决策引擎** 的实现方式，理解其模式。可以从 **macro_decision_engine.py** 的宏观决策这个好例子开始。然后，遵循该模式实现一个新的 **IngameDecisionSuggestionEngine**，让 **实时游戏状态+历史情报** 可以 **生成具体的操作建议（推线/回城/团战/分推/做龙/做男爵）**，并能 **按游戏阶段（前期/中期/后期）调整建议优先级**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M771** `integrations/lol-history/src/lol_history/ingame_voice_narrator.py` — **局内语音解说器**
+
+查看 **history_intel_voice_briefer.py（M764）** 上现有 **语音简报生成** 的实现方式，理解其模式。可以从 **realtime_voice_command_generator.py** 的实时语音指令这个好例子开始。然后，遵循该模式实现一个新的 **IngameVoiceNarrator**，让 **局内决策建议** 可以 **转化为简短语音指令（≤5秒/≤15字）频率控制（≤1次/30秒）**，并能 **紧急度分级（flash/男爵/团战=立即，出装/回城=延迟）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M772** `integrations/lol-history/src/lol_history/postgame_data_collector.py` — **赛后数据收集器**
+
+查看 **postgame_data_harvester.py** 上现有 **赛后数据采集** 的实现方式，理解其模式。可以从 **postgame_auto_evaluator.py** 的自动评估这个好例子开始。然后，遵循该模式实现一个新的 **PostgameDataCollector**，让 **赛后统计数据** 可以 **自动收集（End of Game Stats Block + Match History API）并持久化到训练数据库**，并能 **与赛前预测进行对比（预测准确率评估）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M773** `integrations/lol-history/src/lol_history/evolution_feedback_signal_router.py` — **演化反馈信号路由器**
+
+查看 **history_evolution_bridge.py** 上现有 **演化桥接** 的实现方式，理解其模式。可以从 **intel_reward_signal_generator.py（M728）** 的奖励信号生成这个好例子开始。然后，遵循该模式实现一个新的 **EvolutionFeedbackSignalRouter**，让 **赛后的预测准确率、建议采纳率、胜率变化** 可以 **路由为evolution_callback信号分发到各个模块**，并能 **信号优先级排序+节流+批量发送**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M774** `integrations/lol-history/src/lol_history/model_version_rollback_manager.py` — **模型版本回滚管理器**
+
+查看 **intel_data_version_manager.py（M732）** 上现有 **版本管理** 的实现方式，理解其模式。可以从 **intel_ab_test_framework.py（M738）** 的A/B测试这个好例子开始。然后，遵循该模式实现一个新的 **ModelVersionRollbackManager**，让 **情报模型** 可以 **版本化管理（升级/回滚/快照）并在性能下降时自动回滚**，并能 **追踪每个版本的线上表现（胜率/准确率/延迟）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M775** `integrations/lol-history/src/lol_history/fiddler_protocol_live_enricher.py` — **Fiddler协议实时增强器**
+
+查看 **integrations/lol-fiddler-agent/src/lol_fiddler_agent/network/fiddler_client.py** 上现有 **Fiddler客户端** 的实现方式，理解其模式。可以从 **extensions/fiddler-bridge/fiddler_mcp_bridge.py** 的MCP桥接这个好例子开始。然后，遵循该模式实现一个新的 **FiddlerProtocolLiveEnricher**，让 **Fiddler捕获的网络协议数据** 可以 **增强Live Client Data API无法提供的信息（对手精确操作时序/服务器判定/minimap信号）**，并能 **双源融合（LCD + Fiddler协议）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M776** `integrations/lol-history/src/lol_history/e2e_game_session_orchestrator.py` — **端到端对局编排器**
+
+查看 **deep_history_injection_orchestrator.py（M765）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **game_flow_state_machine.py（M754）** 的游戏状态机这个好例子开始。然后，遵循该模式实现一个新的 **E2eGameSessionOrchestrator**，让 **一整局游戏（从检测客户端→赛前→局内→赛后→训练数据回流）** 可以 **通过一个入口自动编排30分钟的完整生命周期**，并能 **每阶段转换自动激活/停用相关模块**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M777** `integrations/lol-history/src/lol_history/suggestion_adherence_tracker.py` — **建议采纳追踪器**
+
+查看 **action_feedback_collector.py** 上现有 **行动反馈收集** 的实现方式，理解其模式。可以从 **coaching_effectiveness_tracker.py** 的教练有效性追踪这个好例子开始。然后，遵循该模式实现一个新的 **SuggestionAdherenceTracker**，让 **系统给出的每条建议** 可以 **追踪用户是否采纳以及采纳后的结果（正反馈/负反馈）**，并能 **计算per-suggestion-type的采纳率和有效率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M778** `integrations/lol-history/src/lol_history/pipeline_latency_profiler.py` — **管线延迟分析器**
+
+查看 **intel_pipeline_profiler.py（M743）** 上现有 **管线性能分析** 的实现方式，理解其模式。可以从 **e2e_inference_telemetry_exporter.py** 的遥测导出这个好例子开始。然后，遵循该模式实现一个新的 **PipelineLatencyProfiler**，让 **每个管线阶段（数据获取→特征构建→推理→语音输出）** 可以 **精确计时并识别瓶颈**，并能 **P50/P95/P99延迟统计+SLA违规告警**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M779** `integrations/lol-history/src/lol_history/training_data_quality_validator.py` — **训练数据质量验证器**
+
+查看 **history_data_quality_checker.py** 上现有 **数据质量检查** 的实现方式，理解其模式。可以从 **intel_pipeline_e2e_tester.py（M742）** 的端到端测试这个好例子开始。然后，遵循该模式实现一个新的 **TrainingDataQualityValidator**，让 **回流到训练管线的数据** 可以 **经过schema验证+字段完整性+异常值检测+数据倾斜检查**，并能 **拒绝低质量数据（不写入训练集）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M780** `integrations/lol-history/src/lol_history/cross_game_intel_transfer_adapter.py` — **跨游戏情报迁移适配器**
+
+查看 **game_knowledge_transfer_engine.py** 上现有 **跨游戏知识迁移** 的实现方式，理解其模式。可以从 **transfer_learning_feature_aligner.py** 的特征对齐这个好例子开始。然后，遵循该模式实现一个新的 **CrossGameIntelTransferAdapter**，让 **LoL的情报管线模式** 可以 **迁移到Dota2/麻将等其他游戏（通用接口+游戏特定实现）**，并能 **抽象共同概念（对手画像/预测/建议/反馈）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M781** `integrations/lol-history/src/lol_history/observability_metrics_exporter.py` — **可观测性指标导出器**
+
+查看 **e2e_inference_telemetry_exporter.py** 上现有 **遥测导出** 的实现方式，理解其模式。可以从 **realtime_dashboard_data_source.py** 的仪表盘数据这个好例子开始。然后，遵循该模式实现一个新的 **ObservabilityMetricsExporter**，让 **管线的所有运行指标** 可以 **导出为Prometheus/OpenTelemetry格式**，并能 **自定义指标标签（game_id/phase/module_name）+聚合周期**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M782** `integrations/lol-history/src/lol_history/user_preference_learner.py` — **用户偏好学习器**
+
+查看 **playstyle_classifier.py** 上现有 **风格分类** 的实现方式，理解其模式。可以从 **suggestion_adherence_tracker.py（M777）** 的建议采纳追踪这个好例子开始。然后，遵循该模式实现一个新的 **UserPreferenceLearner**，让 **用户的建议采纳/忽略模式** 可以 **学习用户偏好（aggressive/passive/objective-focused等）并调整未来建议**，并能 **per-game-phase偏好追踪**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M783** `integrations/lol-history/src/lol_history/resilience_circuit_breaker.py` — **弹性熔断器**
+
+查看 **circuit_breaker.py** 上现有 **熔断器** 的实现方式，理解其模式。可以从 **intel_pipeline_fault_hardener.py（M744）** 的容错增强这个好例子开始。然后，遵循该模式实现一个新的 **ResilienceCircuitBreaker**，让 **每个外部依赖（Riot API/LCU/SGP/Fiddler）** 可以 **独立熔断+半开探测+自动恢复**，并能 **追踪熔断历史和恢复成功率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M784** `integrations/lol-history/src/lol_history/session_replay_exporter.py` — **对局回放导出器**
+
+查看 **replay_decision_auditor.py** 上现有 **决策审计** 的实现方式，理解其模式。可以从 **match_replay_analyzer.py** 的回放分析这个好例子开始。然后，遵循该模式实现一个新的 **SessionReplayExporter**，让 **一整局的决策日志（建议+实际操作+结果）** 可以 **导出为可回放的时间线格式**，并能 **支持离线复盘和训练数据标注**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M785** `integrations/lol-history/src/lol_history/e2e_realtime_assist_pipeline_orchestrator.py` — **端到端实时辅助管线总编排器**
+
+查看 **deep_history_injection_orchestrator.py（M765）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **e2e_game_session_orchestrator.py（M776）** 的对局编排这个好例子开始。然后，遵循该模式实现一个新的 **E2eRealtimeAssistPipelineOrchestrator**，让 **M766-M784的所有模块** 可以 **通过一个入口编排完整的实时辅助管线（数据采集→分析→建议→语音→反馈→训练）**，并能 **管线级健康监控+故障自愈+性能SLA追踪**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
