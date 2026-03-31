@@ -1,0 +1,1765 @@
+{
+  "timestamp": "2026-03-31T13:57:48.905784",
+  "system": "M826-M845 Diagnostic Logging System",
+  "project": "github.com/dylanyunlon/operatorRL.git",
+  "subsystem": "M846-M865 Historical Battle Data Deep Integration",
+  "modules": {
+    "M846": {
+      "module_id": "M846",
+      "module_name": "logging_orchestrator",
+      "file": "logging_orchestrator.py",
+      "lines": 1013,
+      "classes": 8,
+      "class_names": [
+        "LoggingOrchestratorState",
+        "EventSeverity",
+        "LoggingOrchestratorConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "LoggingOrchestrator"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 14.2,
+      "max_method_length": 89,
+      "complexity_indicators": 21,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M846: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M846: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M846: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M846: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M846: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M846: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M846: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M846: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M846: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M847": {
+      "module_id": "M847",
+      "module_name": "historical_match_crawler",
+      "file": "historical_match_crawler.py",
+      "lines": 1119,
+      "classes": 8,
+      "class_names": [
+        "HistoricalMatchCrawlerState",
+        "EventSeverity",
+        "HistoricalMatchCrawlerConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "HistoricalMatchCrawler"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 16.1,
+      "max_method_length": 89,
+      "complexity_indicators": 29,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M847: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M847: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M847: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M847: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M847: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M847: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M847: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M847: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M847: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M848": {
+      "module_id": "M848",
+      "module_name": "summoner_deep_profiler",
+      "file": "summoner_deep_profiler.py",
+      "lines": 1213,
+      "classes": 8,
+      "class_names": [
+        "SummonerDeepProfilerState",
+        "EventSeverity",
+        "SummonerDeepProfilerConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "SummonerDeepProfiler"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 17.9,
+      "max_method_length": 89,
+      "complexity_indicators": 38,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M848: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M848: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M848: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M848: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M848: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M848: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M848: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M848: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M848: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M849": {
+      "module_id": "M849",
+      "module_name": "match_timeline_reconstructor",
+      "file": "match_timeline_reconstructor.py",
+      "lines": 1135,
+      "classes": 8,
+      "class_names": [
+        "MatchTimelineReconstructorState",
+        "EventSeverity",
+        "MatchTimelineReconstructorConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "MatchTimelineReconstructor"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 16.4,
+      "max_method_length": 89,
+      "complexity_indicators": 37,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M849: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M849: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M849: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M849: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M849: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M849: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M849: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M849: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M849: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M850": {
+      "module_id": "M850",
+      "module_name": "champion_mastery_analyzer",
+      "file": "champion_mastery_analyzer.py",
+      "lines": 1153,
+      "classes": 8,
+      "class_names": [
+        "ChampionMasteryAnalyzerState",
+        "EventSeverity",
+        "ChampionMasteryAnalyzerConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "ChampionMasteryAnalyzer"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 16.8,
+      "max_method_length": 89,
+      "complexity_indicators": 28,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M850: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M850: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M850: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M850: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M850: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M850: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M850: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M850: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M850: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M851": {
+      "module_id": "M851",
+      "module_name": "team_comp_historical_evaluator",
+      "file": "team_comp_historical_evaluator.py",
+      "lines": 1101,
+      "classes": 8,
+      "class_names": [
+        "TeamCompHistoricalEvaluatorState",
+        "EventSeverity",
+        "TeamCompHistoricalEvaluatorConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "TeamCompHistoricalEvaluator"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 15.8,
+      "max_method_length": 89,
+      "complexity_indicators": 27,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M851: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M851: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M851: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M851: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M851: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M851: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M851: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M851: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M851: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M852": {
+      "module_id": "M852",
+      "module_name": "opponent_scouting_engine",
+      "file": "opponent_scouting_engine.py",
+      "lines": 1163,
+      "classes": 8,
+      "class_names": [
+        "OpponentScoutingEngineState",
+        "EventSeverity",
+        "OpponentScoutingEngineConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "OpponentScoutingEngine"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 16.9,
+      "max_method_length": 89,
+      "complexity_indicators": 38,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M852: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M852: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M852: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M852: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M852: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M852: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M852: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M852: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M852: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M853": {
+      "module_id": "M853",
+      "module_name": "ranked_progression_tracker",
+      "file": "ranked_progression_tracker.py",
+      "lines": 1159,
+      "classes": 8,
+      "class_names": [
+        "RankedProgressionTrackerState",
+        "EventSeverity",
+        "RankedProgressionTrackerConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "RankedProgressionTracker"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 16.9,
+      "max_method_length": 89,
+      "complexity_indicators": 36,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M853: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M853: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M853: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M853: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M853: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M853: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M853: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M853: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M853: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M854": {
+      "module_id": "M854",
+      "module_name": "game_flow_session_monitor",
+      "file": "game_flow_session_monitor.py",
+      "lines": 1053,
+      "classes": 8,
+      "class_names": [
+        "GameFlowSessionMonitorState",
+        "EventSeverity",
+        "GameFlowSessionMonitorConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "GameFlowSessionMonitor"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 14.9,
+      "max_method_length": 89,
+      "complexity_indicators": 25,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M854: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M854: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M854: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M854: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M854: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M854: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M854: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M854: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M854: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M855": {
+      "module_id": "M855",
+      "module_name": "rune_item_build_optimizer",
+      "file": "rune_item_build_optimizer.py",
+      "lines": 1144,
+      "classes": 8,
+      "class_names": [
+        "RuneItemBuildOptimizerState",
+        "EventSeverity",
+        "RuneItemBuildOptimizerConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "RuneItemBuildOptimizer"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 16.6,
+      "max_method_length": 89,
+      "complexity_indicators": 27,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M855: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M855: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M855: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M855: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M855: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M855: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M855: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M855: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M855: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M856": {
+      "module_id": "M856",
+      "module_name": "ban_pick_suggestion_engine",
+      "file": "ban_pick_suggestion_engine.py",
+      "lines": 1109,
+      "classes": 8,
+      "class_names": [
+        "BanPickSuggestionEngineState",
+        "EventSeverity",
+        "BanPickSuggestionEngineConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "BanPickSuggestionEngine"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 15.9,
+      "max_method_length": 89,
+      "complexity_indicators": 26,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M856: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M856: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M856: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M856: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M856: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M856: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M856: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M856: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M856: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M857": {
+      "module_id": "M857",
+      "module_name": "vision_score_analyzer",
+      "file": "vision_score_analyzer.py",
+      "lines": 1179,
+      "classes": 8,
+      "class_names": [
+        "VisionScoreAnalyzerState",
+        "EventSeverity",
+        "VisionScoreAnalyzerConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "VisionScoreAnalyzer"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 17.2,
+      "max_method_length": 89,
+      "complexity_indicators": 38,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M857: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M857: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M857: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M857: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M857: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M857: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M857: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M857: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M857: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M858": {
+      "module_id": "M858",
+      "module_name": "objective_control_predictor",
+      "file": "objective_control_predictor.py",
+      "lines": 1160,
+      "classes": 8,
+      "class_names": [
+        "ObjectiveControlPredictorState",
+        "EventSeverity",
+        "ObjectiveControlPredictorConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "ObjectiveControlPredictor"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 16.9,
+      "max_method_length": 89,
+      "complexity_indicators": 33,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M858: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M858: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M858: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M858: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M858: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M858: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M858: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M858: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M858: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M859": {
+      "module_id": "M859",
+      "module_name": "network_protocol_decoder",
+      "file": "network_protocol_decoder.py",
+      "lines": 1040,
+      "classes": 8,
+      "class_names": [
+        "NetworkProtocolDecoderState",
+        "EventSeverity",
+        "NetworkProtocolDecoderConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "NetworkProtocolDecoder"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 14.7,
+      "max_method_length": 89,
+      "complexity_indicators": 21,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M859: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M859: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M859: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M859: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M859: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M859: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M859: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M859: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M859: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M860": {
+      "module_id": "M860",
+      "module_name": "cross_match_pattern_miner",
+      "file": "cross_match_pattern_miner.py",
+      "lines": 1166,
+      "classes": 8,
+      "class_names": [
+        "CrossMatchPatternMinerState",
+        "EventSeverity",
+        "CrossMatchPatternMinerConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "CrossMatchPatternMiner"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 17.0,
+      "max_method_length": 89,
+      "complexity_indicators": 36,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M860: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M860: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M860: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M860: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M860: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M860: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M860: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M860: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M860: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M861": {
+      "module_id": "M861",
+      "module_name": "realtime_strategy_recommender",
+      "file": "realtime_strategy_recommender.py",
+      "lines": 1191,
+      "classes": 8,
+      "class_names": [
+        "RealtimeStrategyRecommenderState",
+        "EventSeverity",
+        "RealtimeStrategyRecommenderConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "RealtimeStrategyRecommender"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 17.5,
+      "max_method_length": 89,
+      "complexity_indicators": 29,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M861: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M861: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M861: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M861: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M861: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M861: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M861: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M861: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M861: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M862": {
+      "module_id": "M862",
+      "module_name": "voice_alert_system_tts",
+      "file": "voice_alert_system_tts.py",
+      "lines": 1019,
+      "classes": 8,
+      "class_names": [
+        "VoiceAlertSystemTTSState",
+        "EventSeverity",
+        "VoiceAlertSystemTTSConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "VoiceAlertSystemTTS"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 14.3,
+      "max_method_length": 89,
+      "complexity_indicators": 22,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M862: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M862: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M862: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M862: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M862: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M862: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M862: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M862: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M862: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M863": {
+      "module_id": "M863",
+      "module_name": "performance_regression_detector",
+      "file": "performance_regression_detector.py",
+      "lines": 1180,
+      "classes": 8,
+      "class_names": [
+        "PerformanceRegressionDetectorState",
+        "EventSeverity",
+        "PerformanceRegressionDetectorConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "PerformanceRegressionDetector"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 17.3,
+      "max_method_length": 89,
+      "complexity_indicators": 37,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M863: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M863: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M863: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M863: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M863: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M863: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M863: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M863: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M863: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M864": {
+      "module_id": "M864",
+      "module_name": "dashboard_data_aggregation_api",
+      "file": "dashboard_data_aggregation_api.py",
+      "lines": 1107,
+      "classes": 8,
+      "class_names": [
+        "DashboardDataAggregationAPIState",
+        "EventSeverity",
+        "DashboardDataAggregationAPIConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "DashboardDataAggregationAPI"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 15.9,
+      "max_method_length": 89,
+      "complexity_indicators": 27,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M864: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M864: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M864: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M864: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M864: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M864: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M864: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M864: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M864: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    },
+    "M865": {
+      "module_id": "M865",
+      "module_name": "plan_update_project_integrator",
+      "file": "plan_update_project_integrator.py",
+      "lines": 1077,
+      "classes": 8,
+      "class_names": [
+        "PlanUpdateProjectIntegratorState",
+        "EventSeverity",
+        "PlanUpdateProjectIntegratorConfig",
+        "ModuleEvent",
+        "TTLCache",
+        "RateLimiter",
+        "MetricsCollector",
+        "PlanUpdateProjectIntegrator"
+      ],
+      "functions": 54,
+      "async_functions": 0,
+      "enums": [],
+      "error_classes": [],
+      "try_except_blocks": 13,
+      "type_hints": 31,
+      "has_property": false,
+      "has_async_context": false,
+      "avg_method_length": 15.4,
+      "max_method_length": 89,
+      "complexity_indicators": 20,
+      "improvements": [
+        {
+          "category": "seraphine_integration",
+          "priority": "HIGH",
+          "description": "M865: Deepen Seraphine LCU connector pattern - add WebSocket event subscription following Seraphine's LcuWebSocket.subscribe() pattern for real-time data push",
+          "estimated_lines": 45
+        },
+        {
+          "category": "fiddler_mcp",
+          "priority": "HIGH",
+          "description": "M865: Add Fiddler MCP Server integration layer - HTTP traffic analysis via localhost:8868/mcp with ApiKey auth, HAR export parsing, and request classification",
+          "estimated_lines": 60
+        },
+        {
+          "category": "agentic_loop",
+          "priority": "CRITICAL",
+          "description": "M865: Implement self-evolution feedback loop - capture module performance metrics, feed into GovernedEnvironment.step() reward signal for PPO training cycle",
+          "estimated_lines": 55
+        },
+        {
+          "category": "async_patterns",
+          "priority": "HIGH",
+          "description": "M865: Add async data pipeline with asyncio.gather() for parallel Riot API requests, following Seraphine's concurrent fetch pattern",
+          "estimated_lines": 50
+        },
+        {
+          "category": "data_validation",
+          "priority": "MEDIUM",
+          "description": "M865: Add comprehensive input validation layer with schema enforcement for all Riot API response parsing, preventing silent data corruption",
+          "estimated_lines": 35
+        },
+        {
+          "category": "telemetry",
+          "priority": "HIGH",
+          "description": "M865: Integrate OpenTelemetry spans for distributed tracing across the M846-M865 subsystem, connecting to agentlightning/tracer/otel.py",
+          "estimated_lines": 40
+        },
+        {
+          "category": "caching",
+          "priority": "MEDIUM",
+          "description": "M865: Implement multi-tier cache (L1 memory LRU + L2 disk sqlite) with configurable TTL per endpoint and cross-module cache invalidation bus",
+          "estimated_lines": 50
+        },
+        {
+          "category": "proxifier",
+          "priority": "HIGH",
+          "description": "M865: Add Proxifier configuration validator - verify LoL client traffic routing through Fiddler proxy, detect certificate pinning issues",
+          "estimated_lines": 35
+        },
+        {
+          "category": "correlation",
+          "priority": "HIGH",
+          "description": "M865: Build cross-match correlation engine connecting historical battle data to real-time game state for predictive analysis",
+          "estimated_lines": 45
+        }
+      ],
+      "improvement_count": 9,
+      "target_lines": 500,
+      "status": "NEEDS_UPGRADE"
+    }
+  },
+  "summary": {
+    "total_modules": 20,
+    "total_lines": 22481,
+    "total_classes": 160,
+    "total_methods": 1080,
+    "total_improvements": 180,
+    "avg_lines_per_module": 1124.0,
+    "reference_projects": [
+      "github.com/ljszx/Seraphine",
+      "github.com/oracle-devrel/leagueoflegends-optimizer",
+      "github.com/forest0xia/dota2bot-OpenHyperAI",
+      "telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server",
+      "github.com/dylanyunlon/operatorRL"
+    ],
+    "network_capture_verdict": "Fiddler + Proxifier (zero hallucination, full API data, <10ms latency)",
+    "vision_fallback": "Only when network capture blocked by certificate pinning"
+  }
+}

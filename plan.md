@@ -4827,3 +4827,202 @@ Proxifier可配置游戏协议走Fiddler：游戏进程`League of Legends.exe`�
 5. **operatorRL** (`github.com/dylanyunlon/operatorRL`) — 本项目主仓库
    - 自部署、自环境反馈、自演化模型系统
 
+
+---
+
+## M826-M845: Historical Battle Data Improvement Subsystem
+
+**Generated:** 2026-03-31
+**Claude Instance:** #28 (M826-M845)
+**Project:** github.com/dylanyunlon/operatorRL.git
+**Total Files:** 23
+**Total Python Lines:** 20,688
+
+### Architecture Overview
+
+M826-M845 implements the **improvement layer** for M846-M865 Historical Battle Data modules.
+Built from diagnostic analysis of all 20 M846-M865 modules (180 improvement findings across
+10 categories), this subsystem provides production-grade infrastructure that the existing
+modules consume.
+
+### Diagnostic-Driven Design
+
+The diagnostic logging system (`M846-M865/diagnostic_logging_system.py`) analyzed all 20
+existing modules and identified 9 improvement areas per module:
+
+1. **Seraphine LCU Integration Depth** → M826, M836
+2. **Fiddler MCP Server Integration** → M827, M837, M844
+3. **Agentic Self-Evolution Loop** → M828
+4. **Async Riot API Pipeline** → M829, M840
+5. **Data Validation / ETL** → M830, M838
+6. **OpenTelemetry Distributed Tracing** → M831, M845
+7. **Multi-Tier Cache Engine** → M832
+8. **Proxifier Configuration Validation** → M833
+9. **Cross-Match Correlation** → M834, M839, M841, M842, M843
+10. **Circuit Breaker Resilience** → M835
+
+### Network Capture vs Vision: Confirmed Decision
+
+**Network capture (Fiddler + Proxifier) is the production choice.**
+
+| Criterion | Network Capture | Vision/Screen |
+|-----------|----------------|---------------|
+| Hallucination | Zero - raw data | High - OCR errors |
+| Completeness | Full API responses | Visible UI only |
+| Performance | Minimal proxy overhead | Heavy (14fps + CV) |
+| Implementation | Proxifier→Fiddler→OperatorRL | Capture + model |
+| Skill match | Reverse engineering | CV/ML expertise |
+| Latency | <10ms/request | 70-200ms/frame |
+| Data fidelity | Exact JSON from Riot API | Interpreted pixels |
+
+Fiddler MCP integration (M827) provides direct AI-powered traffic analysis via
+`localhost:8868/mcp`. Proxifier routes LoL client traffic through Fiddler for
+complete HTTPS interception. Configuration validated by ProxifierConfigValidator (M833).
+
+### Implementation Template Pattern
+
+查看 Seraphine 上现有 LCU connector 的实现方式，理解其模式，特别是代码和接口是
+如何分离的。从 connector.py 这个好例子开始。然后，遵循该模式实现一个新的
+SeraphineLcuWebSocketBridge(M826)，让 LCU WebSocket 可以实时推送事件数据，并能通过
+RateLimiter 控制请求频率。接着 FiddlerMcpIntegrationLayer(M827) 引入 Fiddler MCP
+连接层，使 AgenticSelfEvolutionLoop(M828) 能够捕获模块性能数据反馈到 RL 训练循环，
+同时 AsyncRiotApiPipeline(M829) 优化并行 API 请求吞吐。随后
+RiotResponseSchemaValidator(M830) 整合响应校验，令 OtelDistributedTracer(M831) 支持
+分布式追踪，进而 MultiTierCacheEngine(M832) 增强多级缓存。
+ProxifierConfigValidator(M833) 完善代理配置验证，CrossMatchCorrelationEngine(M834)
+连接历史数据与实时状态，CircuitBreakerResilience(M835) 提供熔断器容错。
+LcuLockfilePortDetector(M836) 动态检测 LCU 端口，HarTrafficAnalyzer(M837) 解析
+Fiddler HAR 导出，MatchDataEtlPipeline(M838) 构建 ETL 数据管道。
+ChampionMetaTrendAnalyzer(M839) 分析英雄 Meta 趋势，LiveGameStateAggregator(M840)
+聚合实时游戏数据，SummonerBehaviorClassifier(M841) 分类玩家行为模式。
+TeamSynergyCalculator(M842) 计算阵容协同，ObjectivePriorityRanker(M843) 排序
+目标优先级，NetworkPacketReplayEngine(M844) 支持流量回放测试。最终
+PlanUpdateM826M845Integrator(M845) 完善计划文档更新，确保系统文档与代码同步，
+全面升级改进层以达成生产级 AI 辅助目标。
+
+### Module Overview
+
+| ID | Module | Lines | Status | Deps |
+|-----|--------|-------|--------|------|
+| M826 | SeraphineLcuWebSocketBridge | 1036 | COMPLETE | M846,M847 |
+| M827 | FiddlerMcpIntegrationLayer | 1073 | COMPLETE | M846,M859 |
+| M828 | AgenticSelfEvolutionLoop | 1053 | COMPLETE | M846 |
+| M829 | AsyncRiotApiPipeline | 1030 | COMPLETE | M846,M847 |
+| M830 | RiotResponseSchemaValidator | 978 | COMPLETE | M846 |
+| M831 | OtelDistributedTracer | 975 | COMPLETE | M846 |
+| M832 | MultiTierCacheEngine | 1051 | COMPLETE | M846 |
+| M833 | ProxifierConfigValidator | 1026 | COMPLETE | M846,M859 |
+| M834 | CrossMatchCorrelationEngine | 1084 | COMPLETE | M846,M847,M849,M860 |
+| M835 | CircuitBreakerResilience | 1005 | COMPLETE | M846 |
+| M836 | LcuLockfilePortDetector | 980 | COMPLETE | M846 |
+| M837 | HarTrafficAnalyzer | 1054 | COMPLETE | M846,M827 |
+| M838 | MatchDataEtlPipeline | 1039 | COMPLETE | M846,M847,M849 |
+| M839 | ChampionMetaTrendAnalyzer | 1061 | COMPLETE | M846,M850,M860 |
+| M840 | LiveGameStateAggregator | 1057 | COMPLETE | M846,M854 |
+| M841 | SummonerBehaviorClassifier | 1083 | COMPLETE | M846,M848,M852 |
+| M842 | TeamSynergyCalculator | 1048 | COMPLETE | M846,M851,M856 |
+| M843 | ObjectivePriorityRanker | 1038 | COMPLETE | M846,M858 |
+| M844 | NetworkPacketReplayEngine | 1022 | COMPLETE | M846,M827,M859 |
+| M845 | PlanUpdateM826M845Integrator | 995 | COMPLETE | M846,M865 |
+
+### System Data Flow
+
+```
+M826-M845 Improvement Layer
+============================
+
+LCU WebSocket Events ← SeraphineLcuWebSocketBridge(M826)
+       │                        │
+LCU Lockfile ← LcuLockfilePortDetector(M836)
+       │                        │
+Fiddler MCP ← FiddlerMcpIntegrationLayer(M827) → HarTrafficAnalyzer(M837)
+       │                        │
+Proxifier Config ← ProxifierConfigValidator(M833)
+       │                        │
+       └──→ AsyncRiotApiPipeline(M829) ──→ RiotResponseSchemaValidator(M830)
+                    │                              │
+            MatchDataEtlPipeline(M838) ← validated data
+                    │
+            MultiTierCacheEngine(M832) ← all modules
+                    │
+            CrossMatchCorrelationEngine(M834) ──→ ChampionMetaTrendAnalyzer(M839)
+                    │                                     │
+            SummonerBehaviorClassifier(M841) ← LiveGameStateAggregator(M840)
+                    │                                     │
+            TeamSynergyCalculator(M842) ──→ ObjectivePriorityRanker(M843)
+                    │
+            CircuitBreakerResilience(M835) ← all external calls
+                    │
+            OtelDistributedTracer(M831) ← all modules
+                    │
+            AgenticSelfEvolutionLoop(M828) → operatorRL GovernedEnvironment
+                    │
+            NetworkPacketReplayEngine(M844) ← offline testing
+                    │
+            PlanUpdateM826M845Integrator(M845) → plan.md
+```
+
+### Reference Projects
+
+- **Seraphine** (`github.com/ljszx/Seraphine`): LCU connector.py patterns, WebSocket subscription, lockfile detection
+- **dota2bot-OpenHyperAI** (`github.com/forest0xia/dota2bot-OpenHyperAI`): MOBA strategy AI patterns
+- **leagueoflegends-optimizer** (`github.com/oracle-devrel/leagueoflegends-optimizer`): Live Client Data API, ML prediction
+- **Fiddler MCP Server** (`telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server`): Network analysis via MCP
+- **operatorRL** (`github.com/dylanyunlon/operatorRL`): Parent agentic self-evolution system
+
+### Complete File Inventory
+
+| # | File | Bytes | Lines | Type |
+|---|------|-------|-------|------|
+| 1 | `__init__.py` | 1,522 | 22 | Python |
+| 2 | `seraphine_lcu_websocket_bridge.py` | 37,916 | 1,036 | Python |
+| 3 | `fiddler_mcp_integration_layer.py` | 39,484 | 1,073 | Python |
+| 4 | `agentic_self_evolution_loop.py` | 39,359 | 1,053 | Python |
+| 5 | `async_riot_api_pipeline.py` | 37,860 | 1,030 | Python |
+| 6 | `riot_response_schema_validator.py` | 36,333 | 978 | Python |
+| 7 | `otel_distributed_tracer.py` | 34,965 | 975 | Python |
+| 8 | `multi_tier_cache_engine.py` | 37,622 | 1,051 | Python |
+| 9 | `proxifier_config_validator.py` | 38,114 | 1,026 | Python |
+| 10 | `cross_match_correlation_engine.py` | 41,163 | 1,084 | Python |
+| 11 | `circuit_breaker_resilience.py` | 37,075 | 1,005 | Python |
+| 12 | `lcu_lockfile_port_detector.py` | 35,817 | 980 | Python |
+| 13 | `har_traffic_analyzer.py` | 39,103 | 1,054 | Python |
+| 14 | `match_data_etl_pipeline.py` | 38,142 | 1,039 | Python |
+| 15 | `champion_meta_trend_analyzer.py` | 39,468 | 1,061 | Python |
+| 16 | `live_game_state_aggregator.py` | 39,208 | 1,057 | Python |
+| 17 | `summoner_behavior_classifier.py` | 40,447 | 1,083 | Python |
+| 18 | `team_synergy_calculator.py` | 39,000 | 1,048 | Python |
+| 19 | `objective_priority_ranker.py` | 38,262 | 1,038 | Python |
+| 20 | `network_packet_replay_engine.py` | 37,002 | 1,022 | Python |
+| 21 | `plan_update_m826_m845_integrator.py` | 36,820 | 995 | Python |
+| 22 | `conftest.py` | 95 | 4 | Python |
+| 23 | `Makefile` | 63 | 5 | Other |
+| 24 | `requirements.txt` | 28 | 2 | Config |
+
+### Critical Analysis
+
+#### 1. User Perspective Bug Assessment
+
+| Risk | Description | Mitigation |
+|------|-------------|------------|
+| WebSocket Reconnection Storm | M826 reconnection could flood LCU | Exponential backoff + jitter + max retry cap |
+| Fiddler MCP Auth Leak | API key in config could be logged | Sanitize keys in all log/event output |
+| Cache Coherence Race | Multi-tier cache L1/L2 desync | Write-through strategy: L1 set always writes L2 |
+| ETL Idempotency Failure | Re-run could duplicate records | Deduplication key based on match_id + timestamp |
+| Proxifier Misconfiguration | Wrong rules block game traffic | Validation + dry-run mode before applying rules |
+| Hot-Swap Data Loss | M828 evolution swap during active request | Drain active requests before swap, with timeout |
+| Circuit Breaker Flapping | Rapid open/close oscillation | Minimum hold time in OPEN state + hysteresis |
+| Schema Version Mismatch | M830 rejects valid response from new API version | Schema versioning + permissive mode fallback |
+
+#### 2. System Architecture Critique
+
+| Concern | Analysis | Resolution |
+|---------|----------|------------|
+| Circular Dependencies | M834↔M860 mutual reference | Interface-based decoupling via event bus |
+| Single Cache Instance | M832 shared across modules | Per-module namespace prefix + isolation |
+| OTel Export Volume | High cardinality spans from M831 | Sampling strategy: 100% errors, 10% success |
+| ETL Backpressure | M838 can't keep up with crawl speed | Bounded queue + backpressure signal to M847 |
+| Lockfile Polling | M836 polls vs inotify | Start with polling, migrate to watchdog library |
+| HAR File Size | Large HAR files OOM M837 | Streaming parser with bounded memory |
+| Evolution Rollback State | M828 rollback may leave inconsistent state | Versioned snapshots with atomic swap |
+| Replay Clock Drift | M844 replay timing diverges from real | Monotonic clock + drift correction |

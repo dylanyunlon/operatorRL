@@ -1,0 +1,22 @@
+"""M826-M845: Historical Battle Data Improvement Subsystem."""
+
+from .seraphine_lcu_websocket_bridge import SeraphineLcuWebSocketBridge  # M826
+from .fiddler_mcp_integration_layer import FiddlerMcpIntegrationLayer  # M827
+from .agentic_self_evolution_loop import AgenticSelfEvolutionLoop  # M828
+from .async_riot_api_pipeline import AsyncRiotApiPipeline  # M829
+from .riot_response_schema_validator import RiotResponseSchemaValidator  # M830
+from .otel_distributed_tracer import OtelDistributedTracer  # M831
+from .multi_tier_cache_engine import MultiTierCacheEngine  # M832
+from .proxifier_config_validator import ProxifierConfigValidator  # M833
+from .cross_match_correlation_engine import CrossMatchCorrelationEngine  # M834
+from .circuit_breaker_resilience import CircuitBreakerResilience  # M835
+from .lcu_lockfile_port_detector import LcuLockfilePortDetector  # M836
+from .har_traffic_analyzer import HarTrafficAnalyzer  # M837
+from .match_data_etl_pipeline import MatchDataEtlPipeline  # M838
+from .champion_meta_trend_analyzer import ChampionMetaTrendAnalyzer  # M839
+from .live_game_state_aggregator import LiveGameStateAggregator  # M840
+from .summoner_behavior_classifier import SummonerBehaviorClassifier  # M841
+from .team_synergy_calculator import TeamSynergyCalculator  # M842
+from .objective_priority_ranker import ObjectivePriorityRanker  # M843
+from .network_packet_replay_engine import NetworkPacketReplayEngine  # M844
+from .plan_update_m826_m845_integrator import PlanUpdateM826M845Integrator  # M845
