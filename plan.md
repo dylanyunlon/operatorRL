@@ -4017,3 +4017,132 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 
 查看 **integrations/lol-history/src/lol_history/multi_game_pipeline_orchestrator.py（M685）** 上现有 **多游戏编排方式** 的实现方式，理解其模式。可以从 **`capture_to_decision_orchestrator.py`（M665）** 的register→initialize→run→shutdown全生命周期开始。然后，遵循该模式实现一个新的 **AgenticSystemIntegrationOrchestrator**，让 **整个operatorRL agentic系统** 可以 **通过一个顶层入口管理自部署+自环境反馈+自演化的完整闭环**（多游戏管线编排+跨游戏模型共享+自适应调度+灰度发布+监控告警+回滚），并能 **追踪系统整体健康度和演化进度**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
 
+
+
+---
+
+### 阶段 AW: 自主决策循环 + 实时协议驱动行动执行（M686-M705）
+
+> **主题**: 在M666-M685跨游戏适配层基础上，构建完整的自主决策循环——从协议数据流入到行动指令输出的闭环。涵盖决策状态机、行动优先级队列、实时风险评估、对局阶段感知、战术意图推理、行动执行器、行动反馈收集、决策日志回放、在线策略调整、多目标权衡、团队协调推理、资源分配优化、视野控制推理、时间窗口调度、行动序列规划、决策解释生成、决策质量评分、实时仪表盘数据源、决策管线健康守卫、以及自主决策总编排器。
+
+---
+
+**M686** `integrations/lol-history/src/lol_history/autonomous_decision_state_machine.py` — **自主决策状态机** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_session_state_machine.py（M647）** 上现有 **有限状态机方式** 的实现方式，理解其模式，特别是状态转换钩子和非法跳转防护。可以从 **`Akagi/mitm/mitm_abc.py`** 的websocket_start→message→end生命周期这个好例子开始。然后，遵循该模式实现一个新的 **AutonomousDecisionStateMachine**，让 **决策循环** 可以 **通过有限状态机（IDLE→OBSERVING→ANALYZING→DECIDING→EXECUTING→REVIEWING）管理每次决策的生命周期**，并能 **注册状态转换钩子、记录状态转换历史、强制超时回退**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M687** `integrations/lol-history/src/lol_history/action_priority_queue.py` — **行动优先级队列** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py（M657）** 上现有 **优先级评分方式** 的实现方式，理解其模式。可以从 **`DI-star/distar/agent/default/agent.py`** 的step→_post_process决策输出管线这个好例子开始。然后，遵循该模式实现一个新的 **ActionPriorityQueue**，让 **决策执行层** 可以 **按优先级排序待执行的行动（critical>high>medium>low）**，并能 **TTL过期淘汰、批量出队、统计各优先级分布**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M688** `integrations/lol-history/src/lol_history/realtime_risk_assessor.py` — **实时风险评估器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_anomaly_detector.py** 上现有 **多类型异常检测方式** 的实现方式，理解其模式。可以从 **`PARL/benchmark/torch/AlphaZero/submission_template.py`** 的MCTS.search风险搜索模式这个好例子开始。然后，遵循该模式实现一个新的 **RealtimeRiskAssessor**，让 **决策分析阶段** 可以 **基于当前游戏状态评估即时风险等级（safe/caution/danger/critical）**，并能 **注册自定义风险因子、追踪风险变化趋势**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M689** `integrations/lol-history/src/lol_history/game_phase_detector.py` — **对局阶段检测器** ✅
+
+查看 **integrations/lol-history/src/lol_history/game_phase_strategy_mapper.py（M642）** 上现有 **阶段策略映射方式** 的实现方式，理解其模式。可以从 **`DI-star/distar/agent/default/agent.py`** 的_get_time_factor这个好例子开始。然后，遵循该模式实现一个新的 **GamePhaseDetector**，让 **决策循环** 可以 **基于游戏时间和事件自动检测当前对局阶段（early_game/mid_game/late_game/endgame）**，并能 **注册阶段转换钩子、支持不同游戏类型的阶段定义**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M690** `integrations/lol-history/src/lol_history/tactical_intent_reasoner.py` — **战术意图推理器** ✅
+
+查看 **integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py（M653）** 上现有 **推理链构建方式** 的实现方式。可以从 **`DI-star/distar/agent/default/rl_training/as_rl_utils.py`** 的policy_gradient_loss策略推理链这个好例子开始。然后，遵循该模式实现一个新的 **TacticalIntentReasoner**，让 **决策分析阶段** 可以 **推理当前最优战术意图（push/farm/defend/gank/objective/retreat）**，并能 **输出意图置信度分布、追踪意图切换频率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M691** `integrations/lol-history/src/lol_history/action_executor_bridge.py` — **行动执行器桥接** ✅
+
+查看 **Akagi/autoplay/autoplay.py** 上现有 **act(mjai_msg)→执行** 的实现方式，理解其模式。可以从 **`Akagi/mitm/bridge/bridge_base.py`** 的parse/build双向接口这个好例子开始。然后，遵循该模式实现一个新的 **ActionExecutorBridge**，让 **决策执行阶段** 可以 **将抽象行动指令转换为游戏特定的执行格式**，并能 **追踪执行成功率、支持dry-run模式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M692** `integrations/lol-history/src/lol_history/action_feedback_collector.py` — **行动反馈收集器** ✅
+
+查看 **integrations/lol-history/src/lol_history/history_feedback_loop_orchestrator.py（M625）** 上现有 **反馈循环方式** 的实现方式。可以从 **`DI-star/distar/agent/default/agent.py`** 的collect_data(next_obs, reward, done)这个好例子开始。然后，遵循该模式实现一个新的 **ActionFeedbackCollector**，让 **决策回顾阶段** 可以 **收集每个行动执行后的环境反馈**，并能 **计算行动有效性评分、维护反馈历史窗口**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M693** `integrations/lol-history/src/lol_history/decision_log_replayer.py` — **决策日志回放器** ✅
+
+查看 **extensions/protocol_decoder/src/protocol_replay_synchronizer.py（M652）** 上现有 **按时间轴同步回放方式** 的实现方式。可以从 **`replay_decision_auditor.py`（M612）** 这个好例子开始。然后，遵循该模式实现一个新的 **DecisionLogReplayer**，让 **赛后复盘** 可以 **按时间顺序回放决策日志**，并能 **精确seek到任意时间点、过滤特定类型的决策**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M694** `integrations/lol-history/src/lol_history/online_policy_adjuster.py` — **在线策略调整器** ✅
+
+查看 **DI-star/distar/agent/default/agent.py** 上现有 **update_fake_reward在线更新方式** 的实现方式。可以从 **`historical_reward_reshaper.py`（M617）** 这个好例子开始。然后，遵循该模式实现一个新的 **OnlinePolicyAdjuster**，让 **决策循环** 可以 **基于行动反馈在线调整策略权重（不重训练）**，并能 **限制调整幅度防止策略漂移**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M695** `integrations/lol-history/src/lol_history/multi_objective_balancer.py` — **多目标权衡器** ✅
+
+查看 **integrations/lol/src/lol_agent/reward_shaper.py** 上现有 **compute_reward多维度评分方式** 的实现方式。可以从 **`DI-star/distar/agent/default/rl_training/as_rl_utils.py`** 的head_weights_dict这个好例子开始。然后，遵循该模式实现一个新的 **MultiObjectiveBalancer**，让 **决策分析阶段** 可以 **在多个目标间做Pareto权衡**，并能 **按游戏阶段自动调整目标权重**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M696** `integrations/lol-history/src/lol_history/team_coordination_reasoner.py` — **团队协调推理器** ✅
+
+查看 **DI-star/distar/agent/default/model/module_utils.py** 上现有 **Attention多头注意力方式** 的实现方式。可以从 **`ELF/elf_python/zmq_adapter.py`** 的多节点协调这个好例子开始。然后，遵循该模式实现一个新的 **TeamCoordinationReasoner**，让 **决策分析阶段** 可以 **推理最优团队协调行动**，并能 **评估团战时机、推荐集合点**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M697** `integrations/lol-history/src/lol_history/resource_allocation_optimizer.py` — **资源分配优化器** ✅
+
+查看 **DI-star/distar/agent/default/agent.py** 上现有 **get_behavior_z** 的实现方式。可以从 **`PARL/benchmark/fluid/PPO/train.py`** 的奖励分配模式这个好例子开始。然后，遵循该模式实现一个新的 **ResourceAllocationOptimizer**，让 **决策分析阶段** 可以 **优化资源分配决策**，并能 **模拟不同分配方案的预期收益**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M698** `integrations/lol-history/src/lol_history/vision_control_reasoner.py` — **视野控制推理器** ✅
+
+查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **ward事件解码方式** 的实现方式。可以从 **`dota2bot-OpenHyperAI/`** 的视野资源管理这个好例子开始。然后，遵循该模式实现一个新的 **VisionControlReasoner**，让 **决策分析阶段** 可以 **推理最优视野控制行动**，并能 **追踪视野覆盖率变化**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M699** `integrations/lol-history/src/lol_history/timing_window_scheduler.py` — **时间窗口调度器** ✅
+
+查看 **integrations/lol-history/src/lol_history/ban_pick_realtime_advisor.py（M637）** 上现有 **实时建议调度方式** 的实现方式。可以从 **`DI-star/distar/agent/default/agent.py`** 的_get_time_factor这个好例子开始。然后，遵循该模式实现一个新的 **TimingWindowScheduler**，让 **决策循环** 可以 **调度时间敏感的行动窗口**，并能 **提前预警、追踪窗口利用率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M700** `integrations/lol-history/src/lol_history/action_sequence_planner.py` — **行动序列规划器** ✅
+
+查看 **PARL/benchmark/torch/AlphaZero/submission_template.py** 上现有 **MCTS.search前瞻搜索方式** 的实现方式。可以从 **`DI-star/distar/agent/default/agent.py`** 的动作序列输出这个好例子开始。然后，遵循该模式实现一个新的 **ActionSequencePlanner**，让 **决策执行层** 可以 **规划多步行动序列**，并能 **评估序列预期收益、支持中途重规划**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M701** `integrations/lol-history/src/lol_history/decision_explanation_generator.py` — **决策解释生成器** ✅
+
+查看 **integrations/lol-history/src/lol_history/realtime_voice_command_generator.py（M662）** 上现有 **推理→语音转换方式** 的实现方式。可以从 **`protocol_anomaly_coaching_translator.py`（M654）** 这个好例子开始。然后，遵循该模式实现一个新的 **DecisionExplanationGenerator**，让 **决策输出层** 可以 **为每个决策生成人类可理解的解释**，并能 **按详细度级别输出（brief/normal/detailed）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M702** `integrations/lol-history/src/lol_history/decision_quality_scorer.py` — **决策质量评分器** ✅
+
+查看 **integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py（M659）** 上现有 **置信度评估方式** 的实现方式。可以从 **`coaching_effectiveness_tracker.py`（M613）** 这个好例子开始。然后，遵循该模式实现一个新的 **DecisionQualityScorer**，让 **决策回顾阶段** 可以 **对每个决策进行事后质量评分**，并能 **维护滑动窗口质量趋势、识别系统性偏差**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M703** `integrations/lol-history/src/lol_history/realtime_dashboard_data_source.py` — **实时仪表盘数据源** ✅
+
+查看 **integrations/lol-history/src/lol_history/history_telemetry_dashboard.py（M643）** 上现有 **遥测聚合方式** 的实现方式。可以从 **`cross_game_telemetry_aggregator.py`（M681）** 这个好例子开始。然后，遵循该模式实现一个新的 **RealtimeDashboardDataSource**，让 **运维仪表盘** 可以 **实时提供决策循环全部关键指标**，并能 **支持SSE/轮询两种消费模式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M704** `integrations/lol-history/src/lol_history/decision_pipeline_health_guard.py` — **决策管线健康守卫** ✅
+
+查看 **extensions/protocol_decoder/src/protocol_health_baseline_manager.py（M658）** 上现有 **健康基线偏离检测方式** 的实现方式。可以从 **`e2e_inference_pipeline_orchestrator.py`（M655）** 这个好例子开始。然后，遵循该模式实现一个新的 **DecisionPipelineHealthGuard**，让 **决策管线** 可以 **持续监控各阶段健康指标并在偏离基线时触发告警或降级**，并能 **自动隔离故障模块**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M705** `integrations/lol-history/src/lol_history/autonomous_decision_orchestrator.py` — **自主决策总编排器** ✅
+
+查看 **integrations/lol-history/src/lol_history/multi_game_pipeline_orchestrator.py（M685）** 上现有 **总编排方式** 的实现方式。可以从 **`capture_to_decision_orchestrator.py`（M665）** 这个好例子开始。然后，遵循该模式实现一个新的 **AutonomousDecisionOrchestrator**，让 **整个自主决策循环** 可以 **通过一个入口编排M686-M704所有模块**，并能 **在30分钟对局中持续运行、追踪全链路决策指标**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
