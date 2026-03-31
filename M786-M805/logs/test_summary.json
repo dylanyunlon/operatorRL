@@ -1,0 +1,91 @@
+{
+  "run_timestamp": "2026-03-31T10:51:31.707029+00:00",
+  "results": {
+    "M786": {
+      "status": "NO_TEST",
+      "module": "logging_system"
+    },
+    "M787": {
+      "status": "NO_TEST",
+      "module": "historical_battle_data"
+    },
+    "M788": {
+      "status": "NO_TEST",
+      "module": "lcu_connector"
+    },
+    "M789": {
+      "status": "NO_TEST",
+      "module": "match_analyzer"
+    },
+    "M790": {
+      "status": "PASS",
+      "module": "player_profiler"
+    },
+    "M791": {
+      "status": "PASS",
+      "module": "champion_stats"
+    },
+    "M792": {
+      "status": "PASS",
+      "module": "team_composition"
+    },
+    "M793": {
+      "status": "PASS",
+      "module": "win_prediction"
+    },
+    "M794": {
+      "status": "PASS",
+      "module": "data_pipeline"
+    },
+    "M795": {
+      "status": "PASS",
+      "module": "network_capture"
+    },
+    "M796": {
+      "status": "PASS",
+      "module": "fiddler_integration"
+    },
+    "M797": {
+      "status": "PASS",
+      "module": "proxy_config"
+    },
+    "M798": {
+      "status": "PASS",
+      "module": "realtime_dashboard"
+    },
+    "M799": {
+      "status": "PASS",
+      "module": "feedback_engine"
+    },
+    "M800": {
+      "status": "PASS",
+      "module": "voice_output"
+    },
+    "M801": {
+      "status": "PASS",
+      "module": "game_state_tracker"
+    },
+    "M802": {
+      "status": "PASS",
+      "module": "strategy_advisor"
+    },
+    "M803": {
+      "status": "PASS",
+      "module": "replay_parser"
+    },
+    "M804": {
+      "status": "PASS",
+      "module": "performance_metrics"
+    },
+    "M805": {
+      "status": "PASS",
+      "module": "plan_update"
+    }
+  },
+  "summary": {
+    "passed": 16,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 4
+  }
+}

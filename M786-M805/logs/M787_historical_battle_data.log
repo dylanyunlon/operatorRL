@@ -1,0 +1,8 @@
+{
+  "module_id": "M787",
+  "module_name": "historical_battle_data",
+  "test_status": "NO_TEST",
+  "timestamp": "2026-03-31T10:51:29.905503+00:00",
+  "python_version": "3.12.3 (main, Jan 22 2026, 20:57:42) [GCC 13.3.0]",
+  "file": "historical_battle_data/historical_battle_data.py"
+}

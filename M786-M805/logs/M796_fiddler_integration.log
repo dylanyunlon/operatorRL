@@ -1,0 +1,8 @@
+{
+  "module_id": "M796",
+  "module_name": "fiddler_integration",
+  "test_status": "PASS",
+  "timestamp": "2026-03-31T10:51:30.472138+00:00",
+  "python_version": "3.12.3 (main, Jan 22 2026, 20:57:42) [GCC 13.3.0]",
+  "file": "fiddler_integration/fiddler_integration.py"
+}

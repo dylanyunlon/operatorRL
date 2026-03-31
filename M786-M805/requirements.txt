@@ -1,0 +1,8 @@
+# OperatorRL M786-M805 Dependencies
+# Core (stdlib only - no external deps required for base operation)
+# Optional enhancements:
+# edge-tts>=6.1.0          # M800 voice output
+# pyttsx3>=2.90            # M800 voice fallback
+# websockets>=12.0         # M788 LCU WebSocket
+# aiohttp>=3.9.0           # M798 dashboard server
+# prometheus-client>=0.20  # M804 metrics export

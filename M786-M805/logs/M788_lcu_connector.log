@@ -1,0 +1,8 @@
+{
+  "module_id": "M788",
+  "module_name": "lcu_connector",
+  "test_status": "NO_TEST",
+  "timestamp": "2026-03-31T10:51:29.919945+00:00",
+  "python_version": "3.12.3 (main, Jan 22 2026, 20:57:42) [GCC 13.3.0]",
+  "file": "lcu_connector/lcu_connector.py"
+}

@@ -1,0 +1,8 @@
+{
+  "module_id": "M803",
+  "module_name": "replay_parser",
+  "test_status": "PASS",
+  "timestamp": "2026-03-31T10:51:31.419681+00:00",
+  "python_version": "3.12.3 (main, Jan 22 2026, 20:57:42) [GCC 13.3.0]",
+  "file": "replay_parser/replay_parser.py"
+}

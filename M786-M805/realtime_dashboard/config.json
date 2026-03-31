@@ -1,0 +1,11 @@
+{
+    "module": "realtime_dashboard",
+    "enabled": true,
+    "version": "1.0.0",
+    "log_level": "INFO",
+    "auto_start": false,
+    "cache_ttl_sec": 300,
+    "max_retries": 3,
+    "timeout_sec": 30,
+    "health_check_interval": 60
+}
