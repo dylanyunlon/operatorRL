@@ -1,0 +1,15 @@
+{
+  "module_id": "M877",
+  "module_name": "RunePageRecommender",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866",
+    "M871",
+    "M872"
+  ],
+  "description": "Recommends optimal rune pages based on matchup, team comp, and play style",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

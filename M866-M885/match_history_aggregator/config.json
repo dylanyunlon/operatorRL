@@ -1,0 +1,14 @@
+{
+  "module_id": "M868",
+  "module_name": "MatchHistoryAggregator",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866",
+    "M867"
+  ],
+  "description": "Aggregates match histories across multiple summoners with deduplication",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

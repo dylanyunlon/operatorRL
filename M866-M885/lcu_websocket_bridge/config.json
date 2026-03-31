@@ -1,0 +1,13 @@
+{
+  "module_id": "M867",
+  "module_name": "LcuWebSocketBridge",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866"
+  ],
+  "description": "Real-time LCU WebSocket event bridge with reconnection and state sync",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

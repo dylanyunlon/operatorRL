@@ -1,0 +1,15 @@
+{
+  "module_id": "M881",
+  "module_name": "StrategyFeedbackLoop",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866",
+    "M875",
+    "M880"
+  ],
+  "description": "Agentic self-evolution feedback loop comparing predicted vs actual outcomes",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

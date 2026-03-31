@@ -1,0 +1,13 @@
+{
+  "module_id": "M885",
+  "module_name": "SystemHealthDashboard",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866"
+  ],
+  "description": "Dashboard API aggregating all M866-M885 subsystem health and metrics",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

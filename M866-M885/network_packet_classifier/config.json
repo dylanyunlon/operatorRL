@@ -1,0 +1,14 @@
+{
+  "module_id": "M879",
+  "module_name": "NetworkPacketClassifier",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866",
+    "M878"
+  ],
+  "description": "Classifies network packets by game event type with protocol fingerprinting",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

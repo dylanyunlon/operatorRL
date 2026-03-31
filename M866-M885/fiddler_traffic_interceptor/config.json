@@ -1,0 +1,11 @@
+{
+  "module_id": "M866",
+  "module_name": "FiddlerTrafficInterceptor",
+  "version": "1.0.0",
+  "dependencies": [],
+  "description": "Intercepts and classifies LoL client traffic via Fiddler MCP proxy pipeline",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

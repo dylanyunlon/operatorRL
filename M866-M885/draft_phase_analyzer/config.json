@@ -1,0 +1,15 @@
+{
+  "module_id": "M871",
+  "module_name": "DraftPhaseAnalyzer",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866",
+    "M869",
+    "M870"
+  ],
+  "description": "Analyzes champion select draft phase with counter-pick and synergy scoring",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}

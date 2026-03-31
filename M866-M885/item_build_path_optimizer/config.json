@@ -1,0 +1,15 @@
+{
+  "module_id": "M876",
+  "module_name": "ItemBuildPathOptimizer",
+  "version": "1.0.0",
+  "dependencies": [
+    "M866",
+    "M869",
+    "M872"
+  ],
+  "description": "Optimizes item build paths using graph search and opponent-adaptive strategies",
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999",
+  "riot_api_version": "v4",
+  "proxifier_profile": "lol_traffic_capture"
+}
