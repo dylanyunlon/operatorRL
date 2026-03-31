@@ -4146,3 +4146,256 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 查看 **integrations/lol-history/src/lol_history/multi_game_pipeline_orchestrator.py（M685）** 上现有 **总编排方式** 的实现方式。可以从 **`capture_to_decision_orchestrator.py`（M665）** 这个好例子开始。然后，遵循该模式实现一个新的 **AutonomousDecisionOrchestrator**，让 **整个自主决策循环** 可以 **通过一个入口编排M686-M704所有模块**，并能 **在30分钟对局中持续运行、追踪全链路决策指标**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
 
 ---
+
+### 阶段 AX: 历史战斗情报实时融合（M706-M725）
+
+> **主题**: 将Seraphine项目的历史对战数据获取能力与实时决策循环（M686-M705）深度融合。构建从对手历史数据聚合→实时威胁评估→选Ban建议→对线增强→战术预测→语音简报的完整情报管线。历史战斗信息的获取对于当前进行的对战至关重要——了解对手的习惯、弱点、心态状态，可以在对局开始前就建立信息优势。参考项目：github.com/ljszx/Seraphine。
+
+---
+
+**M706** `integrations/lol-history/src/lol_history/opponent_history_aggregator.py` — **对手历史数据聚合器** ✅
+
+查看 **integrations/lol-history/src/lol_history/seraphine_deep_history_pipeline.py** 上现有 **register→run管线隔离方式** 的实现方式，理解其模式，特别是模块故障隔离和数据去重。可以从 **`opponent_profiler.py`** 的profile_from_matches聚合模式这个好例子开始。然后，遵循该模式实现一个新的 **OpponentHistoryAggregator**，让 **情报管线** 可以 **从多个数据源（Seraphine/Riot API/SGP）聚合对手比赛历史到统一时间线**，并能 **按match_id去重、TTL缓存、源故障隔离**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M707** `integrations/lol-history/src/lol_history/live_opponent_scout.py` — **实时对手侦察器** ✅
+
+查看 **integrations/lol-history/src/lol_history/pregame_scout.py** 上现有 **赛前侦察方式** 的实现方式，理解其模式。可以从 **`seraphine_bridge.py`** 的HTTP API客户端模式这个好例子开始。然后，遵循该模式实现一个新的 **LiveOpponentScout**，让 **决策循环** 可以 **在游戏开始时对所有对手进行实时侦察（胜率/KDA/近期状态/英雄熟练度）**，并能 **输出威胁排名和弱点清单**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M708** `integrations/lol-history/src/lol_history/historical_matchup_win_predictor.py` — **历史对线胜率预测器** ✅
+
+查看 **integrations/lol-history/src/lol_history/historical_matchup_predictor.py** 上现有 **对线预测方式** 的实现方式，理解其模式。可以从 **`combat_outcome_predictor.py`** 的置信区间输出这个好例子开始。然后，遵循该模式实现一个新的 **HistoricalMatchupWinPredictor**，让 **选人阶段和赛前** 可以 **基于历史对线数据预测整体胜率概率（贝叶斯先验+样本量加权）**，并能 **输出置信区间和逐线预测**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M709** `integrations/lol-history/src/lol_history/history_aware_draft_advisor.py` — **历史感知选Ban建议器** ✅
+
+查看 **integrations/lol-history/src/lol_history/ban_pick_realtime_advisor.py（M637）** 上现有 **实时选人建议方式** 的实现方式，理解其模式。可以从 **`ban_pick_intelligence.py`** 的评分逻辑这个好例子开始。然后，遵循该模式实现一个新的 **HistoryAwareDraftAdvisor**，让 **选人阶段** 可以 **结合对手英雄池历史和Meta胜率建议Ban/Pick目标**，并能 **按对手威胁度加权、排除己方意向英雄**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M710** `integrations/lol-history/src/lol_history/opponent_tendency_live_tracker.py` — **对手倾向实时追踪器** ✅
+
+查看 **integrations/lol-history/src/lol_history/opponent_behavior_modeler.py** 上现有 **行为建模方式** 的实现方式，理解其模式。可以从 **`champion_tendency_analyzer.py`** 的倾向分析这个好例子开始。然后，遵循该模式实现一个新的 **OpponentTendencyLiveTracker**，让 **决策循环** 可以 **实时追踪对手行为并与其历史基线对比（z-score偏离检测）**，并能 **在检测到显著偏离时触发告警**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M711** `integrations/lol-history/src/lol_history/historical_itemization_advisor.py` — **历史出装路径建议器** ✅
+
+查看 **integrations/lol-history/src/lol_history/item_build_path_analyzer.py** 上现有 **出装分析方式** 的实现方式，理解其模式。可以从 **`opgg_build_fetcher.py`** 的外部数据获取这个好例子开始。然后，遵循该模式实现一个新的 **HistoricalItemizationAdvisor**，让 **对局中** 可以 **基于特定对线组合的历史出装胜率推荐最优出装路径**，并能 **区分核心装和对线装、推荐下一件装备**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M712** `integrations/lol-history/src/lol_history/lane_matchup_history_enricher.py` — **对线历史数据增强器** ✅
+
+查看 **integrations/lol-history/src/lol_history/lane_state_tracker.py** 上现有 **对线状态追踪方式** 的实现方式，理解其模式。可以从 **`historical_matchup_predictor.py`** 的数据查询这个好例子开始。然后，遵循该模式实现一个新的 **LaneMatchupHistoryEnricher**，让 **实时对线** 可以 **将当前对线数据与历史平均值对比（"你在第10分钟比历史平均多20补刀"）**，并能 **按时间桶分段、计算每个指标的相对表现**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M713** `integrations/lol-history/src/lol_history/team_composition_history_analyzer.py` — **阵容历史分析器** ✅
+
+查看 **integrations/lol-history/src/lol_history/team_synergy_scorer.py** 上现有 **团队增效评分方式** 的实现方式，理解其模式。可以从 **`win_condition_analyzer.py`** 的胜利条件识别这个好例子开始。然后，遵循该模式实现一个新的 **TeamCompositionHistoryAnalyzer**，让 **选人阶段** 可以 **分析队伍阵容的历史胜率和增效组合**（按双人组合胜率、阵容原型分类），并能 **识别阵容优劣势和对比敌我阵容**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M714** `integrations/lol-history/src/lol_history/opponent_tilt_detector.py` — **对手心态检测器** ✅
+
+查看 **integrations/lol-history/src/lol_history/playtime_fatigue_detector.py** 上现有 **疲劳检测方式** 的实现方式，理解其模式。可以从 **`streak_momentum_analyzer.py`** 的连胜/连败分析这个好例子开始。然后，遵循该模式实现一个新的 **OpponentTiltDetector**，让 **赛前侦察** 可以 **从对手近期比赛模式检测心态崩溃状态**（连败+死亡飙升+换英雄+短局），并能 **输出倾斜概率和利用建议**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M715** `integrations/lol-history/src/lol_history/historical_objective_priority_advisor.py` — **历史目标优先级建议器** ✅
+
+查看 **integrations/lol-history/src/lol_history/objective_priority_engine.py** 上现有 **目标优先级方式** 的实现方式，理解其模式。可以从 **`objective_control_analyzer.py`** 的目标控制分析这个好例子开始。然后，遵循该模式实现一个新的 **HistoricalObjectivePriorityAdvisor**，让 **决策循环** 可以 **基于历史数据计算各目标在当前时间点的胜率影响**（P(win|took dragon at 15min)），并能 **按队伍状态动态调整优先级**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M716** `integrations/lol-history/src/lol_history/pregame_strategy_synthesizer.py` — **赛前策略综合器** ✅
+
+查看 **integrations/lol-history/src/lol_history/pregame_scout.py** 上现有 **赛前侦察聚合方式** 的实现方式，理解其模式。可以从 **`pregame_voice_briefer.py`** 的简报生成这个好例子开始。然后，遵循该模式实现一个新的 **PregameStrategySynthesizer**，让 **赛前阶段** 可以 **将所有情报模块的输出综合为结构化的赛前简报**（威胁排名+对线摘要+阵容分析+心态信息），并能 **按优先级排列可操作策略建议**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M717** `integrations/lol-history/src/lol_history/history_confidence_calibrator.py` — **历史数据置信度校准器** ✅
+
+查看 **integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py（M659）** 上现有 **置信度评估方式** 的实现方式，理解其模式。可以从 **`history_data_quality_checker.py`（M624）** 的数据质量评估这个好例子开始。然后，遵循该模式实现一个新的 **HistoryConfidenceCalibrator**，让 **所有预测模块** 可以 **基于数据质量因素校准预测置信度**（样本量+数据新鲜度+版本相关性+来源可靠性），并能 **输出乘法组合的校准置信度和因素分解**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M718** `integrations/lol-history/src/lol_history/live_history_event_correlator.py` — **实时-历史事件关联器** ✅
+
+查看 **integrations/lol-history/src/lol_history/live_match_history_correlator.py** 上现有 **实时-历史关联方式** 的实现方式，理解其模式。可以从 **`game_event_pattern_library.py`（M615）** 的store→query模式这个好例子开始。然后，遵循该模式实现一个新的 **LiveHistoryEventCorrelator**，让 **决策循环** 可以 **将实时游戏事件与历史模式库进行相似度匹配**，并能 **预测接下来最可能发生的事件序列**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M719** `integrations/lol-history/src/lol_history/opponent_champion_pool_predictor.py` — **对手英雄池预测器** ✅
+
+查看 **integrations/lol-history/src/lol_history/champion_pool_recommender.py（M610）** 上现有 **英雄池分析方式** 的实现方式，理解其模式。可以从 **`champion_pool_tracker.py`** 的池追踪这个好例子开始。然后，遵循该模式实现一个新的 **OpponentChampionPoolPredictor**，让 **选人阶段** 可以 **从对手历史数据预测其最可能选择的英雄**（时间衰减加权+角色过滤+排除已Ban），并能 **输出概率分布和调整后概率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M720** `integrations/lol-history/src/lol_history/historical_power_spike_advisor.py` — **历史强势期建议器** ✅
+
+查看 **integrations/lol-history/src/lol_history/game_phase_strategy_mapper.py（M642）** 上现有 **阶段策略映射方式** 的实现方式，理解其模式。可以从 **`timing_window_scheduler.py`（M699）** 的时间窗口管理这个好例子开始。然后，遵循该模式实现一个新的 **HistoricalPowerSpikeAdvisor**，让 **决策循环** 可以 **基于历史数据告知英雄何时到达强势期**（等级/装备/时间三种强势期触发），并能 **实时检查当前是否处于强势期窗口**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M721** `integrations/lol-history/src/lol_history/cross_match_pattern_detector.py` — **跨对局模式检测器** ✅
+
+查看 **integrations/lol-history/src/lol_history/game_event_pattern_library.py（M615）** 上现有 **模式库存储方式** 的实现方式，理解其模式。可以从 **`comeback_pattern_detector.py`** 的模式检测逻辑这个好例子开始。然后，遵循该模式实现一个新的 **CrossMatchPatternDetector**，让 **赛前侦察** 可以 **检测对手跨多场比赛的重复行为模式**（固定时间入侵/固定时间游走/固定出装习惯），并能 **按一致性频率排名**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M722** `integrations/lol-history/src/lol_history/history_driven_voice_briefer.py` — **历史驱动语音简报器** ✅
+
+查看 **integrations/lol-history/src/lol_history/pregame_voice_briefer.py** 上现有 **语音简报方式** 的实现方式，理解其模式。可以从 **`realtime_voice_command_generator.py`（M662）** 的TTS优化文本输出这个好例子开始。然后，遵循该模式实现一个新的 **HistoryDrivenVoiceBriefer**，让 **赛前和对局中** 可以 **将历史情报转换为TTS友好的自然语言简报**（短句+无缩写+可操作），并能 **控制时长（30-60秒）、支持赛前和实时两种模式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M723** `integrations/lol-history/src/lol_history/opponent_adaptation_tracker.py` — **对手适应性追踪器** ✅
+
+查看 **integrations/lol-history/src/lol_history/opponent_behavior_modeler.py** 上现有 **行为建模方式** 的实现方式，理解其模式。可以从 **`strategy_drift_detector.py`** 的漂移检测这个好例子开始。然后，遵循该模式实现一个新的 **OpponentAdaptationTracker**，让 **决策循环** 可以 **追踪对手在对局内和跨对局的适应性变化**（前期vs后期行为差异+历史画像偏离），并能 **检测对手策略转变并触发重新评估**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M724** `integrations/lol-history/src/lol_history/historical_intel_cache_manager.py` — **历史情报缓存管理器** ✅
+
+查看 **integrations/lol-history/src/lol_history/history_cold_start_handler.py** 上现有 **冷启动/缓存预热方式** 的实现方式，理解其模式。可以从 **`seraphine_lcu_deep_client.py`** 的TTL缓存这个好例子开始。然后，遵循该模式实现一个新的 **HistoricalIntelCacheManager**，让 **情报管线** 可以 **统一管理所有模块的缓存**（命名空间隔离+LRU淘汰+TTL过期+预热+hit/miss统计），并能 **在对局结束时自动清理**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M725** `integrations/lol-history/src/lol_history/history_to_live_fusion_orchestrator.py` — **历史→实时融合总编排器** ✅
+
+查看 **integrations/lol-history/src/lol_history/autonomous_decision_orchestrator.py（M705）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **`multi_game_pipeline_orchestrator.py`（M685）** 的register→init→run→shutdown全生命周期这个好例子开始。然后，遵循该模式实现一个新的 **HistoryToLiveFusionOrchestrator**，让 **整个历史情报管线** 可以 **通过一个入口编排M706-M724所有模块**（赛前：聚合→侦察→预测→综合→简报；对局中：事件关联→偏离检测→适应追踪→强势期提醒），并能 **每个模块有时间预算、故障隔离、全链路遥测**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+
+
+---
+
+### 阶段 AY: 历史情报强化训练闭环（M726-M745）
+
+> **主题**: 将M706-M725构建的历史情报管线接入训练反馈闭环——将情报预测的准确性作为奖励信号反馈给模型训练，构建情报驱动的自演化能力。涵盖情报预测评估、历史特征向量构建、情报奖励信号生成、对手建模训练导出、选人阶段训练数据生成、情报准确性追踪、历史数据版本管理、情报模型微调管线、赛后情报复盘引擎、情报质量反馈循环、在线情报模型更新、情报特征重要性分析、情报预测A/B测试框架、对手适应性模型训练、情报缓存效率优化、跨赛季情报迁移、情报管线端到端测试、情报管线性能分析、情报管线容错增强、以及情报训练闭环总编排器。
+
+---
+
+**M726** `integrations/lol-history/src/lol_history/intel_prediction_evaluator.py` — **情报预测评估器**
+
+查看 **integrations/lol-history/src/lol_history/decision_quality_scorer.py（M702）** 上现有 **事后质量评分方式** 的实现方式，理解其模式，特别是滑动窗口趋势和系统性偏差检测。可以从 **`coaching_effectiveness_tracker.py`（M613）** 这个好例子开始。然后，遵循该模式实现一个新的 **IntelPredictionEvaluator**，让 **赛后复盘** 可以 **评估所有情报预测的准确性（预测胜率vs实际结果、预测对手行为vs观察到的行为）**，并能 **输出每个模块的预测精度报告**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M727** `integrations/lol-history/src/lol_history/intel_feature_vector_builder.py` — **情报特征向量构建器**
+
+查看 **integrations/lol-history/src/lol_history/historical_feature_vector_builder.py（M602）** 上现有 **特征构建方式** 的实现方式，理解其模式。可以从 **`transfer_learning_feature_aligner.py`（M675）** 的特征对齐这个好例子开始。然后，遵循该模式实现一个新的 **IntelFeatureVectorBuilder**，让 **训练管线** 可以 **将历史情报数据（对手画像+对线预测+阵容分析）编码为固定维度的特征向量**，并能 **按特征类型分组、支持稀疏和稠密两种编码**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M728** `integrations/lol-history/src/lol_history/intel_reward_signal_generator.py` — **情报奖励信号生成器**
+
+查看 **integrations/lol/src/lol_agent/reward_shaper.py** 上现有 **compute_reward多维度评分方式** 的实现方式，理解其模式。可以从 **`historical_reward_reshaper.py`（M617）** 这个好例子开始。然后，遵循该模式实现一个新的 **IntelRewardSignalGenerator**，让 **训练管线** 可以 **将情报预测准确性转化为奖励信号**（预测对→正奖励、预测错→负奖励、按置信度加权），并能 **按模块分别生成奖励**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M729** `integrations/lol-history/src/lol_history/opponent_model_training_exporter.py` — **对手建模训练导出器**
+
+查看 **integrations/lol-history/src/lol_history/historical_training_exporter.py** 上现有 **训练数据导出方式** 的实现方式，理解其模式。可以从 **`cross_game_training_data_formatter.py`（M673）** 这个好例子开始。然后，遵循该模式实现一个新的 **OpponentModelTrainingExporter**，让 **训练管线** 可以 **将对手画像+行为+适应性数据导出为对手建模训练集**，并能 **按对手类型标注、支持增量导出**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M730** `integrations/lol-history/src/lol_history/draft_training_data_generator.py` — **选人阶段训练数据生成器**
+
+查看 **integrations/lol-history/src/lol_history/history_to_training_exporter.py** 上现有 **训练导出方式** 的实现方式，理解其模式。可以从 **`history_aware_draft_advisor.py`（M709）** 的ban/pick评分这个好例子开始。然后，遵循该模式实现一个新的 **DraftTrainingDataGenerator**，让 **训练管线** 可以 **从历史选人数据+结果生成选人阶段训练样本**（输入：已选/已Ban/对手画像，标签：选择+胜负），并能 **按Elo段分层采样**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M731** `integrations/lol-history/src/lol_history/intel_accuracy_tracker.py` — **情报准确性追踪器**
+
+查看 **integrations/lol-history/src/lol_history/coaching_effectiveness_tracker.py（M613）** 上现有 **效果评估方式** 的实现方式，理解其模式。可以从 **`decision_quality_scorer.py`（M702）** 的滑动窗口质量趋势这个好例子开始。然后，遵循该模式实现一个新的 **IntelAccuracyTracker**，让 **自演化系统** 可以 **长期追踪每个情报模块的预测准确性趋势**（精确度/召回率/F1/校准误差），并能 **检测准确性退化并触发再训练**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M732** `integrations/lol-history/src/lol_history/intel_data_version_manager.py` — **情报数据版本管理器**
+
+查看 **agentos/governance/model_versioner.py** 上现有 **版本管理方式** 的实现方式，理解其模式。可以从 **`cross_game_model_hub.py`（M676）** 的版本注册+查询这个好例子开始。然后，遵循该模式实现一个新的 **IntelDataVersionManager**，让 **情报管线** 可以 **版本化管理情报数据集（快照+增量更新+回滚）**，并能 **按版本追溯训练数据来源**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M733** `integrations/lol-history/src/lol_history/intel_model_finetune_pipeline.py` — **情报模型微调管线**
+
+查看 **agentlightning/training/training_loop_controller.py** 上现有 **训练循环控制方式** 的实现方式，理解其模式。可以从 **`DI-star/distar/agent/default/rl_training/as_rl_utils.py`** 的policy_gradient_loss这个好例子开始。然后，遵循该模式实现一个新的 **IntelModelFinetunePipeline**，让 **训练管线** 可以 **基于情报预测反馈微调情报模型参数**（学习率调整+早停+梯度裁剪），并能 **追踪微调前后的性能变化**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M734** `integrations/lol-history/src/lol_history/postgame_intel_reviewer.py` — **赛后情报复盘引擎**
+
+查看 **integrations/lol-history/src/lol_history/postgame_auto_evaluator.py** 上现有 **赛后自动评估方式** 的实现方式，理解其模式。可以从 **`replay_decision_auditor.py`（M612）** 的复盘审计这个好例子开始。然后，遵循该模式实现一个新的 **PostgameIntelReviewer**，让 **赛后** 可以 **将全局情报预测与实际结果逐项对比**（哪些预测对了/错了/为什么错了），并能 **生成情报复盘报告供训练管线消费**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M735** `integrations/lol-history/src/lol_history/intel_quality_feedback_loop.py` — **情报质量反馈循环**
+
+查看 **integrations/lol-history/src/lol_history/history_feedback_loop_orchestrator.py（M625）** 上现有 **反馈循环方式** 的实现方式，理解其模式。可以从 **`action_feedback_collector.py`（M692）** 的反馈收集→有效性评分这个好例子开始。然后，遵循该模式实现一个新的 **IntelQualityFeedbackLoop**，让 **自演化系统** 可以 **将赛后评估结果反馈到情报管线配置**（自动调整置信度阈值+权重+数据源优先级），并能 **持续优化情报输出质量**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M736** `integrations/lol-history/src/lol_history/online_intel_model_updater.py` — **在线情报模型更新器**
+
+查看 **integrations/lol-history/src/lol_history/online_policy_adjuster.py（M694）** 上现有 **在线策略调整方式** 的实现方式，理解其模式。可以从 **`DI-star/distar/agent/default/agent.py`** 的update_fake_reward这个好例子开始。然后，遵循该模式实现一个新的 **OnlineIntelModelUpdater**，让 **对局中** 可以 **基于实时反馈在线微调情报模型权重（不重训练）**，并能 **限制更新幅度+追踪更新历史**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M737** `integrations/lol-history/src/lol_history/intel_feature_importance_analyzer.py` — **情报特征重要性分析器**
+
+查看 **integrations/lol-history/src/lol_history/history_feature_importance_ranker.py** 上现有 **特征重要性排名方式** 的实现方式，理解其模式。可以从 **`historical_feature_vector_builder.py`（M602）** 的特征构建这个好例子开始。然后，遵循该模式实现一个新的 **IntelFeatureImportanceAnalyzer**，让 **训练管线** 可以 **分析各情报特征对预测准确性的贡献度**（排列重要性+相关性分析），并能 **建议移除低价值特征、发现新的有价值特征**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M738** `integrations/lol-history/src/lol_history/intel_ab_test_framework.py` — **情报预测A/B测试框架**
+
+查看 **agentlightning/deployment/live_ab_router.py（M560）** 上现有 **A/B路由方式** 的实现方式，理解其模式。可以从 **`cross_game_online_ab_framework.py`（M687）** 的实验分流+统计显著性这个好例子开始。然后，遵循该模式实现一个新的 **IntelABTestFramework**，让 **情报管线** 可以 **对不同情报策略进行A/B测试**（新旧算法对比+分流+指标收集+显著性判定），并能 **自动选择胜出策略**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M739** `integrations/lol-history/src/lol_history/opponent_adaptation_model_trainer.py` — **对手适应性模型训练器**
+
+查看 **integrations/lol-history/src/lol_history/opponent_adaptation_tracker.py（M723）** 上现有 **适应性追踪方式** 的实现方式，理解其模式。可以从 **`opponent_behavior_modeler.py`** 的行为建模这个好例子开始。然后，遵循该模式实现一个新的 **OpponentAdaptationModelTrainer**，让 **训练管线** 可以 **从历史适应性数据训练对手适应性预测模型**（输入：对手初始画像+游戏状态，输出：预测适应方向），并能 **按对手类型分别训练**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M740** `integrations/lol-history/src/lol_history/intel_cache_efficiency_optimizer.py` — **情报缓存效率优化器**
+
+查看 **integrations/lol-history/src/lol_history/historical_intel_cache_manager.py（M724）** 上现有 **缓存管理方式** 的实现方式，理解其模式。可以从 **`history_cold_start_handler.py`** 的冷启动优化这个好例子开始。然后，遵循该模式实现一个新的 **IntelCacheEfficiencyOptimizer**，让 **运维** 可以 **分析缓存命中模式并自动优化TTL/预热策略**（高频key延长TTL、低命中key减短TTL），并能 **生成缓存效率报告**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M741** `integrations/lol-history/src/lol_history/cross_season_intel_migrator.py` — **跨赛季情报迁移器**
+
+查看 **integrations/lol-history/src/lol_history/history_data_migrator.py** 上现有 **数据迁移方式** 的实现方式，理解其模式。可以从 **`patch_adaptation_analyzer.py`（M618）** 的版本适应分析这个好例子开始。然后，遵循该模式实现一个新的 **CrossSeasonIntelMigrator**，让 **赛季更替时** 可以 **将上赛季情报数据迁移到新赛季**（衰减过时数据+保留永久性知识+适应Meta变化），并能 **标注需要重新验证的情报**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M742** `integrations/lol-history/src/lol_history/intel_pipeline_e2e_tester.py` — **情报管线端到端测试器**
+
+查看 **integrations/lol-history/src/lol_history/history_regression_test_runner.py** 上现有 **回归测试方式** 的实现方式，理解其模式。可以从 **`protocol_adapter_test_harness.py`（M677）** 的兼容性测试这个好例子开始。然后，遵循该模式实现一个新的 **IntelPipelineE2ETester**，让 **CI/CD** 可以 **端到端测试整个情报管线**（mock数据→各模块→最终简报→验证输出格式和内容），并能 **生成测试报告和覆盖率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M743** `integrations/lol-history/src/lol_history/intel_pipeline_profiler.py` — **情报管线性能分析器**
+
+查看 **integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py（M664）** 上现有 **遥测导出方式** 的实现方式，理解其模式。可以从 **`history_telemetry_dashboard.py`（M643）** 的遥测聚合这个好例子开始。然后，遵循该模式实现一个新的 **IntelPipelineProfiler**，让 **运维** 可以 **分析情报管线每个阶段的耗时和资源占用**（火焰图风格的调用链分析），并能 **识别瓶颈阶段并建议优化方向**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M744** `integrations/lol-history/src/lol_history/intel_pipeline_fault_hardener.py` — **情报管线容错增强器**
+
+查看 **integrations/lol-history/src/lol_history/decision_pipeline_health_guard.py（M704）** 上现有 **健康守卫方式** 的实现方式，理解其模式。可以从 **`e2e_inference_pipeline_orchestrator.py`（M655）** 的管线故障处理这个好例子开始。然后，遵循该模式实现一个新的 **IntelPipelineFaultHardener**，让 **情报管线** 可以 **自动检测并恢复各模块故障**（重试+降级+熔断+隔离），并能 **追踪故障模式和恢复成功率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+---
+
+**M745** `integrations/lol-history/src/lol_history/intel_training_loop_orchestrator.py` — **情报训练闭环总编排器**
+
+查看 **integrations/lol-history/src/lol_history/history_to_live_fusion_orchestrator.py（M725）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **`history_feedback_loop_orchestrator.py`（M625）** 的全流程编排这个好例子开始。然后，遵循该模式实现一个新的 **IntelTrainingLoopOrchestrator**，让 **整个情报训练闭环** 可以 **通过一个入口编排M726-M744所有模块**（赛后评估→奖励生成→特征构建→训练导出→微调→A/B测试→上线），并能 **追踪训练循环进度和效果**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
