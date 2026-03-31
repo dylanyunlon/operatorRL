@@ -1,0 +1,353 @@
+{
+  "session_id": "6f7488ffa880",
+  "timestamp": "2026-03-31T10:23:30.194628",
+  "total_modules": 20,
+  "scanned": 20,
+  "missing": 20,
+  "checked": 0,
+  "errors": 0,
+  "total_lines": 0,
+  "avg_compliance": 0.0,
+  "entries": [
+    {
+      "task_id": "M806",
+      "module_name": "historical_battle_core",
+      "timestamp": "2026-03-31T10:23:30.194936",
+      "status": "missing",
+      "category": "core",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/core/historical_battle_core.py with ≥500 lines implementing Historical Battle Data Core - data models, schemas, validation"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/core/historical_battle_core.py"
+    },
+    {
+      "task_id": "M807",
+      "module_name": "lcu_api_client",
+      "timestamp": "2026-03-31T10:23:30.195171",
+      "status": "missing",
+      "category": "core",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/core/lcu_api_client.py with ≥500 lines implementing LCU API Client - League Client Update API integration"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/core/lcu_api_client.py"
+    },
+    {
+      "task_id": "M808",
+      "module_name": "match_history_collector",
+      "timestamp": "2026-03-31T10:23:30.195335",
+      "status": "missing",
+      "category": "core",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/core/match_history_collector.py with ≥500 lines implementing Match History Collector - batch/stream match data collection"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/core/match_history_collector.py"
+    },
+    {
+      "task_id": "M809",
+      "module_name": "player_profile_analyzer",
+      "timestamp": "2026-03-31T10:23:30.195521",
+      "status": "missing",
+      "category": "analysis",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/analysis/player_profile_analyzer.py with ≥500 lines implementing Player Profile Analyzer - multi-dimensional player profiling"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/analysis/player_profile_analyzer.py"
+    },
+    {
+      "task_id": "M810",
+      "module_name": "champion_statistics_engine",
+      "timestamp": "2026-03-31T10:23:30.195646",
+      "status": "missing",
+      "category": "analysis",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/analysis/champion_statistics_engine.py with ≥500 lines implementing Champion Statistics Engine - win/pick/ban rates, tier analysis"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/analysis/champion_statistics_engine.py"
+    },
+    {
+      "task_id": "M811",
+      "module_name": "network_capture_layer",
+      "timestamp": "2026-03-31T10:23:30.195778",
+      "status": "missing",
+      "category": "network",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/network/network_capture_layer.py with ≥500 lines implementing Network Capture Layer - Fiddler/mitmproxy integration"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/network/network_capture_layer.py"
+    },
+    {
+      "task_id": "M812",
+      "module_name": "protocol_decoder",
+      "timestamp": "2026-03-31T10:23:30.195921",
+      "status": "missing",
+      "category": "network",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/network/protocol_decoder.py with ≥500 lines implementing Protocol Decoder - game protocol parsing, packet analysis"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/network/protocol_decoder.py"
+    },
+    {
+      "task_id": "M813",
+      "module_name": "battle_timeline_reconstructor",
+      "timestamp": "2026-03-31T10:23:30.196043",
+      "status": "missing",
+      "category": "analysis",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/analysis/battle_timeline_reconstructor.py with ≥500 lines implementing Battle Timeline Reconstructor - event sequence rebuilding"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/analysis/battle_timeline_reconstructor.py"
+    },
+    {
+      "task_id": "M814",
+      "module_name": "team_composition_analyzer",
+      "timestamp": "2026-03-31T10:23:30.196158",
+      "status": "missing",
+      "category": "analysis",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/analysis/team_composition_analyzer.py with ≥500 lines implementing Team Composition Analyzer - synergy/counter analysis"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/analysis/team_composition_analyzer.py"
+    },
+    {
+      "task_id": "M815",
+      "module_name": "performance_metrics_calculator",
+      "timestamp": "2026-03-31T10:23:30.196275",
+      "status": "missing",
+      "category": "analysis",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/analysis/performance_metrics_calculator.py with ≥500 lines implementing Performance Metrics Calculator - KDA, vision, CS, objectives"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/analysis/performance_metrics_calculator.py"
+    },
+    {
+      "task_id": "M816",
+      "module_name": "historical_pattern_recognition",
+      "timestamp": "2026-03-31T10:23:30.196404",
+      "status": "missing",
+      "category": "analysis",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/analysis/historical_pattern_recognition.py with ≥500 lines implementing Historical Pattern Recognition - behavioral pattern detection"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/analysis/historical_pattern_recognition.py"
+    },
+    {
+      "task_id": "M817",
+      "module_name": "opponent_scouting_system",
+      "timestamp": "2026-03-31T10:23:30.196531",
+      "status": "missing",
+      "category": "integration",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/integration/opponent_scouting_system.py with ≥500 lines implementing Opponent Scouting System - pre-game enemy analysis"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/integration/opponent_scouting_system.py"
+    },
+    {
+      "task_id": "M818",
+      "module_name": "realtime_data_bridge",
+      "timestamp": "2026-03-31T10:23:30.196641",
+      "status": "missing",
+      "category": "integration",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/integration/realtime_data_bridge.py with ≥500 lines implementing Real-time Data Bridge - historical↔realtime data fusion"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/integration/realtime_data_bridge.py"
+    },
+    {
+      "task_id": "M819",
+      "module_name": "data_persistence_layer",
+      "timestamp": "2026-03-31T10:23:30.196748",
+      "status": "missing",
+      "category": "persistence",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/persistence/data_persistence_layer.py with ≥500 lines implementing Data Persistence Layer - storage, caching, indexing"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/persistence/data_persistence_layer.py"
+    },
+    {
+      "task_id": "M820",
+      "module_name": "analytics_dashboard_backend",
+      "timestamp": "2026-03-31T10:23:30.196895",
+      "status": "missing",
+      "category": "integration",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/integration/analytics_dashboard_backend.py with ≥500 lines implementing Analytics Dashboard Backend - REST API for analytics"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/integration/analytics_dashboard_backend.py"
+    },
+    {
+      "task_id": "M821",
+      "module_name": "replay_parser",
+      "timestamp": "2026-03-31T10:23:30.197033",
+      "status": "missing",
+      "category": "core",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/core/replay_parser.py with ≥500 lines implementing Replay Parser - .rofl replay file parsing and extraction"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/core/replay_parser.py"
+    },
+    {
+      "task_id": "M822",
+      "module_name": "meta_analysis_engine",
+      "timestamp": "2026-03-31T10:23:30.197153",
+      "status": "missing",
+      "category": "analysis",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/analysis/meta_analysis_engine.py with ≥500 lines implementing Meta Analysis Engine - current meta trends, patch analysis"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/analysis/meta_analysis_engine.py"
+    },
+    {
+      "task_id": "M823",
+      "module_name": "prediction_model_integration",
+      "timestamp": "2026-03-31T10:23:30.197258",
+      "status": "missing",
+      "category": "integration",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/integration/prediction_model_integration.py with ≥500 lines implementing Prediction Model Integration - win probability from history"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/integration/prediction_model_integration.py"
+    },
+    {
+      "task_id": "M824",
+      "module_name": "report_generator",
+      "timestamp": "2026-03-31T10:23:30.197362",
+      "status": "missing",
+      "category": "integration",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/integration/report_generator.py with ≥500 lines implementing Report Generator - structured analysis report creation"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/integration/report_generator.py"
+    },
+    {
+      "task_id": "M825",
+      "module_name": "system_orchestrator",
+      "timestamp": "2026-03-31T10:23:30.197463",
+      "status": "missing",
+      "category": "orchestration",
+      "line_count": 0,
+      "class_count": 0,
+      "function_count": 0,
+      "interface_compliance": 0.0,
+      "dependency_check": {},
+      "code_quality_notes": [],
+      "improvement_suggestions": [
+        "CREATE /home/claude/operatorRL/src/modules/historical_battle/orchestration/system_orchestrator.py with ≥500 lines implementing System Orchestrator - module coordination and lifecycle"
+      ],
+      "error_details": "Module file not found: /home/claude/operatorRL/src/modules/historical_battle/orchestration/system_orchestrator.py"
+    }
+  ]
+}

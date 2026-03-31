@@ -1,0 +1,149 @@
+{
+  "session": "379206210648",
+  "generated_at": "2026-03-31T11:24:17.001693+00:00",
+  "total_modules": 20,
+  "compliant_modules": 20,
+  "total_lines": 13124,
+  "modules": {
+    "M813": {
+      "task_id": "M813",
+      "file": "analysis/battle_timeline_reconstructor.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/analysis/battle_timeline_reconstructor.py",
+      "lines": 662,
+      "compliant": true
+    },
+    "M810": {
+      "task_id": "M810",
+      "file": "analysis/champion_statistics_engine.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/analysis/champion_statistics_engine.py",
+      "lines": 620,
+      "compliant": true
+    },
+    "M816": {
+      "task_id": "M816",
+      "file": "analysis/historical_pattern_recognition.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/analysis/historical_pattern_recognition.py",
+      "lines": 510,
+      "compliant": true
+    },
+    "M822": {
+      "task_id": "M822",
+      "file": "analysis/meta_analysis_engine.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/analysis/meta_analysis_engine.py",
+      "lines": 504,
+      "compliant": true
+    },
+    "M815": {
+      "task_id": "M815",
+      "file": "analysis/performance_metrics_calculator.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/analysis/performance_metrics_calculator.py",
+      "lines": 568,
+      "compliant": true
+    },
+    "M809": {
+      "task_id": "M809",
+      "file": "analysis/player_profile_analyzer.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/analysis/player_profile_analyzer.py",
+      "lines": 953,
+      "compliant": true
+    },
+    "M814": {
+      "task_id": "M814",
+      "file": "analysis/team_composition_analyzer.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/analysis/team_composition_analyzer.py",
+      "lines": 596,
+      "compliant": true
+    },
+    "M806": {
+      "task_id": "M806",
+      "file": "core/historical_battle_core.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/core/historical_battle_core.py",
+      "lines": 1071,
+      "compliant": true
+    },
+    "M807": {
+      "task_id": "M807",
+      "file": "core/lcu_api_client.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/core/lcu_api_client.py",
+      "lines": 999,
+      "compliant": true
+    },
+    "M808": {
+      "task_id": "M808",
+      "file": "core/match_history_collector.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/core/match_history_collector.py",
+      "lines": 832,
+      "compliant": true
+    },
+    "M821": {
+      "task_id": "M821",
+      "file": "core/replay_parser.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/core/replay_parser.py",
+      "lines": 508,
+      "compliant": true
+    },
+    "M820": {
+      "task_id": "M820",
+      "file": "integration/analytics_dashboard_backend.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/integration/analytics_dashboard_backend.py",
+      "lines": 531,
+      "compliant": true
+    },
+    "M817": {
+      "task_id": "M817",
+      "file": "integration/opponent_scouting_system.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/integration/opponent_scouting_system.py",
+      "lines": 549,
+      "compliant": true
+    },
+    "M823": {
+      "task_id": "M823",
+      "file": "integration/prediction_model_integration.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/integration/prediction_model_integration.py",
+      "lines": 513,
+      "compliant": true
+    },
+    "M818": {
+      "task_id": "M818",
+      "file": "integration/realtime_data_bridge.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/integration/realtime_data_bridge.py",
+      "lines": 523,
+      "compliant": true
+    },
+    "M824": {
+      "task_id": "M824",
+      "file": "integration/report_generator.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/integration/report_generator.py",
+      "lines": 527,
+      "compliant": true
+    },
+    "M811": {
+      "task_id": "M811",
+      "file": "network/network_capture_layer.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/network/network_capture_layer.py",
+      "lines": 862,
+      "compliant": true
+    },
+    "M812": {
+      "task_id": "M812",
+      "file": "network/protocol_decoder.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/network/protocol_decoder.py",
+      "lines": 739,
+      "compliant": true
+    },
+    "M825": {
+      "task_id": "M825",
+      "file": "orchestration/system_orchestrator.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/orchestration/system_orchestrator.py",
+      "lines": 543,
+      "compliant": true
+    },
+    "M819": {
+      "task_id": "M819",
+      "file": "persistence/data_persistence_layer.py",
+      "full_path": "/home/claude/operatorRL/src/modules/historical_battle/persistence/data_persistence_layer.py",
+      "lines": 514,
+      "compliant": true
+    }
+  }
+}
