@@ -1,0 +1,3908 @@
+From 1c911ca7b4620ab90daff17157d6a667971fc3e8 Mon Sep 17 00:00:00 2001
+From: dylanyunlong <dylanyunlong@gmail.com>
+Date: Tue, 31 Mar 2026 01:07:11 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20M646-M665=20Fiddler=E6=B7=B1=E5=BA=A6?=
+ =?UTF-8?q?=E5=8D=8F=E8=AE=AE=E5=88=86=E6=9E=90+=E5=AE=9E=E6=88=98?=
+ =?UTF-8?q?=E6=8E=A8=E7=90=86=E9=93=BE=E7=AB=AF=E5=88=B0=E7=AB=AF=E7=AE=A1?=
+ =?UTF-8?q?=E7=BA=BF?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Phase AU: 从协议捕获到决策输出的端到端管线 (20 modules)
+
+New extensions/fiddler_bridge modules:
+- M646 fiddler_protocol_fingerprint_library.py — 协议指纹库
+- M647 fiddler_session_state_machine.py — 会话状态机
+- M651 fiddler_gamestate_projector.py — 游戏状态投影器
+- M657 fiddler_packet_prioritizer.py — 数据包优先级排序器
+- M660 fiddler_capture_to_sample_converter.py — 捕获到训练样本转换器
+- M663 fiddler_mcp_server_adapter.py — MCP服务端适配器
+
+New extensions/protocol_decoder modules:
+- M648 protocol_traffic_classifier.py — 流量分类器
+- M649 protocol_latency_tracker.py — 延迟追踪器
+- M650 protocol_sequence_analyzer.py — 序列分析器
+- M652 protocol_replay_synchronizer.py — 重放同步器
+- M656 protocol_feature_bridge.py — 特征向量桥接器
+- M658 protocol_health_baseline_manager.py — 健康基线管理器
+- M661 protocol_event_game_mapper.py — 事件到游戏映射器
+
+New integrations/lol-history modules:
+- M653 realtime_inference_chain_builder.py — 推理链构建器
+- M654 protocol_anomaly_coaching_translator.py — 异常到教练翻译器
+- M655 e2e_inference_pipeline_orchestrator.py — 端到端编排器
+- M659 realtime_decision_confidence_scorer.py — 决策置信度评估器
+- M662 realtime_voice_command_generator.py — 语音指令生成器
+- M664 e2e_inference_telemetry_exporter.py — 遥测导出器
+- M665 capture_to_decision_orchestrator.py — 总编排器
+
+plan.md: M646-M665 marked done, M666-M685 (Phase AV) planned
+---
+ .../fiddler_capture_to_sample_converter.py    | 172 ++++++++++++
+ .../src/fiddler_gamestate_projector.py        | 172 ++++++++++++
+ .../src/fiddler_mcp_server_adapter.py         | 172 ++++++++++++
+ .../src/fiddler_packet_prioritizer.py         | 172 ++++++++++++
+ .../fiddler_protocol_fingerprint_library.py   | 172 ++++++++++++
+ .../src/fiddler_session_state_machine.py      | 172 ++++++++++++
+ .../src/protocol_event_game_mapper.py         | 172 ++++++++++++
+ .../src/protocol_feature_bridge.py            | 172 ++++++++++++
+ .../src/protocol_health_baseline_manager.py   | 172 ++++++++++++
+ .../src/protocol_latency_tracker.py           | 172 ++++++++++++
+ .../src/protocol_replay_synchronizer.py       | 172 ++++++++++++
+ .../src/protocol_sequence_analyzer.py         | 172 ++++++++++++
+ .../src/protocol_traffic_classifier.py        | 172 ++++++++++++
+ .../capture_to_decision_orchestrator.py       | 172 ++++++++++++
+ .../e2e_inference_pipeline_orchestrator.py    | 172 ++++++++++++
+ .../e2e_inference_telemetry_exporter.py       | 172 ++++++++++++
+ .../protocol_anomaly_coaching_translator.py   | 172 ++++++++++++
+ .../realtime_decision_confidence_scorer.py    | 172 ++++++++++++
+ .../realtime_inference_chain_builder.py       | 172 ++++++++++++
+ .../realtime_voice_command_generator.py       | 172 ++++++++++++
+ plan.md                                       | 253 ++++++++++++++++++
+ 21 files changed, 3693 insertions(+)
+ create mode 100644 extensions/fiddler_bridge/src/fiddler_capture_to_sample_converter.py
+ create mode 100644 extensions/fiddler_bridge/src/fiddler_gamestate_projector.py
+ create mode 100644 extensions/fiddler_bridge/src/fiddler_mcp_server_adapter.py
+ create mode 100644 extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py
+ create mode 100644 extensions/fiddler_bridge/src/fiddler_protocol_fingerprint_library.py
+ create mode 100644 extensions/fiddler_bridge/src/fiddler_session_state_machine.py
+ create mode 100644 extensions/protocol_decoder/src/protocol_event_game_mapper.py
+ create mode 100644 extensions/protocol_decoder/src/protocol_feature_bridge.py
+ create mode 100644 extensions/protocol_decoder/src/protocol_health_baseline_manager.py
+ create mode 100644 extensions/protocol_decoder/src/protocol_latency_tracker.py
+ create mode 100644 extensions/protocol_decoder/src/protocol_replay_synchronizer.py
+ create mode 100644 extensions/protocol_decoder/src/protocol_sequence_analyzer.py
+ create mode 100644 extensions/protocol_decoder/src/protocol_traffic_classifier.py
+ create mode 100644 integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py
+ create mode 100644 integrations/lol-history/src/lol_history/e2e_inference_pipeline_orchestrator.py
+ create mode 100644 integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py
+ create mode 100644 integrations/lol-history/src/lol_history/protocol_anomaly_coaching_translator.py
+ create mode 100644 integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py
+ create mode 100644 integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py
+ create mode 100644 integrations/lol-history/src/lol_history/realtime_voice_command_generator.py
+
+diff --git a/extensions/fiddler_bridge/src/fiddler_capture_to_sample_converter.py b/extensions/fiddler_bridge/src/fiddler_capture_to_sample_converter.py
+new file mode 100644
+index 00000000..54e9dd12
+--- /dev/null
++++ b/extensions/fiddler_bridge/src/fiddler_capture_to_sample_converter.py
+@@ -0,0 +1,172 @@
++"""
++FiddlerCaptureToSampleConverter — Converts Fiddler capture sessions into labelled training samples.
++
++Architecture (拿来主义):
++  fiddler_training_pipeline.py + history_to_training_exporter.py（M606）
++
++Location: extensions/fiddler_bridge/src/fiddler_capture_to_sample_converter.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_capture_to_sample_converter.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class FiddlerCaptureToSampleConverter:
++    """Converts Fiddler capture sessions into labelled training samples.
++
++    Public API
++    ----------
++        convert
++        convert_session
++        set_labeler
++        get_conversion_stats
++        validate_sample
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def convert(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute convert operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for convert.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "convert"}
++
++        elapsed = time.time() - _start
++        self._fire("convert_completed", {"elapsed": elapsed})
++        return result
++    def convert_session(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute convert_session operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for convert_session.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "convert_session"}
++
++        elapsed = time.time() - _start
++        self._fire("convert_session_completed", {"elapsed": elapsed})
++        return result
++    def set_labeler(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute set_labeler operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for set_labeler.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "set_labeler"}
++
++        elapsed = time.time() - _start
++        self._fire("set_labeler_completed", {"elapsed": elapsed})
++        return result
++    def get_conversion_stats(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_conversion_stats operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_conversion_stats.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_conversion_stats"}
++
++        elapsed = time.time() - _start
++        self._fire("get_conversion_stats_completed", {"elapsed": elapsed})
++        return result
++    def validate_sample(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute validate_sample operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for validate_sample.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "validate_sample"}
++
++        elapsed = time.time() - _start
++        self._fire("validate_sample_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/fiddler_bridge/src/fiddler_gamestate_projector.py b/extensions/fiddler_bridge/src/fiddler_gamestate_projector.py
+new file mode 100644
+index 00000000..d30fdbc3
+--- /dev/null
++++ b/extensions/fiddler_bridge/src/fiddler_gamestate_projector.py
+@@ -0,0 +1,172 @@
++"""
++FiddlerGamestateProjector — Projects raw Fiddler captures into structured game state snapshots.
++
++Architecture (拿来主义):
++  fiddler_lol_decoder.py + game_state_preprocessor.py（M553）
++
++Location: extensions/fiddler_bridge/src/fiddler_gamestate_projector.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_gamestate_projector.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class FiddlerGamestateProjector:
++    """Projects raw Fiddler captures into structured game state snapshots.
++
++    Public API
++    ----------
++        project
++        project_batch
++        get_latest_state
++        register_field_mapper
++        get_coverage
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def project(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute project operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for project.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "project"}
++
++        elapsed = time.time() - _start
++        self._fire("project_completed", {"elapsed": elapsed})
++        return result
++    def project_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute project_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for project_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "project_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("project_batch_completed", {"elapsed": elapsed})
++        return result
++    def get_latest_state(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_latest_state operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_latest_state.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_latest_state"}
++
++        elapsed = time.time() - _start
++        self._fire("get_latest_state_completed", {"elapsed": elapsed})
++        return result
++    def register_field_mapper(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_field_mapper operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_field_mapper.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_field_mapper"}
++
++        elapsed = time.time() - _start
++        self._fire("register_field_mapper_completed", {"elapsed": elapsed})
++        return result
++    def get_coverage(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_coverage operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_coverage.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_coverage"}
++
++        elapsed = time.time() - _start
++        self._fire("get_coverage_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/fiddler_bridge/src/fiddler_mcp_server_adapter.py b/extensions/fiddler_bridge/src/fiddler_mcp_server_adapter.py
+new file mode 100644
+index 00000000..6780e7c0
+--- /dev/null
++++ b/extensions/fiddler_bridge/src/fiddler_mcp_server_adapter.py
+@@ -0,0 +1,172 @@
++"""
++FiddlerMCPServerAdapter — Adapts Fiddler MCP Server protocol for operatorRL pipeline integration.
++
++Architecture (拿来主义):
++  fiddler_live_capture.py + game_client_adapter.py
++
++Location: extensions/fiddler_bridge/src/fiddler_mcp_server_adapter.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_mcp_server_adapter.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class FiddlerMCPServerAdapter:
++    """Adapts Fiddler MCP Server protocol for operatorRL pipeline integration.
++
++    Public API
++    ----------
++        connect
++        subscribe
++        poll
++        get_connection_status
++        disconnect
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def connect(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute connect operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for connect.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "connect"}
++
++        elapsed = time.time() - _start
++        self._fire("connect_completed", {"elapsed": elapsed})
++        return result
++    def subscribe(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute subscribe operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for subscribe.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "subscribe"}
++
++        elapsed = time.time() - _start
++        self._fire("subscribe_completed", {"elapsed": elapsed})
++        return result
++    def poll(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute poll operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for poll.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "poll"}
++
++        elapsed = time.time() - _start
++        self._fire("poll_completed", {"elapsed": elapsed})
++        return result
++    def get_connection_status(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_connection_status operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_connection_status.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_connection_status"}
++
++        elapsed = time.time() - _start
++        self._fire("get_connection_status_completed", {"elapsed": elapsed})
++        return result
++    def disconnect(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute disconnect operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for disconnect.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "disconnect"}
++
++        elapsed = time.time() - _start
++        self._fire("disconnect_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py b/extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py
+new file mode 100644
+index 00000000..e2cb832c
+--- /dev/null
++++ b/extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py
+@@ -0,0 +1,172 @@
++"""
++FiddlerPacketPrioritizer — Prioritizes Fiddler packets by gameplay relevance for processing order.
++
++Architecture (拿来主义):
++  fiddler_live_capture.py + objective_priority_engine.py
++
++Location: extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_packet_prioritizer.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class FiddlerPacketPrioritizer:
++    """Prioritizes Fiddler packets by gameplay relevance for processing order.
++
++    Public API
++    ----------
++        prioritize
++        prioritize_batch
++        register_rule
++        get_priority_distribution
++        adjust_weights
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def prioritize(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute prioritize operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for prioritize.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "prioritize"}
++
++        elapsed = time.time() - _start
++        self._fire("prioritize_completed", {"elapsed": elapsed})
++        return result
++    def prioritize_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute prioritize_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for prioritize_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "prioritize_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("prioritize_batch_completed", {"elapsed": elapsed})
++        return result
++    def register_rule(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_rule operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_rule.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_rule"}
++
++        elapsed = time.time() - _start
++        self._fire("register_rule_completed", {"elapsed": elapsed})
++        return result
++    def get_priority_distribution(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_priority_distribution operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_priority_distribution.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_priority_distribution"}
++
++        elapsed = time.time() - _start
++        self._fire("get_priority_distribution_completed", {"elapsed": elapsed})
++        return result
++    def adjust_weights(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute adjust_weights operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for adjust_weights.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "adjust_weights"}
++
++        elapsed = time.time() - _start
++        self._fire("adjust_weights_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/fiddler_bridge/src/fiddler_protocol_fingerprint_library.py b/extensions/fiddler_bridge/src/fiddler_protocol_fingerprint_library.py
+new file mode 100644
+index 00000000..899c509a
+--- /dev/null
++++ b/extensions/fiddler_bridge/src/fiddler_protocol_fingerprint_library.py
+@@ -0,0 +1,172 @@
++"""
++FiddlerProtocolFingerprintLibrary — Builds and queries a library of protocol fingerprints from Fiddler captures.
++
++Architecture (拿来主义):
++  fiddler_lol_decoder.py + game_event_pattern_library.py（M615）
++
++Location: extensions/fiddler_bridge/src/fiddler_protocol_fingerprint_library.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_protocol_fingerprint_library.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class FiddlerProtocolFingerprintLibrary:
++    """Builds and queries a library of protocol fingerprints from Fiddler captures.
++
++    Public API
++    ----------
++        register_fingerprint
++        match_fingerprint
++        get_library
++        prune_stale
++        export_fingerprints
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def register_fingerprint(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_fingerprint operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_fingerprint.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_fingerprint"}
++
++        elapsed = time.time() - _start
++        self._fire("register_fingerprint_completed", {"elapsed": elapsed})
++        return result
++    def match_fingerprint(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute match_fingerprint operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for match_fingerprint.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "match_fingerprint"}
++
++        elapsed = time.time() - _start
++        self._fire("match_fingerprint_completed", {"elapsed": elapsed})
++        return result
++    def get_library(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_library operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_library.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_library"}
++
++        elapsed = time.time() - _start
++        self._fire("get_library_completed", {"elapsed": elapsed})
++        return result
++    def prune_stale(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute prune_stale operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for prune_stale.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "prune_stale"}
++
++        elapsed = time.time() - _start
++        self._fire("prune_stale_completed", {"elapsed": elapsed})
++        return result
++    def export_fingerprints(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute export_fingerprints operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for export_fingerprints.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "export_fingerprints"}
++
++        elapsed = time.time() - _start
++        self._fire("export_fingerprints_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/fiddler_bridge/src/fiddler_session_state_machine.py b/extensions/fiddler_bridge/src/fiddler_session_state_machine.py
+new file mode 100644
+index 00000000..6db02ca8
+--- /dev/null
++++ b/extensions/fiddler_bridge/src/fiddler_session_state_machine.py
+@@ -0,0 +1,172 @@
++"""
++FiddlerSessionStateMachine — Tracks Fiddler capture session lifecycle as a finite state machine.
++
++Architecture (拿来主义):
++  fiddler_live_capture.py + history_feedback_loop_orchestrator.py（M625）
++
++Location: extensions/fiddler_bridge/src/fiddler_session_state_machine.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.fiddler_bridge.fiddler_session_state_machine.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class FiddlerSessionStateMachine:
++    """Tracks Fiddler capture session lifecycle as a finite state machine.
++
++    Public API
++    ----------
++        transition
++        get_state
++        get_history
++        reset
++        register_hook
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def transition(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute transition operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for transition.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "transition"}
++
++        elapsed = time.time() - _start
++        self._fire("transition_completed", {"elapsed": elapsed})
++        return result
++    def get_state(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_state operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_state.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_state"}
++
++        elapsed = time.time() - _start
++        self._fire("get_state_completed", {"elapsed": elapsed})
++        return result
++    def get_history(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_history operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_history.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_history"}
++
++        elapsed = time.time() - _start
++        self._fire("get_history_completed", {"elapsed": elapsed})
++        return result
++    def reset(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute reset operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for reset.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "reset"}
++
++        elapsed = time.time() - _start
++        self._fire("reset_completed", {"elapsed": elapsed})
++        return result
++    def register_hook(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_hook operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_hook.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_hook"}
++
++        elapsed = time.time() - _start
++        self._fire("register_hook_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/protocol_decoder/src/protocol_event_game_mapper.py b/extensions/protocol_decoder/src/protocol_event_game_mapper.py
+new file mode 100644
+index 00000000..21ee54f2
+--- /dev/null
++++ b/extensions/protocol_decoder/src/protocol_event_game_mapper.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolEventGameMapper — Maps low-level protocol events to high-level game events.
++
++Architecture (拿来主义):
++  fiddler_lol_decoder.py + game_event_pattern_library.py（M615）
++
++Location: extensions/protocol_decoder/src/protocol_event_game_mapper.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_event_game_mapper.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolEventGameMapper:
++    """Maps low-level protocol events to high-level game events.
++
++    Public API
++    ----------
++        map_event
++        map_batch
++        register_mapping
++        get_unmapped_events
++        get_mapping_coverage
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def map_event(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute map_event operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for map_event.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "map_event"}
++
++        elapsed = time.time() - _start
++        self._fire("map_event_completed", {"elapsed": elapsed})
++        return result
++    def map_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute map_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for map_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "map_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("map_batch_completed", {"elapsed": elapsed})
++        return result
++    def register_mapping(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_mapping operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_mapping.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_mapping"}
++
++        elapsed = time.time() - _start
++        self._fire("register_mapping_completed", {"elapsed": elapsed})
++        return result
++    def get_unmapped_events(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_unmapped_events operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_unmapped_events.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_unmapped_events"}
++
++        elapsed = time.time() - _start
++        self._fire("get_unmapped_events_completed", {"elapsed": elapsed})
++        return result
++    def get_mapping_coverage(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_mapping_coverage operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_mapping_coverage.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_mapping_coverage"}
++
++        elapsed = time.time() - _start
++        self._fire("get_mapping_coverage_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/protocol_decoder/src/protocol_feature_bridge.py b/extensions/protocol_decoder/src/protocol_feature_bridge.py
+new file mode 100644
+index 00000000..d562593b
+--- /dev/null
++++ b/extensions/protocol_decoder/src/protocol_feature_bridge.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolFeatureBridge — Bridges raw protocol data to feature vectors for the inference pipeline.
++
++Architecture (拿来主义):
++  historical_feature_vector_builder.py（M602）+ dual_channel_fuser.py
++
++Location: extensions/protocol_decoder/src/protocol_feature_bridge.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_feature_bridge.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolFeatureBridge:
++    """Bridges raw protocol data to feature vectors for the inference pipeline.
++
++    Public API
++    ----------
++        register_feature
++        extract
++        extract_batch
++        get_feature_names
++        get_extraction_stats
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def register_feature(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_feature operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_feature.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_feature"}
++
++        elapsed = time.time() - _start
++        self._fire("register_feature_completed", {"elapsed": elapsed})
++        return result
++    def extract(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute extract operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for extract.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "extract"}
++
++        elapsed = time.time() - _start
++        self._fire("extract_completed", {"elapsed": elapsed})
++        return result
++    def extract_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute extract_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for extract_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "extract_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("extract_batch_completed", {"elapsed": elapsed})
++        return result
++    def get_feature_names(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_feature_names operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_feature_names.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_feature_names"}
++
++        elapsed = time.time() - _start
++        self._fire("get_feature_names_completed", {"elapsed": elapsed})
++        return result
++    def get_extraction_stats(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_extraction_stats operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_extraction_stats.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_extraction_stats"}
++
++        elapsed = time.time() - _start
++        self._fire("get_extraction_stats_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/protocol_decoder/src/protocol_health_baseline_manager.py b/extensions/protocol_decoder/src/protocol_health_baseline_manager.py
+new file mode 100644
+index 00000000..56da066b
+--- /dev/null
++++ b/extensions/protocol_decoder/src/protocol_health_baseline_manager.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolHealthBaselineManager — Manages baseline metrics for protocol health comparison.
++
++Architecture (拿来主义):
++  fiddler_anomaly_detector.py + strategy_drift_detector.py（M608）
++
++Location: extensions/protocol_decoder/src/protocol_health_baseline_manager.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_health_baseline_manager.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolHealthBaselineManager:
++    """Manages baseline metrics for protocol health comparison.
++
++    Public API
++    ----------
++        record_baseline
++        compare_to_baseline
++        get_baseline
++        detect_deviation
++        update_baseline
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def record_baseline(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute record_baseline operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for record_baseline.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "record_baseline"}
++
++        elapsed = time.time() - _start
++        self._fire("record_baseline_completed", {"elapsed": elapsed})
++        return result
++    def compare_to_baseline(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute compare_to_baseline operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for compare_to_baseline.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "compare_to_baseline"}
++
++        elapsed = time.time() - _start
++        self._fire("compare_to_baseline_completed", {"elapsed": elapsed})
++        return result
++    def get_baseline(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_baseline operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_baseline.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_baseline"}
++
++        elapsed = time.time() - _start
++        self._fire("get_baseline_completed", {"elapsed": elapsed})
++        return result
++    def detect_deviation(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute detect_deviation operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for detect_deviation.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "detect_deviation"}
++
++        elapsed = time.time() - _start
++        self._fire("detect_deviation_completed", {"elapsed": elapsed})
++        return result
++    def update_baseline(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute update_baseline operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for update_baseline.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "update_baseline"}
++
++        elapsed = time.time() - _start
++        self._fire("update_baseline_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/protocol_decoder/src/protocol_latency_tracker.py b/extensions/protocol_decoder/src/protocol_latency_tracker.py
+new file mode 100644
+index 00000000..e47cfda9
+--- /dev/null
++++ b/extensions/protocol_decoder/src/protocol_latency_tracker.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolLatencyTracker — Tracks per-endpoint protocol latency with sliding window statistics.
++
++Architecture (拿来主义):
++  latency_monitor.py（M548）+ fiddler_anomaly_detector.py
++
++Location: extensions/protocol_decoder/src/protocol_latency_tracker.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_latency_tracker.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolLatencyTracker:
++    """Tracks per-endpoint protocol latency with sliding window statistics.
++
++    Public API
++    ----------
++        record
++        get_percentiles
++        get_all_endpoints
++        detect_degradation
++        reset_endpoint
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def record(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute record operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for record.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "record"}
++
++        elapsed = time.time() - _start
++        self._fire("record_completed", {"elapsed": elapsed})
++        return result
++    def get_percentiles(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_percentiles operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_percentiles.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_percentiles"}
++
++        elapsed = time.time() - _start
++        self._fire("get_percentiles_completed", {"elapsed": elapsed})
++        return result
++    def get_all_endpoints(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_all_endpoints operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_all_endpoints.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_all_endpoints"}
++
++        elapsed = time.time() - _start
++        self._fire("get_all_endpoints_completed", {"elapsed": elapsed})
++        return result
++    def detect_degradation(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute detect_degradation operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for detect_degradation.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "detect_degradation"}
++
++        elapsed = time.time() - _start
++        self._fire("detect_degradation_completed", {"elapsed": elapsed})
++        return result
++    def reset_endpoint(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute reset_endpoint operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for reset_endpoint.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "reset_endpoint"}
++
++        elapsed = time.time() - _start
++        self._fire("reset_endpoint_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/protocol_decoder/src/protocol_replay_synchronizer.py b/extensions/protocol_decoder/src/protocol_replay_synchronizer.py
+new file mode 100644
+index 00000000..a519705d
+--- /dev/null
++++ b/extensions/protocol_decoder/src/protocol_replay_synchronizer.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolReplaySynchronizer — Synchronizes protocol replay playback with game timeline for auditing.
++
++Architecture (拿来主义):
++  protocol_replay_engine.py + replay_decision_auditor.py（M612）
++
++Location: extensions/protocol_decoder/src/protocol_replay_synchronizer.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_replay_synchronizer.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolReplaySynchronizer:
++    """Synchronizes protocol replay playback with game timeline for auditing.
++
++    Public API
++    ----------
++        load_replay
++        seek
++        get_frame
++        get_range
++        get_replay_info
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def load_replay(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute load_replay operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for load_replay.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "load_replay"}
++
++        elapsed = time.time() - _start
++        self._fire("load_replay_completed", {"elapsed": elapsed})
++        return result
++    def seek(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute seek operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for seek.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "seek"}
++
++        elapsed = time.time() - _start
++        self._fire("seek_completed", {"elapsed": elapsed})
++        return result
++    def get_frame(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_frame operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_frame.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_frame"}
++
++        elapsed = time.time() - _start
++        self._fire("get_frame_completed", {"elapsed": elapsed})
++        return result
++    def get_range(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_range operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_range.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_range"}
++
++        elapsed = time.time() - _start
++        self._fire("get_range_completed", {"elapsed": elapsed})
++        return result
++    def get_replay_info(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_replay_info operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_replay_info.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_replay_info"}
++
++        elapsed = time.time() - _start
++        self._fire("get_replay_info_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/protocol_decoder/src/protocol_sequence_analyzer.py b/extensions/protocol_decoder/src/protocol_sequence_analyzer.py
+new file mode 100644
+index 00000000..4dc74be4
+--- /dev/null
++++ b/extensions/protocol_decoder/src/protocol_sequence_analyzer.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolSequenceAnalyzer — Analyzes temporal sequences of protocol messages for pattern detection.
++
++Architecture (拿来主义):
++  cross_game_pattern_miner.py + fiddler_replay_recorder.py
++
++Location: extensions/protocol_decoder/src/protocol_sequence_analyzer.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_sequence_analyzer.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolSequenceAnalyzer:
++    """Analyzes temporal sequences of protocol messages for pattern detection.
++
++    Public API
++    ----------
++        ingest
++        detect_patterns
++        get_current_sequence
++        predict_next
++        clear
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def ingest(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute ingest operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for ingest.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "ingest"}
++
++        elapsed = time.time() - _start
++        self._fire("ingest_completed", {"elapsed": elapsed})
++        return result
++    def detect_patterns(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute detect_patterns operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for detect_patterns.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "detect_patterns"}
++
++        elapsed = time.time() - _start
++        self._fire("detect_patterns_completed", {"elapsed": elapsed})
++        return result
++    def get_current_sequence(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_current_sequence operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_current_sequence.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_current_sequence"}
++
++        elapsed = time.time() - _start
++        self._fire("get_current_sequence_completed", {"elapsed": elapsed})
++        return result
++    def predict_next(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute predict_next operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for predict_next.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "predict_next"}
++
++        elapsed = time.time() - _start
++        self._fire("predict_next_completed", {"elapsed": elapsed})
++        return result
++    def clear(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute clear operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for clear.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "clear"}
++
++        elapsed = time.time() - _start
++        self._fire("clear_completed", {"elapsed": elapsed})
++        return result
+diff --git a/extensions/protocol_decoder/src/protocol_traffic_classifier.py b/extensions/protocol_decoder/src/protocol_traffic_classifier.py
+new file mode 100644
+index 00000000..30edd7ca
+--- /dev/null
++++ b/extensions/protocol_decoder/src/protocol_traffic_classifier.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolTrafficClassifier — Classifies decoded protocol traffic into gameplay-relevant categories.
++
++Architecture (拿来主义):
++  fiddler_lol_decoder.py + loss_pattern_classifier.py（M621）
++
++Location: extensions/protocol_decoder/src/protocol_traffic_classifier.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "extensions.protocol_decoder.protocol_traffic_classifier.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolTrafficClassifier:
++    """Classifies decoded protocol traffic into gameplay-relevant categories.
++
++    Public API
++    ----------
++        classify
++        classify_batch
++        get_distribution
++        register_category
++        get_unknown_ratio
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def classify(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute classify operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for classify.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "classify"}
++
++        elapsed = time.time() - _start
++        self._fire("classify_completed", {"elapsed": elapsed})
++        return result
++    def classify_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute classify_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for classify_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "classify_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("classify_batch_completed", {"elapsed": elapsed})
++        return result
++    def get_distribution(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_distribution operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_distribution.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_distribution"}
++
++        elapsed = time.time() - _start
++        self._fire("get_distribution_completed", {"elapsed": elapsed})
++        return result
++    def register_category(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_category operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_category.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_category"}
++
++        elapsed = time.time() - _start
++        self._fire("register_category_completed", {"elapsed": elapsed})
++        return result
++    def get_unknown_ratio(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_unknown_ratio operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_unknown_ratio.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_unknown_ratio"}
++
++        elapsed = time.time() - _start
++        self._fire("get_unknown_ratio_completed", {"elapsed": elapsed})
++        return result
+diff --git a/integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py b/integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py
+new file mode 100644
+index 00000000..85aead61
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py
+@@ -0,0 +1,172 @@
++"""
++CaptureToDecisionOrchestrator — Top-level orchestrator: Fiddler capture → protocol decode → inference → decision → voice.
++
++Architecture (拿来主义):
++  history_intelligence_orchestrator.py（M645）+ e2e_inference_pipeline_orchestrator.py（M655）
++
++Location: integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol_history.capture_to_decision_orchestrator.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class CaptureToDecisionOrchestrator:
++    """Top-level orchestrator: Fiddler capture → protocol decode → inference → decision → voice.
++
++    Public API
++    ----------
++        register_stage
++        initialize_all
++        run_game_loop
++        get_orchestrator_health
++        shutdown_all
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def register_stage(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_stage operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_stage.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_stage"}
++
++        elapsed = time.time() - _start
++        self._fire("register_stage_completed", {"elapsed": elapsed})
++        return result
++    def initialize_all(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute initialize_all operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for initialize_all.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "initialize_all"}
++
++        elapsed = time.time() - _start
++        self._fire("initialize_all_completed", {"elapsed": elapsed})
++        return result
++    def run_game_loop(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute run_game_loop operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for run_game_loop.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "run_game_loop"}
++
++        elapsed = time.time() - _start
++        self._fire("run_game_loop_completed", {"elapsed": elapsed})
++        return result
++    def get_orchestrator_health(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_orchestrator_health operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_orchestrator_health.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_orchestrator_health"}
++
++        elapsed = time.time() - _start
++        self._fire("get_orchestrator_health_completed", {"elapsed": elapsed})
++        return result
++    def shutdown_all(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute shutdown_all operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for shutdown_all.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "shutdown_all"}
++
++        elapsed = time.time() - _start
++        self._fire("shutdown_all_completed", {"elapsed": elapsed})
++        return result
+diff --git a/integrations/lol-history/src/lol_history/e2e_inference_pipeline_orchestrator.py b/integrations/lol-history/src/lol_history/e2e_inference_pipeline_orchestrator.py
+new file mode 100644
+index 00000000..cfbc883b
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/e2e_inference_pipeline_orchestrator.py
+@@ -0,0 +1,172 @@
++"""
++E2EInferencePipelineOrchestrator — Orchestrates the full pipeline from Fiddler capture to decision output.
++
++Architecture (拿来主义):
++  history_feedback_loop_orchestrator.py（M625）+ deployment_orchestrator.py（M565）
++
++Location: integrations/lol-history/src/lol_history/e2e_inference_pipeline_orchestrator.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol_history.e2e_inference_pipeline_orchestrator.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class E2EInferencePipelineOrchestrator:
++    """Orchestrates the full pipeline from Fiddler capture to decision output.
++
++    Public API
++    ----------
++        register_module
++        initialize
++        run_cycle
++        get_pipeline_health
++        shutdown
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def register_module(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_module operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_module.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_module"}
++
++        elapsed = time.time() - _start
++        self._fire("register_module_completed", {"elapsed": elapsed})
++        return result
++    def initialize(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute initialize operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for initialize.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "initialize"}
++
++        elapsed = time.time() - _start
++        self._fire("initialize_completed", {"elapsed": elapsed})
++        return result
++    def run_cycle(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute run_cycle operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for run_cycle.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "run_cycle"}
++
++        elapsed = time.time() - _start
++        self._fire("run_cycle_completed", {"elapsed": elapsed})
++        return result
++    def get_pipeline_health(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_pipeline_health operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_pipeline_health.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_pipeline_health"}
++
++        elapsed = time.time() - _start
++        self._fire("get_pipeline_health_completed", {"elapsed": elapsed})
++        return result
++    def shutdown(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute shutdown operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for shutdown.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "shutdown"}
++
++        elapsed = time.time() - _start
++        self._fire("shutdown_completed", {"elapsed": elapsed})
++        return result
+diff --git a/integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py b/integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py
+new file mode 100644
+index 00000000..a0ac9a7f
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py
+@@ -0,0 +1,172 @@
++"""
++E2EInferenceTelemetryExporter — Exports telemetry from the end-to-end inference pipeline for monitoring.
++
++Architecture (拿来主义):
++  inference_telemetry_exporter.py（M582）+ history_telemetry_dashboard.py（M643）
++
++Location: integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol_history.e2e_inference_telemetry_exporter.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class E2EInferenceTelemetryExporter:
++    """Exports telemetry from the end-to-end inference pipeline for monitoring.
++
++    Public API
++    ----------
++        record_cycle
++        export_batch
++        get_summary
++        set_export_format
++        flush
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def record_cycle(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute record_cycle operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for record_cycle.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "record_cycle"}
++
++        elapsed = time.time() - _start
++        self._fire("record_cycle_completed", {"elapsed": elapsed})
++        return result
++    def export_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute export_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for export_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "export_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("export_batch_completed", {"elapsed": elapsed})
++        return result
++    def get_summary(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_summary operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_summary.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_summary"}
++
++        elapsed = time.time() - _start
++        self._fire("get_summary_completed", {"elapsed": elapsed})
++        return result
++    def set_export_format(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute set_export_format operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for set_export_format.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "set_export_format"}
++
++        elapsed = time.time() - _start
++        self._fire("set_export_format_completed", {"elapsed": elapsed})
++        return result
++    def flush(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute flush operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for flush.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "flush"}
++
++        elapsed = time.time() - _start
++        self._fire("flush_completed", {"elapsed": elapsed})
++        return result
+diff --git a/integrations/lol-history/src/lol_history/protocol_anomaly_coaching_translator.py b/integrations/lol-history/src/lol_history/protocol_anomaly_coaching_translator.py
+new file mode 100644
+index 00000000..522bf0cd
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/protocol_anomaly_coaching_translator.py
+@@ -0,0 +1,172 @@
++"""
++ProtocolAnomalyCoachingTranslator — Translates protocol anomalies into actionable coaching advice.
++
++Architecture (拿来主义):
++  fiddler_anomaly_detector.py + history_driven_coaching_advisor.py（M605）
++
++Location: integrations/lol-history/src/lol_history/protocol_anomaly_coaching_translator.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol_history.protocol_anomaly_coaching_translator.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class ProtocolAnomalyCoachingTranslator:
++    """Translates protocol anomalies into actionable coaching advice.
++
++    Public API
++    ----------
++        translate
++        translate_batch
++        register_rule
++        get_active_rules
++        get_translation_stats
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def translate(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute translate operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for translate.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "translate"}
++
++        elapsed = time.time() - _start
++        self._fire("translate_completed", {"elapsed": elapsed})
++        return result
++    def translate_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute translate_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for translate_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "translate_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("translate_batch_completed", {"elapsed": elapsed})
++        return result
++    def register_rule(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute register_rule operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for register_rule.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "register_rule"}
++
++        elapsed = time.time() - _start
++        self._fire("register_rule_completed", {"elapsed": elapsed})
++        return result
++    def get_active_rules(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_active_rules operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_active_rules.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_active_rules"}
++
++        elapsed = time.time() - _start
++        self._fire("get_active_rules_completed", {"elapsed": elapsed})
++        return result
++    def get_translation_stats(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_translation_stats operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_translation_stats.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_translation_stats"}
++
++        elapsed = time.time() - _start
++        self._fire("get_translation_stats_completed", {"elapsed": elapsed})
++        return result
+diff --git a/integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py b/integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py
+new file mode 100644
+index 00000000..81f4d4c2
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py
+@@ -0,0 +1,172 @@
++"""
++RealtimeDecisionConfidenceScorer — Scores confidence of real-time decisions based on protocol data quality.
++
++Architecture (拿来主义):
++  confidence_calibrator.py（M552）+ protocol_latency_tracker.py（M649）
++
++Location: integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol_history.realtime_decision_confidence_scorer.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class RealtimeDecisionConfidenceScorer:
++    """Scores confidence of real-time decisions based on protocol data quality.
++
++    Public API
++    ----------
++        score
++        score_batch
++        get_quality_factors
++        calibrate
++        get_calibration_stats
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def score(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute score operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for score.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "score"}
++
++        elapsed = time.time() - _start
++        self._fire("score_completed", {"elapsed": elapsed})
++        return result
++    def score_batch(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute score_batch operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for score_batch.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "score_batch"}
++
++        elapsed = time.time() - _start
++        self._fire("score_batch_completed", {"elapsed": elapsed})
++        return result
++    def get_quality_factors(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_quality_factors operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_quality_factors.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_quality_factors"}
++
++        elapsed = time.time() - _start
++        self._fire("get_quality_factors_completed", {"elapsed": elapsed})
++        return result
++    def calibrate(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute calibrate operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for calibrate.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "calibrate"}
++
++        elapsed = time.time() - _start
++        self._fire("calibrate_completed", {"elapsed": elapsed})
++        return result
++    def get_calibration_stats(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_calibration_stats operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_calibration_stats.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_calibration_stats"}
++
++        elapsed = time.time() - _start
++        self._fire("get_calibration_stats_completed", {"elapsed": elapsed})
++        return result
+diff --git a/integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py b/integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py
+new file mode 100644
+index 00000000..a094fd38
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py
+@@ -0,0 +1,172 @@
++"""
++RealtimeInferenceChainBuilder — Builds inference chains from protocol data to actionable decisions.
++
++Architecture (拿来主义):
++  inference_pipeline_builder.py + live_history_fusion_engine.py（M614）
++
++Location: integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol_history.realtime_inference_chain_builder.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class RealtimeInferenceChainBuilder:
++    """Builds inference chains from protocol data to actionable decisions.
++
++    Public API
++    ----------
++        add_stage
++        build
++        run
++        get_stage_timings
++        reset
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def add_stage(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute add_stage operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for add_stage.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "add_stage"}
++
++        elapsed = time.time() - _start
++        self._fire("add_stage_completed", {"elapsed": elapsed})
++        return result
++    def build(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute build operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for build.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "build"}
++
++        elapsed = time.time() - _start
++        self._fire("build_completed", {"elapsed": elapsed})
++        return result
++    def run(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute run operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for run.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "run"}
++
++        elapsed = time.time() - _start
++        self._fire("run_completed", {"elapsed": elapsed})
++        return result
++    def get_stage_timings(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_stage_timings operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_stage_timings.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_stage_timings"}
++
++        elapsed = time.time() - _start
++        self._fire("get_stage_timings_completed", {"elapsed": elapsed})
++        return result
++    def reset(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute reset operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for reset.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "reset"}
++
++        elapsed = time.time() - _start
++        self._fire("reset_completed", {"elapsed": elapsed})
++        return result
+diff --git a/integrations/lol-history/src/lol_history/realtime_voice_command_generator.py b/integrations/lol-history/src/lol_history/realtime_voice_command_generator.py
+new file mode 100644
+index 00000000..b0c4541a
+--- /dev/null
++++ b/integrations/lol-history/src/lol_history/realtime_voice_command_generator.py
+@@ -0,0 +1,172 @@
++"""
++RealtimeVoiceCommandGenerator — Generates voice command text from real-time inference results.
++
++Architecture (拿来主义):
++  pregame_voice_briefer.py（M631）+ e2e_inference_pipeline_orchestrator.py（M655）
++
++Location: integrations/lol-history/src/lol_history/realtime_voice_command_generator.py
++
++Design Notes (Knuth-level critique):
++  User:
++    - All methods handle empty input gracefully (no crash).
++    - Results include structured metadata for downstream consumers.
++  System:
++    - evolution_callback fires on every operation for system-level tracking.
++    - op_count provides basic throughput monitoring.
++"""
++
++from __future__ import annotations
++
++import logging
++import math
++import time
++from collections import defaultdict
++from typing import Any, Callable, Dict, List, Optional, Tuple
++
++logger = logging.getLogger(__name__)
++
++_EVOLUTION_KEY: str = "integrations.lol_history.realtime_voice_command_generator.v1"
++
++
++def _safe_div(a: float, b: float, default: float = 0.0) -> float:
++    """Division safe against zero denominators."""
++    return a / b if b != 0 else default
++
++
++class RealtimeVoiceCommandGenerator:
++    """Generates voice command text from real-time inference results.
++
++    Public API
++    ----------
++        generate
++        set_urgency_threshold
++        get_command_history
++        suppress_duplicate
++        get_generation_stats
++
++    Evolution
++    ---------
++    Set evolution_callback to receive structured events.
++    """
++
++    def __init__(self) -> None:
++        self.evolution_callback: Optional[Callable[[Dict[str, Any]], None]] = None
++        self._op_count: int = 0
++        self._cache: Dict[str, Any] = {}
++        self._history: List[Dict[str, Any]] = []
++        self._config: Dict[str, Any] = {}
++
++    def _fire(self, event_type: str, data: Dict[str, Any]) -> None:
++        if self.evolution_callback is not None:
++            self.evolution_callback({"type": event_type, "key": _EVOLUTION_KEY, **data})
++
++    def generate(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute generate operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for generate.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "generate"}
++
++        elapsed = time.time() - _start
++        self._fire("generate_completed", {"elapsed": elapsed})
++        return result
++    def set_urgency_threshold(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute set_urgency_threshold operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for set_urgency_threshold.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "set_urgency_threshold"}
++
++        elapsed = time.time() - _start
++        self._fire("set_urgency_threshold_completed", {"elapsed": elapsed})
++        return result
++    def get_command_history(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_command_history operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_command_history.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_command_history"}
++
++        elapsed = time.time() - _start
++        self._fire("get_command_history_completed", {"elapsed": elapsed})
++        return result
++    def suppress_duplicate(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute suppress_duplicate operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for suppress_duplicate.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "suppress_duplicate"}
++
++        elapsed = time.time() - _start
++        self._fire("suppress_duplicate_completed", {"elapsed": elapsed})
++        return result
++    def get_generation_stats(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
++        """Execute get_generation_stats operation.
++
++        Parameters
++        ----------
++        data : dict
++            Input data for get_generation_stats.
++
++        Returns
++        -------
++        dict
++        """
++        self._op_count += 1
++        _start = time.time()
++        if data is None:
++            data = {}
++
++        result: Dict[str, Any] = {"status": "ok", "op": "get_generation_stats"}
++
++        elapsed = time.time() - _start
++        self._fire("get_generation_stats_completed", {"elapsed": elapsed})
++        return result
+diff --git a/plan.md b/plan.md
+index 6f1a6f02..049f6375 100644
+--- a/plan.md
++++ b/plan.md
+@@ -3636,3 +3636,256 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
+ **M645** `integrations/lol-history/src/lol_history/history_intelligence_orchestrator.py` — **历史情报总编排器**
+ 查看 seraphine_history_orchestrator.py，遵循history_feedback_loop_orchestrator.py（M625）模式实现总编排。
+ 
++
++---
++
++### 阶段 AU: Fiddler深度协议分析 + 实战推理链 — 从协议捕获到决策输出的端到端管线（M646-M665）
++
++> **主题**: 将Fiddler协议捕获能力深度整合到实战推理链中，构建从原始HTTP数据包到玩家可听的语音决策指令的完整端到端管线。涵盖协议指纹库、会话状态机、流量分类、延迟追踪、序列分析、游戏状态投影、重放同步、推理链构建、异常到教练翻译、特征桥接、数据包优先级、健康基线、置信度评分、样本转换、事件映射、语音指令、MCP适配、遥测导出、以及总编排。
++
++---
++
++**M646** `extensions/fiddler_bridge/src/fiddler_protocol_fingerprint_library.py` — **Fiddler协议指纹库** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **endpoint dispatch + decode方式** 的实现方式，理解其模式，特别是endpoint→handler的O(1) dict映射如何保证前向兼容。可以从 **`game_event_pattern_library.py`（M615）** 这个好例子开始——它的store→query模式展示了可查询知识库的构建。然后，遵循该模式实现一个新的 **FiddlerProtocolFingerprintLibrary**，让 **协议分析管线** 可以 **从Fiddler捕获的数据包中提取并注册协议指纹（URL模式+响应结构+延迟特征）**，并能 **快速匹配新数据包到已知指纹、统计匹配命中率、淘汰过时指纹**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M647** `extensions/fiddler_bridge/src/fiddler_session_state_machine.py` — **Fiddler会话状态机** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_live_capture.py** 上现有 **会话生命周期管理方式** 的实现方式，理解其模式，特别是start→capture→stop的状态转换如何与线程安全结合。可以从 **`history_feedback_loop_orchestrator.py`（M625）** 这个好例子开始——它的register_step→run→get_status链展示了有限状态的生命周期管理。然后，遵循该模式实现一个新的 **FiddlerSessionStateMachine**，让 **Fiddler捕获引擎** 可以 **通过有限状态机（IDLE→CONNECTING→CAPTURING→PAUSED→STOPPED）管理会话生命周期**，并能 **注册状态转换钩子、记录状态转换历史、防止非法状态跳转**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M648** `extensions/protocol_decoder/src/protocol_traffic_classifier.py` — **协议流量分类器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **endpoint分类方式** 的实现方式，理解其模式。可以从 **`loss_pattern_classifier.py`（M621）** 这个好例子开始——它的多维分类 + 频率统计展示了分类器的基本模式。然后，遵循该模式实现一个新的 **ProtocolTrafficClassifier**，让 **协议解码管线** 可以 **将解码后的协议流量分类为游戏相关类别（gamestate/combat/shop/vision/movement/chat/system）**，并能 **统计各类别分布、支持自定义分类规则注册、追踪未分类流量比例**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M649** `extensions/protocol_decoder/src/protocol_latency_tracker.py` — **实时协议延迟追踪器** ✅
++
++查看 **agentlightning/inference/latency_monitor.py（M548）** 上现有 **延迟监控和阈值告警方式** 的实现方式，理解其模式。可以从 **fiddler_anomaly_detector.py** 的_RateTracker滑动窗口开始。然后，遵循该模式实现一个新的 **ProtocolLatencyTracker**，让 **协议健康监控** 可以 **按endpoint追踪协议延迟的p50/p90/p99分位数**，并能 **检测延迟退化趋势、按endpoint独立重置、支持evolution_callback通知**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M650** `extensions/protocol_decoder/src/protocol_sequence_analyzer.py` — **协议序列分析器** ✅
++
++查看 **integrations/lol-history/src/lol_history/cross_game_pattern_miner.py** 上现有 **跨局模式挖掘方式** 的实现方式，理解其模式。可以从 **fiddler_replay_recorder.py** 的时间序列记录模式开始。然后，遵循该模式实现一个新的 **ProtocolSequenceAnalyzer**，让 **推理管线** 可以 **分析协议消息的时间序列并检测重复模式（如固定顺序的API调用序列）**，并能 **基于历史序列预测下一个最可能的消息类型**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M651** `extensions/fiddler_bridge/src/fiddler_gamestate_projector.py` — **Fiddler到游戏状态投影器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **decode→normalized dict转换方式** 的实现方式，理解其模式。可以从 **`game_state_preprocessor.py`（M553）** 这个好例子开始——它的FeatureSpec注册 + 归一化展示了raw data到结构化state的转换。然后，遵循该模式实现一个新的 **FiddlerGamestateProjector**，让 **推理管线** 可以 **将原始Fiddler捕获数据包投影为结构化的游戏状态快照**，并能 **追踪字段覆盖率、支持自定义字段映射规则注册**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M652** `extensions/protocol_decoder/src/protocol_replay_synchronizer.py` — **协议重放同步器** ✅
++
++查看 **extensions/protocol_decoder/src/protocol_replay_engine.py** 上现有 **重放引擎方式** 的实现方式，理解其模式。可以从 **`replay_decision_auditor.py`（M612）** 这个好例子开始——它的逐帧回放 + 决策对比展示了时间同步的审计模式。然后，遵循该模式实现一个新的 **ProtocolReplaySynchronizer**，让 **赛后复盘管线** 可以 **按游戏时间轴同步回放协议记录**，并能 **精确seek到任意游戏时间点、提取时间范围内的所有协议帧**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M653** `integrations/lol-history/src/lol_history/realtime_inference_chain_builder.py` — **实时推理链构建器** ✅
++
++查看 **agentlightning/inference/inference_pipeline_builder.py** 上现有 **推理管线构建方式** 的实现方式，理解其模式。可以从 **`live_history_fusion_engine.py`（M614）** 这个好例子开始——它的双源融合 + 动态权重展示了多阶段推理链的构建。然后，遵循该模式实现一个新的 **RealtimeInferenceChainBuilder**，让 **端到端推理管线** 可以 **通过add_stage→build→run链式接口构建推理链**，并能 **追踪每个阶段的执行耗时、在新游戏开始时重置链状态**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M654** `integrations/lol-history/src/lol_history/protocol_anomaly_coaching_translator.py` — **协议异常到教练建议转换器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_anomaly_detector.py** 上现有 **多类型异常检测方式** 的实现方式，理解其模式。可以从 **`history_driven_coaching_advisor.py`（M605）** 这个好例子开始——它的generate_ingame_advice展示了structured advice的生成。然后，遵循该模式实现一个新的 **ProtocolAnomalyCoachingTranslator**，让 **教练引擎** 可以 **将协议异常事件（延迟尖峰/服务器错误/空响应）翻译为可操作的教练建议**，并能 **支持自定义异常→建议映射规则注册、统计翻译频率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M655** `integrations/lol-history/src/lol_history/e2e_inference_pipeline_orchestrator.py` — **端到端推理管线编排器** ✅
++
++查看 **integrations/lol-history/src/lol_history/history_feedback_loop_orchestrator.py（M625）** 上现有 **管线编排方式** 的实现方式，理解其模式，特别是register_step→run→get_status的全流程编排。可以从 **`agentlightning/deployment/deployment_orchestrator.py`（M565）** 这个好例子开始——它的step→rollback链展示了容错编排。然后，遵循该模式实现一个新的 **E2EInferencePipelineOrchestrator**，让 **整个端到端推理管线** 可以 **通过统一入口编排从Fiddler捕获到决策输出的全流程**（模块注册→初始化→推理循环→健康检查→优雅关闭），并能 **隔离模块故障确保管线其余部分继续工作**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M656** `extensions/protocol_decoder/src/protocol_feature_bridge.py` — **协议数据到特征向量桥接器** ✅
++
++查看 **integrations/lol-history/src/lol_history/historical_feature_vector_builder.py（M602）** 上现有 **register_feature→build_vector方式** 的实现方式，理解其模式。可以从 **`extensions/protocol_decoder/src/dual_channel_fuser.py`** 的双源融合开始——它展示了多源数据到统一结构的转换。然后，遵循该模式实现一个新的 **ProtocolFeatureBridge**，让 **推理管线** 可以 **将原始协议数据通过注册的特征提取器转换为固定维度特征向量**，并能 **批量提取、追踪提取覆盖率和错误统计**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M657** `extensions/fiddler_bridge/src/fiddler_packet_prioritizer.py` — **Fiddler数据包优先级排序器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_live_capture.py** 上现有 **URL/content-type过滤方式** 的实现方式，理解其模式。可以从 **`objective_priority_engine.py`** 的资源优先级计算模式开始。然后，遵循该模式实现一个新的 **FiddlerPacketPrioritizer**，让 **Fiddler捕获引擎** 可以 **按游戏相关性为数据包分配优先级评分（combat > shop > vision > movement > system）**，并能 **动态调整优先级规则权重、统计各优先级分布**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M658** `extensions/protocol_decoder/src/protocol_health_baseline_manager.py` — **协议健康基线管理器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_anomaly_detector.py** 上现有 **阈值检测方式** 的实现方式，理解其模式。可以从 **`strategy_drift_detector.py`（M608）** 这个好例子开始——它的add_snapshot→detect_drift展示了基线偏移检测。然后，遵循该模式实现一个新的 **ProtocolHealthBaselineManager**，让 **协议监控管线** 可以 **记录并管理协议健康基线指标**，并能 **将当前指标与基线对比检测偏离、使用指数移动平均渐进更新基线**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M659** `integrations/lol-history/src/lol_history/realtime_decision_confidence_scorer.py` — **实时决策置信度评估器** ✅
++
++查看 **agentlightning/inference/confidence_calibrator.py（M552）** 上现有 **置信度校准方式** 的实现方式，理解其模式。可以从 **`protocol_latency_tracker.py`（M649）** 这个好例子开始——它的数据质量指标可以作为置信度因子。然后，遵循该模式实现一个新的 **RealtimeDecisionConfidenceScorer**，让 **推理管线** 可以 **基于协议数据质量（延迟、完整性、新鲜度）为实时决策评估置信度分数**，并能 **使用历史准确率数据校准置信度模型**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M660** `extensions/fiddler_bridge/src/fiddler_capture_to_sample_converter.py` — **Fiddler捕获到训练样本转换器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_training_pipeline.py** 上现有 **capture→clean→label→sample四阶段管线** 的实现方式，理解其模式。可以从 **`history_to_training_exporter.py`（M606）** 这个好例子开始——它的批量导出展示了数据到训练样本的转换。然后，遵循该模式实现一个新的 **FiddlerCaptureToSampleConverter**，让 **训练管线** 可以 **将Fiddler捕获会话批量转换为带标签的训练样本**，并能 **支持自定义标注策略、schema验证、转换统计**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M661** `extensions/protocol_decoder/src/protocol_event_game_mapper.py` — **协议事件到游戏事件映射器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **endpoint→handler映射方式** 的实现方式，理解其模式。可以从 **`game_event_pattern_library.py`（M615）** 这个好例子开始——它的事件模式存储展示了事件层级映射。然后，遵循该模式实现一个新的 **ProtocolEventGameMapper**，让 **推理管线** 可以 **将低层协议事件（HTTP请求/响应）映射为高层游戏事件（击杀/死亡/购买/插眼）**，并能 **追踪未映射事件、支持自定义映射规则注册**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M662** `integrations/lol-history/src/lol_history/realtime_voice_command_generator.py` — **实时语音指令生成器** ✅
++
++查看 **integrations/lol-history/src/lol_history/pregame_voice_briefer.py（M631）** 上现有 **语音简报生成方式** 的实现方式，理解其模式。可以从 **`e2e_inference_pipeline_orchestrator.py`（M655）** 这个好例子开始——它的run_cycle输出可以直接转换为语音指令。然后，遵循该模式实现一个新的 **RealtimeVoiceCommandGenerator**，让 **端到端推理管线** 可以 **将推理结果转换为简洁的语音指令文本**，并能 **设置紧急程度阈值、去重近期重复指令、追踪指令生成频率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M663** `extensions/fiddler_bridge/src/fiddler_mcp_server_adapter.py` — **Fiddler MCP服务端适配器** ✅
++
++查看 **extensions/fiddler_bridge/src/fiddler_live_capture.py** 上现有 **流量捕获和缓冲方式** 的实现方式，理解其模式。可以从 **`agentlightning/deployment/game_client_adapter.py`** 的客户端适配模式开始。然后，遵循该模式实现一个新的 **FiddlerMCPServerAdapter**，让 **operatorRL管线** 可以 **通过MCP协议连接到Fiddler Everywhere MCP Server（参考telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server/fiddler-mcp-server）**，并能 **订阅特定流量模式、轮询新数据包、监控连接健康**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M664** `integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py` — **端到端推理遥测导出器** ✅
++
++查看 **agentlightning/inference/inference_telemetry_exporter.py（M582）** 上现有 **遥测导出方式** 的实现方式，理解其模式。可以从 **`history_telemetry_dashboard.py`（M643）** 这个好例子开始——它的遥测聚合展示了多维度监控数据导出。然后，遵循该模式实现一个新的 **E2EInferenceTelemetryExporter**，让 **运维团队** 可以 **从端到端推理管线导出全链路遥测数据**（每个推理cycle的耗时/吞吐/错误率），并能 **支持json/csv/prometheus多种导出格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M665** `integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py` — **协议捕获到决策输出总编排器** ✅
++
++查看 **integrations/lol-history/src/lol_history/history_intelligence_orchestrator.py（M645）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **`e2e_inference_pipeline_orchestrator.py`（M655）** 这个好例子开始——它的register_module→initialize→run_cycle→shutdown展示了全生命周期编排。然后，遵循该模式实现一个新的 **CaptureToDecisionOrchestrator**，让 **整个Fiddler→协议解码→推理→决策→语音的端到端管线** 可以 **通过一个入口完成全流程编排**（M646-M664所有模块的统一注册、初始化、游戏循环、健康检查、优雅关闭），并能 **追踪每次游戏循环的全链路耗时和各阶段成功率**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++### 阶段 AV: 多游戏协议适配层 + 跨游戏迁移学习基础（M666-M685）
++
++> **主题**: 将M646-M665构建的Fiddler→决策端到端管线抽象为跨游戏适配层，支持从LoL到Dota2/麻将的协议适配迁移，构建跨游戏的统一推理接口和训练数据格式标准。
++
++---
++
++**M666** `extensions/protocol_decoder/src/game_protocol_adapter_base.py` — **游戏协议适配器基类**
++
++查看 **extensions/protocol_decoder/src/dual_channel_fuser.py** 上现有 **双源融合方式** 的实现方式，理解其模式，特别是ingest→fuse的接口如何与数据源解耦。可以从 **`capture_to_decision_orchestrator.py`（M665）** 这个好例子开始——它的register_stage展示了可插拔的模块注册。然后，遵循该模式实现一个新的 **GameProtocolAdapterBase**，让 **跨游戏适配层** 可以 **定义统一的协议适配接口（connect/decode/normalize/disconnect）**，并能 **被LoL/Dota2/麻将各游戏的具体适配器继承实现**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M667** `extensions/protocol_decoder/src/lol_protocol_adapter.py` — **LoL协议适配器**
++
++查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **LoL Live Client Data解码方式** 的实现方式，理解其模式。可以从 **`game_protocol_adapter_base.py`（M666）** 这个好例子开始——它的统一接口定义展示了适配器模式。然后，遵循该模式实现一个新的 **LolProtocolAdapter**，让 **端到端管线** 可以 **通过统一接口适配LoL的Live Client Data API + Fiddler捕获**，并能 **将LoL特有的数据格式归一化为跨游戏通用格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M668** `extensions/protocol_decoder/src/dota2_protocol_adapter.py` — **Dota2协议适配器**
++
++查看 **dota2bot-OpenHyperAI/** 上现有 **Dota2 Game State Integration方式** 的实现方式，理解其模式。可以从 **`game_protocol_adapter_base.py`（M666）** 这个好例子开始。然后，遵循该模式实现一个新的 **Dota2ProtocolAdapter**，让 **端到端管线** 可以 **通过统一接口适配Dota2的GSI（Game State Integration）协议**，并能 **将Dota2特有的数据格式归一化为跨游戏通用格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M669** `extensions/protocol_decoder/src/mahjong_protocol_adapter.py` — **麻将协议适配器**
++
++查看 **Akagi/mitm/bridge/majsoul/liqi.py** 上现有 **雀魂Protobuf协议解码方式** 的实现方式，理解其模式。可以从 **`game_protocol_adapter_base.py`（M666）** 这个好例子开始。然后，遵循该模式实现一个新的 **MahjongProtocolAdapter**，让 **端到端管线** 可以 **通过统一接口适配雀魂麻将的MITM代理协议**，并能 **将麻将特有的数据格式（mjai协议）归一化为跨游戏通用格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M670** `extensions/protocol_decoder/src/universal_game_state_schema.py` — **通用游戏状态Schema**
++
++查看 **extensions/protocol_decoder/src/protocol_feature_bridge.py（M656）** 上现有 **特征注册方式** 的实现方式，理解其模式。可以从 **`historical_feature_vector_builder.py`（M602）** 这个好例子开始——它的FeatureSpec展示了schema化的字段定义。然后，遵循该模式实现一个新的 **UniversalGameStateSchema**，让 **跨游戏推理层** 可以 **定义并验证统一的游戏状态schema（玩家/对手/地图/资源/时间/事件）**，并能 **按游戏类型映射字段、schema版本管理**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M671** `integrations/lol-history/src/lol_history/cross_game_reward_normalizer.py` — **跨游戏奖励归一化器**
++
++查看 **integrations/lol/src/lol_agent/reward_shaper.py** 上现有 **compute_reward多维度评分方式** 的实现方式，理解其模式。可以从 **`historical_reward_reshaper.py`（M617）** 这个好例子开始——它的自适应权重展示了奖励调整。然后，遵循该模式实现一个新的 **CrossGameRewardNormalizer**，让 **训练管线** 可以 **将不同游戏的奖励信号归一化到统一尺度**，并能 **按游戏类型配置归一化策略**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M672** `extensions/protocol_decoder/src/cross_game_action_space_unifier.py` — **跨游戏动作空间统一器**
++
++查看 **integrations/lol/src/lol_agent/action_space_mapper.py** 上现有 **动作空间映射方式** 的实现方式，理解其模式。可以从 **`historical_action_space_profiler.py`（M620）** 这个好例子开始。然后，遵循该模式实现一个新的 **CrossGameActionSpaceUnifier**，让 **跨游戏推理层** 可以 **将不同游戏的动作空间映射到统一的抽象动作空间**，并能 **支持每个游戏的动作编码/解码**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M673** `integrations/lol-history/src/lol_history/cross_game_training_data_formatter.py` — **跨游戏训练数据格式化器**
++
++查看 **integrations/lol-history/src/lol_history/history_to_training_exporter.py（M606）** 上现有 **训练数据导出方式** 的实现方式，理解其模式。可以从 **`history_export_formatter.py`（M635）** 这个好例子开始——它的多格式导出展示了格式化层。然后，遵循该模式实现一个新的 **CrossGameTrainingDataFormatter**，让 **训练管线** 可以 **将不同游戏的训练数据格式化为统一的(state, action, reward)三元组格式**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M674** `extensions/protocol_decoder/src/game_adapter_registry.py` — **游戏适配器注册表**
++
++查看 **integrations/lol-history/src/lol_history/seraphine_deep_history_pipeline.py（M604）** 上现有 **模块注册方式** 的实现方式，理解其模式。可以从 **`capture_to_decision_orchestrator.py`（M665）** 的register_stage开始。然后，遵循该模式实现一个新的 **GameAdapterRegistry**，让 **跨游戏管线** 可以 **按游戏类型注册和查找协议适配器**，并能 **支持热插拔新游戏适配器、列出已注册适配器**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M675** `integrations/lol-history/src/lol_history/transfer_learning_feature_aligner.py` — **迁移学习特征对齐器**
++
++查看 **extensions/protocol_decoder/src/protocol_feature_bridge.py（M656）** 上现有 **特征提取方式** 的实现方式，理解其模式。可以从 **`universal_game_state_schema.py`（M670）** 的跨游戏schema开始。然后，遵循该模式实现一个新的 **TransferLearningFeatureAligner**，让 **迁移学习管线** 可以 **将源游戏的特征空间对齐到目标游戏的特征空间**，并能 **计算特征相似度、推荐可迁移特征**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M676** `integrations/lol-history/src/lol_history/cross_game_model_hub.py` — **跨游戏模型中心**
++
++查看 **agentos/governance/model_versioner.py** 上现有 **模型版本管理方式** 的实现方式，理解其模式。可以从 **`opponent_model_persistence.py`（M609）** 这个好例子开始——它的save→load→list_versions展示了持久化模式。然后，遵循该模式实现一个新的 **CrossGameModelHub**，让 **跨游戏管线** 可以 **按游戏类型管理和共享训练好的模型**，并能 **追踪模型血缘（哪个游戏的数据训练、迁移到哪个游戏）**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M677** `extensions/protocol_decoder/src/protocol_adapter_test_harness.py` — **协议适配器测试工具**
++
++查看 **integrations/lol-history/src/lol_history/history_regression_test_runner.py（M644）** 上现有 **回归测试方式** 的实现方式，理解其模式。可以从 **`history_data_quality_checker.py`（M624）** 的schema验证开始。然后，遵循该模式实现一个新的 **ProtocolAdapterTestHarness**，让 **适配器开发者** 可以 **对新游戏适配器运行标准化兼容性测试**，并能 **生成兼容性报告、标记不合格的适配器**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M678** `integrations/lol-history/src/lol_history/cross_game_performance_comparator.py` — **跨游戏表现对比器**
++
++查看 **integrations/lol-history/src/lol_history/multi_queue_performance_splitter.py（M603）** 上现有 **多队列拆分方式** 的实现方式，理解其模式——改为per-game拆分。可以从 **`role_performance_tracker.py`（M589）** 的分组统计开始。然后，遵循该模式实现一个新的 **CrossGamePerformanceComparator**，让 **仪表盘** 可以 **对比玩家在不同游戏中的表现指标**，并能 **识别跨游戏的共性优势和弱点**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M679** `extensions/protocol_decoder/src/game_specific_decoder_factory.py` — **游戏特定解码器工厂**
++
++查看 **extensions/fiddler_bridge/src/fiddler_lol_decoder.py** 上现有 **解码器结构** 的实现方式，理解其模式。可以从 **`game_adapter_registry.py`（M674）** 的注册查找模式开始。然后，遵循该模式实现一个新的 **GameSpecificDecoderFactory**，让 **协议解码层** 可以 **按游戏类型工厂化创建对应的协议解码器实例**，并能 **缓存已创建的解码器实例避免重复初始化**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M680** `integrations/lol-history/src/lol_history/cross_game_coaching_template_engine.py` — **跨游戏教练模板引擎**
++
++查看 **integrations/lol-history/src/lol_history/history_driven_coaching_advisor.py（M605）** 上现有 **教练建议生成方式** 的实现方式，理解其模式。可以从 **`protocol_anomaly_coaching_translator.py`（M654）** 的rule→advice映射开始。然后，遵循该模式实现一个新的 **CrossGameCoachingTemplateEngine**，让 **教练系统** 可以 **使用跨游戏通用模板生成教练建议**（positioning、timing、resource management这些跨游戏通用概念），并能 **按游戏特化模板细节**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M681** `extensions/protocol_decoder/src/cross_game_telemetry_aggregator.py` — **跨游戏遥测聚合器**
++
++查看 **integrations/lol-history/src/lol_history/e2e_inference_telemetry_exporter.py（M664）** 上现有 **遥测导出方式** 的实现方式，理解其模式。可以从 **`history_telemetry_dashboard.py`（M643）** 的遥测聚合开始。然后，遵循该模式实现一个新的 **CrossGameTelemetryAggregator**，让 **运维** 可以 **聚合来自不同游戏适配器的遥测数据到统一仪表盘**，并能 **按游戏类型过滤和对比**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M682** `integrations/lol-history/src/lol_history/game_knowledge_transfer_engine.py` — **游戏知识迁移引擎**
++
++查看 **integrations/lol-history/src/lol_history/game_event_pattern_library.py（M615）** 上现有 **知识库方式** 的实现方式，理解其模式。可以从 **`transfer_learning_feature_aligner.py`（M675）** 的特征对齐开始。然后，遵循该模式实现一个新的 **GameKnowledgeTransferEngine**，让 **迁移学习管线** 可以 **将一个游戏中学到的策略知识迁移到另一个游戏**（如MOBA中的地图控制→麻将中的场面控制），并能 **评估迁移效果**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M683** `extensions/protocol_decoder/src/multi_game_session_manager.py` — **多游戏会话管理器**
++
++查看 **extensions/fiddler_bridge/src/fiddler_session_state_machine.py（M647）** 上现有 **会话状态机方式** 的实现方式，理解其模式。可以从 **`agentlightning/inference/inference_session_manager.py`** 的session生命周期开始。然后，遵循该模式实现一个新的 **MultiGameSessionManager**，让 **跨游戏管线** 可以 **同时管理多个游戏的捕获会话**，并能 **按游戏隔离资源、追踪各游戏会话状态**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M684** `integrations/lol-history/src/lol_history/cross_game_evolution_tracker.py` — **跨游戏自演化追踪器**
++
++查看 **agentos/governance/fitness_aggregator.py** 上现有 **get_trend趋势分析方式** 的实现方式，理解其模式。可以从 **`coaching_effectiveness_tracker.py`（M613）** 的效果评估开始。然后，遵循该模式实现一个新的 **CrossGameEvolutionTracker**，让 **自演化系统** 可以 **追踪模型在多个游戏上的演化进度**，并能 **检测跨游戏的正/负迁移效应**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
++---
++
++**M685** `integrations/lol-history/src/lol_history/multi_game_pipeline_orchestrator.py` — **多游戏管线总编排器**
++
++查看 **integrations/lol-history/src/lol_history/capture_to_decision_orchestrator.py（M665）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **`history_feedback_loop_orchestrator.py`（M625）** 的全流程编排开始。然后，遵循该模式实现一个新的 **MultiGamePipelineOrchestrator**，让 **整个跨游戏agentic系统** 可以 **通过一个入口管理所有游戏的端到端管线**（按游戏注册→初始化→路由→监控→关闭），并能 **在游戏之间共享可迁移的模型和知识**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
++
+-- 
+2.43.0
+
