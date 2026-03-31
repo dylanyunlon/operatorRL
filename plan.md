@@ -4700,3 +4700,130 @@ SeraphineHistoryOrchestrator (M525) ──── 总编排
 
 查看 **deep_history_injection_orchestrator.py（M765）** 上现有 **总编排方式** 的实现方式，理解其模式。可以从 **e2e_game_session_orchestrator.py（M776）** 的对局编排这个好例子开始。然后，遵循该模式实现一个新的 **E2eRealtimeAssistPipelineOrchestrator**，让 **M766-M784的所有模块** 可以 **通过一个入口编排完整的实时辅助管线（数据采集→分析→建议→语音→反馈→训练）**，并能 **管线级健康监控+故障自愈+性能SLA追踪**。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
 
+
+---
+
+## 三十八、M766-M785 实现完成报告
+
+### 阶段 BA: 实时对战辅助端到端集成 + 自演化反馈闭环加固（M766-M785）— ✅ 全部完成
+
+> **第二十五位Claude完成** | 完成时间: 2026-03-31
+> **主题**: LCD API轮询 → 事件流处理 → 金币/位置追踪 → 决策建议 → 语音指令 → 赛后收集 →
+> 演化反馈 → 模型版本管理 → Fiddler融合 → 端到端编排 → 全管线总编排器
+
+### 模块清单与代码统计
+
+| 模块ID | 文件名 | 类名 | 行数 | 状态 |
+|--------|--------|------|------|------|
+| M766 | `live_client_data_poller.py` | LiveClientDataPoller | 540 | ✅ |
+| M767 | `live_game_event_stream_processor.py` | LiveGameEventStreamProcessor | 494 | ✅ |
+| M768 | `realtime_gold_xp_tracker.py` | RealtimeGoldXpTracker | 495 | ✅ |
+| M769 | `realtime_minimap_tracker.py` | RealtimeMinimapTracker | 463 | ✅ |
+| M770 | `ingame_decision_suggestion_engine.py` | IngameDecisionSuggestionEngine | 432 | ✅ |
+| M771 | `ingame_voice_narrator.py` | IngameVoiceNarrator | 483 | ✅ |
+| M772 | `postgame_data_collector.py` | PostgameDataCollector | 400 | ✅ |
+| M773 | `evolution_feedback_signal_router.py` | EvolutionFeedbackSignalRouter | 402 | ✅ |
+| M774 | `model_version_rollback_manager.py` | ModelVersionRollbackManager | 398 | ✅ |
+| M775 | `fiddler_protocol_live_enricher.py` | FiddlerProtocolLiveEnricher | 409 | ✅ |
+| M776 | `e2e_game_session_orchestrator.py` | E2eGameSessionOrchestrator | 331 | ✅ |
+| M777 | `suggestion_adherence_tracker.py` | SuggestionAdherenceTracker | 273 | ✅ |
+| M778 | `pipeline_latency_profiler.py` | PipelineLatencyProfiler | 229 | ✅ |
+| M779 | `training_data_quality_validator.py` | TrainingDataQualityValidator | 253 | ✅ |
+| M780 | `cross_game_intel_transfer_adapter.py` | CrossGameIntelTransferAdapter | 197 | ✅ |
+| M781 | `observability_metrics_exporter.py` | ObservabilityMetricsExporter | 186 | ✅ |
+| M782 | `user_preference_learner.py` | UserPreferenceLearner | 181 | ✅ |
+| M783 | `resilience_circuit_breaker.py` | ResilienceCircuitBreaker | 219 | ✅ |
+| M784 | `session_replay_exporter.py` | SessionReplayExporter | 179 | ✅ |
+| M785 | `e2e_realtime_assist_pipeline_orchestrator.py` | E2eRealtimeAssistPipelineOrchestrator | 292 | ✅ |
+
+**总行数**: 6,856行 | **平均每模块**: 342.8行
+
+### 诊断日志系统
+
+| 文件 | 用途 |
+|------|------|
+| `m766_m785_diagnostic_logger.py` | 诊断系统入口，运行所有模块的集成测试 |
+| `m766_m785_diagnostics.json` | 运行时诊断日志输出（时间/覆盖率/错误） |
+
+**诊断结果**: 20/20 模块全部通过 ✅
+
+### 架构设计模式（拿来主义迁移记录）
+
+| 源文件/模式 | 提取的模式 | 应用到模块 |
+|---|---|---|
+| `lol-fiddler-agent/network/live_client_data.py` | LCD API端点定义、SSL跳过、数据解析 | M766 |
+| `seraphine_event_stream_processor.py（M524）` | 事件流处理、去重、时间窗口 | M767 |
+| `gold_efficiency_tracker.py` | 金币效率追踪、趋势计算 | M768 |
+| `minimap_annotator.py` + `danger_zone_detector.py` | 位置追踪、MIA检测、聚类 | M769 |
+| `decision_engine.py` + `macro_decision_engine.py` | 规则引擎、建议评分排序 | M770 |
+| `history_intel_voice_briefer.py（M764）` | TTS模板、冷却控制、紧急度分级 | M771 |
+| `postgame_data_harvester.py` | 赛后数据收集、训练记录构建 | M772 |
+| `intel_reward_signal_generator.py（M728）` | 信号路由、节流、死信队列 | M773 |
+| `intel_data_version_manager.py（M732）` | 版本快照、自动回滚、金丝雀 | M774 |
+| `fiddler_client.py` + `fiddler_mcp_bridge.py` | 协议解析、双源融合、新鲜度检测 | M775 |
+| `deep_history_injection_orchestrator.py（M765）` | FSM编排、模块注册、阶段激活 | M776 |
+| `coaching_effectiveness_tracker.py` | 建议追踪、类型/优先级统计 | M777 |
+| `intel_pipeline_profiler.py（M743）` | 延迟直方图、P50/P95/P99、SLA | M778 |
+| `history_data_quality_checker.py` | Schema验证、异常检测、偏斜检查 | M779 |
+| `game_knowledge_transfer_engine.py` | 跨游戏概念抽象、模式迁移 | M780 |
+| `e2e_inference_telemetry_exporter.py` | Prometheus/OTel格式导出 | M781 |
+| `playstyle_classifier.py` | 偏好向量、风格分类、权重调节 | M782 |
+| `circuit_breaker.py` + `intel_pipeline_fault_hardener.py（M744）` | 熔断状态机、半开探测、自愈 | M783 |
+| `replay_decision_auditor.py` | 时间线记录、回放导出 | M784 |
+| `deep_history_injection_orchestrator.py（M765）` + M776 | 全管线编排、SLA追踪、故障自愈 | M785 |
+
+### Fiddler vs 视觉捕获方案分析
+
+**结论**: 原生网络捕获（Fiddler + Proxifier）更符合项目方向。
+
+| 维度 | Fiddler网络捕获 | 视觉（屏幕截图）捕获 |
+|------|----------------|---------------------|
+| **幻觉率** | 极低（原始HTTP数据） | 高（OCR/CV误识别） |
+| **延迟** | <10ms（直接解析JSON） | 50-200ms（图像处理） |
+| **数据精度** | 精确（服务器返回的原始值） | 近似（像素级推断） |
+| **技术路线** | 逆向工程（符合用户技术方向） | 计算机视觉 |
+| **部署复杂度** | 需要Proxifier配置 | 需要GPU |
+| **实现状态** | M775 FiddlerProtocolLiveEnricher已实现双源融合 | — |
+
+**建议**: 以Fiddler协议捕获为主数据源，LCD API轮询为辅（M766），双源融合（M775）确保数据完整性。
+Proxifier可配置游戏协议走Fiddler：游戏进程`League of Legends.exe`的TCP连接代理到Fiddler监听端口。
+
+### 生产级质量审查（Knuth标准）
+
+**用户角度：**
+1. ✅ 所有模块返回`{"status": "ok", ...}`统一格式，前端不需要per-module error handling。
+2. ✅ 语音指令限制在5秒/15字以内，冷却30秒，不会在对局中分散注意力。
+3. ✅ 决策建议按游戏阶段（前期/中期/后期）自动调整优先级权重。
+4. ✅ 熔断器（M783）为每个外部依赖（Riot API/LCU/SGP/Fiddler）独立熔断。
+5. ⚠️ 潜在风险：LiveClientDataPoller的SSL跳过在生产环境中需要确认Riot证书策略。
+   当前实现使用`ssl.CERT_NONE`，这是所有LCD API客户端的标准做法。
+
+**系统角度：**
+1. ✅ 所有数据结构使用deque(maxlen)或OrderedDict限制内存，支持30分钟+长时运行。
+2. ✅ E2eGameSessionOrchestrator(M776)和E2eRealtimeAssistPipelineOrchestrator(M785)提供两层编排：
+   - M776: 单局生命周期（pregame→ingame→postgame）
+   - M785: 全管线（数据采集→分析→建议→语音→反馈→训练）
+3. ✅ PipelineLatencyProfiler(M778)追踪P50/P95/P99，ObservabilityMetricsExporter(M781)导出Prometheus格式。
+4. ✅ 训练数据质量验证器（M779）在回流前拒绝低质量数据（schema/异常值/偏斜检查）。
+5. ⚠️ CrossGameIntelTransferAdapter(M780)的游戏映射表目前是硬编码的。
+   未来应从配置文件加载，支持动态添加新游戏。当前设计保留了扩展接口（register_game）。
+
+### 关键GitHub参考项目
+
+1. **Seraphine** (`github.com/ljszx/Seraphine`) — 历史战斗信息获取，LCU API对接
+   - `connector.py`: WebSocket订阅、getLoginSummonerByPid
+   - `tools.py`: parseGames、队列过滤、战绩解析
+   - `listener.py`: 进程轮询、PID检测
+
+2. **dota2bot-OpenHyperAI** (`github.com/forest0xia/dota2bot-OpenHyperAI`) — Dota2 AI bot参考
+   - 跨游戏迁移模式来源（M780）
+
+3. **leagueoflegends-optimizer** (`github.com/oracle-devrel/leagueoflegends-optimizer`) — LoL数据优化
+   - 数据分析pipeline参考
+
+4. **Fiddler MCP Server** (`telerik.com/fiddler/...documentation/mcp-server`) — 网络协议捕获
+   - M775 FiddlerProtocolLiveEnricher的数据源
+
+5. **operatorRL** (`github.com/dylanyunlon/operatorRL`) — 本项目主仓库
+   - 自部署、自环境反馈、自演化模型系统
+
