@@ -1,0 +1,17 @@
+{
+  "module_id": "M919",
+  "module_name": "FiddlerHistoryPipeline",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M907"
+  ],
+  "description": "Fiddler MCP integration for capturing LCU history API traffic — correlate network captures with parsed history",
+  "seraphine_api_patterns": [
+    "getSummonerGamesByPuuid",
+    "getGameDetailByGameId",
+    "getRankedStatsByPuuid"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

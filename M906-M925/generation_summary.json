@@ -1,0 +1,170 @@
+{
+  "modules": [
+    {
+      "id": "M906",
+      "name": "SeraphineConnectorBridge",
+      "main_file": "/home/claude/operatorRL/M906-M925/seraphine_connector_bridge/seraphine_connector_bridge.py",
+      "lines": 751,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M907",
+      "name": "MatchHistoryFetcher",
+      "main_file": "/home/claude/operatorRL/M906-M925/match_history_fetcher/match_history_fetcher.py",
+      "lines": 502,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M908",
+      "name": "GameDetailParser",
+      "main_file": "/home/claude/operatorRL/M906-M925/game_detail_parser/game_detail_parser.py",
+      "lines": 580,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M909",
+      "name": "RankedStatsCollector",
+      "main_file": "/home/claude/operatorRL/M906-M925/ranked_stats_collector/ranked_stats_collector.py",
+      "lines": 552,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M910",
+      "name": "OpponentProfileBuilder",
+      "main_file": "/home/claude/operatorRL/M906-M925/opponent_profile_builder/opponent_profile_builder.py",
+      "lines": 555,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M911",
+      "name": "ChampionPoolAnalyzer",
+      "main_file": "/home/claude/operatorRL/M906-M925/champion_pool_analyzer/champion_pool_analyzer.py",
+      "lines": 554,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M912",
+      "name": "TiltDetector",
+      "main_file": "/home/claude/operatorRL/M906-M925/tilt_detector/tilt_detector.py",
+      "lines": 554,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M913",
+      "name": "SeasonTrajectoryTracker",
+      "main_file": "/home/claude/operatorRL/M906-M925/season_trajectory_tracker/season_trajectory_tracker.py",
+      "lines": 553,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M914",
+      "name": "PreGameScoutReport",
+      "main_file": "/home/claude/operatorRL/M906-M925/pre_game_scout_report/pre_game_scout_report.py",
+      "lines": 556,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M915",
+      "name": "HistoricalWinrateEngine",
+      "main_file": "/home/claude/operatorRL/M906-M925/historical_winrate_engine/historical_winrate_engine.py",
+      "lines": 553,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M916",
+      "name": "LanePhasePatternMiner",
+      "main_file": "/home/claude/operatorRL/M906-M925/lane_phase_pattern_miner/lane_phase_pattern_miner.py",
+      "lines": 553,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M917",
+      "name": "ObjectiveControlProfiler",
+      "main_file": "/home/claude/operatorRL/M906-M925/objective_control_profiler/objective_control_profiler.py",
+      "lines": 554,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M918",
+      "name": "TeamCompArchetypeClassifier",
+      "main_file": "/home/claude/operatorRL/M906-M925/team_comp_archetype_classifier/team_comp_archetype_classifier.py",
+      "lines": 554,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M919",
+      "name": "FiddlerHistoryPipeline",
+      "main_file": "/home/claude/operatorRL/M906-M925/fiddler_history_pipeline/fiddler_history_pipeline.py",
+      "lines": 553,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M920",
+      "name": "DuoPartnerDetector",
+      "main_file": "/home/claude/operatorRL/M906-M925/duo_partner_detector/duo_partner_detector.py",
+      "lines": 554,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M921",
+      "name": "PatchAdaptationAnalyzer",
+      "main_file": "/home/claude/operatorRL/M906-M925/patch_adaptation_analyzer/patch_adaptation_analyzer.py",
+      "lines": 554,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M922",
+      "name": "HistoryToLiveFusionBridge",
+      "main_file": "/home/claude/operatorRL/M906-M925/history_to_live_fusion_bridge/history_to_live_fusion_bridge.py",
+      "lines": 554,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M923",
+      "name": "SummonerIdentityResolver",
+      "main_file": "/home/claude/operatorRL/M906-M925/summoner_identity_resolver/summoner_identity_resolver.py",
+      "lines": 552,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M924",
+      "name": "HistoricalDataCache",
+      "main_file": "/home/claude/operatorRL/M906-M925/historical_data_cache/historical_data_cache.py",
+      "lines": 552,
+      "syntax_valid": true,
+      "files": 4
+    },
+    {
+      "id": "M925",
+      "name": "IntelligenceDashboardAggregator",
+      "main_file": "/home/claude/operatorRL/M906-M925/intelligence_dashboard_aggregator/intelligence_dashboard_aggregator.py",
+      "lines": 556,
+      "syntax_valid": true,
+      "files": 4
+    }
+  ],
+  "total_lines": 11246,
+  "total_files": 85,
+  "errors": [],
+  "started_at": "2026-03-31T15:33:05.383152",
+  "completed_at": "2026-03-31T15:33:05.593848",
+  "elapsed_seconds": 0.21
+}

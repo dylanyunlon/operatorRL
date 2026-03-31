@@ -1,0 +1,17 @@
+{
+  "module_id": "M908",
+  "module_name": "GameDetailParser",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M907"
+  ],
+  "description": "Parse getGameDetailByGameId responses — extract participants, items, runes, timeline events per game",
+  "seraphine_api_patterns": [
+    "getSummonerGamesByPuuid",
+    "getGameDetailByGameId",
+    "getRankedStatsByPuuid"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

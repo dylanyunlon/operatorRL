@@ -1,0 +1,17 @@
+{
+  "module_id": "M913",
+  "module_name": "SeasonTrajectoryTracker",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M909"
+  ],
+  "description": "Track ranked tier trajectory across season — climbing/falling/plateaued classification with LP velocity",
+  "seraphine_api_patterns": [
+    "getSummonerGamesByPuuid",
+    "getGameDetailByGameId",
+    "getRankedStatsByPuuid"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

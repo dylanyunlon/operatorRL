@@ -1,0 +1,20 @@
+{
+  "module_id": "M925",
+  "module_name": "IntelligenceDashboardAggregator",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M910",
+    "M914",
+    "M918",
+    "M922"
+  ],
+  "description": "Aggregate all M906-M925 intelligence into unified dashboard — JSON/HTML reports, voice briefing feed",
+  "seraphine_api_patterns": [
+    "getSummonerGamesByPuuid",
+    "getGameDetailByGameId",
+    "getRankedStatsByPuuid"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

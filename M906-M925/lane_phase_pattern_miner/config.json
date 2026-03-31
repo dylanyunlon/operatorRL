@@ -1,0 +1,17 @@
+{
+  "module_id": "M916",
+  "module_name": "LanePhasePatternMiner",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M908"
+  ],
+  "description": "Mine early-game patterns from match timelines — CS@10, gold@15, first blood tendencies, ward placement",
+  "seraphine_api_patterns": [
+    "getSummonerGamesByPuuid",
+    "getGameDetailByGameId",
+    "getRankedStatsByPuuid"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

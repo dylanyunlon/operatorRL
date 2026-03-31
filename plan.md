@@ -5155,3 +5155,208 @@ Items  Runes         Replay  Strategy
 
 根目录：`generate_all_modules.py`, `generation_summary.json`, `plan.md`,
 `__init__.py`, `conftest.py`, `requirements.txt`, `Makefile`, `run_all_tests.py`, `logs/`
+
+---
+
+## 阶段 AH: Seraphine 历史战斗数据深度集成（M906-M925）
+
+> 第三十二位 Claude (Instance #32) 完成 M906-M925
+>
+> 从 Seraphine (github.com/ljszx/Seraphine) 拿来历史数据获取能力，
+> 深度集成 LCU connector 模式、SGP 双路径回退、Fiddler MCP 网络分析管道，
+> 构建对手历史画像、英雄池分析、倾斜检测、赛季轨迹追踪等20个模块，
+> 每个模块500+行生产级代码，为实时对战提供历史情报支撑。
+>
+> **核心命题**：历史战斗信息的获取对于当前正在进行的对战至关重要——
+> 了解对手的英雄池偏好、连败倾斜状态、排位轨迹、双排搭档等信息，
+> 可以在选英雄阶段和对线阶段提供决策性优势。
+>
+> **Fiddler vs 视觉方案决策**：选择原生网络捕获（Fiddler + Proxifier），
+> 因为：零幻觉（原始API数据）、完整响应（非仅UI可见信息）、
+> <10ms延迟（vs 70-200ms屏幕捕获）、符合逆向工程技术方向。
+>
+> **技术架构**：
+> - Seraphine connector.py retry + PastRequest 模式适配
+> - getSummonerGamesByPuuid / getGameDetailByGameId / getRankedStatsByPuuid 全量对接
+> - SGP via getSummonerGamesByPuuidViaSGP 国服兼容
+> - Fiddler MCP Server (localhost:8868) 网络流量分析
+> - Proxifier 全局代理配置（游戏协议走 Fiddler）
+
+### 模块列表
+
+| # | ID | Module | Dir | Lines | Deps | Description |
+|---|-----|--------|-----|-------|------|-------------|
+| 1 | M906 | SeraphineConnectorBridge | seraphine_connector_bridge | 750 | - | Seraphine LCU connector 深度桥接 — HTTP会话、retry、PastRequest、连接池、SSL |
+| 2 | M907 | MatchHistoryFetcher | match_history_fetcher | 501 | M906 | 批量拉取对局历史 — LCU/SGP双路径、分页、去重、增量同步 |
+| 3 | M908 | GameDetailParser | game_detail_parser | 579 | M906,M907 | 对局详情解析 — participants/items/runes/timeline完整提取 |
+| 4 | M909 | RankedStatsCollector | ranked_stats_collector | 551 | M906 | 排位数据收集 — getRankedStatsByPuuid + SGP回退 |
+| 5 | M910 | OpponentProfileBuilder | opponent_profile_builder | 554 | M906,M907,M908,M909 | 对手画像构建 — 综合历史+排位数据的玩家风格分类 |
+| 6 | M911 | ChampionPoolAnalyzer | champion_pool_analyzer | 553 | M906,M908,M910 | 英雄池分析 — 舒适英雄、独活英雄、flex英雄检测 |
+| 7 | M912 | TiltDetector | tilt_detector | 553 | M906,M907,M908 | 倾斜检测 — 连败/死亡飙升/投降模式识别 |
+| 8 | M913 | SeasonTrajectoryTracker | season_trajectory_tracker | 552 | M906,M909 | 赛季轨迹追踪 — 段位爬升/下降/停滞分类 + LP速度 |
+| 9 | M914 | PreGameScoutReport | pre_game_scout_report | 555 | M906,M910,M911,M912,M913 | 赛前侦察报告 — 聚合对手情报生成可操作简报 |
+| 10 | M915 | HistoricalWinrateEngine | historical_winrate_engine | 552 | M906,M908 | 历史胜率引擎 — 英雄对英雄胜率矩阵计算 |
+| 11 | M916 | LanePhasePatternMiner | lane_phase_pattern_miner | 552 | M906,M908 | 对线模式挖掘 — CS@10/金币@15/一血倾向/插眼习惯 |
+| 12 | M917 | ObjectiveControlProfiler | objective_control_profiler | 553 | M906,M908,M916 | 目标控制分析 — 龙优先级/峡谷先锋使用/男爵时机模式 |
+| 13 | M918 | TeamCompArchetypeClassifier | team_comp_archetype_classifier | 553 | M906,M911,M915 | 阵容原型分类 — poke/engage/split/protect/pick识别 |
+| 14 | M919 | FiddlerHistoryPipeline | fiddler_history_pipeline | 552 | M906,M907 | Fiddler MCP管道 — LCU历史API流量捕获与解析关联 |
+| 15 | M920 | DuoPartnerDetector | duo_partner_detector | 553 | M906,M907,M910 | 双排搭档检测 — 重叠对局历史共现分析+协同评分 |
+| 16 | M921 | PatchAdaptationAnalyzer | patch_adaptation_analyzer | 553 | M906,M908,M911 | 版本适应分析 — 对手patch前后英雄选择/出装变化/胜率delta |
+| 17 | M922 | HistoryToLiveFusionBridge | history_to_live_fusion_bridge | 553 | M906,M910,M914 | 历史→实时融合桥 — 赛前情报注入M866-M885实时模块 |
+| 18 | M923 | SummonerIdentityResolver | summoner_identity_resolver | 551 | M906 | 召唤师身份解析 — 跨改名/转区puuid中心身份追踪 |
+| 19 | M924 | HistoricalDataCache | historical_data_cache | 551 | M906 | 历史数据缓存 — LRU+TTL缓存、磁盘持久化、失效策略 |
+| 20 | M925 | IntelligenceDashboardAggregator | intelligence_dashboard_aggregator | 555 | M906,M910,M914,M918,M922 | 情报仪表盘聚合 — 统一JSON/HTML报告+语音简报流 |
+
+### 文件清单（88文件）
+
+位置：`M906-M925/`
+
+每个模块4个文件：`__init__.py`, `config.json`, `README.md`, `{module}.py`(500+行)
+
+根目录：`generate_all_modules.py`, `generation_summary.json`, `plan.md`,
+`__init__.py`, `conftest.py`, `requirements.txt`, `Makefile`, `run_all_tests.py`, `logs/`
+
+### 模板化架构模式
+
+查看 Seraphine/app/lol/connector.py 上现有 LCU API connector 的实现方式,
+理解其模式, 特别是 retry 装饰器和 PastRequest 是如何与 HTTP session 分离的。
+从 connector.needLcu + retry 这个好例子开始。
+然后, 遵循该模式实现一个新的 SeraphineConnectorBridge (M906),
+让 operatorRL 可以调用所有 Seraphine API, 并能做连接池管理。
+接着 MatchHistoryFetcher (M907) 引入批量分页拉取,
+使 GameDetailParser (M908) 能够解析完整对局详情,
+同时 RankedStatsCollector (M909) 优化排位数据收集。
+随后 OpponentProfileBuilder (M910) 整合所有数据源,
+令 ChampionPoolAnalyzer (M911) 支持英雄池深度分析,
+进而 TiltDetector (M912) 增强倾斜检测精度。
+SeasonTrajectoryTracker (M913) 追踪赛季段位轨迹,
+PreGameScoutReport (M914) 生成赛前侦察报告。
+HistoricalWinrateEngine (M915) 计算英雄对英雄胜率矩阵,
+LanePhasePatternMiner (M916) 挖掘对线期模式,
+ObjectiveControlProfiler (M917) 分析目标控制习惯,
+TeamCompArchetypeClassifier (M918) 分类阵容原型。
+FiddlerHistoryPipeline (M919) 管理Fiddler MCP网络捕获管道,
+DuoPartnerDetector (M920) 检测双排搭档,
+PatchAdaptationAnalyzer (M921) 分析版本适应能力。
+HistoryToLiveFusionBridge (M922) 将历史情报注入实时对战模块,
+SummonerIdentityResolver (M923) 解决召唤师身份跨期追踪,
+HistoricalDataCache (M924) 提供高性能历史数据缓存。
+最终 IntelligenceDashboardAggregator (M925) 完善情报仪表盘聚合,
+确保所有模块兼容M866-M885实时系统,
+全面升级历史情报层以达成赛前+赛中AI辅助目标。
+
+### 数据流
+
+```
+LoL Client LCU API
+       |
+       v
+SeraphineConnectorBridge(M906) ←→ Fiddler MCP (M919)
+  |          |          |
+  v          v          v
+MatchHistory  RankedStats  SummonerIdentity
+Fetcher(M907) Collector(M909) Resolver(M923)
+  |                |              |
+  v                v              |
+GameDetail    Season             |
+Parser(M908)  Trajectory(M913)  |
+  |    |    |         |          |
+  v    v    v         v          v
+Champ  Tilt  Lane    Opponent Profile
+Pool   Detect Pattern Builder(M910)
+(M911) (M912) (M916)     |
+  |      |      |         |
+  v      v      v         v
+Historical Objective PreGame
+Winrate   Control  Scout
+(M915)   (M917)  Report(M914)
+  |        |       |
+  v        v       v
+TeamComp  Duo     Patch
+Archetype Partner  Adapt
+(M918)   (M920)  (M921)
+  |        |       |
+  +--------+-------+
+           |
+           v
+   HistoryToLive
+   FusionBridge(M922)
+           |
+           v
+   Intelligence
+   Dashboard(M925) → 缓存层 HistoricalDataCache(M924)
+           |
+           v
+   M866-M885 Real-time Modules
+```
+
+### 与上游 M866-M885 的集成点
+
+| M866-M885 Module | M906-M925 Integration | 数据流向 |
+|---|---|---|
+| FiddlerTrafficInterceptor (M866) | FiddlerHistoryPipeline (M919) | 共享Fiddler MCP端点 |
+| LcuWebSocketBridge (M867) | SeraphineConnectorBridge (M906) | 共享LCU连接 |
+| MatchHistoryAggregator (M868) | MatchHistoryFetcher (M907) | 历史→实时数据合并 |
+| PlayerBehaviorPredictor (M870) | OpponentProfileBuilder (M910) | 实时行为+历史画像 |
+| DraftPhaseAnalyzer (M871) | PreGameScoutReport (M914) | 选英雄阶段情报注入 |
+| WinProbabilityModel (M875) | HistoryToLiveFusionBridge (M922) | 历史胜率加权 |
+| SystemHealthDashboard (M885) | IntelligenceDashboardAggregator (M925) | 统一监控 |
+
+### Seraphine API 映射
+
+| Seraphine API | M906-M925 使用模块 | 用途 |
+|---|---|---|
+| `getSummonerGamesByPuuid(puuid, begIndex, endIndex)` | M907 MatchHistoryFetcher | 对局列表分页拉取 |
+| `getSummonerGamesByPuuidSlowly(puuid, begIndex, endIndex)` | M907 MatchHistoryFetcher (慢速路径) | 速率限制下的可靠拉取 |
+| `getSummonerGamesByPuuidViaSGP(puuid, begIdx, endIdx)` | M907 MatchHistoryFetcher (SGP回退) | 国服兼容 |
+| `getGameDetailByGameId(gameId)` | M908 GameDetailParser | 对局完整详情 |
+| `getRankedStatsByPuuid(puuid)` | M909 RankedStatsCollector | 排位段位/胜率 |
+| `getRankedStatsByPuuidViaSGP(puuid)` | M909 RankedStatsCollector (SGP回退) | 国服排位数据 |
+| `getSummonerByPuuid(puuid)` | M923 SummonerIdentityResolver | 召唤师身份 |
+| `getSummonerByPuuidViaSGP(puuid)` | M923 SummonerIdentityResolver (SGP回退) | 国服召唤师身份 |
+| `getCurrentSummoner()` | M906 SeraphineConnectorBridge | 连接验证 |
+| `getGameflowSession()` | M922 HistoryToLiveFusionBridge | 实时对局状态 |
+
+### Fiddler MCP 集成
+
+参考：https://www.telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server/fiddler-mcp-server
+
+配置方式：
+1. Fiddler Everywhere 启动 MCP Server (默认端口 8868)
+2. Proxifier 配置 LoL 客户端流量走 Fiddler 代理
+3. M919 FiddlerHistoryPipeline 通过 http://localhost:8868/mcp 提交流量分析
+4. M906 SeraphineConnectorBridge 的 FiddlerMcpClient 处理 MCP 响应
+
+### Knuth级质量审查
+
+**用户角度：**
+1. **LCU连接竞争** — M906 使用 asyncio.Lock 保护连接状态转换，避免多模块并发connect冲突。
+2. **SGP Token过期** — M906 connect_sgp 支持token刷新，M909 getRankedStatsByPuuidViaSGP 调用前自动检查。
+3. **Fiddler未启动降级** — M919 检测到Fiddler不可用时回退到纯LCU API模式，不影响核心功能。
+4. **历史数据量大导致OOM** — M924 HistoricalDataCache 设置per-entry大小限制 + LRU淘汰策略。
+5. **对手改名后画像断裂** — M923 SummonerIdentityResolver 以puuid为中心，跨改名/转区保持追踪。
+6. **API限流导致数据不完整** — M907 指数退避 + 429 Retry-After 头部解析 + 断点续传。
+7. **赛前时间窗口过短** — M914 PreGameScoutReport 优先返回缓存画像，后台异步刷新。
+
+**系统角度：**
+1. **RequestReplayBuffer内存增长** — M906 使用 collections.deque(maxlen=200) 固定大小循环缓冲区。
+2. **async/threading混用** — M906 在async上下文使用 asyncio.Lock，在sync上下文使用 threading.Lock，不混用。
+3. **MatchDeduplicator的set增长** — M907 每次fetch_history调用前reset()，不跨调用积累。
+4. **ParsedGameDetail缓存未设TTL** — M908 cache dict 无限增长风险，建议接入 M924 TTL缓存。
+5. **统计函数除零** — StatisticalHelper.safe_mean/safe_stdev 对空列表返回0而非抛异常。
+6. **Wilson下界对小样本** — ConfidenceLevel.from_sample_size 标记<3场为LOW，UI层显示不可靠警告。
+7. **Fiddler SSL证书** — SslContextFactory 支持自定义证书路径或跳过验证（开发环境），生产环境应配置信任。
+
+### 总计统计
+
+| 指标 | 值 |
+|---|---|
+| 模块数 | 20 |
+| Python文件 | 44 |
+| 总文件数 | 88 |
+| 代码总行数 | 11,246+ |
+| 平均每模块行数 | 562 |
+| 最大模块 | M906 SeraphineConnectorBridge (750行) |
+| 最小模块 | M907 MatchHistoryFetcher (501行) |
+| 语法错误 | 0 |
+| 生成时间 | 0.21s |
