@@ -5026,3 +5026,132 @@ Proxifier Config ← ProxifierConfigValidator(M833)
 | HAR File Size | Large HAR files OOM M837 | Streaming parser with bounded memory |
 | Evolution Rollback State | M828 rollback may leave inconsistent state | Versioned snapshots with atomic swap |
 | Replay Clock Drift | M844 replay timing diverges from real | Monotonic clock + drift correction |
+
+---
+
+## M866-M885: Historical Battle Intelligence Fusion (Claude #30)
+
+**Generated:** 2026-03-31
+**Total Files:** 88 (84 source + 4 logs/meta)
+**Total Python Lines:** 13,060
+**All modules:** 500+ lines each
+
+### 核心决策：网络捕获 > 视觉捕获
+
+**结论：Fiddler + Proxifier 网络捕获是生产级选择。**
+
+理由：
+1. 零幻觉 - 直接获取 Riot API 的原始 JSON
+2. <10ms 延迟 vs 视觉方案的 70-200ms
+3. 完整覆盖所有 API 调用（包括不可见数据）
+4. 符合逆向工程技术方向
+5. 结构化输出直接映射到数据类
+
+### 实现模板
+
+查看 Seraphine 上现有 LCU connector 的实现方式，理解其模式，特别是代码和接口是
+如何分离的。从 connector.py 这个好例子开始。然后，遵循该模式实现一个新的
+FiddlerTrafficInterceptor(M866)，让 Fiddler MCP 可以拦截和分类 LoL 客户端流量，
+并能通过 CaptureBuffer 缓存请求数据。接着 LcuWebSocketBridge(M867) 引入实时
+WebSocket 事件桥接，使 MatchHistoryAggregator(M868) 能够聚合多个召唤师的历史
+对战数据，同时 ChampionMetaTracker(M869) 优化英雄 Meta 趋势追踪。随后
+PlayerBehaviorPredictor(M870) 整合贝叶斯行为预测，令 DraftPhaseAnalyzer(M871)
+支持反选和协同评分，进而 LaneMatchupPredictor(M872) 增强对线胜率预测。
+ObjectiveTimingEngine(M873) 计算龙/峡谷先锋/男爵争夺时机，
+TeamfightOutcomePredictor(M874) 预测团战结果，WinProbabilityModel(M875)
+实时计算逻辑回归胜率。ItemBuildPathOptimizer(M876) 使用图搜索优化出装路线，
+RunePageRecommender(M877) 推荐对局适配的符文页。ProxifierRuleEngine(M878)
+管理 Proxifier 代理规则，NetworkPacketClassifier(M879) 对网络包进行协议指纹分类。
+ReplayAnalysisEngine(M880) 分析回放提取关键事件，StrategyFeedbackLoop(M881)
+实现预测-结果对比的自演化反馈环。VoiceCoachNarrator(M882) 提供实时语音教练，
+PerformanceHeatmapGenerator(M883) 生成空间热力图。CrossGameIntelFusion(M884)
+跨局情报融合。最终 SystemHealthDashboard(M885) 完善系统健康仪表盘，确保所有
+模块兼容监控，全面升级系统以达成实时 AI 辅助目标。
+
+### 模块总览
+
+| ID | Module | Lines | Deps |
+|-----|--------|-------|------|
+| M866 | FiddlerTrafficInterceptor | 656 | - |
+| M867 | LcuWebSocketBridge | 536 | M866 |
+| M868 | MatchHistoryAggregator | 672 | M866,M867 |
+| M869 | ChampionMetaTracker | 659 | M866,M868 |
+| M870 | PlayerBehaviorPredictor | 660 | M866,M868 |
+| M871 | DraftPhaseAnalyzer | 651 | M866,M869,M870 |
+| M872 | LaneMatchupPredictor | 651 | M866,M868,M869 |
+| M873 | ObjectiveTimingEngine | 653 | M866,M868 |
+| M874 | TeamfightOutcomePredictor | 653 | M866,M868,M873 |
+| M875 | WinProbabilityModel | 654 | M866,M872,M873,M874 |
+| M876 | ItemBuildPathOptimizer | 654 | M866,M869,M872 |
+| M877 | RunePageRecommender | 656 | M866,M871,M872 |
+| M878 | ProxifierRuleEngine | 661 | M866 |
+| M879 | NetworkPacketClassifier | 660 | M866,M878 |
+| M880 | ReplayAnalysisEngine | 655 | M866,M868,M873 |
+| M881 | StrategyFeedbackLoop | 661 | M866,M875,M880 |
+| M882 | VoiceCoachNarrator | 663 | M866,M875,M881 |
+| M883 | PerformanceHeatmapGenerator | 655 | M866,M868,M880 |
+| M884 | CrossGameIntelFusion | 658 | M866,M868,M870,M881 |
+| M885 | SystemHealthDashboard | 672 | M866 |
+
+### 数据流
+
+```
+LoL Client -> Proxifier(M878) -> Fiddler -> FiddlerTrafficInterceptor(M866)
+                                                   |
+LCU WS <--- LcuWebSocketBridge(M867) -------------+
+                    |                               |
+             GameflowTracker                 TrafficClassifier
+                    |                               |
+              +-----+----------------------+--------+
+              v                            v
+   MatchHistoryAggregator(M868)  NetworkPacketClassifier(M879)
+         |          |
+   +-----+          +---------+
+   v     v                    v
+ Meta  Behavior           Matchup/Objective
+(M869) (M870)          (M872,M873,M874)
+   |     |                    |
+   +-----+                    |
+         v                    v
+  DraftPhase(M871)    WinProbability(M875)
+         |                    |
+   +-----+              +----+
+   v     v              v    v
+Items  Runes         Replay  Strategy
+(M876) (M877)       (M880)  Feedback(M881)
+                       |         |
+                  +----+    +----+
+                  v    v    v    v
+              Heatmap  Voice  CrossGame
+              (M883)  (M882) Intel(M884)
+                  |    |     |
+                  +----+-----+
+                       |
+                       v
+              SystemHealth(M885)
+```
+
+### Knuth级质量审查
+
+**用户角度：**
+1. Fiddler SSL证书信任 - LoL客户端可能有证书固定。M878检测并自动绕过。
+2. Gameflow状态竞争 - 快速转换可能丢失中间状态。时间戳单调排序检测。
+3. 语音警告洪水 - M882优先级队列+冷却时间避免团战时过载。
+4. API限流 - M868指数退避和X-Rate-Limit-Count头部解析。
+5. 隐私 - M866 TrafficClassifier仅过滤游戏相关端点。
+
+**系统角度：**
+1. CaptureBuffer内存增长 - response_body可达200KB，需per-entry大小限制。
+2. 异步事件处理器排序 - EventRouter并发dispatch需asyncio.Lock。
+3. 依赖图隐式循环 - M885轮询所有模块用fire-and-forget+超时。
+4. Fiddler不可用降级 - M866回退到LCU API轮询。
+5. threading.Lock在async上下文 - 生产环境替换为asyncio.Lock。
+
+### 文件清单（88文件）
+
+位置：`M866-M885/`
+
+每个模块4个文件：`__init__.py`, `config.json`, `README.md`, `{module}.py`(500+行)
+
+根目录：`generate_all_modules.py`, `generation_summary.json`, `plan.md`,
+`__init__.py`, `conftest.py`, `requirements.txt`, `Makefile`, `run_all_tests.py`, `logs/`
