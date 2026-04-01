@@ -228,3 +228,159 @@
 | `integration/` | — | **独有**：Riot API + Agent OS桥接 |
 | `conf/` + `proto/` | `modules/common/` | **互补**：我的是配置+协议，他的是类型+状态码 |
 | `launch/main_loop.py` | `launch/mainboard.py` | **互补**：两个入口点，可选择使用 |
+
+---
+
+# lolbot-HyperAI Release — Claude#3 Batch (Runtime + Integration + Deployment)
+
+> 17 production files, ~6,500 lines
+> Author: dylanyunlong <dylanyunlong@gmail.com>
+
+---
+
+## 1. Runtime 运行时层 (`runtime/`)
+
+### 1.1 process_manager.py — Apollo式 while-true Proc() 调度器
+
+查看 Apollo 上现有 `cyber/scheduler/scheduler.cc` + `cyber/mainboard/mainboard.cc` 的实现方式，理解其模式，特别是组件生命周期管理和定时调度是如何分离的。可以从 `cyber/scheduler/scheduler.cc` 的 DAG 调度循环 这个好例子开始。然后，遵循该模式实现一个新的 **ProcessManager + TickScheduler**，让 所有 lolbot-HyperAI 组件 可以 在统一的 while-true 循环中按优先级被调度执行（10ms 基础时钟），并能 自动处理组件状态机转换（REGISTERED→RUNNING→DEGRADED→ERROR→STOPPED）和信号处理（SIGINT/SIGTERM）。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `ComponentProtocol`: name / init() / proc() / shutdown() 接口定义
+- `TickScheduler`: 10ms 基础时钟，按 interval_ms 判断每 tick 哪些组件该执行
+- `ProcessManager`: while-true 主循环，组件注册/卸载，interval 对齐到基础时钟
+- `ComponentPriority`: PERCEPTION(0)→DATA(5)→ANALYSIS(10)→PREDICTION(15)→PLANNING(20)→EVOLUTION(25)→OUTPUT(30)→RUNTIME(40)
+- `LifecycleHook`: on_start / on_stop / on_error / on_state_change 回调
+- 初始化按优先级顺序，关停按反向优先级顺序
+
+### 1.2 health_monitor.py — 全系统健康检查与告警
+
+查看 Apollo 上现有 `modules/monitor/software/summary_monitor.cc` 的实现方式，理解其模式，特别是组件健康采集和告警是如何分离的。可以从 `cyber/common/global_data.cc` 的健康状态管理 这个好例子开始。然后，遵循该模式实现一个新的 **HealthMonitor + AlertManager**，让 运行时系统 可以 持续追踪所有组件心跳、外部依赖可达性和系统资源占用，并能 在检测到不健康状态时触发告警（去重+冷却）并通知演化层。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `ComponentHealth`: 心跳超时检测、延迟P99、错误率滑动窗口、HEALTHY→DEGRADED→UNHEALTHY
+- `DependencyHealth`: Riot API / Fiddler MCP / LCU / TTS 四大外部依赖检查
+- `AlertManager`: 去重 key=(source, message_hash)、冷却期60s、severity INFO→WARNING→ERROR→CRITICAL
+- `ResourceSnapshot`: CPU / 内存 / 磁盘 / asyncio任务数（通过 /proc 读取）
+- `should_trigger_evolution()`: 供 EvolutionController 调用判断是否需要自演化
+
+### 1.3 graceful_shutdown.py — 多阶段优雅关停协调器
+
+查看 Apollo 上现有 `cyber/mainboard/mainboard.cc` shutdown 序列的实现方式，理解其模式，特别是关停顺序和超时控制是如何分离的。可以从 `cyber/node/node.cc` Clear() 的组件清理 这个好例子开始。然后，遵循该模式实现一个新的 **GracefulShutdown 协调器**，让 系统关停 可以 按6个有序阶段执行（通知→刷盘→持久化→关闭IO→清理→确认），并能 在强制退出（双信号）时仍写入脏检查点供下次启动恢复。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `ShutdownPhase`: PRE_SHUTDOWN(0)→FLUSH_DATA(10)→PERSIST_STATE(20)→CLOSE_IO(30)→CLEANUP(40)→FINAL(50)
+- `ShutdownTask`: 每任务独立超时，critical 标志（失败则标记非干净关停）
+- `CheckpointWriter`: 原子写入 .lolbot_checkpoint.json（dirty/clean 标志）
+- `RecoveryDetector`: 启动时检查检查点，执行注册的恢复动作
+- 全局超时15s，双SIGINT强制退出安全阀
+
+### 1.4 error_recovery.py — 熔断器 + 自动重连 + 降级链 + 组件自愈
+
+查看 Apollo 上现有 `cyber/transport/` 故障恢复模式的实现方式，理解其模式，特别是故障检测和恢复策略是如何分离的。可以从 Martin Fowler 的 CircuitBreaker 模式 这个好例子开始。然后，遵循该模式实现一个新的 **ErrorRecovery 工具集**，让 所有外部依赖调用 可以 通过熔断器保护（防止级联故障）、自动重连（指数退避+抖动）和降级链（Fiddler→LCU→缓存），并能 自动重启失败组件（带冷却和最大重试限制）。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `CircuitBreaker`: 滑动窗口错误率、CLOSED→OPEN→HALF_OPEN、指数退避（最大300s）、状态变更回调
+- `AutoReconnect`: 指数退避+±25%抖动、最大重试次数、async generator 模式
+- `FallbackChain`: 按优先级尝试多数据源、与 CircuitBreaker 集成、降级标志
+- `ComponentHealer`: 注册重启回调、按组件独立冷却、最大重启次数后禁用
+
+### 1.5 metrics_collector.py — Prometheus 风格运行时指标
+
+查看 Apollo 上现有 `cyber/common/perf_monitor.cc` 的实现方式，理解其模式，特别是指标采集和导出是如何分离的。可以从 Prometheus client_python 的 Counter/Gauge/Histogram 这个好例子开始。然后，遵循该模式实现一个新的 **MetricsCollector**，让 所有组件 可以 注册和记录 Counter / Gauge / Histogram / Timer 四种指标类型，并能 导出为 Prometheus text 格式供外部抓取和仪表板展示。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `CounterValue`: 单调递增，禁止负增量
+- `GaugeValue`: 可增可减，跟踪 min/max
+- `HistogramValue`: LoL 优化桶 [1,2,5,10,25,50,100,250,500,1000,2500]ms、P50/P95/P99
+- `Timer`: 上下文管理器，自动记录到 Histogram
+- `TimeSeries`: 滚动时间序列 + 线性趋势检测
+- `prometheus_text()`: Prometheus text exposition 格式输出
+- 便捷方法: record_proc_duration / record_packet_received / record_prediction / record_voice_output / record_evolution_cycle
+
+---
+
+## 2. Integration 集成层 (`integration/`)
+
+### 2.1 agent_os_bridge.py — Agent-OS 内核桥接
+
+查看 `src/agent_os/` 上现有 `base_agent.py` GovernedRunner 的实现方式，理解其模式，特别是策略评估和奖励信号是如何分离的。可以从 `semantic_policy.py` PolicyEngine 这个好例子开始。然后，遵循该模式实现一个新的 **AgentOSBridge**，让 lolbot-HyperAI 可以 作为 Agent-OS 治理框架中的受治理 Agent 运行（策略检查、信任声明、事件发布），并能 在内核不可用时自动降级为 passthrough 模式（所有策略返回 ALLOW）。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `BridgeMode`: CONNECTED / PASSTHROUGH / DEGRADED
+- `PolicyAdapter`: 策略评估+缓存（TTL 60s）、超时默认 ALLOW、记录被拒绝的动作
+- `RewardAdapter`: 游戏结果→RL 奖励信号（Brier score 0.4 + 建议质量 0.25 + 系统稳定性 0.2 + 参与度 0.15）
+- `AgentIdentity`: 7 种能力声明（network_capture 到 self_evolution）
+- `KernelEvent`: 非阻塞事件发布（1000 队列上限，满则丢弃）
+
+### 2.2 event_dispatcher.py — 全局 Pub/Sub 事件总线
+
+查看 Apollo 上现有 `cyber/node/reader.h` + `writer.h` 的实现方式，理解其模式，特别是消息订阅和投递是如何分离的。可以从 `cyber/blocker/blocker_manager.h` 同步机制 这个好例子开始。然后，遵循该模式实现一个新的 **EventDispatcher**，让 所有模块 可以 通过类型化事件进行通信（30+ 事件类型覆盖游戏全生命周期），并能 按优先级调度（CRITICAL→LOW）和检测慢处理器（10ms 预算）。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `EventType`: 30+ 事件类型（GAME_FLOW_CHANGE → SHUTDOWN_INITIATED）
+- `Event`: event_id / source / payload / priority / correlation_id
+- `Subscription`: 事件类型集合、filter_fn、超时检测
+- `dispatch()`: 每 tick 处理最多100事件，按优先级排序，10K 队列上限
+- 慢处理器检测: 超过10ms自动计数和告警
+
+### 2.3 module_registry.py — 中央模块注册中心
+
+查看 Apollo 上现有 `cyber/class_loader/` 的实现方式，理解其模式，特别是动态组件加载和接口验证是如何分离的。可以从 `cyber/component/component.h` 注册宏 这个好例子开始。然后，遵循该模式实现一个新的 **ModuleRegistry**，让 所有系统模块 可以 声明自己的元数据（类别/版本/依赖/提供的接口），并能 通过 Kahn 拓扑排序确定初始化顺序并检测循环依赖。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `ModuleDescriptor`: name / category / version / dependencies / provides / requires
+- `InterfaceValidator`: 验证 name 属性 + async init/proc/shutdown
+- `DependencyResolver`: Kahn BFS 拓扑排序 + DFS 环检测
+- `hot_swap()`: 运行时替换模块实现（仅 hot_swappable 模块）
+- `check_requirements()`: 验证所有模块的 requires 接口都有对应的 provides
+
+### 2.4 pipeline_builder.py — 感知→输出 数据流水线
+
+查看 Apollo 上现有 `cyber/message/message_traits.h` 的实现方式，理解其模式，特别是类型化通道和处理阶段是如何分离的。可以从 Apollo `modules/perception/ → prediction/ → planning/` 数据流 这个好例子开始。然后，遵循该模式实现一个新的 **PipelineBuilder**，让 LoL 数据处理流水线 可以 通过声明式定义组装（NetworkCapture→GameState→Analysis→Prediction→Strategy→Voice），并能 在某个阶段缺失时使用 passthrough 占位符自动降级。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `TypedChannel`: 命名数据通道、可配深度（默认1=最新值语义）、溢出丢弃最旧
+- `PipelineStage`: 输入通道 → processor.process(inputs) → 输出通道
+- `DEFAULT_LOL_PIPELINE`: 6 阶段预定义流水线
+- `PipelineBuilder.build()`: 自动创建通道、解析处理器、组装 Pipeline
+- `_PassthroughProcessor`: 缺失模块的自动占位
+
+### 2.5 plugin_loader.py — M 系列模块热加载
+
+查看 Apollo 上现有 `cyber/class_loader/class_loader_manager.h` 的实现方式，理解其模式，特别是动态库加载和命名空间隔离是如何分离的。可以从 Python `importlib.util.spec_from_file_location` 这个好例子开始。然后，遵循该模式实现一个新的 **PluginLoader**，让 演化层 可以 在运行时发现、加载、验证和热重载模块（包括 M-series 任务文件夹），并能 在加载失败时不影响系统其余部分。从头开始构建，除了代码库中已有的库之外，不要使用其他库。
+
+**实现要点**：
+- `PluginDiscovery`: 扫描目录 + M 系列文件夹（M1006-M1025 等）
+- `ModuleImporter`: importlib 隔离命名空间导入、卸载时清理 sys.modules
+- `SandboxValidator`: 扫描 .py 文件检查 subprocess / ctypes / shutil.rmtree 等危险导入
+- 完整生命周期: discover → load → validate → activate → deactivate → unload
+- `reload()`: 热重载（unload + re-discover + load）
+
+---
+
+## 3. Deployment 部署层 (`deploy/` + `scripts/` + `Makefile`)
+
+### 3.1 Dockerfile — 多阶段容器构建
+- Stage 1 (builder): 安装 Python 依赖、语法检查
+- Stage 2 (runtime): python:3.11-slim、非 root 用户(lolbot:1000)、/data 持久化卷、Edge-TTS 预装、HEALTHCHECK
+
+### 3.2 docker-compose.yml — 容器编排
+- lolbot 主服务: host.docker.internal 网络、资源限制 2CPU/2G、日志轮转 50M×5
+- prometheus (monitoring profile): 30 天数据保留
+- grafana (monitoring profile): 仪表板可视化
+
+### 3.3 entrypoint.sh — 容器入口
+- 预检: Python 版本、目录创建、核心模块导入验证
+- 脏关停恢复检测
+- 4 种运行模式: full / test / dashboard / shell
+
+### 3.4 run_with_logs.py — 结构化日志启动脚本
+- `JsonLogFormatter`: 单行 JSON 日志（ts/level/logger/msg/module/func/line）
+- 日志文件轮转: 50MB × 5 份
+- HTTP 健康端点: :8080/health + :8080/metrics + :8080/status
+- 模块自动发现和注册
+
+### 3.5 Makefile — 统一入口
+- `make install` / `make test` / `make run` / `make run-debug`
+- `make docker-build` / `make docker-up` / `make docker-down`
+- `make lint` / `make validate` / `make smoke-test` / `make clean`

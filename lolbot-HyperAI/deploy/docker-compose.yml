@@ -1,0 +1,151 @@
+###############################################################################
+# OperatorRL lolbot-HyperAI · Docker Compose
+# 自部署 自环境反馈 自演化
+#
+# Services:
+#   lolbot      — Main game assistant (proc loop, perception, planning, voice)
+#   prometheus  — Metrics scraping (optional, for production monitoring)
+#   grafana     — Dashboard visualization (optional)
+#
+# Usage:
+#   docker-compose up -d                    # Start all services
+#   docker-compose up lolbot                # Start lolbot only
+#   docker-compose logs -f lolbot           # Follow lolbot logs
+#   docker-compose down                     # Stop all services
+#
+# Profiles:
+#   docker-compose --profile monitoring up  # Include Prometheus + Grafana
+###############################################################################
+
+version: "3.9"
+
+services:
+  # ================================================================
+  # lolbot — Main Game Assistant
+  # ================================================================
+  lolbot:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: lolbot-hyperai
+    restart: unless-stopped
+
+    # Host network for access to LoL client (LCU) and Fiddler
+    # On Windows/Mac Docker Desktop, use extra_hosts instead
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    ports:
+      # Dashboard and metrics endpoint
+      - "8080:8080"
+
+    volumes:
+      # Persistent data (evolution state, checkpoints, logs)
+      - lolbot-data:/data
+      # Optional: mount local config
+      - ./config:/app/lolbot-HyperAI/config:ro
+
+    environment:
+      # Core settings
+      - LOLBOT_BASE_TICK_MS=10
+      - LOLBOT_TTS_BACKEND=edge
+      - LOLBOT_LOG_LEVEL=INFO
+
+      # External services
+      - LOLBOT_FIDDLER_URL=http://host.docker.internal:8868/mcp
+      - LOLBOT_LCU_HOST=host.docker.internal
+
+      # Riot API (optional — for historical data)
+      - RIOT_API_KEY=${RIOT_API_KEY:-}
+
+      # OpenAI TTS (optional — for premium voice)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+
+      # Evolution settings
+      - LOLBOT_EVOLUTION_ENABLED=true
+      - LOLBOT_EVOLUTION_INTERVAL_GAMES=5
+
+      # Agent-OS kernel (optional)
+      - LOLBOT_KERNEL_URL=${LOLBOT_KERNEL_URL:-}
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+        "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ================================================================
+  # Prometheus — Metrics Collection (optional, monitoring profile)
+  # ================================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: lolbot-prometheus
+    profiles: ["monitoring"]
+    restart: unless-stopped
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - prometheus-data:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+
+    depends_on:
+      lolbot:
+        condition: service_healthy
+
+  # ================================================================
+  # Grafana — Dashboard (optional, monitoring profile)
+  # ================================================================
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: lolbot-grafana
+    profiles: ["monitoring"]
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+    depends_on:
+      - prometheus
+
+
+# ================================================================
+# Volumes
+# ================================================================
+volumes:
+  lolbot-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

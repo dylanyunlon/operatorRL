@@ -1,0 +1,18 @@
+# OperatorRL lolbot-HyperAI · Python Dependencies
+# Core (no external deps for runtime/integration layers)
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+
+# Voice output (Claude #2's modules)
+edge-tts>=6.1.9
+pyttsx3>=2.90
+
+# HTTP server (for dashboard)
+aiohttp>=3.9.0
+
+# Optional: Prometheus client (for production monitoring)
+# prometheus-client>=0.20.0
+
+# Optional: Riot API wrapper
+# riotwatcher>=3.3.0
