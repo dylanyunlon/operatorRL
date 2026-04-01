@@ -1,0 +1,160 @@
+{
+  "instance": "#36",
+  "milestone": "M986-M1005",
+  "title": "Historical Battle Intelligence Acquisition for Live Matches",
+  "generated_at": "2026-04-01T03:43:27.896910+00:00",
+  "elapsed_seconds": 0.782,
+  "summary": {
+    "total_modules": 20,
+    "total_lines": 17008,
+    "avg_lines_per_module": 850,
+    "syntax_errors": 0,
+    "self_test_failures": 0,
+    "warnings": 0,
+    "errors": 0
+  },
+  "modules": {
+    "M986": {
+      "name": "LiveMatchPlayerResolver",
+      "lines": 848,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 182.82
+    },
+    "M987": {
+      "name": "BatchHistoryFetcher",
+      "lines": 849,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 29.66
+    },
+    "M988": {
+      "name": "OpponentProfileBuilder",
+      "lines": 849,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 45.31
+    },
+    "M989": {
+      "name": "ChampionMasteryAnalyzer",
+      "lines": 850,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 24.52
+    },
+    "M990": {
+      "name": "RecentFormTracker",
+      "lines": 853,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 24.05
+    },
+    "M991": {
+      "name": "LaneHistoryComparator",
+      "lines": 851,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 42.67
+    },
+    "M992": {
+      "name": "DuoSynergyDetector",
+      "lines": 852,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 26.47
+    },
+    "M993": {
+      "name": "FiddlerHistoryInterceptor",
+      "lines": 852,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 25.12
+    },
+    "M994": {
+      "name": "RankTrajectoryAnalyzer",
+      "lines": 854,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 39.01
+    },
+    "M995": {
+      "name": "HistoricalWardHeatmap",
+      "lines": 851,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 26.33
+    },
+    "M996": {
+      "name": "JunglePathingProfiler",
+      "lines": 851,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 25.9
+    },
+    "M997": {
+      "name": "TeamfightTendencyScorer",
+      "lines": 849,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 43.11
+    },
+    "M998": {
+      "name": "ObjectiveControlHistorian",
+      "lines": 851,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 28.18
+    },
+    "M999": {
+      "name": "DeathPatternAnalyzer",
+      "lines": 850,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 25.22
+    },
+    "M1000": {
+      "name": "ItemBuildHistorian",
+      "lines": 849,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 25.61
+    },
+    "M1001": {
+      "name": "SummonerSpellHistorian",
+      "lines": 848,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 42.27
+    },
+    "M1002": {
+      "name": "PregameIntelAggregator",
+      "lines": 853,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 26.43
+    },
+    "M1003": {
+      "name": "LiveDataSubscriptionHub",
+      "lines": 849,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 26.18
+    },
+    "M1004": {
+      "name": "HistoricalIntelligenceCache",
+      "lines": 849,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 41.24
+    },
+    "M1005": {
+      "name": "HistoricalIntelOrchestrator",
+      "lines": 850,
+      "syntax_ok": true,
+      "self_test_ok": true,
+      "duration_ms": 25.12
+    }
+  },
+  "errors": [],
+  "warnings": []
+}

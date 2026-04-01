@@ -1,0 +1,27 @@
+{
+  "module_id": "M991",
+  "module_name": "LaneHistoryComparator",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M987",
+    "M988"
+  ],
+  "settings": {
+    "max_cache_size": 512,
+    "cache_ttl_seconds": 1800,
+    "min_sample_size": 3,
+    "confidence_threshold": 0.55,
+    "batch_size": 10,
+    "timeout_seconds": 15.0,
+    "max_concurrent_requests": 8,
+    "history_depth_games": 30
+  },
+  "seraphine_integration": {
+    "lcu_api_required": true,
+    "sgp_fallback": true,
+    "fiddler_proxy_support": false,
+    "websocket_events": false
+  },
+  "domain": "lane_comparison"
+}
