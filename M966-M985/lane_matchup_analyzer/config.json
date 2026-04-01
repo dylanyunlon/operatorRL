@@ -1,0 +1,24 @@
+{
+  "module_id": "M969",
+  "module_name": "LaneMatchupAnalyzer",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M908",
+    "M916",
+    "M966"
+  ],
+  "settings": {
+    "max_cache_size": 500,
+    "cache_ttl_seconds": 1800,
+    "min_sample_size": 3,
+    "confidence_threshold": 0.5,
+    "batch_size": 100,
+    "timeout_seconds": 30.0
+  },
+  "seraphine_integration": {
+    "lcu_api_required": true,
+    "sgp_fallback": true,
+    "fiddler_mcp_enabled": false
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "modules": [
+    {
+      "id": "M966",
+      "name": "HistoricalPatternRecognizer",
+      "dir": "historical_pattern_recognizer",
+      "code_lines": 725,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M967",
+      "name": "MatchOutcomePredictor",
+      "dir": "match_outcome_predictor",
+      "code_lines": 533,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M968",
+      "name": "DraftSimulationEngine",
+      "dir": "draft_simulation_engine",
+      "code_lines": 462,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M969",
+      "name": "LaneMatchupAnalyzer",
+      "dir": "lane_matchup_analyzer",
+      "code_lines": 686,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M970",
+      "name": "ItemBuildPathOptimizer",
+      "dir": "item_build_path_optimizer",
+      "code_lines": 701,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M971",
+      "name": "RuneStrategyEngine",
+      "dir": "rune_strategy_engine",
+      "code_lines": 624,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M972",
+      "name": "ObjectivePriorityForecaster",
+      "dir": "objective_priority_forecaster",
+      "code_lines": 631,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M973",
+      "name": "TeamfightSimulator",
+      "dir": "teamfight_simulator",
+      "code_lines": 628,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M974",
+      "name": "WardingPatternAnalyzer",
+      "dir": "warding_pattern_analyzer",
+      "code_lines": 625,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M975",
+      "name": "SummonerSpellTracker",
+      "dir": "summoner_spell_tracker",
+      "code_lines": 627,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M976",
+      "name": "MomentumShiftDetector",
+      "dir": "momentum_shift_detector",
+      "code_lines": 627,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M977",
+      "name": "RoamingPredictionEngine",
+      "dir": "roaming_prediction_engine",
+      "code_lines": 625,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M978",
+      "name": "FiddlerRealTimeAnalytics",
+      "dir": "fiddler_realtime_analytics",
+      "code_lines": 704,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M979",
+      "name": "CrossMatchPatternMiner",
+      "dir": "cross_match_pattern_miner",
+      "code_lines": 620,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M980",
+      "name": "MetaAdaptationPredictor",
+      "dir": "meta_adaptation_predictor",
+      "code_lines": 622,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M981",
+      "name": "HistoryReplayIndexer",
+      "dir": "history_replay_indexer",
+      "code_lines": 624,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M982",
+      "name": "VoiceNarrationPipeline",
+      "dir": "voice_narration_pipeline",
+      "code_lines": 696,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M983",
+      "name": "TrainingDataExporter",
+      "dir": "training_data_exporter",
+      "code_lines": 666,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M984",
+      "name": "IntelligenceReportGenerator",
+      "dir": "intelligence_report_generator",
+      "code_lines": 663,
+      "files": 4,
+      "status": "OK"
+    },
+    {
+      "id": "M985",
+      "name": "PredictiveIntelligenceOrchestrator",
+      "dir": "predictive_intelligence_orchestrator",
+      "code_lines": 744,
+      "files": 4,
+      "status": "OK"
+    }
+  ],
+  "total_files": 85,
+  "total_lines": 12833,
+  "errors": [],
+  "start_time": "2026-04-01T01:19:10.804039+00:00",
+  "end_time": "2026-04-01T01:19:10.880973+00:00",
+  "elapsed_seconds": 0.077
+}

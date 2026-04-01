@@ -1,0 +1,22 @@
+{
+  "module_id": "M978",
+  "module_name": "FiddlerRealTimeAnalytics",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M919"
+  ],
+  "settings": {
+    "max_cache_size": 500,
+    "cache_ttl_seconds": 1800,
+    "min_sample_size": 3,
+    "confidence_threshold": 0.5,
+    "batch_size": 100,
+    "timeout_seconds": 30.0
+  },
+  "seraphine_integration": {
+    "lcu_api_required": true,
+    "sgp_fallback": true,
+    "fiddler_mcp_enabled": true
+  }
+}
