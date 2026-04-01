@@ -1,0 +1,17 @@
+{
+  "module_id": "M957",
+  "module_name": "LaneMatchupPredictor",
+  "version": "1.0.0",
+  "dependencies": [
+    "M948",
+    "M950",
+    "M916"
+  ],
+  "description": "Predict lane matchup outcomes from historical head-to-head data",
+  "seraphine_api_patterns": [
+    "getSummonerGamesByPuuid",
+    "getGameDetailByGameId"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

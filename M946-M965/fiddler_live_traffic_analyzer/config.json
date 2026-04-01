@@ -1,0 +1,13 @@
+{
+  "module_id": "M947",
+  "module_name": "FiddlerLiveTrafficAnalyzer",
+  "version": "1.0.0",
+  "dependencies": [
+    "M919",
+    "M946"
+  ],
+  "description": "Real-time traffic analysis via Fiddler MCP for LoL protocol interception",
+  "seraphine_api_patterns": [],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

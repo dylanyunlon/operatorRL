@@ -1,0 +1,33 @@
+{
+  "module_id": "M965",
+  "module_name": "BattleIntelligenceOrchestrator",
+  "version": "1.0.0",
+  "dependencies": [
+    "M946",
+    "M947",
+    "M948",
+    "M949",
+    "M950",
+    "M951",
+    "M952",
+    "M953",
+    "M954",
+    "M955",
+    "M956",
+    "M957",
+    "M958",
+    "M959",
+    "M960",
+    "M961",
+    "M962",
+    "M963",
+    "M964"
+  ],
+  "description": "Orchestrate all M946-M964 modules into unified battle intelligence system",
+  "seraphine_api_patterns": [
+    "getCurrentSummoner",
+    "getGameflowSession"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

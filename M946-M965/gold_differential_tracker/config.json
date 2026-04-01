@@ -1,0 +1,16 @@
+{
+  "module_id": "M954",
+  "module_name": "GoldDifferentialTracker",
+  "version": "1.0.0",
+  "dependencies": [
+    "M950",
+    "M948",
+    "M915"
+  ],
+  "description": "Track gold differential curves with historical comparison",
+  "seraphine_api_patterns": [
+    "getGameDetailByGameId"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

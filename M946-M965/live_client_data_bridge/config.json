@@ -1,0 +1,16 @@
+{
+  "module_id": "M946",
+  "module_name": "LiveClientDataBridge",
+  "version": "1.0.0",
+  "dependencies": [
+    "M906",
+    "M922"
+  ],
+  "description": "Poll Riot Live Client Data API at https://127.0.0.1:2999 for real-time game state",
+  "seraphine_api_patterns": [
+    "getGameflowSession",
+    "getGameStatus"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

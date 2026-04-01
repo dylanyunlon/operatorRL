@@ -1,0 +1,15 @@
+{
+  "module_id": "M964",
+  "module_name": "StrategyDeviationDetector",
+  "version": "1.0.0",
+  "dependencies": [
+    "M950",
+    "M956",
+    "M958",
+    "M960"
+  ],
+  "description": "Detect player deviation from recommended strategy and provide feedback",
+  "seraphine_api_patterns": [],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

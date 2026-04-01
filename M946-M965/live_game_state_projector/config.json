@@ -1,0 +1,16 @@
+{
+  "module_id": "M950",
+  "module_name": "LiveGameStateProjector",
+  "version": "1.0.0",
+  "dependencies": [
+    "M946",
+    "M947"
+  ],
+  "description": "Project real-time game state at 14fps snapshot rate",
+  "seraphine_api_patterns": [
+    "getGameflowSession",
+    "getGameStatus"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

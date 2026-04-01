@@ -1,0 +1,16 @@
+{
+  "module_id": "M961",
+  "module_name": "PostGameDiffAnalyzer",
+  "version": "1.0.0",
+  "dependencies": [
+    "M959",
+    "M948",
+    "M950"
+  ],
+  "description": "Analyze prediction vs actual outcome differences after each game",
+  "seraphine_api_patterns": [
+    "getGameDetailByGameId"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

@@ -1,0 +1,16 @@
+{
+  "module_id": "M956",
+  "module_name": "ItemBuildPathAdvisor",
+  "version": "1.0.0",
+  "dependencies": [
+    "M948",
+    "M950",
+    "M911"
+  ],
+  "description": "Advise optimal item build paths based on historical win rates",
+  "seraphine_api_patterns": [
+    "getGameDetailByGameId"
+  ],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

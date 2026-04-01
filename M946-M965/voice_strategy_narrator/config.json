@@ -1,0 +1,15 @@
+{
+  "module_id": "M960",
+  "module_name": "VoiceStrategyNarrator",
+  "version": "1.0.0",
+  "dependencies": [
+    "M959",
+    "M953",
+    "M958",
+    "M956"
+  ],
+  "description": "Convert strategy insights to real-time voice guidance via TTS",
+  "seraphine_api_patterns": [],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}

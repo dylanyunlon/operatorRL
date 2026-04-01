@@ -1,0 +1,17 @@
+{
+  "module_id": "M959",
+  "module_name": "WinProbabilityFusionEngine",
+  "version": "1.0.0",
+  "dependencies": [
+    "M951",
+    "M952",
+    "M953",
+    "M954",
+    "M957",
+    "M875"
+  ],
+  "description": "Fuse historical and live signals into unified win probability",
+  "seraphine_api_patterns": [],
+  "fiddler_mcp_endpoint": "http://localhost:8868/mcp",
+  "lcu_base_url": "https://127.0.0.1:2999"
+}
