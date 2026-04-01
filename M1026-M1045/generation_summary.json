@@ -1,0 +1,210 @@
+{
+  "timestamp": "2026-04-01T03:44:39.559052+00:00",
+  "milestone": "M1026-M1045",
+  "instance": "#38",
+  "modules": [
+    {
+      "module_id": "M1026",
+      "package": "match_history_deep_fetcher",
+      "class": "MatchHistoryDeepFetcher",
+      "line_count": 690,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/match_history_deep_fetcher/match_history_deep_fetcher.py",
+        "/home/claude/operatorRL/M1026-M1045/match_history_deep_fetcher/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1027",
+      "package": "summoner_profile_aggregator",
+      "class": "SummonerProfileAggregator",
+      "line_count": 659,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/summoner_profile_aggregator/summoner_profile_aggregator.py",
+        "/home/claude/operatorRL/M1026-M1045/summoner_profile_aggregator/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1028",
+      "package": "champion_mastery_analyzer",
+      "class": "ChampionMasteryAnalyzer",
+      "line_count": 697,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/champion_mastery_analyzer/champion_mastery_analyzer.py",
+        "/home/claude/operatorRL/M1026-M1045/champion_mastery_analyzer/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1029",
+      "package": "ranked_stats_tracker",
+      "class": "RankedStatsTracker",
+      "line_count": 690,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/ranked_stats_tracker/ranked_stats_tracker.py",
+        "/home/claude/operatorRL/M1026-M1045/ranked_stats_tracker/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1030",
+      "package": "match_timeline_parser",
+      "class": "MatchTimelineParser",
+      "line_count": 664,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/match_timeline_parser/match_timeline_parser.py",
+        "/home/claude/operatorRL/M1026-M1045/match_timeline_parser/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1031",
+      "package": "player_behavior_profiler",
+      "class": "PlayerBehaviorProfiler",
+      "line_count": 654,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/player_behavior_profiler/player_behavior_profiler.py",
+        "/home/claude/operatorRL/M1026-M1045/player_behavior_profiler/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1032",
+      "package": "team_history_correlator",
+      "class": "TeamHistoryCorrelator",
+      "line_count": 687,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/team_history_correlator/team_history_correlator.py",
+        "/home/claude/operatorRL/M1026-M1045/team_history_correlator/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1033",
+      "package": "opponent_pattern_miner",
+      "class": "OpponentPatternMiner",
+      "line_count": 680,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/opponent_pattern_miner/opponent_pattern_miner.py",
+        "/home/claude/operatorRL/M1026-M1045/opponent_pattern_miner/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1034",
+      "package": "win_streak_momentum_engine",
+      "class": "WinStreakMomentumEngine",
+      "line_count": 694,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/win_streak_momentum_engine/win_streak_momentum_engine.py",
+        "/home/claude/operatorRL/M1026-M1045/win_streak_momentum_engine/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1035",
+      "package": "role_performance_decomposer",
+      "class": "RolePerformanceDecomposer",
+      "line_count": 674,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/role_performance_decomposer/role_performance_decomposer.py",
+        "/home/claude/operatorRL/M1026-M1045/role_performance_decomposer/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1036",
+      "package": "item_build_history_analyzer",
+      "class": "ItemBuildHistoryAnalyzer",
+      "line_count": 694,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/item_build_history_analyzer/item_build_history_analyzer.py",
+        "/home/claude/operatorRL/M1026-M1045/item_build_history_analyzer/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1037",
+      "package": "death_heatmap_generator",
+      "class": "DeathHeatmapGenerator",
+      "line_count": 687,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/death_heatmap_generator/death_heatmap_generator.py",
+        "/home/claude/operatorRL/M1026-M1045/death_heatmap_generator/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1038",
+      "package": "cs_efficiency_tracker",
+      "class": "CsEfficiencyTracker",
+      "line_count": 684,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/cs_efficiency_tracker/cs_efficiency_tracker.py",
+        "/home/claude/operatorRL/M1026-M1045/cs_efficiency_tracker/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1039",
+      "package": "vision_score_history_engine",
+      "class": "VisionScoreHistoryEngine",
+      "line_count": 691,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/vision_score_history_engine/vision_score_history_engine.py",
+        "/home/claude/operatorRL/M1026-M1045/vision_score_history_engine/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1040",
+      "package": "duo_partner_detector",
+      "class": "DuoPartnerDetector",
+      "line_count": 684,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/duo_partner_detector/duo_partner_detector.py",
+        "/home/claude/operatorRL/M1026-M1045/duo_partner_detector/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1041",
+      "package": "tilt_detection_engine",
+      "class": "TiltDetectionEngine",
+      "line_count": 694,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/tilt_detection_engine/tilt_detection_engine.py",
+        "/home/claude/operatorRL/M1026-M1045/tilt_detection_engine/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1042",
+      "package": "meta_compliance_scorer",
+      "class": "MetaComplianceScorer",
+      "line_count": 680,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/meta_compliance_scorer/meta_compliance_scorer.py",
+        "/home/claude/operatorRL/M1026-M1045/meta_compliance_scorer/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1043",
+      "package": "historical_matchup_matrix",
+      "class": "HistoricalMatchupMatrix",
+      "line_count": 674,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/historical_matchup_matrix/historical_matchup_matrix.py",
+        "/home/claude/operatorRL/M1026-M1045/historical_matchup_matrix/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1044",
+      "package": "pregame_intelligence_fuser",
+      "class": "PregameIntelligenceFuser",
+      "line_count": 675,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/pregame_intelligence_fuser/pregame_intelligence_fuser.py",
+        "/home/claude/operatorRL/M1026-M1045/pregame_intelligence_fuser/__init__.py"
+      ]
+    },
+    {
+      "module_id": "M1045",
+      "package": "historical_intelligence_gateway",
+      "class": "HistoricalIntelligenceGateway",
+      "line_count": 629,
+      "files": [
+        "/home/claude/operatorRL/M1026-M1045/historical_intelligence_gateway/historical_intelligence_gateway.py",
+        "/home/claude/operatorRL/M1026-M1045/historical_intelligence_gateway/__init__.py"
+      ]
+    }
+  ],
+  "generation_time_seconds": 0.046,
+  "total_modules": 20,
+  "total_lines": 13581
+}

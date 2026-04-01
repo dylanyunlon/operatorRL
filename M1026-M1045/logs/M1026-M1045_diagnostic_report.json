@@ -1,0 +1,411 @@
+{
+  "timestamp": "2026-04-01T03:44:44.013960+00:00",
+  "milestone": "M1026-M1045",
+  "instance": "#38",
+  "total_modules": 20,
+  "success": 20,
+  "fail": 0,
+  "total_lines": 13601,
+  "avg_lines": 680,
+  "modules": {
+    "M1026": {
+      "module_id": "M1026",
+      "package": "match_history_deep_fetcher",
+      "class": "MatchHistoryDeepFetcher",
+      "file_exists": true,
+      "line_count": 691,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "batch_fetch_participants",
+        "ensure_initialized",
+        "fetch_match_detail",
+        "fetch_match_history",
+        "get_module_info",
+        "health_check",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1027": {
+      "module_id": "M1027",
+      "package": "summoner_profile_aggregator",
+      "class": "SummonerProfileAggregator",
+      "file_exists": true,
+      "line_count": 660,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "aggregate_profile",
+        "ensure_initialized",
+        "get_module_info",
+        "get_rank_history",
+        "health_check",
+        "resolve_puuid_by_name",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1028": {
+      "module_id": "M1028",
+      "package": "champion_mastery_analyzer",
+      "class": "ChampionMasteryAnalyzer",
+      "file_exists": true,
+      "line_count": 698,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "analyze_mastery_distribution",
+        "compute_role_flexibility",
+        "detect_otp",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1029": {
+      "module_id": "M1029",
+      "package": "ranked_stats_tracker",
+      "class": "RankedStatsTracker",
+      "file_exists": true,
+      "line_count": 691,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "analyze_promotion_readiness",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "predict_rank_trend",
+        "shutdown",
+        "track_rank_changes"
+      ],
+      "errors": []
+    },
+    "M1030": {
+      "module_id": "M1030",
+      "package": "match_timeline_parser",
+      "class": "MatchTimelineParser",
+      "file_exists": true,
+      "line_count": 665,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "compute_gold_diff_curve",
+        "ensure_initialized",
+        "extract_key_events",
+        "get_module_info",
+        "health_check",
+        "parse_timeline",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1031": {
+      "module_id": "M1031",
+      "package": "player_behavior_profiler",
+      "class": "PlayerBehaviorProfiler",
+      "file_exists": true,
+      "line_count": 655,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "ensure_initialized",
+        "generate_behavior_fingerprint",
+        "get_module_info",
+        "health_check",
+        "profile_aggression",
+        "profile_macro_style",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1032": {
+      "module_id": "M1032",
+      "package": "team_history_correlator",
+      "class": "TeamHistoryCorrelator",
+      "file_exists": true,
+      "line_count": 688,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "compute_team_cohesion",
+        "correlate_teammates",
+        "ensure_initialized",
+        "find_duo_history",
+        "get_module_info",
+        "health_check",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1033": {
+      "module_id": "M1033",
+      "package": "opponent_pattern_miner",
+      "class": "OpponentPatternMiner",
+      "file_exists": true,
+      "line_count": 681,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "ensure_initialized",
+        "generate_counter_brief",
+        "get_module_info",
+        "health_check",
+        "mine_champion_preferences",
+        "mine_weakness_patterns",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1034": {
+      "module_id": "M1034",
+      "package": "win_streak_momentum_engine",
+      "class": "WinStreakMomentumEngine",
+      "file_exists": true,
+      "line_count": 695,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "compute_momentum",
+        "detect_streaks",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "predict_tilt_risk",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1035": {
+      "module_id": "M1035",
+      "package": "role_performance_decomposer",
+      "class": "RolePerformanceDecomposer",
+      "file_exists": true,
+      "line_count": 675,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "compute_autofill_penalty",
+        "decompose_by_role",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "identify_main_role",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1036": {
+      "module_id": "M1036",
+      "package": "item_build_history_analyzer",
+      "class": "ItemBuildHistoryAnalyzer",
+      "file_exists": true,
+      "line_count": 695,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "analyze_build_paths",
+        "compute_item_winrate",
+        "detect_suboptimal_builds",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1037": {
+      "module_id": "M1037",
+      "package": "death_heatmap_generator",
+      "class": "DeathHeatmapGenerator",
+      "file_exists": true,
+      "line_count": 688,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "analyze_death_timing",
+        "ensure_initialized",
+        "generate_death_heatmap",
+        "get_module_info",
+        "health_check",
+        "identify_danger_zones",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1038": {
+      "module_id": "M1038",
+      "package": "cs_efficiency_tracker",
+      "class": "CsEfficiencyTracker",
+      "file_exists": true,
+      "line_count": 685,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "compare_with_rank_avg",
+        "compute_cs_efficiency_curve",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "shutdown",
+        "track_cs_milestones"
+      ],
+      "errors": []
+    },
+    "M1039": {
+      "module_id": "M1039",
+      "package": "vision_score_history_engine",
+      "class": "VisionScoreHistoryEngine",
+      "file_exists": true,
+      "line_count": 692,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "analyze_ward_habits",
+        "compute_vision_grade",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "shutdown",
+        "track_vision_history"
+      ],
+      "errors": []
+    },
+    "M1040": {
+      "module_id": "M1040",
+      "package": "duo_partner_detector",
+      "class": "DuoPartnerDetector",
+      "file_exists": true,
+      "line_count": 685,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "assess_duo_synergy",
+        "detect_duos",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "predict_premade_strategy",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1041": {
+      "module_id": "M1041",
+      "package": "tilt_detection_engine",
+      "class": "TiltDetectionEngine",
+      "file_exists": true,
+      "line_count": 695,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "analyze_performance_decay",
+        "detect_tilt",
+        "ensure_initialized",
+        "estimate_recovery_likelihood",
+        "get_module_info",
+        "health_check",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1042": {
+      "module_id": "M1042",
+      "package": "meta_compliance_scorer",
+      "class": "MetaComplianceScorer",
+      "file_exists": true,
+      "line_count": 681,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "detect_off_meta_picks",
+        "ensure_initialized",
+        "get_module_info",
+        "health_check",
+        "score_meta_compliance",
+        "shutdown",
+        "suggest_meta_adjustments"
+      ],
+      "errors": []
+    },
+    "M1043": {
+      "module_id": "M1043",
+      "package": "historical_matchup_matrix",
+      "class": "HistoricalMatchupMatrix",
+      "file_exists": true,
+      "line_count": 675,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "build_matchup_matrix",
+        "ensure_initialized",
+        "find_comfort_matchups",
+        "get_module_info",
+        "health_check",
+        "query_matchup",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1044": {
+      "module_id": "M1044",
+      "package": "pregame_intelligence_fuser",
+      "class": "PregameIntelligenceFuser",
+      "file_exists": true,
+      "line_count": 676,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "ensure_initialized",
+        "fuse_pregame_intel",
+        "generate_threat_ranking",
+        "get_module_info",
+        "health_check",
+        "produce_voice_brief",
+        "shutdown"
+      ],
+      "errors": []
+    },
+    "M1045": {
+      "module_id": "M1045",
+      "package": "historical_intelligence_gateway",
+      "class": "HistoricalIntelligenceGateway",
+      "file_exists": true,
+      "line_count": 630,
+      "syntax_ok": true,
+      "import_ok": true,
+      "instantiate_ok": true,
+      "methods": [
+        "ensure_initialized",
+        "get_full_report",
+        "get_module_info",
+        "health_check",
+        "initialize_all",
+        "shutdown"
+      ],
+      "errors": []
+    }
+  }
+}

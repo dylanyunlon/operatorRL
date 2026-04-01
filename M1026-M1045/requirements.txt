@@ -1,0 +1,7 @@
+# M1026-M1045: Seraphine Historical Battle Intelligence System
+# Core dependencies (stdlib only for base modules)
+# Optional production dependencies:
+# aiohttp>=3.9.0     # Async HTTP for LCU API
+# websockets>=12.0   # LCU WebSocket events  
+# pydantic>=2.0      # Data validation
+# orjson>=3.9        # Fast JSON serialization
