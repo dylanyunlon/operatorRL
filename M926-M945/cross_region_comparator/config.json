@@ -1,0 +1,19 @@
+{
+  "module_id": "M942",
+  "module_name": "CrossRegionComparator",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M908",
+    "M923"
+  ],
+  "description": "跨区对比分析器 — 对比不同大区玩家的英雄偏好/出装/打法差异,SGP多区数据聚合"
+}

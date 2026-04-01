@@ -1,0 +1,19 @@
+{
+  "module_id": "M926",
+  "module_name": "ReplayTimelineAnalyzer",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M908",
+    "M938"
+  ],
+  "description": "回放时间线深度分析 — 从replay文件提取完整timeline事件,构建分钟级状态快照,识别关键转折点"
+}

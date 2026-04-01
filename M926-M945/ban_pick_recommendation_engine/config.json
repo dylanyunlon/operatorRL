@@ -1,0 +1,20 @@
+{
+  "module_id": "M928",
+  "module_name": "BanPickRecommendationEngine",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M911",
+    "M915",
+    "M930"
+  ],
+  "description": "禁选推荐引擎 — 基于对手英雄池+Meta胜率+克制关系的多维度评分推荐系统"
+}

@@ -1,0 +1,19 @@
+{
+  "module_id": "M938",
+  "module_name": "TimelineEventCorrelator",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M908",
+    "M926"
+  ],
+  "description": "时间线事件关联器 — 发现事件因果链(如一血→推塔→龙控制的时序关联)"
+}

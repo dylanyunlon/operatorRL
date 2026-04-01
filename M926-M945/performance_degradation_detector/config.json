@@ -1,0 +1,20 @@
+{
+  "module_id": "M937",
+  "module_name": "PerformanceDegradationDetector",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M908",
+    "M912",
+    "M916"
+  ],
+  "description": "表现退化检测器 — 检测玩家近期表现下降趋势(CS/KDA/视野/参团率衰减)"
+}

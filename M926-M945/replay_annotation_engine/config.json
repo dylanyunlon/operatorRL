@@ -1,0 +1,20 @@
+{
+  "module_id": "M941",
+  "module_name": "ReplayAnnotationEngine",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M926",
+    "M938",
+    "M939"
+  ],
+  "description": "回放标注引擎 — 自动标注replay中的关键事件(失误/精彩操作/决策点)并生成报告"
+}

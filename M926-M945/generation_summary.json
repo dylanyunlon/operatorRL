@@ -1,0 +1,148 @@
+{
+  "generated_at": "2026-04-01T01:54:19.809313",
+  "modules": [
+    {
+      "id": "M926",
+      "name": "ReplayTimelineAnalyzer",
+      "dir": "replay_timeline_analyzer",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M927",
+      "name": "DraftPhaseIntelligence",
+      "dir": "draft_phase_intelligence",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M928",
+      "name": "BanPickRecommendationEngine",
+      "dir": "ban_pick_recommendation_engine",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M929",
+      "name": "RuneBuildOptimizer",
+      "dir": "rune_build_optimizer",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M930",
+      "name": "CounterPickSuggestionEngine",
+      "dir": "counter_pick_suggestion_engine",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M931",
+      "name": "GameOutcomePredictor",
+      "dir": "game_outcome_predictor",
+      "lines": 873,
+      "files": 4
+    },
+    {
+      "id": "M932",
+      "name": "PowerSpikeDetector",
+      "dir": "power_spike_detector",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M933",
+      "name": "WardPlacementPatternAnalyzer",
+      "dir": "ward_placement_pattern_analyzer",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M934",
+      "name": "MacroStrategyRecommender",
+      "dir": "macro_strategy_recommender",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M935",
+      "name": "MetaShiftTracker",
+      "dir": "meta_shift_tracker",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M936",
+      "name": "SynergyCounterMatrix",
+      "dir": "synergy_counter_matrix",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M937",
+      "name": "PerformanceDegradationDetector",
+      "dir": "performance_degradation_detector",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M938",
+      "name": "TimelineEventCorrelator",
+      "dir": "timeline_event_correlator",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M939",
+      "name": "HistoricalCoachingEngine",
+      "dir": "historical_coaching_engine",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M940",
+      "name": "RiskAssessmentEngine",
+      "dir": "risk_assessment_engine",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M941",
+      "name": "ReplayAnnotationEngine",
+      "dir": "replay_annotation_engine",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M942",
+      "name": "CrossRegionComparator",
+      "dir": "cross_region_comparator",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M943",
+      "name": "FiddlerDeepPacketAnalyzer",
+      "dir": "fiddler_deep_packet_analyzer",
+      "lines": 871,
+      "files": 4
+    },
+    {
+      "id": "M944",
+      "name": "UnifiedIntelligenceGateway",
+      "dir": "unified_intelligence_gateway",
+      "lines": 872,
+      "files": 4
+    },
+    {
+      "id": "M945",
+      "name": "PredictiveAnalyticsDashboard",
+      "dir": "predictive_analytics_dashboard",
+      "lines": 872,
+      "files": 4
+    }
+  ],
+  "total_modules": 20,
+  "total_lines": 17432,
+  "total_files": 87
+}

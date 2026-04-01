@@ -1,0 +1,19 @@
+{
+  "module_id": "M943",
+  "module_name": "FiddlerDeepPacketAnalyzer",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M919",
+    "M943"
+  ],
+  "description": "Fiddler深度包分析器 — 解析LCU/SGP网络包的深层字段,提取隐藏数据(MMR估算/行为评分)"
+}

@@ -1,0 +1,20 @@
+{
+  "module_id": "M944",
+  "module_name": "UnifiedIntelligenceGateway",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M914",
+    "M922",
+    "M925"
+  ],
+  "description": "统一情报API网关 — 聚合M906-M945所有模块的RESTful API入口,支持WebSocket实时推送"
+}

@@ -1,0 +1,20 @@
+{
+  "module_id": "M934",
+  "module_name": "MacroStrategyRecommender",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M917",
+    "M918",
+    "M932"
+  ],
+  "description": "宏观策略推荐器 — 基于阵容类型+对手习惯+游戏阶段的分推/团战/入侵策略推荐"
+}

@@ -1,0 +1,21 @@
+{
+  "module_id": "M931",
+  "module_name": "GameOutcomePredictor",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M910",
+    "M913",
+    "M915",
+    "M936"
+  ],
+  "description": "对局结果预测器 — 基于双方历史胜率/英雄池/赛季轨迹的赛前胜率预测+赛中动态更新"
+}

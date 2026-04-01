@@ -1,0 +1,20 @@
+{
+  "module_id": "M940",
+  "module_name": "RiskAssessmentEngine",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M917",
+    "M933",
+    "M938"
+  ],
+  "description": "风险评估引擎 — 对线期/团战期/推进期的风险评分+预警(gank概率/被反野概率)"
+}

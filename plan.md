@@ -5704,3 +5704,177 @@ ChecksumUtil(SHA256校验), StatisticalHelper(贝叶斯/Wilson/EMA)
 | 平均每模块行数 | 680 |
 | 语法错误 | 0 |
 | 运行时自测 | 全部通过 |
+
+---
+
+## 第三十三位 Claude (Instance #33) — M926-M945: Advanced Predictive Analytics & Real-Time History Fusion
+
+> 第三十三位 Claude (Instance #33) 完成 M926-M945
+>
+> 在 M906-M925 基础历史情报层上构建预测分析能力，
+> 深度集成 Replay Timeline 分析、选英雄阶段智能辅助、禁选推荐、
+> 符文出装优化、克制推荐、对局结果预测、强势期检测、
+> 插眼模式挖掘、宏观策略推荐、Meta变迁追踪、协同克制矩阵、
+> 表现退化检测、时间线事件关联、历史教练引擎、风险评估、
+> 回放标注、跨区对比、Fiddler深度包分析、统一情报API网关、
+> 预测分析仪表盘等20个模块。
+> 每个模块900+行生产级代码，含独立域逻辑，为实时对战提供预测分析支撑。
+>
+> **核心命题**：M906-M925解决了"从哪里获取历史数据"，
+> M926-M945解决"如何用历史数据做预测和决策"——
+> 将原始数据变换为可操作的情报（ban/pick建议、胜率预测、教练反馈、风险评估）。
+>
+> **Fiddler深度包分析（M943）**：不止捕获API调用，
+> 还从LCU/SGP响应体中提取隐藏字段（MMR估算、行为评分、provisionalGamesRemaining），
+> 这些数据在标准API文档中未公开，是逆向工程的核心产出。
+>
+> **技术架构**：
+> - 每个模块独立域逻辑：ReplayTimeline解析分钟级快照+转折点识别，
+>   DraftPhase实时WebSocket监听，BanPick多因子评分，
+>   RuneBuild按对线对手动态调整，CounterPick个人精通度加权，
+>   GameOutcome赛前预测+赛中动态更新，PowerSpike等级/装备节点检测，
+>   WardPlacement视野热区覆盖率，MacroStrategy分推/团战推荐，
+>   MetaShift跨版本趋势，SynergyCounter英雄组合矩阵，
+>   PerformanceDegradation KDA/CS衰减告警，
+>   TimelineEvent因果链发现，HistoricalCoaching个性化建议+语音，
+>   RiskAssessment gank/目标风险评分，ReplayAnnotation自动标注，
+>   CrossRegion多区风格对比，FiddlerDeep隐藏字段提取，
+>   UnifiedGateway RESTful聚合，PredictiveDashboard HTML+语音报告
+> - 统一 AnalysisResult + ConfidenceLevel + PriorityLevel 输出格式
+> - 线程安全 AnalysisCache (LRU+TTL+RLock)
+> - StatisticalHelper: Wilson score / 指数衰减 / 余弦相似度 / 趋势斜率
+> - ConnectorProtocol 鸭子类型桥接 M906 SeraphineConnectorBridge
+> - retry + 指数退避 数据获取管道
+
+### 模块列表
+
+| # | ID | Module | Dir | Lines | Deps | Description |
+|---|-----|--------|-----|-------|------|-------------|
+| 1 | M926 | ReplayTimelineAnalyzer | replay_timeline_analyzer | 986 | M906,M908,M938 | 回放时间线深度分析 — replay事件提取+分钟级快照+转折点识别+金币曲线 |
+| 2 | M927 | DraftPhaseIntelligence | draft_phase_intelligence | 958 | M906,M910,M911,M928 | 选英雄阶段智能辅助 — champ select WebSocket实时监听+禁选建议+阵容评估 |
+| 3 | M928 | BanPickRecommendationEngine | ban_pick_recommendation_engine | 944 | M906,M911,M915,M930 | 禁选推荐引擎 — meta_strength*opponent_mastery*counter_value多因子评分 |
+| 4 | M929 | RuneBuildOptimizer | rune_build_optimizer | 941 | M906,M908,M915 | 符文出装优化器 — 按对线对手动态调整+出装路线对比+胜率delta |
+| 5 | M930 | CounterPickSuggestionEngine | counter_pick_suggestion_engine | 922 | M906,M911,M915,M936 | 克制英雄推荐 — 胜率矩阵+个人精通度0.6/0.4加权+matchup评估 |
+| 6 | M931 | GameOutcomePredictor | game_outcome_predictor | 924 | M906,M910,M913,M915,M936 | 对局结果预测 — 赛前胜率预测+赛中gold_diff动态更新+时间权重 |
+| 7 | M932 | PowerSpikeDetector | power_spike_detector | 936 | M906,M908,M929 | 强势期检测 — 等级/装备节点+对线窗口对比+spike_strength评分 |
+| 8 | M933 | WardPlacementPatternAnalyzer | ward_placement_pattern_analyzer | 947 | M906,M908,M926 | 插眼模式分析 — 8大视野热区覆盖率+role/时间预测+ward_kill统计 |
+| 9 | M934 | MacroStrategyRecommender | macro_strategy_recommender | 941 | M906,M917,M918,M932 | 宏观策略推荐 — 6策略模板(split/teamfight/pick/poke/aggro/scale)+目标优先级 |
+| 10 | M935 | MetaShiftTracker | meta_shift_tracker | 909 | M906,M908,M921 | Meta变迁追踪 — 跨版本pick/ban/win趋势斜率+emerging picks检测 |
+| 11 | M936 | SynergyCounterMatrix | synergy_counter_matrix | 910 | M906,M908,M915 | 协同克制矩阵 — 英雄对英雄+组合synergy评分+Wilson下界筛选 |
+| 12 | M937 | PerformanceDegradationDetector | performance_degradation_detector | 921 | M906,M908,M912,M916 | 表现退化检测 — KDA/CS/WR slope告警+baseline对比+degradation阈值 |
+| 13 | M938 | TimelineEventCorrelator | timeline_event_correlator | 924 | M906,M908,M926 | 时间线事件关联 — 因果链发现(kill→tower→dragon 90s/120s窗口)+impact计算 |
+| 14 | M939 | HistoricalCoachingEngine | historical_coaching_engine | 936 | M906,M910,M916,M937 | 历史教练引擎 — 个性化改进建议+ABCDF评级+语音TTS简报生成 |
+| 15 | M940 | RiskAssessmentEngine | risk_assessment_engine | 926 | M906,M917,M933,M938 | 风险评估引擎 — gank概率(ward+jg_unseen)+目标success_probability评分 |
+| 16 | M941 | ReplayAnnotationEngine | replay_annotation_engine | 936 | M906,M926,M938,M939 | 回放标注引擎 — 自动分类mistake/good_play/decision+importance评分+报告 |
+| 17 | M942 | CrossRegionComparator | cross_region_comparator | 912 | M906,M908,M923 | 跨区对比分析 — 16大区pick/win/ban率对比+区域风格分类 |
+| 18 | M943 | FiddlerDeepPacketAnalyzer | fiddler_deep_packet_analyzer | 937 | M906,M919 | Fiddler深度包分析 — LCU/SGP隐藏字段提取(MMR/行为评分)+traffic分类 |
+| 19 | M944 | UnifiedIntelligenceGateway | unified_intelligence_gateway | 923 | M906,M914,M922,M925 | 统一情报API网关 — 模块注册/查询+full_pregame_intel聚合 |
+| 20 | M945 | PredictiveAnalyticsDashboard | predictive_analytics_dashboard | 932 | M906,M925,M931,M944 | 预测分析仪表盘 — HTML报告+TTS简报+threat告警聚合 |
+
+### 文件清单（90文件）
+
+位置：`M926-M945/`
+
+每个模块4个文件：`__init__.py`, `config.json`, `README.md`, `{module}.py`(900+行)
+
+根目录文件：
+- `__init__.py` — 包初始化
+- `conftest.py` — pytest配置
+- `requirements.txt` — 依赖声明
+- `Makefile` — test/lint/format/clean
+- `run_all_tests.py` — 测试运行器
+- `generate_all_modules.py` — 模块生成器
+- `generation_summary.json` — 生成摘要
+- `logging_system.py` — 日志系统
+- `logs/M926-M945.log` — 运行日志
+- `logs/M926-M945_diagnostic_report.json` — 诊断报告
+
+### 模板化架构模式
+
+查看 Seraphine/app/lol/connector.py 上现有 LCU API connector 的实现方式,
+理解其模式, 特别是 retry 装饰器和 PastRequest 是如何与 HTTP session 分离的。
+从 M906 SeraphineConnectorBridge 的 retry + PastRequest 这个好例子开始。
+然后, 遵循该模式实现 ReplayTimelineAnalyzer (M926),
+让 operatorRL 可以解析 replay timeline 分钟级快照, 并能识别转折点。
+接着 DraftPhaseIntelligence (M927) 引入 champ select WebSocket 实时监听,
+使 BanPickRecommendationEngine (M928) 能够多因子评分推荐,
+同时 RuneBuildOptimizer (M929) 优化符文出装路线。
+随后 CounterPickSuggestionEngine (M930) 整合胜率矩阵+精通度加权,
+令 GameOutcomePredictor (M931) 支持赛前+赛中动态预测,
+进而 PowerSpikeDetector (M932) 增强等级/装备强势期检测。
+WardPlacementPatternAnalyzer (M933) 挖掘视野热区覆盖模式,
+MacroStrategyRecommender (M934) 推荐分推/团战/入侵策略。
+MetaShiftTracker (M935) 追踪跨版本 Meta 变迁趋势,
+SynergyCounterMatrix (M936) 构建英雄组合协同/克制评分矩阵,
+PerformanceDegradationDetector (M937) 检测KDA/CS衰减告警,
+TimelineEventCorrelator (M938) 发现事件因果链。
+HistoricalCoachingEngine (M939) 生成个性化教练建议+语音简报,
+RiskAssessmentEngine (M940) 评估gank和目标风险,
+ReplayAnnotationEngine (M941) 自动标注回放关键时刻。
+CrossRegionComparator (M942) 跨16大区风格对比,
+FiddlerDeepPacketAnalyzer (M943) 从网络包提取隐藏数据。
+最终 UnifiedIntelligenceGateway (M944) 聚合所有模块API,
+PredictiveAnalyticsDashboard (M945) 完善HTML+语音报告输出,
+确保全部模块兼容 M906-M925 历史情报层 + M866-M885 实时系统,
+全面升级预测分析层以达成赛前+赛中AI辅助决策目标。
+
+### 数据流
+
+```
+M906-M925 Historical Intelligence Layer
+       |
+       v
+ReplayTimelineAnalyzer(M926) → TimelineEventCorrelator(M938) → ReplayAnnotationEngine(M941)
+       |
+DraftPhaseIntelligence(M927) ←→ BanPickRecommendationEngine(M928) ←→ CounterPickSuggestionEngine(M930)
+       |                                    |
+RuneBuildOptimizer(M929)        SynergyCounterMatrix(M936) → MetaShiftTracker(M935)
+       |
+GameOutcomePredictor(M931) ←→ PowerSpikeDetector(M932) ←→ MacroStrategyRecommender(M934)
+       |                                    |
+WardPlacementPatternAnalyzer(M933) → RiskAssessmentEngine(M940)
+       |
+PerformanceDegradationDetector(M937) → HistoricalCoachingEngine(M939)
+       |
+CrossRegionComparator(M942) → FiddlerDeepPacketAnalyzer(M943)
+       |
+       v
+UnifiedIntelligenceGateway(M944) → PredictiveAnalyticsDashboard(M945)
+       |
+       v
+HTML Report / Voice TTS Briefing / WebSocket Real-Time Push
+```
+
+### 用户角度批判
+
+1. **DraftPhase建议延迟** — M927 依赖M910/M911分析，首次查询可能2-3秒，用户在ban/pick阶段需要亚秒响应。解决：M927 预缓存高频对手数据，WebSocket事件触发后只查cache。
+2. **GameOutcome过度自信** — M931赛前预测如果给出"80%胜率"可能导致玩家松懈。解决：UI层显示置信区间，低样本量时标注"仅供参考"。
+3. **CoachingEngine建议太泛** — M939可能输出"提高CS"这种无意义建议。解决：每条tip附带具体target值和练习方法。
+4. **PowerSpike静态DB** — M932的SPIKE_DB是硬编码的，版本更新后可能不准。解决：从M935 MetaShiftTracker拉取最新数据。
+5. **RiskAssessment假阴性** — M940如果jungle_unseen_duration阈值不当可能漏报gank。解决：与M933 ward_coverage联动，无视野时自动提升risk。
+6. **ReplayAnnotation过度标注** — M941每个击杀都标注会导致信息过载。解决：importance < 0.5的事件折叠，只展示高importance标注。
+7. **CrossRegion数据延迟** — M942依赖SGP多区查询，某些区可能超时。解决：per-region超时独立处理，部分失败仍返回可用数据。
+
+### 系统角度批判
+
+1. **模块间循环依赖** — M928依赖M930，M930依赖M936，M928也依赖M936，需确保初始化顺序正确。解决：UnifiedGateway(M944)管理模块依赖图的拓扑排序初始化。
+2. **Cache一致性** — 20个模块各自维护AnalysisCache实例，同一puuid的数据可能在不同cache中版本不同。解决：共享cache实例或使用M924 HistoricalDataCache作为统一缓存层。
+3. **asyncio.Lock粒度** — 每个模块持有自己的asyncio.Lock，高并发时不会互相阻塞，但模块内部只有单一锁可能成为瓶颈。解决：分离initialize锁和analyze锁。
+4. **StatisticalHelper无状态** — 所有模块实例化自己的StatisticalHelper（纯静态方法），这没问题但可以改为模块级单例减少内存。
+5. **FiddlerDeepPacket的SSL** — M943解析Fiddler流量需要Fiddler的HTTPS解密功能开启，Proxifier配置需正确路由游戏进程。建议：启动时检测Fiddler证书安装状态。
+6. **UnifiedGateway注册表内存** — M944持有所有模块引用，如果模块析构但引用未清除会导致内存泄漏。解决：使用weakref。
+7. **HTML报告XSS** — M945 generate_html_report直接拼接数据到HTML，如果数据含恶意内容可能XSS。解决：html.escape()所有用户可控字段。
+
+### 总计统计
+
+| 指标 | 值 |
+|---|---|
+| 模块数 | 20 |
+| Python文件 | 45 |
+| 总文件数 | 90 |
+| 代码总行数 | 18,665+ |
+| 平均每模块行数 | 933 |
+| 最大模块 | M926 ReplayTimelineAnalyzer (986行) |
+| 最小模块 | M935 MetaShiftTracker (909行) |
+| 语法错误 | 0 |
+| 域逻辑方法数 | 60+ (每模块3-5个独立域方法) |

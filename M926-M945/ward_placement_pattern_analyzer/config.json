@@ -1,0 +1,19 @@
+{
+  "module_id": "M933",
+  "module_name": "WardPlacementPatternAnalyzer",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M908",
+    "M926"
+  ],
+  "description": "插眼模式分析 — 从历史timeline数据挖掘对手视野控制习惯,预测插眼位置和时机"
+}

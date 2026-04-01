@@ -1,0 +1,19 @@
+{
+  "module_id": "M929",
+  "module_name": "RuneBuildOptimizer",
+  "version": "1.0.0",
+  "cache_ttl": 300,
+  "max_entries": 10000,
+  "batch_size": 50,
+  "confidence_threshold": 0.6,
+  "min_sample_size": 5,
+  "retry_count": 5,
+  "connection_timeout": 30.0,
+  "read_timeout": 60.0,
+  "dependencies": [
+    "M906",
+    "M908",
+    "M915"
+  ],
+  "description": "符文出装优化器 — 从历史对局数据统计最优符文/出装路线,按对线对手动态调整"
+}
