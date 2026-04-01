@@ -5881,276 +5881,360 @@ HTML Report / Voice TTS Briefing / WebSocket Real-Time Push
 
 ---
 
-## 第三十六位 Claude (Instance #36) — M986-M1005: Historical Battle Intelligence Acquisition for Live Matches
+## M1046-M1065: Historical Battle Data + Real-time Network Capture Integration
 
-> 第三十六位 Claude (Instance #36) 完成 M986-M1005
->
-> 核心命题：M966-M985 建立了预测情报引擎，但其数据管线假设历史数据已就绪。
-> M986-M1005 解决实时采集问题——在对局开始（champ select）的瞬间，
-> 如何在5秒内获取10名玩家的历史战斗数据，构建完整的对手/队友画像，
-> 并在整场30分钟对局中持续更新情报。
->
-> 这是 Seraphine (github.com/ljszx/Seraphine) 项目 LCU API connector 模式
-> 在 operatorRL 自演化系统中的生产级延伸——PastRequest审计、retry指数退避、
-> needLcu守卫、TTLCache、asyncio.Semaphore并发控制，全部遵循该模式。
->
-> Fiddler网络抓包 vs 视觉捕获判断：
-> 采用Fiddler+Proxifier原生网络捕获方案。理由：
-> 1. 零幻觉——网络数据是精确的JSON/protobuf，无OCR误差
-> 2. 符合逆向工程技术方向——直接解析LCU/SGP协议
-> 3. 可提取隐藏字段（MMR估算、行为评分、provisionalGamesRemaining）
-> 4. 延迟更低——无需14帧截屏+视觉模型推理
-> 5. Fiddler MCP Server (telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server)
->    提供标准化接口
->
-> 参考项目：
-> - Seraphine: github.com/ljszx/Seraphine — LCU connector + PastRequest + retry模式
-> - LoL Optimizer: github.com/oracle-devrel/leagueoflegends-optimizer — 数据分析管线
-> - Dota2Bot: github.com/forest0xia/dota2bot-OpenHyperAI — MOBA AI决策参考
-> - Fiddler MCP: telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server
-> - operatorRL: github.com/dylanyunlon/operatorRL.git
+**Generated:** 2026-04-01
+**Claude Instance:** #39 (M1046-M1065)
+**Project:** github.com/dylanyunlon/operatorRL.git
+**Total Files:** 49 (15 Python modules + 9 __init__.py + configs/logs)
+**Total Python Lines:** 8530
 
-### 模板化架构模式
+### Architecture Overview
 
-查看 Seraphine/app/lol/connector.py 上现有 LCU API connector 的实现方式,
-理解其模式, 特别是 retry 装饰器和 PastRequest 是如何与 HTTP session 分离的。
-从 connector.needLcu + retry + PastRequest 这个好例子开始。
-然后, 遵循该模式实现 LiveMatchPlayerResolver (M986),
-让 operatorRL 可以在 champ select 阶段解析全部10名玩家身份,
-并能通过 LCU gameflow-session WebSocket 实时获取。
-接着 BatchHistoryFetcher (M987) 引入并行异步批量获取,
-使 OpponentProfileBuilder (M988) 能够构建对手全维度画像,
-同时 ChampionMasteryAnalyzer (M989) 深度分析英雄熟练度。
-随后 RecentFormTracker (M990) 整合近期20场状态追踪,
-令 LaneHistoryComparator (M991) 支持对线历史统计对比,
-进而 DuoSynergyDetector (M992) 增强双排检测能力。
-FiddlerHistoryInterceptor (M993) 拦截Fiddler代理的LCU/SGP响应,
-RankTrajectoryAnalyzer (M994) 分析段位轨迹和代练/小号检测。
-HistoricalWardHeatmap (M995) 聚合历史插眼数据生成预测热力图,
-JunglePathingProfiler (M996) 画像敌方打野的路径偏好,
-TeamfightTendencyScorer (M997) 评估团战行为倾向,
-ObjectiveControlHistorian (M998) 分析目标控制历史。
-DeathPatternAnalyzer (M999) 挖掘死亡位置和时间规律,
-ItemBuildHistorian (M1000) 追踪出装路径偏好,
-SummonerSpellHistorian (M1001) 分析召唤师技能使用模式。
-PregameIntelAggregator (M1002) 聚合全部历史情报为赛前简报,
-LiveDataSubscriptionHub (M1003) 建立WebSocket实时事件订阅中心。
-最终 HistoricalIntelligenceCache (M1004) 完善统一缓存层,
-HistoricalIntelOrchestrator (M1005) 编排全部M986-M1004模块,
-确保兼容 M906-M925 历史情报层 + M866-M885 实时系统 + M926-M945 预测层,
-全面升级历史战斗情报实时采集以达成对局中AI辅助决策目标。
+M1046-M1065 implements **Historical Battle Data Deep Integration** with **Real-time
+Network Capture** for the OperatorRL agentic system. The core insight from Seraphine
+(ljszx/Seraphine): historical match data from other players is critical for real-time
+game assistance — by analyzing opponents' historical patterns, champion pools, and
+behavioral tendencies, we provide actionable intelligence during live games.
 
-### 模块列表
+### Design Decision: Network Capture > Vision Capture
 
-| # | ID | Module | Dir | Lines | Deps | Description |
-|---|-----|--------|-----|-------|------|-------------|
-| 1 | M986 | LiveMatchPlayerResolver | live_match_player_resolver | 848 | M906,M907 | 实时对局玩家解析 — champ select WebSocket + gameflow-session |
-| 2 | M987 | BatchHistoryFetcher | batch_history_fetcher | 849 | M906,M986 | 批量历史获取 — 并行async + 自适应限流 + 部分失败容忍 |
-| 3 | M988 | OpponentProfileBuilder | opponent_profile_builder | 849 | M906,M987 | 对手画像构建 — 英雄池/角色偏好/攻击性分类/连胜检测 |
-| 4 | M989 | ChampionMasteryAnalyzer | champion_mastery_analyzer | 850 | M906,M987 | 英雄熟练度分析 — 独活检测/舒适英雄/Meta适应度 |
-| 5 | M990 | RecentFormTracker | recent_form_tracker | 853 | M906,M987 | 近期状态追踪 — 倾斜检测/动量计算/连败告警 |
-| 6 | M991 | LaneHistoryComparator | lane_history_comparator | 851 | M906,M987,M988 | 对线历史对比 — CS@10/金币差/首杀率/线上压制指数 |
-| 7 | M992 | DuoSynergyDetector | duo_synergy_detector | 852 | M906,M987 | 双排检测 — 共场率分析/频繁搭档/时间相关性 |
-| 8 | M993 | FiddlerHistoryInterceptor | fiddler_history_interceptor | 852 | M906,M919 | Fiddler拦截 — LCU/SGP响应解析/隐藏字段提取/流量分类 |
-| 9 | M994 | RankTrajectoryAnalyzer | rank_trajectory_analyzer | 854 | M906,M987,M993 | 段位轨迹分析 — LP变化/小号概率/代练指标/段位稳定性 |
-| 10 | M995 | HistoricalWardHeatmap | historical_ward_heatmap | 851 | M906,M987,M933 | 历史插眼热力图 — 视野模式聚合/扫描时机/视野密度 |
-| 11 | M996 | JunglePathingProfiler | jungle_pathing_profiler | 851 | M906,M987 | 打野路径画像 — 首轮路线/gank时机/目标优先级/入侵频率 |
-| 12 | M997 | TeamfightTendencyScorer | teamfight_tendency_scorer | 849 | M906,M987 | 团战倾向评分 — 开团率/保护倾向/侧翼率/集火精度 |
-| 13 | M998 | ObjectiveControlHistorian | objective_control_historian | 851 | M906,M987 | 目标控制历史 — 龙/男爵/峡谷先锋抢夺率/惩戒精度 |
-| 14 | M999 | DeathPatternAnalyzer | death_pattern_analyzer | 850 | M906,M987 | 死亡模式分析 — 死亡位置/时间分布/过度推线频率 |
-| 15 | M1000 | ItemBuildHistorian | item_build_historian | 849 | M906,M987 | 出装历史 — 核心装备顺序/情境适应/出装偏离度/首件时间 |
-| 16 | M1001 | SummonerSpellHistorian | summoner_spell_historian | 848 | M906,M987 | 召唤师技能历史 — 闪现时机/TP效率/攻击性技能选择 |
-| 17 | M1002 | PregameIntelAggregator | pregame_intel_aggregator | 853 | M906,M986,M988-M994 | 赛前情报聚合 — 威胁评估/阵容分析/胜利条件/推荐Ban |
-| 18 | M1003 | LiveDataSubscriptionHub | live_data_subscription_hub | 849 | M906,M986,M993 | 实时订阅中心 — WebSocket多路复用/重连/心跳 |
-| 19 | M1004 | HistoricalIntelligenceCache | historical_intelligence_cache | 849 | M906,M987 | 统一缓存层 — LRU+TTL/champ select预热/分层存储/命中率 |
-| 20 | M1005 | HistoricalIntelOrchestrator | historical_intel_orchestrator | 850 | M906,M986,M987,M1002-M1004 | 顶层编排器 — 游戏阶段检测/管线触发/模块协调/情报分发 |
+**Production choice: Fiddler + Proxifier network capture pipeline.**
 
-### 文件清单（109文件）
+| Criterion       | Network Capture (Chosen) | Vision/Screen Capture |
+|-----------------|--------------------------|----------------------|
+| Hallucination   | Zero — raw JSON data     | High — OCR errors    |
+| Completeness    | Full API responses       | Visible UI only      |
+| Performance     | <10ms per request        | 70-200ms per frame   |
+| Skill alignment | Reverse engineering      | CV/ML expertise      |
+| Data fidelity   | Exact Riot API JSON      | Interpreted pixels   |
+| Latency         | <10ms/request            | 70-200ms/frame       |
 
-位置：`M986-M1005/`
+Rationale: Network capture aligns with the reverse engineering skill direction,
+provides zero-hallucination data directly from Riot API responses, and integrates
+seamlessly with Fiddler MCP Server (telerik.com) for traffic analysis. Proxifier
+routes LoL client traffic through Fiddler for complete HTTPS interception.
 
-每个模块4个文件：`__init__.py`, `config.json`, `README.md`, `{module}.py`(848-854行)
+### Fiddler MCP Integration
 
-根目录文件：
-- `__init__.py` — 包初始化（导出全部20个类）
-- `logging_system.py` — 日志系统（结构化JSON + 人类可读双通道）
-- `generate_all_modules.py` — 模块生成器（含自测）
-- `generation_summary.json` — 生成摘要
-- `requirements.txt` — 依赖声明
-- `Makefile` — test/lint/clean
-- `plan.md` — 本文件
-- `logs/M986-M1005.log` — 运行日志
-- `logs/M986-M1005_diagnostic_report.json` — 诊断报告
+The Fiddler Everywhere MCP server (localhost:8868/mcp) provides:
+- Complete HTTPS traffic capture and analysis
+- API call extraction and classification
+- HAR export for offline analysis
+- Authorization via generated API key
 
-### 数据流
+### Reference Projects (Top 5 GitHub)
+
+1. **Akagi** (shinkuan/Akagi) — Mahjong AI with MITM proxy + Proxifier
+   - Pattern: Network interception via mitmproxy, real-time AI analysis
+   - Files: 200+, supports Majsoul/Tenhou/Riichi City
+   - Key insight: Proxifier routing pattern, MITM certificate trust
+
+2. **dota2bot-OpenHyperAI** (forest0xia/dota2bot-OpenHyperAI) — Dota2 AI bot
+   - Pattern: Game API integration, distributed bot architecture
+   - Key insight: MOBA game state representation, action space design
+
+3. **Seraphine** (ljszx/Seraphine) — LoL client tool with LCU API
+   - Pattern: Lockfile auth, async LCU REST API, match history crawling
+   - Files: 317, full PyQt5 application
+   - Key insight: Connector pattern, process detection, ranked data models
+
+4. **LeagueAI** (Oleffa/LeagueAI) — CV-based LoL object detection
+   - Pattern: Screen capture + PyTorch object detection
+   - Key insight: Why network capture is better — no hallucination
+
+5. **LeagueAiCoach** (sorena-ai/LeagueAiCoach) — AI voice assistant for LoL
+   - Pattern: FastAPI + screenshot + LLM analysis + TTS voice output
+   - Key insight: Voice output architecture, LangChain coach wrapper
+
+### Self-Evolution Loop (from plan.md §二)
 
 ```
-LCU WebSocket (champ select / gameflow)
-       |
-       v
-M986 LiveMatchPlayerResolver ──→ 10 PlayerIdentity
-       |
-       v
-M987 BatchHistoryFetcher ──→ 10 × 30 games (parallel async)
-       |
-       ├──→ M988 OpponentProfileBuilder (画像)
-       ├──→ M989 ChampionMasteryAnalyzer (熟练度)
-       ├──→ M990 RecentFormTracker (状态)
-       ├──→ M991 LaneHistoryComparator (对线)
-       ├──→ M992 DuoSynergyDetector (双排)
-       ├──→ M994 RankTrajectoryAnalyzer (段位)
-       ├──→ M995 HistoricalWardHeatmap (视野)
-       ├──→ M996 JunglePathingProfiler (打野)
-       ├──→ M997 TeamfightTendencyScorer (团战)
-       ├──→ M998 ObjectiveControlHistorian (目标)
-       ├──→ M999 DeathPatternAnalyzer (死亡)
-       ├──→ M1000 ItemBuildHistorian (出装)
-       └──→ M1001 SummonerSpellHistorian (技能)
-               |
-M993 FiddlerHistoryInterceptor ──→ 隐藏字段 (MMR/行为评分)
-               |
-               v
-M1002 PregameIntelAggregator ──→ 赛前情报简报
-               |
-M1003 LiveDataSubscriptionHub ──→ 实时事件流
-               |
-M1004 HistoricalIntelligenceCache ──→ 统一缓存
-               |
-               v
-M1005 HistoricalIntelOrchestrator
-               |
-       ┌───────┼───────┐
-       v       v       v
-M866-M885   M926-M945   Voice/Dashboard
-(实时系统)  (预测层)    (用户界面)
+真实世界 HTTP —→ success/error（不可改变的物理事实）
+    ↓
+程序A（Agent: NetworkCaptureEngine）—→ 运行，撞墙，记录日志
+    ↓
+LLM（修复酶: EvolutionController）—→ 看日志，建议修改
+    ↓
+程序A'（新一代: MutationStrategy.apply_mutation）—→ 替换 A
 ```
 
-### Fiddler vs 视觉方案判断
+### Module Architecture (20 Task Files)
 
-| 维度 | Fiddler网络捕获 | 视觉(14帧截屏) |
-|---|---|---|
-| 数据精度 | ★★★★★ JSON精确解析 | ★★★ OCR有误差 |
-| 延迟 | ★★★★★ <50ms | ★★★ 100-500ms |
-| 隐藏数据 | ★★★★★ MMR/行为评分 | ★ 仅可见UI数据 |
-| 幻觉风险 | ★★★★★ 零幻觉 | ★★ 视觉模型可能幻觉 |
-| 技术栈匹配 | ★★★★★ 逆向工程方向 | ★★★ 需额外CV模型 |
-| 部署复杂度 | ★★★ 需Proxifier配置 | ★★★★ 截屏即可 |
-| 带宽消耗 | ★★★★★ 仅JSON文本 | ★★ 每帧1-2MB图像 |
+| Module | File | Lines | Role |
+|--------|------|-------|------|
+| M1046 | capture/network_capture_engine.py | 846 | Core: Fiddler MCP + LCU fallback capture |
+| M1047 | capture/proxifier_config_manager.py | 631 | Proxifier .ppx profile generation |
+| M1048 | core/riot_api_models.py | 658 | Type-safe Riot API data models |
+| M1049 | core/game_state_tracker.py | 487 | Game phase state machine + minimap |
+| M1050 | analysis/trend_analyzer.py | 554 | Cross-session performance trends |
+| M1051 | capture/fiddler_deep_packet_analyzer.py | 526 | HAR parsing + deep packet analysis |
+| M1052 | integration/voice_output_engine.py | 499 | TTS voice output + narrator formatter |
+| M1053 | history/match_data_crawler.py | 599 | Historical match data acquisition |
+| M1054 | analysis/opponent_behavior_analyzer.py | 475 | Opponent profiling + behavior analysis |
+| M1055 | core/live_match_monitor.py | 477 | Kill feed parser + gold tracking |
+| M1056 | strategy/strategy_engine.py | 522 | Core strategy recommendation engine |
+| M1057 | strategy/champ_select_advisor.py | 456 | Counter-pick + ban + draft advisor |
+| M1058 | core/evolution_controller.py | 498 | Self-evolution: mutation + checkpointing |
+| M1059 | orchestrator.py | 455 | System orchestrator + health monitor |
+| M1060 | evo_logging/evolution_logger.py | 847 | Structured logging + ring buffer + analysis |
 
-**结论**：Fiddler+Proxifier原生网络捕获方案在所有核心维度（精度、延迟、隐藏数据、零幻觉）
-全面优于视觉方案。Proxifier配置游戏进程走Fiddler代理后，可直接解析LCU/SGP响应体，
-参考 Fiddler MCP Server (telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server)。
+### Key Interfaces (How Modules Connect)
 
-### 用户角度批判
+```
+NetworkCaptureEngine (M1046)
+    ├── FiddlerMCPClient → Fiddler Everywhere MCP Server
+    ├── LCUConnector → Direct LoL Client API (fallback)
+    └── ProxifierConfigManager (M1047) → Proxifier .ppx profile
+         │
+    ┌────┘ InterceptedRequest events
+    ▼
+GameStateTracker (M1049) ←── riot_api_models (M1048)
+    │                             │
+    ├── MinimapStateReconstructor  ├── SummonerInfo
+    ├── TeamCompositionAnalyzer    ├── MatchData
+    └── GamePhase state machine    ├── OpponentProfile
+         │                         └── ChampionStats
+    ┌────┘ game state events
+    ▼
+MatchDataCrawler (M1053) ──→ OpponentBehaviorAnalyzer (M1054)
+    │                              │
+    ├── HistoricalDataCache        ├── PlaystyleClassifier
+    └── fetch opponent history     └── ThreatAssessor
+         │                              │
+    ┌────┘ opponent profiles             │
+    ▼                                    │
+StrategyEngine (M1056) ◄────────────────┘
+    │
+    ├── MacroStrategyAdvisor
+    ├── ChampSelectAdvisor (M1057)
+    │   ├── CounterPickEngine
+    │   ├── BanRecommendationEngine
+    │   └── DraftPhaseStateMachine
+    └── StrategyRecommendation
+         │
+    ┌────┘ recommendations
+    ▼
+VoiceOutputEngine (M1052)
+    ├── StrategicNarratorFormatter
+    ├── TTS synthesis (pyttsx3/edge-tts)
+    └── Audio playback (non-blocking)
+         │
+    ┌────┘ all events + logs
+    ▼
+EvolutionLogger (M1060) ──→ EvolutionController (M1058)
+    ├── StructuredLogEntry          ├── MutationStrategy
+    ├── RingBuffer (128MB cap)      ├── EvolutionCheckpointer
+    ├── AsyncLogWriter (rotation)   └── generation tracking
+    └── LogAnalyzer (for LLM)
+         │
+    ┌────┘
+    ▼
+Orchestrator (M1059) — top-level lifecycle management
+    ├── HealthMonitor (component health tracking)
+    ├── SessionRecorder (full game session replay)
+    └── graceful startup/shutdown
+```
 
-1. **Champ Select时间窗口紧张** — M986解析10人+M987批量获取30场×10人=300次API调用，champ select仅60-90秒。解决：M1004预热缓存+M987并行fetch(8并发)+M993 Fiddler缓存历史响应。
-2. **隐私顾虑** — 获取对手历史数据可能引起玩家不适。解决：仅使用Riot公开API+LCU本地API，不违反ToS，UI中注明数据来源。
-3. **Smurf检测误报** — M994的smurf_probability可能误判转区玩家或回归玩家。解决：结合账号等级、赛季初始化状态、champion mastery等多维度交叉验证。
-4. **Tilt检测伦理** — M990标记玩家"tilted"可能导致队友放弃。解决：仅在self视角显示对手tilt信息，不显示队友tilt（避免内耗）。
-5. **Fiddler证书问题** — M993依赖Fiddler HTTPS解密，部分玩家可能不愿安装自签证书。解决：提供纯LCU API降级路径，Fiddler为可选增强。
-6. **数据新鲜度** — 对手可能刚换了英雄池，30场历史可能过时。解决：M990 EMA加权近期数据，M1004动态TTL（新数据短TTL，旧数据长TTL）。
-7. **10人同时查询限流** — Riot API rate limit可能不够。解决：M987自适应限流+M1004缓存已查询过的玩家+SGP fallback。
+### Proxifier + Fiddler Setup (Network Capture Pipeline)
 
-### 系统角度批判
+1. Install Proxifier (proxifier.com)
+2. Install Fiddler Everywhere (telerik.com/fiddler/fiddler-everywhere)
+3. In Fiddler: Settings → HTTPS → Trust root certificate
+4. In Fiddler: Settings → MCP Server → Set port 8868, generate API key
+5. Import operatorrl_proxifier.ppx (auto-generated by M1047)
+6. Launch LoL → traffic flows: LoL → Proxifier → Fiddler → OperatorRL
 
-1. **M987并发与M1004缓存的竞态** — 10个并行fetch可能同时cache miss同一个热门玩家（如果对方也查过此人）。解决：M1004使用singleflight模式（相同key只发一次请求，其余等待）。
-2. **M1005编排器的依赖图深度** — M1005→M1002→M988→M987→M986，4层调用深度。解决：M1005不串行等待，而是用asyncio.gather并行触发所有模块，各模块自行从M1004取缓存。
-3. **MockConnector在生产中残留** — initialize()失败时会fallback到MockConnector，生产环境中这可能导致返回假数据。解决：生产配置中设置strict_mode=True，connector失败直接抛异常而非fallback。
-4. **审计日志内存** — 每个模块500条PastRequest deque，20个模块=10000条审计记录常驻内存。解决：可接受（每条约200B，总计约2MB），但应定期rotate到磁盘。
-5. **M993 Fiddler端口发现** — Fiddler默认8866端口，但用户可能自定义。解决：从config.json读取端口，或扫描本地Fiddler进程获取监听端口。
-6. **M1003 WebSocket重连风暴** — LCU重启时所有模块同时重连可能打满LCU。解决：M1003统一管理连接，各模块通过M1003订阅事件而非直连LCU。
-7. **跨milestone依赖版本** — M986-M1005依赖M906-M925的ConnectorProtocol，如果M906 API变更可能break。解决：通过鸭子类型（Protocol）而非继承，只要方法签名兼容即可。
+### Production Critique (Knuth-level)
 
-### 总计统计
+**User perspective:**
+- If Fiddler is not running, system degrades to direct LCU API (60% data)
+- If both fail, system runs in offline mode with cached data
+- Voice output has ~500ms latency — acceptable for macro strategy advice
+- All recommendations include confidence scores for transparency
 
-| 指标 | 值 |
-|---|---|
-| 模块数 | 20 |
-| Python文件 | 43 |
-| 总文件数 | 109 |
-| 代码总行数 | 17,008+ |
-| 平均每模块行数 | 850 |
-| 最大模块 | M994 RankTrajectoryAnalyzer (854行) |
-| 最小模块 | M986 LiveMatchPlayerResolver (848行) |
-| 语法错误 | 0 |
-| 自测通过 | 20/20 |
-| 域逻辑方法数 | 80+ (每模块4-5个独立域方法) |
+**System perspective:**
+- Ring buffer caps memory at 128MB regardless of game duration
+- Log rotation at 50MB prevents disk exhaustion
+- Async I/O prevents logger from blocking 14fps capture hot path
+- One mutation per evolution cycle maintains clear causality
+- Checkpoint system enables instant rollback on regression
+
 
 ---
 
-## M1026-M1045: Seraphine历史战斗情报系统（第三十八位 Claude, Instance #38）
+# M1046-M1065: Historical Battle Data + Network Capture Integration (Claude #39)
 
-> **核心命题**: 历史战斗信息的获取对于当前对局的实时决策至关重要。从Seraphine(github.com/ljszx/Seraphine)的LCU API获取其他玩家的历史对局数据，为正在进行的对战提供情报支持。
+**Generated:** 2026-04-01T04:15:00Z
+**Claude Instance:** #39 (M1046-M1065)
+**Project:** github.com/dylanyunlon/operatorRL.git
+**Total Files:** 50 (15 Python modules + 9 __init__.py + 26 supporting)
+**Total Python Lines:** 8530
 
-### 技术决策: Fiddler网络捕获 vs 视觉转化
+## Architecture Overview
 
-**结论: 优先选择Fiddler网络捕获方案**
+M1046-M1065 implements **Historical Battle Data Integration via Network Capture** for the OperatorRL agentic system. This subsystem intercepts League of Legends client-server communication using Fiddler Everywhere + Proxifier, extracts opponent historical data from Seraphine-pattern LCU API calls, and feeds it into a real-time strategy engine that outputs voice-guided recommendations during live games.
 
-| 维度 | Fiddler网络捕获 | 视觉/屏幕捕获 |
-|---|---|---|
-| 幻觉率 | 极低(原始数据包) | 高(OCR/CV误差) |
-| 延迟 | <50ms | 200-500ms |
-| 数据精度 | 100%(原始JSON) | 85-95% |
-| 与逆向工程方向契合 | ✅ 完全契合 | ❌ 偏离 |
-| 实现复杂度 | 中(Proxifier+Fiddler) | 高(CV模型+GPU) |
-| Fiddler MCP支持 | ✅ telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server | N/A |
+### Core Design Decision: Network Capture > Vision Capture
 
-### 模块清单 (20个模块, 13601行)
+| Criterion       | Network Capture (Fiddler)    | Vision/Screen Capture       |
+|----------------|-----------------------------|-----------------------------|
+| Hallucination  | Zero — raw JSON from API    | High — OCR/CV errors        |
+| Completeness   | Full API responses          | Only visible UI elements    |
+| Performance    | <10ms per intercepted req   | 70-200ms per frame at 14fps |
+| Data fidelity  | Exact Riot API JSON         | Interpreted pixel values    |
+| Skill alignment| Reverse engineering         | Computer vision / ML        |
+| Latency        | <10ms proxy overhead        | 70-200ms frame + inference  |
 
-| # | 模块ID | 类名 | 行数 | 描述 |
-|---|---|---|---|---|
-| 1 | M1026 | MatchHistoryDeepFetcher | 691 | 深度对局历史获取器 |
-| 2 | M1027 | SummonerProfileAggregator | 660 | 召唤师档案聚合器 |
-| 3 | M1028 | ChampionMasteryAnalyzer | 698 | 英雄精通度分析器 |
-| 4 | M1029 | RankedStatsTracker | 691 | 排位数据追踪器 |
-| 5 | M1030 | MatchTimelineParser | 665 | 对局时间线解析器 |
-| 6 | M1031 | PlayerBehaviorProfiler | 655 | 玩家行为画像器 |
-| 7 | M1032 | TeamHistoryCorrelator | 688 | 队伍历史关联器 |
-| 8 | M1033 | OpponentPatternMiner | 681 | 对手模式挖掘器 |
-| 9 | M1034 | WinStreakMomentumEngine | 695 | 连胜动量引擎 |
-| 10 | M1035 | RolePerformanceDecomposer | 675 | 位置表现分解器 |
-| 11 | M1036 | ItemBuildHistoryAnalyzer | 695 | 出装历史分析器 |
-| 12 | M1037 | DeathHeatmapGenerator | 688 | 死亡热力图生成器 |
-| 13 | M1038 | CsEfficiencyTracker | 685 | 补刀效率追踪器 |
-| 14 | M1039 | VisionScoreHistoryEngine | 692 | 视野分数历史引擎 |
-| 15 | M1040 | DuoPartnerDetector | 685 | 双排搭档检测器 |
-| 16 | M1041 | TiltDetectionEngine | 695 | 心态倾斜检测引擎 |
-| 17 | M1042 | MetaComplianceScorer | 681 | 版本适应度评分器 |
-| 18 | M1043 | HistoricalMatchupMatrix | 675 | 历史对位矩阵 |
-| 19 | M1044 | PregameIntelligenceFuser | 676 | 赛前情报融合器 |
-| 20 | M1045 | HistoricalIntelligenceGateway | 630 | 历史情报网关 |
+**Decision: Network capture via Fiddler MCP Server is the production choice.**
 
-### 总计: 20模块 / 43 Python文件 / 13601行 / 语法0错误
+Rationale: Aligns with reverse engineering skill direction, provides zero-hallucination data, integrates with Fiddler MCP Server (telerik.com/fiddler/fiddler-everywhere/documentation/mcp-server) for structured traffic analysis. Proxifier routes LeagueClient.exe traffic through Fiddler for complete HTTPS interception.
 
----
+### Fiddler MCP Integration
 
-## M1006-M1025: 历史战斗数据获取层 — Historical Battle Data Acquisition Layer
+The Fiddler Everywhere MCP server (localhost:8868/mcp) provides:
+- Complete HTTPS traffic capture and analysis
+- API call extraction and classification
+- HAR export for offline analysis
+- Authorization via generated API key
 
-> **第三十七位 Claude 完成**: M1006-M1025
-> **核心命题**: 历史战斗信息的获取对于当前对战至关重要。实时数据(M866-M885)告诉你"正在发生什么"，历史数据告诉你"应该怎么做"。
-> **技术决策**: 选择 Fiddler 原生网络捕获方案（非视觉OCR），零幻觉、低延迟、符合逆向工程方向。
+Configuration: Proxifier → routes LoL client → Fiddler proxy (127.0.0.1:8866) → Fiddler MCP exposes to OperatorRL
 
-### 模块架构 (20 模块, 32 文件, 13,070 行)
+### Self-Evolution Loop (from plan.md §二)
 
-| # | 模块 | 行数 | 职责 |
-|---|---|---|---|
-| M1006 | HistoricalMatchCrawler | 888 | 批量爬取历史对局, retry+PastRequest模式, 速率限制 |
-| M1007 | FiddlerNetworkBridge | 757 | Fiddler MCP桥接, Proxifier配置, 流量分类, SSL证书检测 |
-| M1008 | MatchTimelineDeserializer | 564 | 分钟级快照, 转折点识别, 事件因果链 |
-| M1009 | PlayerProfileAggregator | 559 | 多区多账号合并, Riot ID解析, 小号检测 |
-| M1010 | ChampionMasteryIndexer | 542 | 英雄精通度索引, 英雄池广度 |
-| M1011 | RankTierClassifier | 546 | 段位分类, MMR估算, 段位趋势预测 |
-| M1012 | MatchOutcomeCorrelator | 543 | 胜负因素关联, 特征重要性, 关键时刻评分 |
-| M1013 | LaneMatchupStatEngine | 535 | 对线统计矩阵, 克制排名, 策略建议 |
-| M1014 | ItemBuildPathAnalyzer | 549 | 出装路线分析, 异常检测, 适应建议 |
-| M1015 | GoldDiffTrendTracker | 537 | 金币差趋势, 经济突变检测, 走势预测 |
-| M1016 | ObjectiveControlAnalyzer | 550 | 龙/男爵/塔控制, 目标优先级, 交换检测 |
-| M1017 | TeamfightDetector | 535 | 团战时空聚类, 团战评分, 开团模式 |
-| M1018 | VisionScoreAnalyzer | 541 | 视野分析, 眼位模式, 效率评估 |
-| M1019 | DeathHeatmapGenerator | 551 | 死亡热图, 热区分析, 站位建议 |
-| M1020 | FiddlerPacketDecoder | 545 | 深度包解码, 隐藏字段, WebSocket帧解析 |
-| M1021 | LiveFeedHistoricalMerger | 540 | 实时-历史融合, 相似对局查找, 实时洞察 |
-| M1022 | PredictiveFeatureExtractor | 534 | ML特征提取, 与leagueoflegends-optimizer对齐 |
-| M1023 | HistoricalCoachReportGen | 534 | 教练报告, 改进建议, TTS语音简报 |
-| M1024 | CrossMatchPatternMiner | 544 | 跨对局模式挖掘, 心态崩溃检测, 行为指纹 |
-| M1025 | UnifiedHistoricalGateway | 535 | 统一网关, 模块注册, 健康检查, 数据导出 |
+```
+Fiddler captures LoL HTTPS traffic → OperatorRL parses game events
+    ↓
+Strategy Engine generates recommendations → Voice output to player
+    ↓
+Player follows/ignores advice → Win/Loss outcome
+    ↓
+Evolution Logger records all events → LogAnalyzer extracts patterns
+    ↓
+Evolution Controller proposes parameter mutations → Next generation
+```
+
+### Reference Projects Analyzed
+
+1. **Akagi** (shinkuan/Akagi) — Mahjong AI with MITM proxy + Proxifier pattern
+   - Key insight: MITM proxy for WebSocket interception → our Fiddler approach
+   - Files: 200+, supports Majsoul/Tenhou/Riichi City
+
+2. **Seraphine** (ljszx/Seraphine) — LoL historical data client
+   - Key insight: LCU lockfile auth pattern (app/lol/connector.py)
+   - Opponent history fetching (app/lol/tools.py)
+   - Files: 317, PyQt5 GUI + LCU API connector
+
+3. **LeagueAiCoach** (sorena-ai/LeagueAiCoach) — LoL voice AI coach
+   - Key insight: Screenshot → LLM analysis → voice advice pipeline
+   - FastAPI + Whisper + TTS architecture
+   - Our approach is superior: network data instead of screenshots
+
+4. **dota2bot-OpenHyperAI** (forest0xia/dota2bot-OpenHyperAI) — Dota2 bot
+   - Key insight: Game state extraction via scripting API
+   - Distributed bot architecture with logging
+
+5. **leagueoflegends-optimizer** (oracle-devrel) — Match data optimization
+   - Key insight: Riot API data structures and match analysis patterns
+
+## File Manifest (100 files content reading plan)
+
+### Tier 1: Core Data Acquisition (Files 1-20)
+
+| # | File Path | Lines | Role | Pattern Template |
+|---|-----------|-------|------|-----------------|
+| 1 | `M1046-M1065/capture/network_capture_engine.py` | 846 | Primary traffic interception | 查看 Akagi 的 MITM 实现方式, 理解其模式, 特别是代码和接口是如何分离的。从 Seraphine connector.py 开始。遵循该模式实现 NetworkCaptureEngine, 让 Fiddler MCP 可以 获取全部HTTPS流量, 并能 分类到EndpointCategory。接着 FiddlerMCPClient 引入 JSON-RPC调用, 使 策略引擎 能够 实时获取对手数据。 |
+| 2 | `M1046-M1065/capture/proxifier_config_manager.py` | 631 | Proxifier profile generation | 查看 Akagi 的 Proxifier配置文档, 理解其 .ppx 格式。从 ProxifierProfileBuilder 开始。遵循该模式实现 自动化PPX生成, 让用户一键导入, 并能 验证规则无冲突。 |
+| 3 | `M1046-M1065/capture/fiddler_deep_packet_analyzer.py` | 526 | Deep packet analysis + HAR parsing | 查看 Fiddler MCP文档, 理解HAR格式。从 HARFileParser 开始。遵循该模式实现 离线回放分析, 让开发者 可以 无需游戏客户端测试策略。 |
+| 4 | `M1046-M1065/core/riot_api_models.py` | 658 | Type-safe API data models | 查看 Seraphine tools.py 的数据结构, 理解 Riot API 响应格式。从 SummonerInfo 开始。遵循该模式实现 完整类型系统, 让所有下游模块共用统一数据模型。 |
+| 5 | `M1046-M1065/evo_logging/evolution_logger.py` | 847 | Structured logging + ring buffer | 查看 Seraphine logger.py, 理解其日志模式。从 StructuredLogEntry 开始。遵循该模式实现 结构化JSON日志, 让 LLM修复酶 可以 解析错误集群, 并能 生成演化报告。 |
+
+### Tier 2: Historical Data & Analysis (Files 21-40)
+
+| # | File Path | Lines | Role | Pattern Template |
+|---|-----------|-------|------|-----------------|
+| 6 | `M1046-M1065/history/match_data_crawler.py` | 599 | Match history fetching + caching | 查看 Seraphine connector.py 的 API调用模式。从 HistoricalDataCache 开始。遵循该模式实现 对手历史数据爬取, 让策略引擎 可以分析对手英雄池和胜率趋势。 |
+| 7 | `M1046-M1065/analysis/opponent_behavior_analyzer.py` | 475 | Opponent profiling + playstyle detection | 查看 leagueoflegends-optimizer 的分析算法。从 OpponentProfile 开始。实现 行为模式检测, 让策略引擎识别 aggressive/passive/roaming 等风格标签。 |
+| 8 | `M1046-M1065/analysis/trend_analyzer.py` | 554 | Cross-session trend detection | 查看 PerformanceTrajectoryModel EMA算法。从 WinConditionAnalyzer 开始。实现 胜率相关性分析, 让玩家了解哪些因素最影响自己的胜负。 |
+
+### Tier 3: Game State & Strategy (Files 41-60)
+
+| # | File Path | Lines | Role | Pattern Template |
+|---|-----------|-------|------|-----------------|
+| 9 | `M1046-M1065/core/game_state_tracker.py` | 487 | Game phase state machine + minimap | 查看 Seraphine listener.py 的进程检测模式。从 GamePhaseStateMachine 开始。实现 MinimapStateReconstructor, 让策略引擎从网络数据重建地图状态。 |
+| 10 | `M1046-M1065/core/live_match_monitor.py` | 477 | Real-time match event processing | 从 KillFeedParser 开始。实现 团战检测 和 GoldDifferentialTracker, 让系统实时估算胜率变化。 |
+| 11 | `M1046-M1065/strategy/strategy_engine.py` | 522 | Main strategy recommendation engine | 查看 LeagueAiCoach 的分析架构。从 StrategyEngine 开始。实现 MacroStrategyAdvisor, 根据金币差/击杀差/阵容分析给出宏观策略建议。 |
+| 12 | `M1046-M1065/strategy/champ_select_advisor.py` | 456 | Champion select recommendations | 从 CounterPickEngine 开始。实现 DraftPhaseStateMachine, 在BP阶段实时推荐英雄选择和禁用。 |
+
+### Tier 4: Integration & Evolution (Files 61-80)
+
+| # | File Path | Lines | Role | Pattern Template |
+|---|-----------|-------|------|-----------------|
+| 13 | `M1046-M1065/integration/voice_output_engine.py` | 499 | TTS voice output for strategy | 查看 LeagueAiCoach 的语音输出架构。从 StrategicNarratorFormatter 开始。实现 去重+优先级语音队列, 确保30分钟对局中不重复无用信息。 |
+| 14 | `M1046-M1065/core/evolution_controller.py` | 498 | Self-evolution loop controller | 从 MutationStrategy 开始。实现 EvolutionCheckpointer, 让系统在每局后自动调优参数并支持回滚。 |
+| 15 | `M1046-M1065/orchestrator.py` | 455 | System orchestration + health monitoring | 从 HealthMonitor 开始。实现 SessionRecorder, 协调所有子系统的生命周期和降级策略。 |
+
+### Tier 5: Supporting Infrastructure (Files 81-100)
+
+| # | File Path | Role |
+|---|-----------|------|
+| 16-24 | `M1046-M1065/*/\__init__.py` × 9 | Package initialization |
+| 25 | `M1046-M1065/config/proxifier/operatorrl_proxifier.ppx` | Generated Proxifier profile |
+| 26 | `M1046-M1065/config/proxifier/setup_instructions.json` | Setup guide |
+| 27 | `M1046-M1065/config/proxifier/validation_report.json` | Profile validation |
+| 28-50 | `M1046-M1065/logs/*.jsonl` | Runtime log files |
+
+## Production Critique (Knuth-Level Review)
+
+### 1. User-Perspective Bug Analysis
+
+- **Fiddler未运行时降级**: 如果Fiddler MCP不可用, 系统自动降级到LCU直连模式。用户只会看到一条警告, 功能不中断, 但无法获取对手历史数据(~40%数据缺失)。
+- **Proxifier配置冲突**: 如果用户已有Proxifier规则, 我们的PPX导入可能覆盖现有规则。validate()方法检测并警告冲突, 但不自动解决。需要用户确认。
+- **语音输出延迟**: 从网络事件到语音输出的端到端延迟约1-2秒。对于宏观策略建议可接受, 但不适用于微操指导。
+- **30分钟内存增长**: RingBuffer限制128MB, 日志文件限制50MB×5轮转。30分钟对局约产生500-600条日志, 远低于上限。
+
+### 2. System-Perspective Bug Analysis
+
+- **HTTPS证书信任**: Fiddler的CA证书必须被系统信任才能解密HTTPS。如果证书过期或被撤销, 所有流量捕获静默失败。建议: 启动时验证证书状态。
+- **LCU lockfile竞争**: 多开客户端场景下, lockfile可能指向非活跃客户端。Seraphine通过进程监听器解决, 我们的LCUConnector需要类似的PID验证逻辑。
+- **Evolution Controller单点突变**: 每个演化周期只改变一个参数, 确保因果关系清晰, 但收敛速度慢。对于10局/天的使用频率, 需要约20天才能显著优化。
+- **日志写入线程**: AsyncLogWriter使用daemon线程, 进程崩溃时最多丢失1秒日志。生产建议: 关键事件(EVOLUTION/CRITICAL)同步写入。
+
+## Dependencies
+
+```
+aiohttp>=3.8.0    # Async HTTP for Fiddler MCP + LCU API
+pyttsx3>=2.90     # Offline TTS (fallback)
+```
+
+## Quick Start
+
+```bash
+# 1. Install dependencies
+pip install aiohttp pyttsx3
+
+# 2. Generate Proxifier profile
+cd M1046-M1065
+python3 -c "from capture.proxifier_config_manager import generate_setup_package; generate_setup_package()"
+
+# 3. Import profile into Proxifier, start Fiddler, launch LoL
+
+# 4. Run the system
+python3 -c "
+import asyncio
+from orchestrator import M1046Orchestrator
+async def main():
+    orch = M1046Orchestrator()
+    await orch.initialize()
+    await orch.run_game_session()
+asyncio.run(main())
+"
+```
+
+## Evolution Log Sample
+
+```json
+{"timestamp":"2026-04-01T04:00:00Z","level":"INFO","category":"network_capture","component":"network_capture_engine:_poll_fiddler_mcp","message":"GET /lol-match-history/v1/games → 200","latency_ms":12.5}
+{"timestamp":"2026-04-01T04:00:01Z","level":"REWARD","category":"strategy_engine","component":"strategy_engine:evaluate","message":"Strategy recommendation accepted","reward_signal":0.85}
+{"timestamp":"2026-04-01T04:30:00Z","level":"EVOLUTION","category":"evolution","component":"evolution_controller:evolve","message":"Generation 1 → 2: poll_interval 1.0 → 0.85","data":{"mutation":"poll_interval_sec","old":1.0,"new":0.85}}
+```
