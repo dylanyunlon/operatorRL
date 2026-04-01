@@ -1,0 +1,175 @@
+{
+  "report_version": "1.0.0",
+  "generated_at": "2026-04-01T03:47:03.310153+00:00",
+  "milestone_range": "M1006-M1025",
+  "total_elapsed_seconds": 0.12,
+  "total_modules": 20,
+  "initialized_modules": 20,
+  "total_calls": 0,
+  "total_errors": 0,
+  "total_warnings": 0,
+  "module_summaries": {
+    "M1006": {
+      "name": "HistoricalMatchCrawler",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1007": {
+      "name": "FiddlerNetworkBridge",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1008": {
+      "name": "MatchTimelineDeserializer",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1009": {
+      "name": "PlayerProfileAggregator",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1010": {
+      "name": "ChampionMasteryIndexer",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1011": {
+      "name": "RankTierClassifier",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1012": {
+      "name": "MatchOutcomeCorrelator",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1013": {
+      "name": "LaneMatchupStatEngine",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1014": {
+      "name": "ItemBuildPathAnalyzer",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1015": {
+      "name": "GoldDiffTrendTracker",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1016": {
+      "name": "ObjectiveControlAnalyzer",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1017": {
+      "name": "TeamfightDetector",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1018": {
+      "name": "VisionScoreAnalyzer",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1019": {
+      "name": "DeathHeatmapGenerator",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1020": {
+      "name": "FiddlerPacketDecoder",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1021": {
+      "name": "LiveFeedHistoricalMerger",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1022": {
+      "name": "PredictiveFeatureExtractor",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1023": {
+      "name": "HistoricalCoachReportGen",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1024": {
+      "name": "CrossMatchPatternMiner",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    },
+    "M1025": {
+      "name": "UnifiedHistoricalGateway",
+      "status": "ok",
+      "total_calls": 0,
+      "total_errors": 0,
+      "avg_duration_ms": 0,
+      "max_duration_ms": 0
+    }
+  },
+  "recent_errors": [],
+  "recent_warnings": []
+}

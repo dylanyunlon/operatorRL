@@ -6121,3 +6121,36 @@ M866-M885   M926-M945   Voice/Dashboard
 | 20 | M1045 | HistoricalIntelligenceGateway | 630 | 历史情报网关 |
 
 ### 总计: 20模块 / 43 Python文件 / 13601行 / 语法0错误
+
+---
+
+## M1006-M1025: 历史战斗数据获取层 — Historical Battle Data Acquisition Layer
+
+> **第三十七位 Claude 完成**: M1006-M1025
+> **核心命题**: 历史战斗信息的获取对于当前对战至关重要。实时数据(M866-M885)告诉你"正在发生什么"，历史数据告诉你"应该怎么做"。
+> **技术决策**: 选择 Fiddler 原生网络捕获方案（非视觉OCR），零幻觉、低延迟、符合逆向工程方向。
+
+### 模块架构 (20 模块, 32 文件, 13,070 行)
+
+| # | 模块 | 行数 | 职责 |
+|---|---|---|---|
+| M1006 | HistoricalMatchCrawler | 888 | 批量爬取历史对局, retry+PastRequest模式, 速率限制 |
+| M1007 | FiddlerNetworkBridge | 757 | Fiddler MCP桥接, Proxifier配置, 流量分类, SSL证书检测 |
+| M1008 | MatchTimelineDeserializer | 564 | 分钟级快照, 转折点识别, 事件因果链 |
+| M1009 | PlayerProfileAggregator | 559 | 多区多账号合并, Riot ID解析, 小号检测 |
+| M1010 | ChampionMasteryIndexer | 542 | 英雄精通度索引, 英雄池广度 |
+| M1011 | RankTierClassifier | 546 | 段位分类, MMR估算, 段位趋势预测 |
+| M1012 | MatchOutcomeCorrelator | 543 | 胜负因素关联, 特征重要性, 关键时刻评分 |
+| M1013 | LaneMatchupStatEngine | 535 | 对线统计矩阵, 克制排名, 策略建议 |
+| M1014 | ItemBuildPathAnalyzer | 549 | 出装路线分析, 异常检测, 适应建议 |
+| M1015 | GoldDiffTrendTracker | 537 | 金币差趋势, 经济突变检测, 走势预测 |
+| M1016 | ObjectiveControlAnalyzer | 550 | 龙/男爵/塔控制, 目标优先级, 交换检测 |
+| M1017 | TeamfightDetector | 535 | 团战时空聚类, 团战评分, 开团模式 |
+| M1018 | VisionScoreAnalyzer | 541 | 视野分析, 眼位模式, 效率评估 |
+| M1019 | DeathHeatmapGenerator | 551 | 死亡热图, 热区分析, 站位建议 |
+| M1020 | FiddlerPacketDecoder | 545 | 深度包解码, 隐藏字段, WebSocket帧解析 |
+| M1021 | LiveFeedHistoricalMerger | 540 | 实时-历史融合, 相似对局查找, 实时洞察 |
+| M1022 | PredictiveFeatureExtractor | 534 | ML特征提取, 与leagueoflegends-optimizer对齐 |
+| M1023 | HistoricalCoachReportGen | 534 | 教练报告, 改进建议, TTS语音简报 |
+| M1024 | CrossMatchPatternMiner | 544 | 跨对局模式挖掘, 心态崩溃检测, 行为指纹 |
+| M1025 | UnifiedHistoricalGateway | 535 | 统一网关, 模块注册, 健康检查, 数据导出 |

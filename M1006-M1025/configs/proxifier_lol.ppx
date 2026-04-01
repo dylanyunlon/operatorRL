@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ProxifierProfile>
+  <ProxyList>
+    <Proxy id="100" type="HTTPS">
+      <Address>127.0.0.1</Address>
+      <Port>8866</Port>
+      <Options>48</Options>
+    </Proxy>
+  </ProxyList>
+  <RuleList>
+  <Rule>
+    <Name>LeagueClient.exe via Fiddler</Name>
+    <Applications>LeagueClient.exe</Applications>
+    <Action>proxy</Action>
+    <Proxy>127.0.0.1:8866</Proxy>
+    <Enabled>true</Enabled>
+  </Rule>
+  <Rule>
+    <Name>LeagueClientUx.exe via Fiddler</Name>
+    <Applications>LeagueClientUx.exe</Applications>
+    <Action>proxy</Action>
+    <Proxy>127.0.0.1:8866</Proxy>
+    <Enabled>true</Enabled>
+  </Rule>
+  <Rule>
+    <Name>League of Legends.exe via Fiddler</Name>
+    <Applications>League of Legends.exe</Applications>
+    <Action>proxy</Action>
+    <Proxy>127.0.0.1:8866</Proxy>
+    <Enabled>true</Enabled>
+  </Rule>
+  <Rule>
+    <Name>RiotClientServices.exe via Fiddler</Name>
+    <Applications>RiotClientServices.exe</Applications>
+    <Action>proxy</Action>
+    <Proxy>127.0.0.1:8866</Proxy>
+    <Enabled>true</Enabled>
+  </Rule>
+    <Rule>
+      <Name>Default</Name>
+      <Action>Direct</Action>
+    </Rule>
+  </RuleList>
+</ProxifierProfile>
