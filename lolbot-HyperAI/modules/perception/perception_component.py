@@ -7,8 +7,9 @@ assembles it into typed ``GameSnapshot`` objects on ``/lol/game_state``.
 Also detects in-game events (kills, objectives, teamfights) and
 publishes them on ``/lol/events``.
 
-This is the "eyes" of the system — analogous to Apollo's perception
-module which fuses LiDAR + camera into obstacle lists.
+Phase 4 additions (Claude#6):
+    - KillFeedAnalyzer integration: kill patterns → /lol/kill_feed
+    - MinimapAnalyzer integration: zone control → /lol/minimap_state
 
 Architecture position:
     modules/perception/perception_component.py   ← YOU ARE HERE
@@ -16,7 +17,10 @@ Architecture position:
     ├─ Reads: /lol/raw_fiddler (RawFiddlerData from canbus, optional)
     ├─ Publishes: /lol/game_state (GameSnapshot)
     ├─ Publishes: /lol/events (GameEvent list)
-    └─ Delegates to: game_state/state_assembler, events/event_detector
+    ├─ Publishes: /lol/kill_feed (DetectedKillPattern list)  [Phase 4]
+    ├─ Publishes: /lol/minimap_state (MinimapState)          [Phase 4]
+    └─ Delegates to: game_state/state_assembler, events/event_detector,
+                     events/kill_feed_analyzer, minimap/minimap_analyzer
 
 Apollo reference:
     modules/perception/multi_sensor_fusion/ — fuse multiple inputs
@@ -28,6 +32,8 @@ Design notes:
     - Team color resolution from active player's team
     - Gold diff computation from per-player gold totals
     - Phase classification from game time
+    - KillFeedAnalyzer: dedup by business fields, not id(event)
+    - MinimapAnalyzer: graceful fallback when positions unavailable
 """
 
 from __future__ import annotations
@@ -55,6 +61,14 @@ from modules.common.adapters.game_messages import (
     TeamSide,
     TeamState,
 )
+from modules.perception.events.kill_feed_analyzer import (
+    KillFeedAnalyzer,
+    DetectedKillPattern,
+)
+from modules.perception.minimap.minimap_analyzer import (
+    MinimapAnalyzer,
+    MinimapState,
+)
 
 logger = get_logger("perception")
 
@@ -62,6 +76,10 @@ logger = get_logger("perception")
 
 _PERCEPTION_INTERVAL_MS = 100.0  # 10Hz, same as canbus
 _WARN_THRESHOLD_MS = 150.0
+
+# Sub-analyzer tick divisors: run at lower frequency to save CPU.
+# KillFeed runs every tick (kill timing matters), Minimap every 5th tick.
+_MINIMAP_TICK_DIVISOR = 5
 
 
 class PerceptionComponent(TimerComponent):
@@ -71,8 +89,10 @@ class PerceptionComponent(TimerComponent):
     1. Reads latest RawLCUData from ``/lol/raw_lcu``
     2. Parses allgamedata JSON into typed PlayerState / TeamState objects
     3. Detects new events since last cycle
-    4. Publishes complete GameSnapshot on ``/lol/game_state``
-    5. Publishes new events on ``/lol/events``
+    4. Runs KillFeedAnalyzer on new events → publishes patterns
+    5. Runs MinimapAnalyzer on snapshot (every N ticks) → publishes state
+    6. Publishes complete GameSnapshot on ``/lol/game_state``
+    7. Publishes new events on ``/lol/events``
     """
 
     def __init__(self) -> None:
@@ -93,6 +113,8 @@ class PerceptionComponent(TimerComponent):
         self._game_state_writer: Optional[Writer[GameSnapshot]] = None
         self._events_writer: Optional[Writer[List[GameEvent]]] = None
         self._status_writer: Optional[Writer[StatusMessage]] = None
+        self._kill_feed_writer: Optional[Writer[List[DetectedKillPattern]]] = None
+        self._minimap_writer: Optional[Writer[MinimapState]] = None
 
         # State tracking
         self._last_snapshot: Optional[GameSnapshot] = None
@@ -102,8 +124,14 @@ class PerceptionComponent(TimerComponent):
         self._active_summoner: str = ""
         self._active_team: TeamSide = TeamSide.UNKNOWN
 
+        # Sub-analyzers (Phase 4 wiring)
+        self._kill_feed_analyzer: Optional[KillFeedAnalyzer] = None
+        self._minimap_analyzer: Optional[MinimapAnalyzer] = None
+        self._minimap_tick_counter: int = 0
+        self._last_minimap_state: Optional[MinimapState] = None
+
     def Init(self) -> bool:
-        """Set up cyber node, readers, and writers."""
+        """Set up cyber node, readers, writers, and sub-analyzers."""
         logger.info("Initializing PerceptionComponent...")
 
         self._node = CyberNode("perception")
@@ -127,11 +155,23 @@ class PerceptionComponent(TimerComponent):
             "/lol/perception_status", StatusMessage
         )
 
-        logger.info("PerceptionComponent initialized")
+        # Phase 4: sub-analyzer output channels
+        self._kill_feed_writer = self._node.CreateWriter(
+            "/lol/kill_feed", list
+        )
+        self._minimap_writer = self._node.CreateWriter(
+            "/lol/minimap_state", MinimapState
+        )
+
+        # Phase 4: instantiate sub-analyzers
+        self._kill_feed_analyzer = KillFeedAnalyzer()
+        self._minimap_analyzer = MinimapAnalyzer()
+
+        logger.info("PerceptionComponent initialized (with KillFeed + Minimap)")
         return True
 
     def Proc(self) -> bool:
-        """One perception cycle: raw data → GameSnapshot.
+        """One perception cycle: raw data → GameSnapshot → sub-analyzers.
 
         Returns:
             True if a valid snapshot was produced.
@@ -179,7 +219,7 @@ class PerceptionComponent(TimerComponent):
             gold_diff=snapshot.gold_diff,
         )
 
-        # ── Publish ──────────────────────────────────────────────────
+        # ── Publish core snapshot ────────────────────────────────────
         if self._game_state_writer:
             self._game_state_writer.Write(final)
 
@@ -193,6 +233,52 @@ class PerceptionComponent(TimerComponent):
                     )
 
         self._last_snapshot = final
+
+        # ── Phase 4: KillFeedAnalyzer ────────────────────────────────
+        # Runs every tick because kill timing is critical for multi-kill
+        # detection (10s window between consecutive kills).
+        if new_events and self._kill_feed_analyzer is not None:
+            try:
+                patterns = self._kill_feed_analyzer.analyze(
+                    new_events, final,
+                )
+                if patterns and self._kill_feed_writer:
+                    self._kill_feed_writer.Write(patterns)
+                    for pat in patterns:
+                        logger.info(
+                            "KillPattern: %s — %s (%.1fs)",
+                            pat.pattern_type.value,
+                            pat.player_name,
+                            pat.game_time,
+                        )
+            except Exception as exc:
+                # Sub-analyzer failure must NOT crash main perception loop.
+                # Log and continue — the core snapshot is already published.
+                logger.warning(
+                    "KillFeedAnalyzer error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Phase 4: MinimapAnalyzer ─────────────────────────────────
+        # Runs every _MINIMAP_TICK_DIVISOR ticks (~500ms at 10Hz).
+        # Position data changes slowly; running every tick wastes CPU.
+        self._minimap_tick_counter += 1
+        if (
+            self._minimap_tick_counter >= _MINIMAP_TICK_DIVISOR
+            and self._minimap_analyzer is not None
+        ):
+            self._minimap_tick_counter = 0
+            try:
+                minimap_state = self._minimap_analyzer.analyze(final)
+                self._last_minimap_state = minimap_state
+                if self._minimap_writer:
+                    self._minimap_writer.Write(minimap_state)
+            except Exception as exc:
+                logger.warning(
+                    "MinimapAnalyzer error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
         self._publish_status(Status.ok())
         return True
 
@@ -415,5 +501,16 @@ class PerceptionComponent(TimerComponent):
             "active_summoner": self._active_summoner,
             "active_team": self._active_team.name,
             "last_game_time": self._last_snapshot.game_time if self._last_snapshot else 0.0,
+            "kill_feed_analysis_count": (
+                self._kill_feed_analyzer._analysis_count
+                if self._kill_feed_analyzer else 0
+            ),
+            "minimap_analysis_count": (
+                self._minimap_analyzer._analysis_count
+                if self._minimap_analyzer else 0
+            ),
+            "last_minimap_state": (
+                self._last_minimap_state is not None
+            ),
         })
         return base

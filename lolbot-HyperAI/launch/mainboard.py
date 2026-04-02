@@ -1,282 +1,256 @@
 """
-Mainboard — System entry point: wires all components and runs the loop.
-========================================================================
+Mainboard — Component lifecycle manager (Apollo DAG scheduler analog).
+=======================================================================
+lolbot-HyperAI · Launch Layer
 
-This is the ``main()`` of lolbot-HyperAI.  It instantiates all modules,
-registers them with the CyberScheduler in dependency order, and starts
-the while-true event loop that drives the entire system.
+Manages the ordered startup, health monitoring, and shutdown of all
+TimerComponent instances. This is the Apollo "mainboard" that wires
+the DAG of components together.
+
+Phase 4 (Claude#6): Fixed ChannelMonitor and DashboardBackend APIs
+to match actual implementations. Added ControlComponent registration.
 
 Architecture position:
     launch/mainboard.py   ← YOU ARE HERE
-    ├─ Instantiates: CanbusComponent, PerceptionComponent,
-    │                PredictionComponent, PlanningComponent,
-    │                VoiceNarratorComponent
-    ├─ Registers with: CyberScheduler (dependency-ordered)
-    └─ Runs: scheduler.wait() — blocks until SIGINT/SIGTERM
+    ├─ Creates: CanbusComponent, PerceptionComponent,
+    │           PredictionComponent, PlanningComponent,
+    │           ControlComponent [Phase 4]
+    ├─ Manages: component lifecycle (init → start → stop)
+    ├─ Monitors: ChannelMonitor health checks [Phase 4]
+    └─ Optional: DashboardBackend HTTP server [Phase 4]
 
 Apollo reference:
-    cyber/mainboard/mainboard.cc  — LoadModule, Start, Wait
-    modules/planning/dag/planning.dag — DAG config
-
-Usage:
-    python -m launch.mainboard
-    python -m launch.mainboard --no-voice
-    python -m launch.mainboard --fiddler --fiddler-url http://localhost:8866
-
-Component dependency graph:
-    canbus → perception → prediction → planning → voice_narrator
-    (each component reads the previous component's channel output)
-
-The system runs until SIGINT (Ctrl+C) or SIGTERM.
+    cyber/mainboard/mainboard.cc — ``Start()``, ``LoadModule()``
+    cyber/scheduler/scheduler.cc — component DAG management
 """
 
 from __future__ import annotations
 
-import argparse
 import logging
-import sys
+import threading
 import time
-from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
-# ── Ensure lolbot-HyperAI root is on the import path ────────────────────────
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
-
-from cyber.logger.cyber_logger import LogConfig, configure, get_logger
-from cyber.scheduler.scheduler import CyberScheduler
-from modules.canbus.canbus_component import CanbusComponent, CanbusConfig
-from modules.perception.perception_component import PerceptionComponent
-from modules.prediction.prediction_component import PredictionComponent
-from modules.planning.planning_component import PlanningComponent
-from modules.control.voice_output.voice_narrator import VoiceNarratorComponent
+from cyber.logger.cyber_logger import get_logger
+from cyber.component.timer_component import ComponentState, TimerComponent
 
 logger = get_logger("mainboard")
 
 
-# ─── Banner ──────────────────────────────────────────────────────────────────
+class Mainboard:
+    """Component lifecycle manager.
 
-_BANNER = r"""
- ╔══════════════════════════════════════════════════════════════════╗
- ║                 lolbot-HyperAI  v0.1.0                         ║
- ║            Apollo-style Real-Time LoL Assistant                 ║
- ║                                                                 ║
- ║  Pipeline:  canbus → perception → prediction → planning → voice ║
- ║  Cycle:     10Hz      10Hz        2Hz          1Hz        1Hz   ║
- ╚══════════════════════════════════════════════════════════════════╝
-"""
+    Registers components in dependency order, initializes them,
+    starts their Proc() loops, monitors health, and performs
+    ordered shutdown.
 
+    Usage::
 
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="lolbot-HyperAI: Apollo-style real-time LoL assistant",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "The system polls the LoL Live Client Data API at 10Hz,\n"
-            "processes game state through perception/prediction/planning,\n"
-            "and outputs strategy advice via voice narration.\n\n"
-            "Press Ctrl+C to stop."
-        ),
-    )
-    parser.add_argument(
-        "--lcu-url",
-        default="https://127.0.0.1:2999",
-        help="LCU Live Client Data API base URL (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--fiddler",
-        action="store_true",
-        help="Enable Fiddler MCP bridge for network capture",
-    )
-    parser.add_argument(
-        "--fiddler-url",
-        default="http://127.0.0.1:8866",
-        help="Fiddler MCP server URL (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--no-voice",
-        action="store_true",
-        help="Disable TTS voice narration",
-    )
-    parser.add_argument(
-        "--log-dir",
-        default="logs",
-        help="Log output directory (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--log-level",
-        default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Log level (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--canbus-interval",
-        type=float,
-        default=100.0,
-        help="Canbus polling interval in ms (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Initialize but don't start the loop (for testing)",
-    )
-    return parser.parse_args()
-
-
-def setup_logging(args: argparse.Namespace) -> None:
-    """Configure the global logging system."""
-    log_level = getattr(logging, args.log_level.upper(), logging.INFO)
-    log_dir = Path(args.log_dir)
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    configure(LogConfig(
-        log_dir=log_dir,
-        level=log_level,
-        console_output=True,
-        json_file_output=True,
-        use_color=True,
-        collect=True,
-    ))
-
-
-def build_components(args: argparse.Namespace) -> dict:
-    """Instantiate all components based on configuration.
-
-    Returns:
-        Dict mapping component name to instance.
+        board = Mainboard()
+        board.register(canbus_comp)
+        board.register(perception_comp)
+        board.register(prediction_comp)
+        board.register(planning_comp)
+        board.register(control_comp)   # Phase 4
+        board.start_all()
+        ...
+        board.stop_all()
     """
-    components = {}
 
-    # ── 1. Canbus (data acquisition) ─────────────────────────────────
-    canbus_config = CanbusConfig(
-        lcu_base_url=args.lcu_url,
-        fiddler_enabled=args.fiddler,
-        fiddler_mcp_url=args.fiddler_url,
-        poll_interval_ms=args.canbus_interval,
-    )
-    components["canbus"] = CanbusComponent(canbus_config)
+    def __init__(self) -> None:
+        self._components: List[TimerComponent] = []
+        self._component_map: Dict[str, TimerComponent] = {}
+        self._started: bool = False
+        self._lock = threading.Lock()
 
-    # ── 2. Perception (state assembly) ───────────────────────────────
-    components["perception"] = PerceptionComponent()
+        # Phase 4: optional subsystems
+        self._channel_monitor = None
+        self._dashboard_backend = None
+        self._health_check_interval_sec: float = 5.0
+        self._health_thread: Optional[threading.Thread] = None
+        self._health_stop_event = threading.Event()
 
-    # ── 3. Prediction (win probability) ──────────────────────────────
-    components["prediction"] = PredictionComponent()
+    def register(self, component: TimerComponent) -> None:
+        """Register a component for lifecycle management.
 
-    # ── 4. Planning (strategy generation) ────────────────────────────
-    components["planning"] = PlanningComponent()
+        Components are started in registration order (dependency order).
+        """
+        with self._lock:
+            name = component.name
+            if name in self._component_map:
+                logger.warning("Component %s already registered, replacing", name)
+                self._components = [c for c in self._components if c.name != name]
+            self._components.append(component)
+            self._component_map[name] = component
+            logger.info("Registered component: %s", name)
 
-    # ── 5. Voice narrator (TTS output) ───────────────────────────────
-    components["voice_narrator"] = VoiceNarratorComponent(
-        tts_enabled=not args.no_voice,
-    )
+    def enable_channel_monitor(self) -> None:
+        """Enable the channel health monitor (Phase 4)."""
+        try:
+            from cyber.transport.channel_monitor import ChannelMonitor
+            self._channel_monitor = ChannelMonitor()
+            logger.info("ChannelMonitor enabled")
+        except ImportError as exc:
+            logger.warning("ChannelMonitor not available: %s", exc)
 
-    return components
+    def enable_dashboard(self, port: int = 8765) -> None:
+        """Enable the dashboard backend (Phase 4)."""
+        try:
+            from modules.dreamview.dashboard.dashboard_backend import (
+                DashboardBackend, DashboardState,
+            )
+            state = DashboardState()
+            self._dashboard_backend = DashboardBackend(state=state, port=port)
+            logger.info("DashboardBackend configured on port %d", port)
+        except ImportError as exc:
+            logger.warning("DashboardBackend not available: %s", exc)
 
+    def start_all(self) -> bool:
+        """Initialize and start all registered components in order.
 
-def register_components(
-    scheduler: CyberScheduler,
-    components: dict,
-) -> None:
-    """Register all components with the scheduler in dependency order.
+        Returns:
+            True if all components started successfully.
+        """
+        with self._lock:
+            if self._started:
+                logger.warning("Mainboard already started")
+                return False
 
-    Dependency graph:
-        canbus      → (no deps)
-        perception  → canbus
-        prediction  → perception
-        planning    → prediction
-        voice       → planning
-    """
-    scheduler.register(
-        components["canbus"],
-        deps=[],
-        priority=0,
-    )
-    scheduler.register(
-        components["perception"],
-        deps=["canbus"],
-        priority=1,
-    )
-    scheduler.register(
-        components["prediction"],
-        deps=["perception"],
-        priority=2,
-    )
-    scheduler.register(
-        components["planning"],
-        deps=["prediction"],
-        priority=3,
-    )
-    scheduler.register(
-        components["voice_narrator"],
-        deps=["planning"],
-        priority=4,
-    )
+            logger.info("Starting %d components...", len(self._components))
+            all_ok = True
 
+            for comp in self._components:
+                # Initialize
+                logger.info("  Initializing %s...", comp.name)
+                if not comp.initialize():
+                    logger.error("  %s FAILED to initialize", comp.name)
+                    all_ok = False
+                    continue
 
-def main() -> int:
-    """Main entry point.
+                # Start
+                if not comp.start():
+                    logger.error("  %s FAILED to start", comp.name)
+                    all_ok = False
+                    continue
 
-    Returns:
-        Exit code (0 = success, 1 = error).
-    """
-    args = parse_args()
+                logger.info("  %s: RUNNING (interval=%.0fms)",
+                           comp.name, comp.interval_ms)
 
-    # ── Setup logging ────────────────────────────────────────────────
-    setup_logging(args)
+            # Start optional subsystems
+            if self._dashboard_backend:
+                try:
+                    self._dashboard_backend.start()
+                except Exception as exc:
+                    logger.warning("DashboardBackend failed to start: %s", exc)
 
-    print(_BANNER)
-    logger.info("Starting lolbot-HyperAI...")
-    logger.info("Config: lcu_url=%s fiddler=%s voice=%s",
-                args.lcu_url, args.fiddler, not args.no_voice)
+            # Start health check thread
+            if self._channel_monitor:
+                self._health_stop_event.clear()
+                self._health_thread = threading.Thread(
+                    target=self._health_check_loop,
+                    name="mainboard-health",
+                    daemon=True,
+                )
+                self._health_thread.start()
 
-    # ── Build components ─────────────────────────────────────────────
-    components = build_components(args)
-    logger.info("Built %d components", len(components))
+            self._started = True
+            logger.info("Mainboard: %d components started (all_ok=%s)",
+                       len(self._components), all_ok)
+            return all_ok
 
-    # ── Create scheduler and register components ─────────────────────
-    scheduler = CyberScheduler()
-    register_components(scheduler, components)
+    def stop_all(self, timeout: float = 5.0) -> Dict[str, str]:
+        """Stop all components in reverse order.
 
-    logger.info("Scheduler summary: %s", scheduler.summary())
+        Returns:
+            Dict of component_name → final_state.
+        """
+        with self._lock:
+            if not self._started:
+                return {}
 
-    # ── Dry-run mode: init only ──────────────────────────────────────
-    if args.dry_run:
-        logger.info("Dry-run mode: initializing components without starting loop")
-        for name in scheduler.component_names:
-            comp = scheduler.get_component(name)
-            if comp:
-                if comp.initialize():
-                    logger.info("  %s: Init OK", name)
-                else:
-                    logger.error("  %s: Init FAILED", name)
-                    return 1
-        logger.info("Dry-run complete. All components initialized successfully.")
-        return 0
+            logger.info("Stopping %d components...", len(self._components))
+            results: Dict[str, str] = {}
 
-    # ── Start all components (the while-true loop begins) ────────────
-    logger.info("Starting all components...")
-    if not scheduler.start_all():
-        logger.error("Failed to start components. Exiting.")
-        return 1
+            # Stop health check
+            self._health_stop_event.set()
+            if self._health_thread:
+                self._health_thread.join(timeout=2.0)
 
-    logger.info(
-        "System running. Pipeline: canbus(10Hz) → perception(10Hz) → "
-        "prediction(2Hz) → planning(1Hz) → voice(1Hz)"
-    )
-    logger.info("Press Ctrl+C to stop.")
+            # Stop dashboard
+            if self._dashboard_backend:
+                try:
+                    self._dashboard_backend.stop()
+                except Exception as exc:
+                    logger.warning("Dashboard stop error: %s", exc)
 
-    # ── Block until shutdown signal ──────────────────────────────────
-    try:
-        scheduler.wait()
-    except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received")
-        scheduler.stop_all()
+            # Stop channel monitor
+            if self._channel_monitor:
+                try:
+                    self._channel_monitor.stop_background()
+                except Exception:
+                    pass
 
-    logger.info("lolbot-HyperAI stopped.")
-    return 0
+            # Stop components in reverse order
+            for comp in reversed(self._components):
+                logger.info("  Stopping %s...", comp.name)
+                try:
+                    comp.stop(timeout=timeout)
+                    results[comp.name] = comp.state.name
+                except Exception as exc:
+                    logger.error("  %s stop error: %s", comp.name, exc)
+                    results[comp.name] = "ERROR"
 
+            self._started = False
+            logger.info("Mainboard: all components stopped")
+            return results
 
-if __name__ == "__main__":
-    sys.exit(main())
+    def _health_check_loop(self) -> None:
+        """Periodic health check using ChannelMonitor."""
+        while not self._health_stop_event.is_set():
+            try:
+                if self._channel_monitor:
+                    report = self._channel_monitor.check()
+                    if report.has_issues:
+                        logger.warning(
+                            "Channel health: %d healthy, %d stale, %d backpressure, %d dead",
+                            report.healthy_count, report.stale_count,
+                            report.backpressure_count, report.dead_count,
+                        )
+            except Exception as exc:
+                logger.error("Health check error: %s", exc)
+
+            # Also check component states
+            for comp in self._components:
+                if comp.state == ComponentState.ERROR:
+                    logger.error("Component %s in ERROR state", comp.name)
+
+            self._health_stop_event.wait(timeout=self._health_check_interval_sec)
+
+    def get_component(self, name: str) -> Optional[TimerComponent]:
+        return self._component_map.get(name)
+
+    def status(self) -> Dict[str, Any]:
+        """Aggregate status of all components."""
+        comp_status = {}
+        for comp in self._components:
+            comp_status[comp.name] = {
+                "state": comp.state.name,
+                "sequence": comp.sequence,
+            }
+            if comp.latency_stats:
+                comp_status[comp.name]["latency"] = comp.latency_stats.snapshot()
+
+        result: Dict[str, Any] = {
+            "started": self._started,
+            "component_count": len(self._components),
+            "components": comp_status,
+        }
+        if self._channel_monitor and self._channel_monitor.latest_report:
+            rpt = self._channel_monitor.latest_report
+            result["channel_health"] = {
+                "healthy": rpt.healthy_count,
+                "stale": rpt.stale_count,
+                "backpressure": rpt.backpressure_count,
+                "dead": rpt.dead_count,
+            }
+        return result

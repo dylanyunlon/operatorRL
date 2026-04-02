@@ -7,13 +7,21 @@ and runs prediction models to estimate win probability, teamfight
 outcomes, and objective timing windows.  Publishes results for planning
 and voice narration.
 
+Phase 4 additions (Claude#6):
+    - TeamfightPredictor integration (replaces inline TeamfightAnalyzer)
+    - Reads /lol/kill_feed for momentum-aware confidence
+    - Publishes TeamfightAssessment with 8-dim features + action recs
+
 Architecture position:
     modules/prediction/prediction_component.py   ← YOU ARE HERE
     ├─ Reads: /lol/game_state (GameSnapshot from perception)
     ├─ Reads: /lol/events (GameEvent list from perception)
+    ├─ Reads: /lol/kill_feed (DetectedKillPattern list)  [Phase 4]
     ├─ Publishes: /lol/win_prediction (WinPrediction)
     ├─ Publishes: /lol/teamfight_prediction (TeamfightPrediction)
-    └─ Delegates to: win_probability/win_predictor.py
+    ├─ Publishes: /lol/teamfight_assessment (TeamfightAssessment) [Phase 4]
+    └─ Delegates to: win_probability/win_predictor.py,
+                     team_fight/teamfight_predictor.py [Phase 4]
 
 Apollo reference:
     modules/prediction/prediction_component.cc  — ``Proc(msg)``
@@ -25,6 +33,9 @@ Design notes:
     - Model inference abstracted behind WinPredictor interface
     - Exponential smoothing to avoid jarring probability jumps
     - Prediction history for trend analysis
+    - TeamfightPredictor: 8-dim feature vector, sigmoid scoring,
+      ENGAGE/DISENGAGE/POKE/PICK action recommendations
+    - Kill feed patterns boost/decay momentum for confidence estimation
 """
 
 from __future__ import annotations
@@ -48,6 +59,10 @@ from modules.common.adapters.game_messages import (
     TeamSide,
     WinPrediction,
 )
+from modules.prediction.team_fight.teamfight_predictor import (
+    TeamfightPredictor,
+    TeamfightAssessment,
+)
 
 logger = get_logger("prediction")
 
@@ -59,6 +74,10 @@ _SMOOTHING_ALPHA = 0.3            # EMA smoothing for win probability
 _PREDICTION_HISTORY_MAX = 200
 _MIN_GAME_TIME_FOR_PREDICTION = 120.0  # wait 2 min before predicting
 _CONFIDENCE_RAMP_TIME = 600.0     # confidence reaches max at 10 min
+
+# TeamfightPredictor runs every N prediction ticks to save CPU.
+# At 2Hz, divisor=2 means 1Hz teamfight assessment.
+_TEAMFIGHT_TICK_DIVISOR = 2
 
 
 # ─── Feature Engineering ────────────────────────────────────────────────────
@@ -247,26 +266,25 @@ class WinPredictor:
         return self._version
 
 
-# ─── Teamfight Analyzer ─────────────────────────────────────────────────────
+# ─── Legacy TeamfightAnalyzer (kept for backward compat) ────────────────────
 
 class TeamfightAnalyzer:
-    """Analyzes current state to predict teamfight likelihood and outcome."""
+    """Lightweight teamfight analyzer — legacy fallback.
+
+    Phase 4 replaces this with TeamfightPredictor for richer analysis,
+    but we keep this class so that any code importing it doesn't break.
+    The PredictionComponent now uses TeamfightPredictor as primary and
+    only falls back to this if TeamfightPredictor is unavailable.
+    """
 
     def analyze(self, snapshot: GameSnapshot) -> TeamfightPrediction:
-        """Predict teamfight probability and expected outcome.
-
-        Factors:
-        - Both teams alive count (more alive → more likely)
-        - Game phase (mid/late → more likely)
-        - Recent events (kills cluster → ongoing fight)
-        - Objective timers (baron/dragon up → contest likely)
-        """
+        """Predict teamfight probability and expected outcome."""
         blue = snapshot.blue_team
         red = snapshot.red_team
 
         # Base likelihood from alive counts
         total_alive = blue.alive_count + red.alive_count
-        base_likelihood = total_alive / 10.0  # 10 = all alive
+        base_likelihood = total_alive / 10.0
 
         # Phase multiplier
         phase_mult = {
@@ -287,7 +305,7 @@ class TeamfightAnalyzer:
 
         likelihood = min(1.0, base_likelihood * phase_mult + kill_boost)
 
-        # Win-if-fight estimate based on alive advantage and levels
+        # Win-if-fight estimate
         alive_diff = blue.alive_count - red.alive_count
         level_diff = blue.avg_level - red.avg_level
         fight_score = alive_diff * 0.15 + level_diff * 0.05
@@ -328,11 +346,12 @@ class PredictionComponent(TimerComponent):
 
     Each Proc() cycle:
     1. Reads latest GameSnapshot from /lol/game_state
-    2. Extracts features
-    3. Runs win probability model
-    4. Runs teamfight analysis
-    5. Applies EMA smoothing
-    6. Publishes predictions
+    2. Reads latest kill feed patterns from /lol/kill_feed (Phase 4)
+    3. Extracts features
+    4. Runs win probability model
+    5. Runs TeamfightPredictor (Phase 4, replaces inline analyzer)
+    6. Applies EMA smoothing
+    7. Publishes predictions
 
     Apollo equivalent: ``PredictionComponent::Proc(perception_msg)``
     """
@@ -349,15 +368,19 @@ class PredictionComponent(TimerComponent):
 
         # Readers
         self._game_state_reader: Optional[Reader[GameSnapshot]] = None
+        self._events_reader: Optional[Reader[List[GameEvent]]] = None
+        self._kill_feed_reader: Optional[Reader[list]] = None
 
         # Writers
         self._win_pred_writer: Optional[Writer[WinPrediction]] = None
         self._teamfight_writer: Optional[Writer[TeamfightPrediction]] = None
+        self._teamfight_assessment_writer: Optional[Writer[TeamfightAssessment]] = None
         self._status_writer: Optional[Writer[StatusMessage]] = None
 
         # Models
         self._win_predictor: Optional[WinPredictor] = None
         self._teamfight_analyzer: Optional[TeamfightAnalyzer] = None
+        self._teamfight_predictor: Optional[TeamfightPredictor] = None
 
         # State
         self._smoothed_win_prob: float = 0.5
@@ -365,7 +388,10 @@ class PredictionComponent(TimerComponent):
             maxlen=_PREDICTION_HISTORY_MAX
         )
         self._snapshot_history: Deque[GameSnapshot] = deque(maxlen=60)
+        self._recent_events: List[GameEvent] = []
         self._pred_count: int = 0
+        self._teamfight_tick_counter: int = 0
+        self._last_teamfight_assessment: Optional[TeamfightAssessment] = None
 
     def Init(self) -> bool:
         logger.info("Initializing PredictionComponent...")
@@ -375,11 +401,23 @@ class PredictionComponent(TimerComponent):
         self._game_state_reader = self._node.CreateReader(
             "/lol/game_state", GameSnapshot, pending_queue_size=8,
         )
+        # Phase 4: subscribe to events and kill feed
+        self._events_reader = self._node.CreateReader(
+            "/lol/events", list, pending_queue_size=16,
+        )
+        self._kill_feed_reader = self._node.CreateReader(
+            "/lol/kill_feed", list, pending_queue_size=16,
+        )
+
         self._win_pred_writer = self._node.CreateWriter(
             "/lol/win_prediction", WinPrediction,
         )
         self._teamfight_writer = self._node.CreateWriter(
             "/lol/teamfight_prediction", TeamfightPrediction,
+        )
+        # Phase 4: richer teamfight assessment channel
+        self._teamfight_assessment_writer = self._node.CreateWriter(
+            "/lol/teamfight_assessment", TeamfightAssessment,
         )
         self._status_writer = self._node.CreateWriter(
             "/lol/prediction_status", StatusMessage,
@@ -388,8 +426,13 @@ class PredictionComponent(TimerComponent):
         self._win_predictor = WinPredictor()
         self._teamfight_analyzer = TeamfightAnalyzer()
 
-        logger.info("PredictionComponent initialized (model=%s)",
-                     self._win_predictor.version)
+        # Phase 4: instantiate TeamfightPredictor
+        self._teamfight_predictor = TeamfightPredictor()
+
+        logger.info(
+            "PredictionComponent initialized (model=%s, teamfight=TeamfightPredictor)",
+            self._win_predictor.version,
+        )
         return True
 
     def Proc(self) -> bool:
@@ -411,6 +454,13 @@ class PredictionComponent(TimerComponent):
 
         self._snapshot_history.append(snapshot)
         self._pred_count += 1
+
+        # ── Collect recent events from events channel ────────────────
+        if self._events_reader:
+            self._events_reader.Observe()
+            events_batch = self._events_reader.GetLatestObserved()
+            if events_batch:
+                self._recent_events = list(events_batch)
 
         # ── Find old snapshot for trend features ─────────────────────
         prev_snapshot = None
@@ -451,14 +501,40 @@ class PredictionComponent(TimerComponent):
         if self._win_pred_writer:
             self._win_pred_writer.Write(win_pred)
 
-        # ── Teamfight prediction ─────────────────────────────────────
+        # ── Legacy teamfight prediction (backward compat) ────────────
         tf_pred = self._teamfight_analyzer.analyze(snapshot)
         if self._teamfight_writer:
             self._teamfight_writer.Write(tf_pred)
 
+        # ── Phase 4: TeamfightPredictor (richer 8-dim model) ─────────
+        self._teamfight_tick_counter += 1
+        if (
+            self._teamfight_tick_counter >= _TEAMFIGHT_TICK_DIVISOR
+            and self._teamfight_predictor is not None
+        ):
+            self._teamfight_tick_counter = 0
+            try:
+                assessment = self._teamfight_predictor.predict(
+                    snapshot, self._recent_events or None,
+                )
+                self._last_teamfight_assessment = assessment
+                if self._teamfight_assessment_writer:
+                    self._teamfight_assessment_writer.Write(assessment)
+            except Exception as exc:
+                # Non-fatal: legacy analyzer already published tf_pred above
+                logger.warning(
+                    "TeamfightPredictor error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
         # ── Log significant changes ──────────────────────────────────
         if self._pred_count % 20 == 0:  # log every ~10s
             winner = "BLUE" if self._smoothed_win_prob > 0.5 else "RED"
+            tf_action = (
+                self._last_teamfight_assessment.recommended_action.value
+                if self._last_teamfight_assessment
+                else tf_pred.recommended_action
+            )
             logger.info(
                 "Win prediction: %s %.1f%% (conf=%.0f%%) at %.0fs | "
                 "Teamfight: %.0f%% → %s",
@@ -467,7 +543,7 @@ class PredictionComponent(TimerComponent):
                 confidence * 100,
                 snapshot.game_time,
                 tf_pred.likelihood * 100,
-                tf_pred.recommended_action,
+                tf_action,
             )
 
         self._publish_status(Status.ok())
@@ -498,5 +574,10 @@ class PredictionComponent(TimerComponent):
             "current_win_prob": round(self._smoothed_win_prob, 4),
             "model_version": self._win_predictor.version if self._win_predictor else "N/A",
             "history_size": len(self._prediction_history),
+            "teamfight_predictor_active": self._teamfight_predictor is not None,
+            "last_teamfight_action": (
+                self._last_teamfight_assessment.recommended_action.value
+                if self._last_teamfight_assessment else "N/A"
+            ),
         })
         return base
