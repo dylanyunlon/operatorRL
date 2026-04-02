@@ -1,0 +1,402 @@
+"""
+GameNarrator — Event-to-narrative generation engine.
+======================================================
+
+Converts structured game events from /lol/events into natural-language
+commentary suitable for TTS output. Produces varied, context-aware
+narration that avoids repetition and adapts tone to game state.
+
+Architecture position:
+    modules/storytelling/game_narrator.py   ← YOU ARE HERE
+    ├─ Reads: /lol/events (GameEvent from perception)
+    ├─ Reads: /lol/game_state (GameSnapshot for context)
+    ├─ Publishes: /lol/narration (NarrationSegment)
+    └─ Consumed by: modules/control/voice_output/voice_narrator.py
+
+Apollo reference:
+    modules/storytelling/storytelling_component.cc — narrative generation
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import random
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Any, Deque, Dict, List, Optional, Set, Tuple
+
+logger = logging.getLogger(__name__)
+
+_NARRATION_CHANNEL: str = "/lol/narration"
+_EVENT_CHANNEL: str = "/lol/events"
+_STATE_CHANNEL: str = "/lol/game_state"
+_COOLDOWN_SAME_TYPE_S: float = 10.0
+_MAX_QUEUE_SIZE: int = 50
+_RECENT_HASH_WINDOW: int = 30
+
+
+class NarrationTone(Enum):
+    """Tone adapts based on game state."""
+    NEUTRAL = auto()
+    EXCITED = auto()
+    TENSE = auto()
+    ENCOURAGING = auto()
+    WARNING = auto()
+    CELEBRATORY = auto()
+
+
+class NarrationPriority(Enum):
+    """Priority determines queue ordering and TTS urgency."""
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+    CRITICAL = 4
+
+
+@dataclass
+class NarrationSegment:
+    """A single narration unit ready for TTS."""
+    text: str
+    tone: NarrationTone = NarrationTone.NEUTRAL
+    priority: NarrationPriority = NarrationPriority.MEDIUM
+    timestamp: float = 0.0
+    event_type: str = ""
+    duration_hint_s: float = 0.0
+    suppress_duplicate: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "text": self.text,
+            "tone": self.tone.name,
+            "priority": self.priority.value,
+            "timestamp": self.timestamp,
+            "event_type": self.event_type,
+            "duration_hint_s": round(self.duration_hint_s, 1),
+        }
+
+
+# ─── Template collections ───────────────────────────────────────────────────
+
+_KILL_TEMPLATES = [
+    "{killer} takes down {victim}! {context}",
+    "{killer} eliminates {victim}. {context}",
+    "{victim} has been slain by {killer}. {context}",
+    "And {killer} picks up the kill on {victim}! {context}",
+    "{killer} with the takedown on {victim}. {context}",
+]
+
+_MULTI_KILL_TEMPLATES = [
+    "{killer} is on a rampage with a {streak}!",
+    "Incredible! {killer} gets a {streak}!",
+    "{killer} unstoppable — {streak}!",
+]
+
+_OBJECTIVE_TEMPLATES = {
+    "dragon": [
+        "{team} secures the {dragon_type} dragon!",
+        "{dragon_type} dragon goes to {team}.",
+        "{team} takes {dragon_type} drake. {context}",
+    ],
+    "baron": [
+        "{team} takes Baron Nashor! This could be the turning point.",
+        "Baron secured by {team}! Power play incoming.",
+        "{team} with the Baron take! Huge objective.",
+    ],
+    "herald": [
+        "{team} picks up the Rift Herald.",
+        "Herald goes to {team}. Tower pressure incoming.",
+    ],
+    "tower": [
+        "{team} destroys a {lane} tower. Map control shifting.",
+        "Tower down in {lane} for {team}.",
+    ],
+    "inhibitor": [
+        "{team} takes the {lane} inhibitor! Super minions incoming.",
+        "Inhibitor down in {lane}! {team} applying serious pressure.",
+    ],
+}
+
+_TEAMFIGHT_TEMPLATES = [
+    "Teamfight breaks out! {result}",
+    "A massive teamfight erupts! {result}",
+    "Both teams engage! {result}",
+]
+
+_WIN_PROB_TEMPLATES = {
+    "ahead": [
+        "Looking strong — win probability at {prob}%.",
+        "In a commanding position at {prob}% win chance.",
+    ],
+    "behind": [
+        "Tough spot — win probability down to {prob}%.",
+        "Need a comeback — sitting at {prob}% win chance.",
+    ],
+    "even": [
+        "Anyone's game — {prob}% win probability.",
+        "Dead even at {prob}%.",
+    ],
+}
+
+_GAME_PHASE_TEMPLATES = {
+    "early": "Laning phase underway.",
+    "mid": "Mid game — rotations and objectives matter now.",
+    "late": "Late game — one fight could decide it all.",
+}
+
+
+class GameNarrator:
+    """Stateful narrator that converts events into speech-ready text.
+
+    Tracks recent narrations to avoid repetition, adapts tone based
+    on game state, and prioritizes important events.
+
+    Usage::
+
+        narrator = GameNarrator()
+        segments = narrator.narrate_event(event_dict, game_state_dict)
+        for seg in segments:
+            tts_queue.put(seg)
+    """
+
+    def __init__(self) -> None:
+        self._recent_hashes: Deque[str] = deque(maxlen=_RECENT_HASH_WINDOW)
+        self._last_event_times: Dict[str, float] = {}
+        self._kill_count: int = 0
+        self._narration_count: int = 0
+        self._rng = random.Random(42)
+
+    def narrate_event(
+        self,
+        event: Dict[str, Any],
+        game_state: Optional[Dict[str, Any]] = None,
+    ) -> List[NarrationSegment]:
+        """Convert a game event into narration segments.
+
+        Args:
+            event: Event dict with at least 'type' field.
+            game_state: Optional current game state for context.
+
+        Returns:
+            List of NarrationSegment (may be empty if suppressed).
+        """
+        event_type = event.get("type", "unknown")
+        now = time.time()
+
+        # Cooldown check
+        last_time = self._last_event_times.get(event_type, 0)
+        if now - last_time < _COOLDOWN_SAME_TYPE_S:
+            if event_type not in ("multi_kill", "baron", "ace"):
+                return []
+
+        segments = []
+        tone = self._determine_tone(game_state)
+
+        if event_type == "champion_kill":
+            segments = self._narrate_kill(event, game_state, tone)
+        elif event_type == "multi_kill":
+            segments = self._narrate_multi_kill(event, tone)
+        elif event_type in ("dragon", "baron", "herald",
+                            "tower", "inhibitor"):
+            segments = self._narrate_objective(event, event_type, tone)
+        elif event_type == "teamfight":
+            segments = self._narrate_teamfight(event, tone)
+        elif event_type == "win_probability_update":
+            segments = self._narrate_win_prob(event, tone)
+        elif event_type == "game_phase_change":
+            segments = self._narrate_phase_change(event, tone)
+        elif event_type == "ace":
+            segments = self._narrate_ace(event, tone)
+        else:
+            return []
+
+        # Dedup
+        result = []
+        for seg in segments:
+            h = hashlib.md5(seg.text.encode()).hexdigest()[:8]
+            if h not in self._recent_hashes:
+                self._recent_hashes.append(h)
+                result.append(seg)
+
+        if result:
+            self._last_event_times[event_type] = now
+            self._narration_count += len(result)
+
+        return result
+
+    def _determine_tone(
+        self, game_state: Optional[Dict[str, Any]]
+    ) -> NarrationTone:
+        if not game_state:
+            return NarrationTone.NEUTRAL
+
+        win_prob = game_state.get("win_probability", 0.5)
+        gold_diff = game_state.get("gold_diff", 0)
+
+        if win_prob > 0.7:
+            return NarrationTone.CELEBRATORY
+        elif win_prob < 0.3:
+            return NarrationTone.WARNING
+        elif abs(gold_diff) < 1000:
+            return NarrationTone.TENSE
+        elif gold_diff > 3000:
+            return NarrationTone.EXCITED
+        return NarrationTone.NEUTRAL
+
+    def _narrate_kill(
+        self,
+        event: Dict[str, Any],
+        game_state: Optional[Dict[str, Any]],
+        tone: NarrationTone,
+    ) -> List[NarrationSegment]:
+        killer = event.get("killer", "Someone")
+        victim = event.get("victim", "an enemy")
+        context = ""
+
+        if game_state:
+            gd = game_state.get("gold_diff", 0)
+            if abs(gd) > 3000:
+                context = f"Gold lead now {abs(gd):,}."
+
+        template = self._rng.choice(_KILL_TEMPLATES)
+        text = template.format(
+            killer=killer, victim=victim, context=context
+        ).strip()
+
+        self._kill_count += 1
+        return [NarrationSegment(
+            text=text, tone=tone,
+            priority=NarrationPriority.MEDIUM,
+            timestamp=time.time(), event_type="champion_kill",
+            duration_hint_s=3.0,
+        )]
+
+    def _narrate_multi_kill(
+        self, event: Dict[str, Any], tone: NarrationTone
+    ) -> List[NarrationSegment]:
+        killer = event.get("killer", "Someone")
+        count = event.get("kill_count", 2)
+        streak_names = {2: "Double Kill", 3: "Triple Kill",
+                        4: "Quadra Kill", 5: "Penta Kill"}
+        streak = streak_names.get(count, f"{count}-kill streak")
+
+        template = self._rng.choice(_MULTI_KILL_TEMPLATES)
+        text = template.format(killer=killer, streak=streak)
+
+        priority = (NarrationPriority.CRITICAL if count >= 4
+                     else NarrationPriority.HIGH)
+        return [NarrationSegment(
+            text=text, tone=NarrationTone.EXCITED,
+            priority=priority, timestamp=time.time(),
+            event_type="multi_kill", duration_hint_s=3.5,
+        )]
+
+    def _narrate_objective(
+        self,
+        event: Dict[str, Any],
+        obj_type: str,
+        tone: NarrationTone,
+    ) -> List[NarrationSegment]:
+        team = event.get("team", "A team")
+        templates = _OBJECTIVE_TEMPLATES.get(obj_type, ["{team} takes an objective."])
+        template = self._rng.choice(templates)
+
+        kwargs = {"team": team, "context": ""}
+        if obj_type == "dragon":
+            kwargs["dragon_type"] = event.get("dragon_type", "elemental")
+        if obj_type in ("tower", "inhibitor"):
+            kwargs["lane"] = event.get("lane", "unknown")
+
+        text = template.format(**kwargs).strip()
+        priority = (NarrationPriority.HIGH if obj_type in ("baron", "inhibitor")
+                     else NarrationPriority.MEDIUM)
+
+        return [NarrationSegment(
+            text=text, tone=tone, priority=priority,
+            timestamp=time.time(), event_type=obj_type,
+            duration_hint_s=4.0,
+        )]
+
+    def _narrate_teamfight(
+        self, event: Dict[str, Any], tone: NarrationTone
+    ) -> List[NarrationSegment]:
+        winners = event.get("winning_team", "unknown")
+        kills = event.get("total_kills", 0)
+        result = f"{winners} wins the fight with {kills} kills."
+
+        template = self._rng.choice(_TEAMFIGHT_TEMPLATES)
+        text = template.format(result=result)
+
+        return [NarrationSegment(
+            text=text, tone=NarrationTone.EXCITED,
+            priority=NarrationPriority.HIGH,
+            timestamp=time.time(), event_type="teamfight",
+            duration_hint_s=4.0,
+        )]
+
+    def _narrate_win_prob(
+        self, event: Dict[str, Any], tone: NarrationTone
+    ) -> List[NarrationSegment]:
+        prob = event.get("probability", 0.5)
+        prob_pct = round(prob * 100)
+
+        if prob_pct > 60:
+            templates = _WIN_PROB_TEMPLATES["ahead"]
+        elif prob_pct < 40:
+            templates = _WIN_PROB_TEMPLATES["behind"]
+        else:
+            templates = _WIN_PROB_TEMPLATES["even"]
+
+        template = self._rng.choice(templates)
+        text = template.format(prob=prob_pct)
+
+        return [NarrationSegment(
+            text=text, tone=tone,
+            priority=NarrationPriority.LOW,
+            timestamp=time.time(), event_type="win_probability",
+            duration_hint_s=3.0,
+        )]
+
+    def _narrate_phase_change(
+        self, event: Dict[str, Any], tone: NarrationTone
+    ) -> List[NarrationSegment]:
+        phase = event.get("phase", "")
+        text = _GAME_PHASE_TEMPLATES.get(phase, "")
+        if not text:
+            return []
+        return [NarrationSegment(
+            text=text, tone=NarrationTone.NEUTRAL,
+            priority=NarrationPriority.LOW,
+            timestamp=time.time(), event_type="phase_change",
+            duration_hint_s=2.5,
+        )]
+
+    def _narrate_ace(
+        self, event: Dict[str, Any], tone: NarrationTone
+    ) -> List[NarrationSegment]:
+        team = event.get("team", "A team")
+        text = f"ACE! {team} wipes the enemy team!"
+        return [NarrationSegment(
+            text=text, tone=NarrationTone.EXCITED,
+            priority=NarrationPriority.CRITICAL,
+            timestamp=time.time(), event_type="ace",
+            duration_hint_s=3.0,
+        )]
+
+    # ─── Introspection ───────────────────────────────────────────────────
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "narration_count": self._narration_count,
+            "kill_count": self._kill_count,
+            "recent_hash_count": len(self._recent_hashes),
+            "cooldown_types": len(self._last_event_times),
+        }
+
+    def reset(self) -> None:
+        self._recent_hashes.clear()
+        self._last_event_times.clear()
+        self._kill_count = 0
+        self._narration_count = 0
