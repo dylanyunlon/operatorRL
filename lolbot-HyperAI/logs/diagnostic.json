@@ -1,0 +1,1181 @@
+{
+  "timestamp": "2026-04-01T15:42:10+0000",
+  "total_modules": 52,
+  "total_lines": 24941,
+  "import_failures": 0,
+  "stub_modules": 1,
+  "channel_gaps": 4,
+  "modules": [
+    {
+      "path": "canbus/channel_message.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 535,
+      "class_count": 4,
+      "function_count": 21,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ChannelMessage",
+        "MessageFactory",
+        "MessageBus",
+        "_ChannelStats"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "canbus/transport.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 530,
+      "class_count": 5,
+      "function_count": 22,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "_RateLimit",
+        "DeadLetter",
+        "MessageRecorder",
+        "MessageReplayer",
+        "Transport"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "conf/default_config.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 261,
+      "class_count": 9,
+      "function_count": 7,
+      "has_proc": false,
+      "has_init": false,
+      "is_stub": false,
+      "classes": [
+        "TransportConfig",
+        "PerceptionConfig",
+        "PredictionConfig",
+        "PlanningConfig",
+        "OutputConfig",
+        "EvolutionConfig",
+        "IntegrationConfig",
+        "SystemConfig",
+        "LolBotConfig"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "cyber/component/timer_component.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 544,
+      "class_count": 5,
+      "function_count": 33,
+      "has_proc": true,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ComponentState",
+        "ComponentConfig",
+        "LatencyStats",
+        "TimerComponent",
+        "MyComponent"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "cyber/logger/cyber_logger.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 407,
+      "class_count": 7,
+      "function_count": 24,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "_JsonFormatter",
+        "_ConsoleFormatter",
+        "_ModuleTagFilter",
+        "LogEntry",
+        "LogCollector",
+        "_CollectorHandler",
+        "LogConfig"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "cyber/node/node.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 410,
+      "class_count": 5,
+      "function_count": 26,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "_Subscriber",
+        "_Channel",
+        "Reader",
+        "Writer",
+        "CyberNode"
+      ],
+      "channels_read": [
+        "/lol/game_state",
+        "/lol/raw_events"
+      ],
+      "channels_write": [
+        "/lol/game_state",
+        "/lol/game_state"
+      ],
+      "warnings": []
+    },
+    {
+      "path": "cyber/scheduler/scheduler.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 460,
+      "class_count": 4,
+      "function_count": 15,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "SchedulerState",
+        "ComponentEntry",
+        "HealthReport",
+        "CyberScheduler"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "cyber/timer/rate_timer.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 314,
+      "class_count": 5,
+      "function_count": 17,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "RateController",
+        "ActivityLevel",
+        "AdaptiveRateConfig",
+        "AdaptiveRate",
+        "ThrottleGuard"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "evolution/fitness_evaluator.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 598,
+      "class_count": 6,
+      "function_count": 30,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "PredictionAccuracyMetrics",
+        "RecommendationMetrics",
+        "SystemHealthMetrics",
+        "AnnouncementMetrics",
+        "FitnessScore",
+        "FitnessEvaluator"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "evolution/generation_manager.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 548,
+      "class_count": 3,
+      "function_count": 18,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "GenerationSnapshot",
+        "MutationProposal",
+        "GenerationManager"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "evolution/strategy_mutator.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 501,
+      "class_count": 3,
+      "function_count": 5,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "MutationStrategy",
+        "FitnessDiagnosis",
+        "StrategyMutator"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "integration/agent_os_bridge.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 559,
+      "class_count": 11,
+      "function_count": 17,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "BridgeMode",
+        "PolicyDecision",
+        "AgentCapability",
+        "AgentIdentity",
+        "PolicyRequest",
+        "PolicyResult",
+        "KernelEvent",
+        "RewardSignal",
+        "PolicyAdapter",
+        "RewardAdapter",
+        "AgentOSBridge"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "integration/agent_os_connector.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 429,
+      "class_count": 4,
+      "function_count": 11,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "GovernanceMode",
+        "PolicyResult",
+        "RewardSignal",
+        "AgentOSConnector"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "integration/event_dispatcher.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 455,
+      "class_count": 5,
+      "function_count": 9,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "EventType",
+        "EventPriority",
+        "Event",
+        "Subscription",
+        "EventDispatcher"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "integration/module_registry.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 528,
+      "class_count": 6,
+      "function_count": 19,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ModuleCategory",
+        "ModuleDescriptor",
+        "VersionRecord",
+        "InterfaceValidator",
+        "DependencyResolver",
+        "ModuleRegistry"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "integration/pipeline_builder.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 573,
+      "class_count": 8,
+      "function_count": 26,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "OverflowPolicy",
+        "ChannelStats",
+        "TypedChannel",
+        "StageDefinition",
+        "PipelineStage",
+        "PipelineBuilder",
+        "Pipeline",
+        "_PassthroughProcessor"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "integration/plugin_loader.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 582,
+      "class_count": 6,
+      "function_count": 26,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "PluginInfo",
+        "PluginManifest",
+        "PluginDiscovery",
+        "ModuleImporter",
+        "SandboxValidator",
+        "PluginLoader"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "integration/riot_api_client.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 593,
+      "class_count": 5,
+      "function_count": 13,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "Region",
+        "Cluster",
+        "RateLimiter",
+        "LRUCache",
+        "RiotAPIClient"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "launch/main_loop.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 639,
+      "class_count": 2,
+      "function_count": 17,
+      "has_proc": false,
+      "has_init": false,
+      "is_stub": false,
+      "classes": [
+        "SessionState",
+        "MainLoop"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "launch/mainboard.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 282,
+      "class_count": 0,
+      "function_count": 4,
+      "has_proc": false,
+      "has_init": false,
+      "is_stub": false,
+      "classes": [],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/canbus/canbus_component.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 530,
+      "class_count": 5,
+      "function_count": 20,
+      "has_proc": true,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ConnectionState",
+        "CanbusConfig",
+        "LCUClient",
+        "FiddlerMCPClient",
+        "CanbusComponent"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/canbus/fiddler_bridge/fiddler_mcp.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 360,
+      "class_count": 4,
+      "function_count": 13,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "FiddlerState",
+        "CapturedSession",
+        "FiddlerConfig",
+        "FiddlerMCPBridge"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/canbus/lcu_client/lcu_connector.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 408,
+      "class_count": 4,
+      "function_count": 19,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "LCUConnectionState",
+        "LCUAuth",
+        "RequestStats",
+        "LCUConnector"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/common/adapters/abc_impl.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 387,
+      "class_count": 4,
+      "function_count": 26,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "LoLGameBridge",
+        "LoLStrategyAdvisor",
+        "LoLObjectiveTracker",
+        "LoLDangerAssessment"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/common/adapters/game_messages.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 483,
+      "class_count": 17,
+      "function_count": 23,
+      "has_proc": false,
+      "has_init": false,
+      "is_stub": false,
+      "classes": [
+        "TeamSide",
+        "GamePhase",
+        "ObjectiveType",
+        "EventType",
+        "PlayerScore",
+        "PlayerItems",
+        "PlayerAbilities",
+        "PlayerState",
+        "TeamState",
+        "GameEvent",
+        "GameSnapshot",
+        "RawLCUData",
+        "RawFiddlerData",
+        "WinPrediction",
+        "TeamfightPrediction",
+        "StrategyAdvice",
+        "VoiceCommand"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/common/filters/kalman_filter.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 303,
+      "class_count": 3,
+      "function_count": 16,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "KalmanState",
+        "KalmanFilter1D",
+        "MultiChannelKalman"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/common/status/error_code.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 326,
+      "class_count": 3,
+      "function_count": 13,
+      "has_proc": false,
+      "has_init": false,
+      "is_stub": false,
+      "classes": [
+        "ErrorCode",
+        "Status",
+        "StatusMessage"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/control/voice_output/voice_narrator.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 356,
+      "class_count": 3,
+      "function_count": 16,
+      "has_proc": true,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "TTSBackend",
+        "_QueueItem",
+        "VoiceNarratorComponent"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/dreamview/api/dreamview_api.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 471,
+      "class_count": 4,
+      "function_count": 27,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "DreamviewConfig",
+        "DreamviewState",
+        "DreamviewHandler",
+        "DreamviewAPI"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/perception/events/event_detector.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 470,
+      "class_count": 3,
+      "function_count": 6,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "PatternType",
+        "DetectedPattern",
+        "EventDetector"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/perception/game_state/state_assembler.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 335,
+      "class_count": 4,
+      "function_count": 9,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "PlayerMetrics",
+        "GoldSnapshot",
+        "ObjectiveState",
+        "StateAssembler"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/perception/perception_component.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 419,
+      "class_count": 1,
+      "function_count": 8,
+      "has_proc": true,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "PerceptionComponent"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/planning/item_build/item_build_advisor.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 339,
+      "class_count": 4,
+      "function_count": 5,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ItemTag",
+        "ItemDef",
+        "ItemRecommendation",
+        "ItemBuildAdvisor"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/planning/planning_component.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 417,
+      "class_count": 2,
+      "function_count": 7,
+      "has_proc": true,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "MacroDecisionEngine",
+        "PlanningComponent"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/prediction/objective/objective_timer.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 302,
+      "class_count": 2,
+      "function_count": 14,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ObjectiveTimerEntry",
+        "ObjectiveTimer"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/prediction/prediction_component.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 502,
+      "class_count": 4,
+      "function_count": 12,
+      "has_proc": true,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "PredictionFeatures",
+        "WinPredictor",
+        "TeamfightAnalyzer",
+        "PredictionComponent"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "modules/prediction/win_probability/win_predictor.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 398,
+      "class_count": 5,
+      "function_count": 21,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "WinPredictionModel",
+        "HeuristicWinModel",
+        "PlattCalibrator",
+        "FeatureStore",
+        "ModelRegistry"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "output/voice_announcer.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 519,
+      "class_count": 5,
+      "function_count": 20,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "TTSBackend",
+        "VoiceConfig",
+        "TTSEngine",
+        "Announcement",
+        "VoiceAnnouncer"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "perception/game_state_parser.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 517,
+      "class_count": 6,
+      "function_count": 17,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "GamePhase",
+        "PlayerState",
+        "TeamState",
+        "ObjectiveState",
+        "GameState",
+        "GameStateParser"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "perception/network_listener.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 879,
+      "class_count": 6,
+      "function_count": 22,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "EndpointCategory",
+        "CaptureMode",
+        "CapturedPacket",
+        "LCUConnection",
+        "LiveClientAPI",
+        "NetworkListener"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "planning/strategy_planner.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 616,
+      "class_count": 8,
+      "function_count": 16,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "RecType",
+        "Priority",
+        "Recommendation",
+        "CooldownManager",
+        "ObjectiveAdvisor",
+        "TempoAdvisor",
+        "LaneAdvisor",
+        "StrategyPlanner"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "prediction/feature_pipeline.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 613,
+      "class_count": 4,
+      "function_count": 17,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "FeatureCategory",
+        "FeatureSpec",
+        "FeatureVector",
+        "FeaturePipeline"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "prediction/win_probability_engine.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 583,
+      "class_count": 6,
+      "function_count": 19,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "PredictionTrend",
+        "WinPrediction",
+        "LogisticModel",
+        "TrendTracker",
+        "ConfidenceEstimator",
+        "WinProbabilityEngine"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "proto/lolbot_messages.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 406,
+      "class_count": 2,
+      "function_count": 8,
+      "has_proc": false,
+      "has_init": false,
+      "is_stub": false,
+      "classes": [
+        "FieldSpec",
+        "MessageSchema"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "runtime/error_recovery.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 642,
+      "class_count": 10,
+      "function_count": 26,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "CircuitState",
+        "CircuitBreakerConfig",
+        "CircuitBreaker",
+        "CircuitOpenError",
+        "ReconnectConfig",
+        "AutoReconnect",
+        "FallbackSource",
+        "FallbackChain",
+        "FallbackExhaustedError",
+        "ComponentHealer"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "runtime/graceful_shutdown.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 502,
+      "class_count": 6,
+      "function_count": 14,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ShutdownPhase",
+        "ShutdownTask",
+        "ShutdownReport",
+        "CheckpointWriter",
+        "GracefulShutdown",
+        "RecoveryDetector"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "runtime/health_monitor.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 712,
+      "class_count": 10,
+      "function_count": 20,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "HealthStatus",
+        "AlertSeverity",
+        "DependencyType",
+        "Heartbeat",
+        "ComponentHealth",
+        "DependencyHealth",
+        "Alert",
+        "ResourceSnapshot",
+        "AlertManager",
+        "HealthMonitor"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "runtime/metrics_collector.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 501,
+      "class_count": 7,
+      "function_count": 38,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "CounterValue",
+        "GaugeValue",
+        "HistogramValue",
+        "Timer",
+        "TimeSeriesPoint",
+        "TimeSeries",
+        "MetricsCollector"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "runtime/process_manager.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 660,
+      "class_count": 9,
+      "function_count": 20,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "ComponentProtocol",
+        "ComponentState",
+        "ComponentPriority",
+        "ComponentSlot",
+        "TickStats",
+        "LifecycleHook",
+        "TickScheduler",
+        "ProcessManager",
+        "_DummyComponent"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    },
+    {
+      "path": "scripts/diagnostic_runner.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 425,
+      "class_count": 7,
+      "function_count": 7,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": true,
+      "classes": [
+        "ModuleDiagnostic",
+        "ChannelDiagnostic",
+        "PipelineDiagnostic",
+        "ModuleScanner",
+        "ChannelAnalyzer",
+        "ComponentInitTester",
+        "DiagnosticReportGenerator"
+      ],
+      "channels_read": [
+        "CreateReader"
+      ],
+      "channels_write": [
+        "CreateWriter"
+      ],
+      "warnings": []
+    },
+    {
+      "path": "scripts/replay_simulator.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 436,
+      "class_count": 2,
+      "function_count": 10,
+      "has_proc": false,
+      "has_init": true,
+      "is_stub": false,
+      "classes": [
+        "SyntheticGameGenerator",
+        "ReplaySimulator"
+      ],
+      "channels_read": [],
+      "channels_write": [
+        "/lol/raw_lcu"
+      ],
+      "warnings": []
+    },
+    {
+      "path": "scripts/run_with_logs.py",
+      "import_ok": true,
+      "import_error": "",
+      "line_count": 376,
+      "class_count": 2,
+      "function_count": 5,
+      "has_proc": false,
+      "has_init": false,
+      "is_stub": false,
+      "classes": [
+        "JsonLogFormatter",
+        "HealthHandler"
+      ],
+      "channels_read": [],
+      "channels_write": [],
+      "warnings": []
+    }
+  ],
+  "channels": [
+    {
+      "name": "/lol/game_state",
+      "writers": [
+        "cyber/node/node.py",
+        "cyber/node/node.py"
+      ],
+      "readers": [
+        "cyber/node/node.py"
+      ],
+      "has_orphan_writer": false,
+      "has_orphan_reader": false
+    },
+    {
+      "name": "/lol/raw_events",
+      "writers": [],
+      "readers": [
+        "cyber/node/node.py"
+      ],
+      "has_orphan_writer": false,
+      "has_orphan_reader": true
+    },
+    {
+      "name": "/lol/raw_lcu",
+      "writers": [
+        "scripts/replay_simulator.py"
+      ],
+      "readers": [],
+      "has_orphan_writer": true,
+      "has_orphan_reader": false
+    },
+    {
+      "name": "CreateReader",
+      "writers": [],
+      "readers": [
+        "scripts/diagnostic_runner.py"
+      ],
+      "has_orphan_writer": false,
+      "has_orphan_reader": true
+    },
+    {
+      "name": "CreateWriter",
+      "writers": [
+        "scripts/diagnostic_runner.py"
+      ],
+      "readers": [],
+      "has_orphan_writer": true,
+      "has_orphan_reader": false
+    }
+  ],
+  "component_init_results": {
+    "cyber.node.node.CyberNode": "OK",
+    "cyber.component.timer_component.TimerComponent": "OK (abstract, not instantiated)",
+    "cyber.scheduler.scheduler.CyberScheduler": "OK"
+  },
+  "proc_timing": {},
+  "recommendations": [
+    "IMPLEMENT: scripts/diagnostic_runner.py (425 lines, likely stub)",
+    "CHANNEL GAP: '/lol/raw_events' has reader(s) but no writer",
+    "CHANNEL GAP: '/lol/raw_lcu' has writer(s) but no reader",
+    "CHANNEL GAP: 'CreateReader' has reader(s) but no writer",
+    "CHANNEL GAP: 'CreateWriter' has writer(s) but no reader"
+  ]
+}

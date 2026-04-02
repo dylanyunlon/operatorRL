@@ -1,0 +1,99 @@
+# =============================================================================
+# lolbot-HyperAI Pipeline Configuration
+# =============================================================================
+# Apollo-style game assistant configuration.
+# Override any value with environment variable: LOLBOT_SECTION__KEY=value
+# e.g. LOLBOT_SYSTEM__DEBUG=true
+
+system:
+  debug: false
+  log_level: INFO
+  data_dir: data
+
+server:
+  host: localhost
+  port: 8080
+
+# CAN Bus — LCU data acquisition
+canbus:
+  interval_ms: 100
+  lcu_url: "https://127.0.0.1:2999"
+  fiddler_enabled: false
+  fiddler_port: 8866
+  connection_timeout_s: 5.0
+  max_retries: 3
+
+# Perception — game state fusion
+perception:
+  interval_ms: 100
+  event_window_s: 120.0
+  teamfight_proximity_s: 15.0
+  minimap_analysis: true
+
+# Prediction — win probability and teamfight prediction
+prediction:
+  interval_ms: 500
+  smoothing_alpha: 0.3
+  model_dir: data/models
+  min_game_time_s: 120.0
+  confidence_ramp_time_s: 600.0
+  teamfight_engage_threshold: 0.60
+  teamfight_disengage_threshold: 0.40
+
+# Planning — strategy and macro decisions
+planning:
+  interval_ms: 1000
+  macro_cooldown_s: 5.0
+  advice_cooldown_s: 15.0
+  min_confidence: 0.3
+  lane_advisor_enabled: true
+  item_advisor_enabled: true
+
+# Voice output
+voice:
+  enabled: true
+  rate_wpm: 180
+  volume: 0.8
+  cooldown_s: 5.0
+  win_update_interval_s: 60.0
+  backend: pyttsx3
+
+# Overlay
+overlay:
+  enabled: true
+  max_elements: 8
+  default_ttl_s: 10.0
+
+# Evolution — self-improvement between games
+evolution:
+  enabled: true
+  auto_evolve: true
+  data_dir: data/generations
+  fitness_commit_threshold: 0.05
+  mutation_rate: 0.15
+  max_mutations_per_session: 3
+
+# Training data collection
+training:
+  enabled: true
+  db_path: data/training_data.db
+  sample_interval_s: 30.0
+  retention_days: 90
+
+# Dreamview dashboard
+dreamview:
+  enabled: true
+  port: 8080
+  sse_enabled: true
+
+# Shared memory transport
+shared_memory:
+  enabled: false
+  slot_count: 16
+  slot_size_kb: 256
+
+# Integration
+integration:
+  agent_os_mode: audit
+  riot_api_key: ""
+  riot_region: na1
