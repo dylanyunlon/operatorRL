@@ -1,0 +1,169 @@
+{
+    "activePlayer": {
+        "abilities": {
+            "E": {"abilityLevel": 3, "displayName": "Charm", "id": "AhriSeduce"},
+            "Passive": {"displayName": "Essence Theft", "id": "AhriEssenceTheft"},
+            "Q": {"abilityLevel": 5, "displayName": "Orb of Deception", "id": "AhriOrbofDeception"},
+            "R": {"abilityLevel": 2, "displayName": "Spirit Rush", "id": "AhriTumble"},
+            "W": {"abilityLevel": 3, "displayName": "Fox-Fire", "id": "AhriFoxFire"}
+        },
+        "championName": "Ahri",
+        "currentGold": 1423.5,
+        "fullRunes": {
+            "generalRunes": [],
+            "keystone": {"displayName": "Electrocute", "id": 8112},
+            "primaryRuneTree": {"displayName": "Domination", "id": 8100},
+            "secondaryRuneTree": {"displayName": "Inspiration", "id": 8300},
+            "statRunes": []
+        },
+        "level": 13,
+        "summonerName": "TestPlayer",
+        "teamRelativeColors": true
+    },
+    "allPlayers": [
+        {
+            "championName": "Ahri",
+            "isBot": false,
+            "isDead": false,
+            "items": [
+                {"itemID": 3089, "displayName": "Rabadon's Deathcap", "count": 1, "price": 3600},
+                {"itemID": 3020, "displayName": "Sorcerer's Shoes", "count": 1, "price": 1100},
+                {"itemID": 3285, "displayName": "Luden's Tempest", "count": 1, "price": 3200}
+            ],
+            "level": 13,
+            "position": "MIDDLE",
+            "rawChampionName": "game_character_displayname_Ahri",
+            "respawnTimer": 0.0,
+            "runes": {"keystone": {"displayName": "Electrocute", "id": 8112}},
+            "scores": {"assists": 7, "creepScore": 156, "deaths": 2, "kills": 8, "wardScore": 12.0},
+            "skinID": 0,
+            "summonerName": "TestPlayer",
+            "summonerSpells": {
+                "summonerSpellOne": {"displayName": "Flash"},
+                "summonerSpellTwo": {"displayName": "Ignite"}
+            },
+            "team": "ORDER"
+        },
+        {
+            "championName": "Jinx",
+            "isBot": false,
+            "isDead": false,
+            "items": [
+                {"itemID": 3031, "displayName": "Infinity Edge", "count": 1, "price": 3400},
+                {"itemID": 3006, "displayName": "Berserker's Greaves", "count": 1, "price": 1100}
+            ],
+            "level": 12,
+            "position": "BOTTOM",
+            "scores": {"assists": 5, "creepScore": 172, "deaths": 3, "kills": 6, "wardScore": 8.0},
+            "summonerName": "ADCPlayer",
+            "team": "ORDER"
+        },
+        {
+            "championName": "Thresh",
+            "isBot": false,
+            "isDead": false,
+            "items": [],
+            "level": 10,
+            "position": "UTILITY",
+            "scores": {"assists": 15, "creepScore": 32, "deaths": 4, "kills": 1, "wardScore": 45.0},
+            "summonerName": "SupportMain",
+            "team": "ORDER"
+        },
+        {
+            "championName": "LeeSin",
+            "isBot": false,
+            "isDead": true,
+            "items": [],
+            "level": 11,
+            "position": "JUNGLE",
+            "respawnTimer": 15.3,
+            "scores": {"assists": 9, "creepScore": 98, "deaths": 5, "kills": 4, "wardScore": 20.0},
+            "summonerName": "JungleKing",
+            "team": "ORDER"
+        },
+        {
+            "championName": "Garen",
+            "isBot": false,
+            "isDead": false,
+            "items": [],
+            "level": 12,
+            "position": "TOP",
+            "scores": {"assists": 3, "creepScore": 145, "deaths": 2, "kills": 5, "wardScore": 6.0},
+            "summonerName": "TopLaner",
+            "team": "ORDER"
+        },
+        {
+            "championName": "Zed",
+            "isBot": false,
+            "isDead": false,
+            "items": [],
+            "level": 14,
+            "position": "MIDDLE",
+            "scores": {"assists": 4, "creepScore": 168, "deaths": 1, "kills": 10, "wardScore": 5.0},
+            "summonerName": "EnemyMid",
+            "team": "CHAOS"
+        },
+        {
+            "championName": "Ashe",
+            "isBot": false,
+            "isDead": false,
+            "items": [],
+            "level": 11,
+            "position": "BOTTOM",
+            "scores": {"assists": 6, "creepScore": 155, "deaths": 4, "kills": 5, "wardScore": 10.0},
+            "summonerName": "EnemyADC",
+            "team": "CHAOS"
+        },
+        {
+            "championName": "Blitzcrank",
+            "isBot": false,
+            "isDead": false,
+            "items": [],
+            "level": 9,
+            "position": "UTILITY",
+            "scores": {"assists": 12, "creepScore": 28, "deaths": 6, "kills": 2, "wardScore": 38.0},
+            "summonerName": "EnemySupport",
+            "team": "CHAOS"
+        },
+        {
+            "championName": "Kayn",
+            "isBot": false,
+            "isDead": false,
+            "items": [],
+            "level": 12,
+            "position": "JUNGLE",
+            "scores": {"assists": 8, "creepScore": 110, "deaths": 3, "kills": 7, "wardScore": 15.0},
+            "summonerName": "EnemyJungle",
+            "team": "CHAOS"
+        },
+        {
+            "championName": "Darius",
+            "isBot": false,
+            "isDead": false,
+            "items": [],
+            "level": 13,
+            "position": "TOP",
+            "scores": {"assists": 2, "creepScore": 140, "deaths": 3, "kills": 6, "wardScore": 4.0},
+            "summonerName": "EnemyTop",
+            "team": "CHAOS"
+        }
+    ],
+    "events": {
+        "Events": [
+            {"EventID": 0, "EventName": "GameStart", "EventTime": 0.0},
+            {"EventID": 1, "EventName": "FirstBlood", "EventTime": 185.2, "Recipient": "TestPlayer"},
+            {"EventID": 2, "EventName": "TurretKilled", "EventTime": 520.3, "TurretKilled": "Turret_T2_R_03_A", "KillerName": "EnemyTop"},
+            {"EventID": 3, "EventName": "DragonKill", "EventTime": 680.1, "DragonType": "Fire", "Stolen": "False", "KillerName": "JungleKing"},
+            {"EventID": 4, "EventName": "ChampionKill", "EventTime": 890.5, "KillerName": "TestPlayer", "VictimName": "Zed", "Assisters": ["JungleKing", "SupportMain"]},
+            {"EventID": 5, "EventName": "HeraldKill", "EventTime": 950.2, "KillerName": "JungleKing", "Stolen": "False"},
+            {"EventID": 6, "EventName": "BaronKill", "EventTime": 1550.8, "KillerName": "JungleKing", "Stolen": "False"}
+        ]
+    },
+    "gameData": {
+        "gameMode": "CLASSIC",
+        "gameTime": 1680.5,
+        "mapName": "Map11",
+        "mapNumber": 11,
+        "mapTerrain": "Default"
+    }
+}

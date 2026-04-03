@@ -1,0 +1,43 @@
+# canbus.dag — CAN Bus 组件声明式 DAG 编排
+# =============================================
+#
+# Apollo 等价: modules/canbus/dag/canbus.dag
+# 声明组件依赖、通道绑定、定时器配置
+#
+# 格式: JSON (Apollo 用 protobuf text format, 我们用 JSON)
+
+{
+    "module_config": {
+        "module_library": "modules.canbus.canbus_component",
+        "components": [
+            {
+                "class_name": "CanbusComponent",
+                "config": {
+                    "name": "canbus",
+                    "interval_ms": 100,
+                    "warn_threshold_ms": 200,
+                    "max_consecutive_failures": 10,
+                    "cooldown_s": 2.0
+                },
+                "timer_component_config": {
+                    "interval": 100
+                },
+                "readers": [],
+                "writers": [
+                    {
+                        "channel": "/lol/raw_lcu",
+                        "type": "RawLCUData"
+                    },
+                    {
+                        "channel": "/lol/raw_fiddler",
+                        "type": "RawFiddlerData"
+                    },
+                    {
+                        "channel": "/lol/canbus_status",
+                        "type": "StatusMessage"
+                    }
+                ]
+            }
+        ]
+    }
+}
