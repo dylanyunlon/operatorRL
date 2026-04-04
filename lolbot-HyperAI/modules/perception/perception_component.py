@@ -46,6 +46,11 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from cyber.component.timer_component import ComponentConfig, TimerComponent
 from cyber.node.node import CyberNode, Reader, Writer
 from cyber.logger.cyber_logger import get_logger
+from modules.common.component_base import (
+    ComponentDependency,
+    LifecycleState,
+    ManagedComponent,
+)
 from modules.common.status.error_code import ErrorCode, Status, StatusMessage
 from modules.common.adapters.game_messages import (
     EventType,
@@ -82,7 +87,7 @@ _WARN_THRESHOLD_MS = 150.0
 _MINIMAP_TICK_DIVISOR = 5
 
 
-class PerceptionComponent(TimerComponent):
+class PerceptionComponent(TimerComponent, ManagedComponent):
     """Perception component: fuses raw data into structured game state.
 
     Each ``Proc()`` cycle:
@@ -93,7 +98,16 @@ class PerceptionComponent(TimerComponent):
     5. Runs MinimapAnalyzer on snapshot (every N ticks) → publishes state
     6. Publishes complete GameSnapshot on ``/lol/game_state``
     7. Publishes new events on ``/lol/events``
+
+    Claude11: Added ManagedComponent mixin for lifecycle + circuit breaker.
     """
+
+    COMPONENT_NAME = "perception"
+    DEPENDENCIES = [
+        ComponentDependency("canbus", required=True,
+                            channels=["/lol/raw_lcu"]),
+    ]
+    VERSION = "2.0.0"
 
     def __init__(self) -> None:
         super().__init__(
@@ -132,6 +146,7 @@ class PerceptionComponent(TimerComponent):
 
     def Init(self) -> bool:
         """Set up cyber node, readers, writers, and sub-analyzers."""
+        self._managed_init()
         logger.info("Initializing PerceptionComponent...")
 
         self._node = CyberNode("perception")
@@ -167,15 +182,21 @@ class PerceptionComponent(TimerComponent):
         self._kill_feed_analyzer = KillFeedAnalyzer()
         self._minimap_analyzer = MinimapAnalyzer()
 
+        self.register_self()
+        self._transition(LifecycleState.READY)
+        self._transition(LifecycleState.RUNNING)
         logger.info("PerceptionComponent initialized (with KillFeed + Minimap)")
         return True
 
     def Proc(self) -> bool:
-        """One perception cycle: raw data → GameSnapshot → sub-analyzers.
+        """One perception cycle: raw data -> GameSnapshot -> sub-analyzers.
 
         Returns:
             True if a valid snapshot was produced.
         """
+        if self.should_skip_proc():
+            return True
+
         # ── Read latest raw data ─────────────────────────────────────
         self._raw_lcu_reader.Observe()
         raw: Optional[RawLCUData] = self._raw_lcu_reader.GetLatestObserved()

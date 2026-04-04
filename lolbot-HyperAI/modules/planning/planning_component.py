@@ -45,6 +45,11 @@ from typing import Any, Deque, Dict, List, Optional, Tuple
 from cyber.component.timer_component import ComponentConfig, TimerComponent
 from cyber.node.node import CyberNode, Reader, Writer
 from cyber.logger.cyber_logger import get_logger
+from modules.common.component_base import (
+    ComponentDependency,
+    LifecycleState,
+    ManagedComponent,
+)
 from modules.common.status.error_code import ErrorCode, Status, StatusMessage
 from modules.common.adapters.game_messages import (
     GameEvent,
@@ -218,7 +223,7 @@ class MacroDecisionEngine:
 
 # ─── PlanningComponent ──────────────────────────────────────────────────────
 
-class PlanningComponent(TimerComponent):
+class PlanningComponent(TimerComponent, ManagedComponent):
     """Planning component: 2Hz strategy recommendation.
 
     Each Proc() cycle:
@@ -230,7 +235,16 @@ class PlanningComponent(TimerComponent):
     6. Publishes all results to respective channels
 
     Apollo equivalent: ``PlanningComponent::Proc(prediction_msg)``
+
+    Claude11: Added ManagedComponent mixin for lifecycle + circuit breaker.
     """
+
+    COMPONENT_NAME = "planning"
+    DEPENDENCIES = [
+        ComponentDependency("perception", required=True),
+        ComponentDependency("prediction", required=False),
+    ]
+    VERSION = "2.0.0"
 
     def __init__(self) -> None:
         super().__init__(
@@ -266,6 +280,7 @@ class PlanningComponent(TimerComponent):
         self._recent_events: List[GameEvent] = []
 
     def Init(self) -> bool:
+        self._managed_init()
         logger.info("Initializing PlanningComponent...")
 
         self._node = CyberNode("planning")
@@ -300,6 +315,9 @@ class PlanningComponent(TimerComponent):
         self._macro_planner = MacroPlanner()
         self._lane_advisor = LaneAdvisor()
 
+        self.register_self()
+        self._transition(LifecycleState.READY)
+        self._transition(LifecycleState.RUNNING)
         logger.info("PlanningComponent initialized (with MacroPlanner + LaneAdvisor)")
         return True
 

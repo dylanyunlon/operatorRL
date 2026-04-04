@@ -50,6 +50,11 @@ from typing import Any, Deque, Dict, List, Optional, Tuple
 from cyber.component.timer_component import ComponentConfig, TimerComponent
 from cyber.node.node import CyberNode, Reader, Writer
 from cyber.logger.cyber_logger import get_logger
+from modules.common.component_base import (
+    ComponentDependency,
+    LifecycleState,
+    ManagedComponent,
+)
 from modules.common.status.error_code import ErrorCode, Status, StatusMessage
 from modules.common.adapters.game_messages import (
     GameEvent,
@@ -341,7 +346,7 @@ class TeamfightAnalyzer:
 
 # ─── PredictionComponent ────────────────────────────────────────────────────
 
-class PredictionComponent(TimerComponent):
+class PredictionComponent(TimerComponent, ManagedComponent):
     """Prediction component: 2Hz win/teamfight prediction.
 
     Each Proc() cycle:
@@ -353,8 +358,17 @@ class PredictionComponent(TimerComponent):
     6. Applies EMA smoothing
     7. Publishes predictions
 
+    Claude11: Added ManagedComponent mixin for lifecycle + circuit breaker.
+
     Apollo equivalent: ``PredictionComponent::Proc(perception_msg)``
     """
+
+    COMPONENT_NAME = "prediction"
+    DEPENDENCIES = [
+        ComponentDependency("perception", required=True,
+                            channels=["/lol/game_state"]),
+    ]
+    VERSION = "2.0.0"
 
     def __init__(self) -> None:
         super().__init__(
@@ -394,6 +408,7 @@ class PredictionComponent(TimerComponent):
         self._last_teamfight_assessment: Optional[TeamfightAssessment] = None
 
     def Init(self) -> bool:
+        self._managed_init()
         logger.info("Initializing PredictionComponent...")
 
         self._node = CyberNode("prediction")
@@ -429,6 +444,9 @@ class PredictionComponent(TimerComponent):
         # Phase 4: instantiate TeamfightPredictor
         self._teamfight_predictor = TeamfightPredictor()
 
+        self.register_self()
+        self._transition(LifecycleState.READY)
+        self._transition(LifecycleState.RUNNING)
         logger.info(
             "PredictionComponent initialized (model=%s, teamfight=TeamfightPredictor)",
             self._win_predictor.version,

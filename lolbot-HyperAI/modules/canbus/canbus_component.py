@@ -47,6 +47,11 @@ from cyber.component.timer_component import (
 )
 from cyber.node.node import CyberNode, Reader, Writer
 from cyber.logger.cyber_logger import get_logger
+from modules.common.component_base import (
+    ComponentDependency,
+    LifecycleState,
+    ManagedComponent,
+)
 from modules.common.status.error_code import ErrorCode, Status, StatusMessage
 from modules.common.adapters.game_messages import RawLCUData, RawFiddlerData
 
@@ -245,7 +250,7 @@ class FiddlerMCPClient:
 
 # ─── CanbusComponent ────────────────────────────────────────────────────────
 
-class CanbusComponent(TimerComponent):
+class CanbusComponent(TimerComponent, ManagedComponent):
     """Apollo-style canbus component: 10Hz LCU data acquisition.
 
     This is the heartbeat of the entire system.  Every 100ms it:
@@ -258,12 +263,20 @@ class CanbusComponent(TimerComponent):
     Mirrors Apollo's ``CanbusComponent::Proc()`` which reads CAN frames
     at 10ms intervals and publishes ``/apollo/canbus/chassis``.
 
+    Claude11: Added ManagedComponent mixin for lifecycle + circuit breaker.
+
     Usage::
 
         config = CanbusConfig(fiddler_enabled=True)
         canbus = CanbusComponent(config)
         # registered with CyberScheduler; Proc() runs automatically
     """
+
+    COMPONENT_NAME = "canbus"
+    DEPENDENCIES = []
+    VERSION = "2.0.0"
+    CB_MAX_FAILURES = 10
+    CB_COOLDOWN_S = 2.0
 
     def __init__(
         self,
@@ -309,6 +322,7 @@ class CanbusComponent(TimerComponent):
 
         Apollo equivalent: ``CanbusComponent::Init()``
         """
+        self._managed_init()
         logger.info("Initializing CanbusComponent...")
 
         # Create LCU HTTP client
@@ -339,6 +353,9 @@ class CanbusComponent(TimerComponent):
         )
 
         self._connection_state = ConnectionState.CONNECTING
+        self.register_self()
+        self._transition(LifecycleState.READY)
+        self._transition(LifecycleState.RUNNING)
         logger.info("CanbusComponent initialized")
         return True
 
@@ -357,6 +374,9 @@ class CanbusComponent(TimerComponent):
         Returns:
             True on success (even partial), False on hard failure.
         """
+        if self.should_skip_proc():
+            return True
+
         self._tick += 1
         proc_start = time.monotonic()
 
@@ -414,6 +434,7 @@ class CanbusComponent(TimerComponent):
 
     def on_shutdown(self) -> None:
         """Clean up resources on shutdown."""
+        self._managed_shutdown()
         if self._node:
             self._node.shutdown()
         logger.info("CanbusComponent shutdown complete")
