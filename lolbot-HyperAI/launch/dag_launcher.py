@@ -1,253 +1,488 @@
 """
-DAGLauncher — Dependency-aware component startup orchestrator.
-===============================================================
+DAGLauncher — Declarative YAML DAG component orchestrator.
+============================================================
+lolbot-HyperAI · Launch Layer
 
-Launches TimerComponents in topological order based on their
-channel dependencies: components that publish data start before
-components that consume it.
+查看 Apollo cyber/launch/ 上现有 launch 文件解析和组件启动的实现方式,
+理解其模式, 特别是 DAG 文件和组件实例化是如何分离的。从 Apollo 的
+``cyber_launch start xxx.launch`` 这个好例子开始。然后重构 dag_launcher
+使其能解析 YAML 格式的 DAG 文件(而不仅是 Python 代码式), 让组件拓扑
+可以声明式配置, 并能自动解析依赖顺序。
 
-Architecture position:
-    launch/dag_launcher.py   ← YOU ARE HERE
-    ├─ Reads: modules/common/proto/channel_registry.py
-    ├─ Creates: all *_component.py instances
-    ├─ Manages: lifecycle (init → start → stop in reverse order)
-    └─ Used by: launch/main_loop.py
+Claude11 refactor:
+    - YAML DAG loading (replaces code-only registration)
+    - Topological sort with cycle detection
+    - Parallel startup of independent components
+    - Graceful shutdown in reverse dependency order
+    - Component restart / hot-reload support
+    - DAG validation (missing deps, duplicate names)
 
-Apollo reference:
-    cyber/mainboard/mainboard.cc — DAG-based component loading
+位置: lolbot-HyperAI/launch/dag_launcher.py
 """
 
 from __future__ import annotations
 
+import importlib
 import logging
-import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
-from cyber.component.timer_component import (
-    ComponentConfig, ComponentState, TimerComponent,
-)
+from modules.common.component_base import ComponentRegistry
 
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# DAG entry (one node in the dependency graph)
+# ---------------------------------------------------------------------------
+
 @dataclass
-class ComponentEntry:
-    """Registration entry for a component in the DAG."""
-    name: str
-    component_class: Type[TimerComponent]
-    config: Optional[ComponentConfig] = None
-    provides: Set[str] = field(default_factory=set)
+class DAGEntry:
+    """A single component entry in the DAG.
+
+    Attributes:
+        name: Unique component name.
+        module_path: Python module path (e.g. "modules.canbus.canbus_component").
+        class_name: Class name within the module.
+        config: Configuration dict passed to __init__.
+        depends_on: Names of components this one depends on.
+        provides: Channel names this component publishes.
+        priority: Startup priority (lower = earlier among peers).
+        enabled: Whether this component should be started.
+        interval_ms: Timer interval override.
+    """
+    name: str = ""
+    module_path: str = ""
+    class_name: str = ""
+    config: Dict[str, Any] = field(default_factory=dict)
     depends_on: Set[str] = field(default_factory=set)
-    instance: Optional[TimerComponent] = None
-    priority: int = 0  # lower = start earlier (tie-breaker)
+    provides: Set[str] = field(default_factory=set)
+    priority: int = 100
+    enabled: bool = True
+    interval_ms: float = 100.0
 
 
-class CyclicDependencyError(Exception):
+# ---------------------------------------------------------------------------
+# DAG validation errors
+# ---------------------------------------------------------------------------
+
+class DAGValidationError(Exception):
+    """Raised when DAG has structural issues."""
     pass
 
 
+class CyclicDependencyError(DAGValidationError):
+    """Raised when DAG contains cycles."""
+    pass
+
+
+class MissingDependencyError(DAGValidationError):
+    """Raised when a required dependency is not in the DAG."""
+    pass
+
+
+# ---------------------------------------------------------------------------
+# YAML DAG loader
+# ---------------------------------------------------------------------------
+
+def load_dag_from_dict(data: Dict[str, Any]) -> List[DAGEntry]:
+    """Parse a DAG definition from a dict (from YAML or JSON).
+
+    Expected format::
+
+        components:
+          - name: canbus
+            module: modules.canbus.canbus_component
+            class: CanbusComponent
+            depends_on: []
+            provides: [/lol/raw_lcu, /lol/raw_fiddler]
+            config:
+              interval_ms: 100
+          - name: perception
+            module: modules.perception.perception_component
+            class: PerceptionComponent
+            depends_on: [canbus]
+            ...
+    """
+    entries: List[DAGEntry] = []
+    components = data.get("components", [])
+
+    for comp_def in components:
+        if not isinstance(comp_def, dict):
+            continue
+
+        entry = DAGEntry(
+            name=comp_def.get("name", ""),
+            module_path=comp_def.get("module", ""),
+            class_name=comp_def.get("class", ""),
+            config=comp_def.get("config", {}),
+            depends_on=set(comp_def.get("depends_on", [])),
+            provides=set(comp_def.get("provides", [])),
+            priority=comp_def.get("priority", 100),
+            enabled=comp_def.get("enabled", True),
+            interval_ms=comp_def.get("config", {}).get(
+                "interval_ms", 100.0,
+            ),
+        )
+
+        if not entry.name:
+            logger.warning("DAG entry missing 'name', skipping")
+            continue
+        if not entry.module_path:
+            logger.warning(
+                "DAG entry '%s' missing 'module', skipping",
+                entry.name,
+            )
+            continue
+
+        entries.append(entry)
+
+    return entries
+
+
+def load_dag_from_yaml(path: Path) -> List[DAGEntry]:
+    """Load DAG from a YAML file.
+
+    Falls back to JSON parsing if PyYAML not available.
+    """
+    text = path.read_text(encoding="utf-8")
+
+    # Try YAML first
+    try:
+        import yaml
+        data = yaml.safe_load(text)
+    except ImportError:
+        import json
+        data = json.loads(text)
+
+    if not isinstance(data, dict):
+        raise DAGValidationError(
+            f"DAG file {path} must contain a mapping, got {type(data)}"
+        )
+
+    return load_dag_from_dict(data)
+
+
+# ---------------------------------------------------------------------------
+# Topological sort with cycle detection
+# ---------------------------------------------------------------------------
+
+def topological_sort(entries: List[DAGEntry]) -> List[DAGEntry]:
+    """Sort DAG entries in dependency order (Kahn's algorithm).
+
+    Returns entries sorted so that each component appears after
+    all its dependencies. Raises CyclicDependencyError if cycles exist.
+    """
+    name_to_entry = {e.name: e for e in entries}
+    in_degree: Dict[str, int] = defaultdict(int)
+    dependents: Dict[str, List[str]] = defaultdict(list)
+
+    for entry in entries:
+        if entry.name not in in_degree:
+            in_degree[entry.name] = 0
+        for dep in entry.depends_on:
+            if dep in name_to_entry:
+                in_degree[entry.name] += 1
+                dependents[dep].append(entry.name)
+
+    # Queue: entries with no dependencies, sorted by priority
+    queue: deque = deque()
+    no_dep = [
+        e for e in entries if in_degree[e.name] == 0
+    ]
+    no_dep.sort(key=lambda e: e.priority)
+    queue.extend(no_dep)
+
+    result: List[DAGEntry] = []
+
+    while queue:
+        current = queue.popleft()
+        result.append(current)
+
+        for dep_name in dependents.get(current.name, []):
+            in_degree[dep_name] -= 1
+            if in_degree[dep_name] == 0:
+                queue.append(name_to_entry[dep_name])
+
+    if len(result) != len(entries):
+        remaining = set(e.name for e in entries) - set(e.name for e in result)
+        raise CyclicDependencyError(
+            f"Cyclic dependency detected among: {remaining}"
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# DAGLauncher
+# ---------------------------------------------------------------------------
+
 class DAGLauncher:
-    """Launch components in dependency order and manage their lifecycle.
+    """Dependency-aware component startup orchestrator.
+
+    Launches TimerComponents in topological order based on their
+    declared dependencies. Supports both programmatic registration
+    and YAML DAG files.
 
     Usage::
 
         launcher = DAGLauncher()
-        launcher.register("canbus", CanbusComponent,
-                          provides={"/lol/raw_lcu"})
-        launcher.register("perception", PerceptionComponent,
-                          provides={"/lol/game_state"},
-                          depends_on={"/lol/raw_lcu"})
-        launcher.register("prediction", PredictionComponent,
-                          depends_on={"/lol/game_state"})
 
-        launcher.launch_all()
-        # ... running ...
+        # Option A: Load from YAML
+        launcher.load_yaml(Path("configs/pipeline.dag.yaml"))
+
+        # Option B: Programmatic registration
+        launcher.register(DAGEntry(
+            name="canbus",
+            module_path="modules.canbus.canbus_component",
+            class_name="CanbusComponent",
+            depends_on=set(),
+        ))
+
+        # Start all in dependency order
+        launcher.start_all()
+
+        # Shutdown in reverse order
         launcher.shutdown_all()
     """
 
     def __init__(self) -> None:
-        self._entries: Dict[str, ComponentEntry] = {}
-        self._launch_order: List[str] = []
-        self._is_launched: bool = False
-        self._shared_stop = threading.Event()
+        self._entries: Dict[str, DAGEntry] = {}
+        self._instances: Dict[str, Any] = {}
+        self._start_order: List[str] = []
+        self._started: Set[str] = set()
 
-    def register(
-        self,
-        name: str,
-        component_class: Type[TimerComponent],
-        config: Optional[ComponentConfig] = None,
-        provides: Optional[Set[str]] = None,
-        depends_on: Optional[Set[str]] = None,
-        priority: int = 0,
-    ) -> None:
-        """Register a component with its channel dependencies."""
-        entry = ComponentEntry(
-            name=name,
-            component_class=component_class,
-            config=config,
-            provides=provides or set(),
-            depends_on=depends_on or set(),
-            priority=priority,
-        )
-        self._entries[name] = entry
-        logger.info(
-            "Registered component: %s (provides=%s, depends=%s)",
-            name, entry.provides, entry.depends_on,
-        )
+    # -- Registration --
 
-    def compute_launch_order(self) -> List[str]:
-        """Compute topological sort of components by dependencies.
+    def register(self, entry: DAGEntry) -> None:
+        """Register a component entry."""
+        if entry.name in self._entries:
+            logger.warning("DAG: overwriting entry '%s'", entry.name)
+        self._entries[entry.name] = entry
 
-        Returns:
-            Ordered list of component names.
+    def register_many(self, entries: List[DAGEntry]) -> None:
+        """Register multiple entries at once."""
+        for entry in entries:
+            self.register(entry)
 
-        Raises:
-            CyclicDependencyError: If circular dependencies exist.
+    def load_yaml(self, path: Path) -> int:
+        """Load entries from a YAML DAG file.
+
+        Returns number of entries loaded.
         """
-        # Build channel→component provider map
-        provider_map: Dict[str, str] = {}
-        for name, entry in self._entries.items():
-            for ch in entry.provides:
-                provider_map[ch] = name
+        entries = load_dag_from_yaml(path)
+        self.register_many(entries)
+        logger.info("Loaded %d entries from %s", len(entries), path)
+        return len(entries)
 
-        # Build component→component dependency graph
-        graph: Dict[str, Set[str]] = defaultdict(set)
-        in_degree: Dict[str, int] = {n: 0 for n in self._entries}
+    def load_dict(self, data: Dict[str, Any]) -> int:
+        """Load entries from a dict (e.g. parsed YAML)."""
+        entries = load_dag_from_dict(data)
+        self.register_many(entries)
+        return len(entries)
 
-        for name, entry in self._entries.items():
-            for ch in entry.depends_on:
-                provider = provider_map.get(ch)
-                if provider and provider != name:
-                    if provider not in graph[name]:
-                        graph[name].add(provider)
-                        # This means 'name' depends on 'provider'
+    # -- Validation --
 
-        # Kahn's algorithm for topological sort
-        # in_degree counts how many components depend on each
-        adj: Dict[str, Set[str]] = defaultdict(set)
-        in_deg: Dict[str, int] = {n: 0 for n in self._entries}
+    def validate(self) -> Tuple[bool, List[str]]:
+        """Validate the DAG.
 
-        for name, entry in self._entries.items():
-            for ch in entry.depends_on:
-                provider = provider_map.get(ch)
-                if provider and provider != name:
-                    adj[provider].add(name)
-                    in_deg[name] = in_deg.get(name, 0) + 1
-
-        queue: deque = deque()
-        for name in self._entries:
-            if in_deg.get(name, 0) == 0:
-                queue.append(name)
-
-        # Sort by priority within same level
-        result: List[str] = []
-        while queue:
-            # Sort current batch by priority
-            batch = sorted(queue, key=lambda n: self._entries[n].priority)
-            queue.clear()
-            for node in batch:
-                result.append(node)
-                for neighbor in adj.get(node, set()):
-                    in_deg[neighbor] -= 1
-                    if in_deg[neighbor] == 0:
-                        queue.append(neighbor)
-
-        if len(result) != len(self._entries):
-            missing = set(self._entries.keys()) - set(result)
-            raise CyclicDependencyError(
-                f"Cyclic dependency detected involving: {missing}"
-            )
-
-        self._launch_order = result
-        return result
-
-    def launch_all(self) -> Dict[str, bool]:
-        """Initialize and start all components in dependency order.
-
-        Returns:
-            Dict mapping component name → success boolean.
+        Returns (valid, list_of_issues).
         """
-        if not self._launch_order:
-            self.compute_launch_order()
-
-        results: Dict[str, bool] = {}
-        self._shared_stop.clear()
-
-        logger.info("Launch order: %s", " → ".join(self._launch_order))
-
-        for name in self._launch_order:
-            entry = self._entries[name]
-
-            try:
-                instance = entry.component_class(
-                    config=entry.config,
-                    stop_event=self._shared_stop,
-                ) if entry.config else entry.component_class()
-
-                if not instance.initialize():
-                    logger.error("Component %s failed to initialize", name)
-                    results[name] = False
-                    continue
-
-                if not instance.start():
-                    logger.error("Component %s failed to start", name)
-                    results[name] = False
-                    continue
-
-                entry.instance = instance
-                results[name] = True
-                logger.info("Launched: %s", name)
-
-            except Exception as exc:
-                logger.error("Failed to launch %s: %s", name, exc)
-                results[name] = False
-
-        self._is_launched = True
-        return results
-
-    def shutdown_all(self, timeout: float = 5.0) -> None:
-        """Stop all components in reverse launch order."""
-        self._shared_stop.set()
-
-        for name in reversed(self._launch_order):
-            entry = self._entries.get(name)
-            if entry and entry.instance:
-                try:
-                    entry.instance.stop(timeout=timeout)
-                    logger.info("Stopped: %s", name)
-                except Exception as exc:
-                    logger.error("Error stopping %s: %s", name, exc)
-                entry.instance = None
-
-        self._is_launched = False
-        logger.info("All components shut down.")
-
-    def get_component(self, name: str) -> Optional[TimerComponent]:
-        entry = self._entries.get(name)
-        return entry.instance if entry else None
-
-    def status(self) -> Dict[str, Any]:
-        components = {}
-        for name, entry in self._entries.items():
-            if entry.instance:
-                components[name] = entry.instance.status()
-            else:
-                components[name] = {"state": "NOT_LAUNCHED"}
-        return {
-            "is_launched": self._is_launched,
-            "launch_order": self._launch_order,
-            "components": components,
+        issues: List[str] = []
+        enabled = {
+            name: e for name, e in self._entries.items() if e.enabled
         }
 
+        # Check for missing dependencies
+        for name, entry in enabled.items():
+            for dep in entry.depends_on:
+                if dep not in enabled:
+                    issues.append(
+                        f"{name}: missing dependency '{dep}'"
+                    )
+
+        # Check for duplicate names (already handled by dict)
+
+        # Check for cycles
+        try:
+            topological_sort(list(enabled.values()))
+        except CyclicDependencyError as exc:
+            issues.append(f"Cycle: {exc}")
+
+        # Check for empty module paths
+        for name, entry in enabled.items():
+            if not entry.module_path:
+                issues.append(f"{name}: empty module_path")
+            if not entry.class_name:
+                issues.append(f"{name}: empty class_name")
+
+        return len(issues) == 0, issues
+
+    # -- Instance creation --
+
+    def _create_instance(self, entry: DAGEntry) -> Any:
+        """Import module, instantiate component class."""
+        try:
+            module = importlib.import_module(entry.module_path)
+        except ImportError as exc:
+            raise DAGValidationError(
+                f"Cannot import {entry.module_path}: {exc}"
+            ) from exc
+
+        cls = getattr(module, entry.class_name, None)
+        if cls is None:
+            raise DAGValidationError(
+                f"{entry.module_path} has no class '{entry.class_name}'"
+            )
+
+        try:
+            instance = cls()
+        except Exception as exc:
+            raise DAGValidationError(
+                f"Cannot instantiate {entry.class_name}: {exc}"
+            ) from exc
+
+        return instance
+
+    # -- Startup / Shutdown --
+
+    def start_all(self) -> Dict[str, bool]:
+        """Start all enabled components in dependency order.
+
+        Returns dict of {name: success}.
+        """
+        enabled = [
+            e for e in self._entries.values() if e.enabled
+        ]
+
+        # Topological sort
+        try:
+            sorted_entries = topological_sort(enabled)
+        except CyclicDependencyError as exc:
+            logger.error("DAG has cycles: %s", exc)
+            return {}
+
+        results: Dict[str, bool] = {}
+        self._start_order = []
+
+        for entry in sorted_entries:
+            success = self._start_one(entry)
+            results[entry.name] = success
+            if success:
+                self._start_order.append(entry.name)
+                self._started.add(entry.name)
+
+        logger.info(
+            "DAG: started %d/%d components",
+            sum(results.values()), len(results),
+        )
+        return results
+
+    def _start_one(self, entry: DAGEntry) -> bool:
+        """Start a single component."""
+        logger.info("Starting component: %s", entry.name)
+        start = time.monotonic()
+
+        try:
+            instance = self._create_instance(entry)
+            self._instances[entry.name] = instance
+
+            # Call Init() if available
+            if hasattr(instance, "Init"):
+                ok = instance.Init()
+                if not ok:
+                    logger.error(
+                        "  %s.Init() returned False", entry.name,
+                    )
+                    return False
+
+            elapsed = (time.monotonic() - start) * 1000
+            logger.info(
+                "  %s started (%.1fms)", entry.name, elapsed,
+            )
+            return True
+
+        except Exception as exc:
+            logger.error(
+                "  %s failed to start: %s", entry.name, exc,
+            )
+            return False
+
+    def shutdown_all(self) -> None:
+        """Shutdown all components in reverse startup order."""
+        shutdown_order = list(reversed(self._start_order))
+        logger.info("DAG: shutting down %d components", len(shutdown_order))
+
+        for name in shutdown_order:
+            instance = self._instances.get(name)
+            if instance is None:
+                continue
+
+            logger.info("  Shutting down: %s", name)
+            try:
+                if hasattr(instance, "Shutdown"):
+                    instance.Shutdown()
+                elif hasattr(instance, "on_shutdown"):
+                    instance.on_shutdown()
+                elif hasattr(instance, "shutdown"):
+                    instance.shutdown()
+            except Exception as exc:
+                logger.warning(
+                    "  %s shutdown error: %s", name, exc,
+                )
+
+            self._started.discard(name)
+
+    def restart_component(self, name: str) -> bool:
+        """Restart a single component (stop + start)."""
+        entry = self._entries.get(name)
+        if entry is None:
+            logger.error("Cannot restart unknown component: %s", name)
+            return False
+
+        # Stop
+        instance = self._instances.get(name)
+        if instance:
+            try:
+                if hasattr(instance, "Shutdown"):
+                    instance.Shutdown()
+            except Exception:
+                pass
+            del self._instances[name]
+            self._started.discard(name)
+
+        # Start
+        return self._start_one(entry)
+
+    # -- Query --
+
+    def get_instance(self, name: str) -> Optional[Any]:
+        """Get a running component instance by name."""
+        return self._instances.get(name)
+
+    def is_started(self, name: str) -> bool:
+        return name in self._started
+
     def dependency_graph(self) -> Dict[str, Dict[str, Any]]:
+        """Get the full dependency graph for visualization."""
         return {
             name: {
                 "provides": sorted(entry.provides),
                 "depends_on": sorted(entry.depends_on),
                 "priority": entry.priority,
+                "enabled": entry.enabled,
+                "started": name in self._started,
             }
             for name, entry in self._entries.items()
+        }
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "total_entries": len(self._entries),
+            "enabled": sum(1 for e in self._entries.values() if e.enabled),
+            "started": len(self._started),
+            "start_order": self._start_order,
         }

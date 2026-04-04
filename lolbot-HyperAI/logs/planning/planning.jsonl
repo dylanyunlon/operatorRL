@@ -1,0 +1,2 @@
+{"timestamp": "2026-04-04T13:13:06.409Z", "level": "INFO", "module": "planning", "message": "Initializing PlanningComponent...", "correlation_id": "", "seq": 2, "extra": {"message": "Initializing PlanningComponent...", "asctime": "2026-04-04 13:13:06,409"}}
+{"timestamp": "2026-04-04T13:13:06.410Z", "level": "INFO", "module": "planning", "message": "PlanningComponent initialized (with MacroPlanner + LaneAdvisor)", "correlation_id": "", "seq": 4, "extra": {"message": "PlanningComponent initialized (with MacroPlanner + LaneAdvisor)", "asctime": "2026-04-04 13:13:06,410"}}

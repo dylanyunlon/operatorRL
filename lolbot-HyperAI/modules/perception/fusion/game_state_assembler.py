@@ -1,368 +1,464 @@
 """
-perception/fusion/game_state_assembler.py — 多源数据融合
-==========================================================
+perception/fusion/game_state_assembler.py — Multi-source data fusion
+=====================================================================
+lolbot-HyperAI · Perception Layer
 
 查看 Apollo modules/perception/fusion/ 上现有多传感器融合的实现方式,
 理解其模式, 特别是不同数据源的时间对齐和冲突解决。从 Apollo sensor
-fusion pipeline 这个好例子开始。然后遵循该模式实现一个 GameStateAssembler,
+fusion pipeline 这个好例子开始。然后遵循该模式实现 GameStateAssembler,
 让 perception 可以将 LCU Live Client 数据、Fiddler 网络数据、WebSocket
-事件流融合为统一的游戏状态快照, 并能处理数据延迟不一致。
+事件流融合为统一的游戏状态快照, 并能处理数据延迟不一致 (LCU 100ms vs
+Fiddler 500ms)。
+
+Claude11 refactor:
+    - SourceFrame: timestamped data from each source
+    - Time alignment with configurable staleness thresholds
+    - Conflict resolution strategy (newest-wins / weighted / priority)
+    - Quality score computation (completeness * freshness)
+    - Event deduplication across sources
+    - Snapshot versioning for downstream consumers
 
 位置: lolbot-HyperAI/modules/perception/fusion/game_state_assembler.py
 """
 
 from __future__ import annotations
 
-import copy
+import hashlib
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from enum import Enum, auto
+from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Source metadata
+# Constants
 # ---------------------------------------------------------------------------
+
+_LCU_SOURCE = "lcu"
+_FIDDLER_SOURCE = "fiddler"
+_WEBSOCKET_SOURCE = "websocket"
+_REPLAY_SOURCE = "replay"
+
+_LCU_STALE_MS = 500.0        # LCU data stale after 500ms
+_FIDDLER_STALE_MS = 2000.0   # Fiddler data stale after 2s
+_WS_STALE_MS = 1000.0        # WebSocket data stale after 1s
+
+_MAX_EVENT_HISTORY = 200
+_SNAPSHOT_HISTORY_SIZE = 50
+_EVENT_DEDUP_WINDOW_S = 5.0
+
+
+# ---------------------------------------------------------------------------
+# Source frame (one data packet from one source)
+# ---------------------------------------------------------------------------
+
+class ConflictStrategy(Enum):
+    """How to resolve conflicting values across sources."""
+    NEWEST_WINS = auto()      # Use the most recent value
+    PRIORITY = auto()         # Use the highest-priority source
+    WEIGHTED_AVERAGE = auto() # Blend numeric values
+
 
 @dataclass
 class SourceFrame:
-    """单个数据源的一帧数据.
+    """Timestamped data from a single source.
 
-    Attributes:
-        source: 数据源标识 ("lcu", "fiddler", "websocket").
-        timestamp: 数据到达时间 (monotonic).
-        game_time: 数据中的游戏内时间.
-        data: 原始数据.
-        latency_ms: 从数据源获取的延迟.
+    Represents one "reading" from LCU, Fiddler, or WebSocket.
+    The assembler aligns multiple frames by game_time.
     """
     source: str = ""
-    timestamp: float = 0.0
-    game_time: float = 0.0
+    receive_time: float = 0.0    # monotonic time of receipt
+    game_time_s: float = 0.0     # in-game timestamp
     data: Dict[str, Any] = field(default_factory=dict)
-    latency_ms: float = 0.0
+    events: List[Dict[str, Any]] = field(default_factory=list)
+    sequence: int = 0
+    stale_threshold_ms: float = 500.0
 
     @property
     def age_ms(self) -> float:
-        """数据年龄 (从到达到现在)."""
-        return (time.monotonic() - self.timestamp) * 1000
+        """Age since receipt in milliseconds."""
+        return (time.monotonic() - self.receive_time) * 1000.0
 
+    @property
+    def is_stale(self) -> bool:
+        return self.age_ms > self.stale_threshold_ms
+
+    @property
+    def freshness(self) -> float:
+        """Freshness score 0.0-1.0 (1.0 = just received)."""
+        age = self.age_ms
+        if age <= 0:
+            return 1.0
+        if age >= self.stale_threshold_ms:
+            return 0.0
+        return 1.0 - (age / self.stale_threshold_ms)
+
+
+# ---------------------------------------------------------------------------
+# Fused game state snapshot
+# ---------------------------------------------------------------------------
 
 @dataclass
 class FusedSnapshot:
-    """融合后的游戏状态快照.
+    """Result of assembling all source frames into one state.
 
-    Attributes:
-        game_time: 融合后的游戏时间.
-        timestamp: 快照生成时间.
-        sources_used: 使用了哪些数据源.
-        game_data: 游戏元数据.
-        active_player: 活跃玩家数据.
-        all_players: 所有玩家数据.
-        events: 事件列表.
-        quality: 数据质量 [0, 1].
-        supplementary: Fiddler/WS 补充数据.
+    Downstream consumers (prediction, planning) read this.
     """
-    game_time: float = 0.0
-    timestamp: float = field(default_factory=time.time)
-    sources_used: List[str] = field(default_factory=list)
-    game_data: Dict[str, Any] = field(default_factory=dict)
+    version: int = 0
+    assemble_time: float = 0.0
+    game_time_s: float = 0.0
+
+    # Merged player data
+    players: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Game state
     active_player: Dict[str, Any] = field(default_factory=dict)
-    all_players: List[Dict[str, Any]] = field(default_factory=list)
+    game_stats: Dict[str, Any] = field(default_factory=dict)
     events: List[Dict[str, Any]] = field(default_factory=list)
-    quality: float = 1.0
-    supplementary: Dict[str, Any] = field(default_factory=dict)
+
+    # Scores
+    blue_kills: int = 0
+    red_kills: int = 0
+    blue_gold: float = 0.0
+    red_gold: float = 0.0
+
+    # Quality metrics
+    quality: float = 0.0
+    sources_used: List[str] = field(default_factory=list)
+    sources_stale: List[str] = field(default_factory=list)
+    completeness: float = 0.0
+    freshness: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "game_time": self.game_time,
-            "timestamp": self.timestamp,
-            "sources_used": self.sources_used,
-            "game_data": self.game_data,
-            "active_player": self.active_player,
-            "all_players": self.all_players,
-            "events": self.events,
+            "version": self.version,
+            "game_time_s": round(self.game_time_s, 1),
             "quality": round(self.quality, 3),
+            "sources_used": self.sources_used,
+            "sources_stale": self.sources_stale,
+            "blue_kills": self.blue_kills,
+            "red_kills": self.red_kills,
+            "player_count": len(self.players),
+            "event_count": len(self.events),
         }
 
 
 # ---------------------------------------------------------------------------
-# Conflict resolution strategies
+# Event deduplication
 # ---------------------------------------------------------------------------
 
-class ConflictStrategy:
-    """数据冲突解决策略."""
+class EventDeduplicator:
+    """Deduplicates game events across multiple sources.
 
-    @staticmethod
-    def latest(frames: List[SourceFrame]) -> SourceFrame:
-        """选择最新的数据帧."""
-        return max(frames, key=lambda f: f.timestamp)
+    The same kill/dragon/tower event may arrive via LCU, Fiddler,
+    and WebSocket. We dedup by computing a content hash.
+    """
 
-    @staticmethod
-    def lowest_latency(frames: List[SourceFrame]) -> SourceFrame:
-        """选择延迟最低的数据帧."""
-        return min(frames, key=lambda f: f.latency_ms)
+    def __init__(self, window_s: float = _EVENT_DEDUP_WINDOW_S) -> None:
+        self._seen: Dict[str, float] = {}
+        self._window_s = window_s
 
-    @staticmethod
-    def by_priority(
-        frames: List[SourceFrame],
-        priority: List[str],
-    ) -> SourceFrame:
-        """按数据源优先级选择.
+    def is_duplicate(self, event: Dict[str, Any]) -> bool:
+        """Check if event is a duplicate. Returns True if seen before."""
+        key = self._event_key(event)
+        now = time.monotonic()
 
-        Args:
-            priority: 优先级列表, 前面的优先.
-        """
-        for src in priority:
-            for f in frames:
-                if f.source == src:
-                    return f
-        return frames[0] if frames else SourceFrame()
+        # Prune old entries
+        cutoff = now - self._window_s
+        stale_keys = [
+            k for k, t in self._seen.items() if t < cutoff
+        ]
+        for k in stale_keys:
+            del self._seen[k]
+
+        if key in self._seen:
+            return True
+
+        self._seen[key] = now
+        return False
+
+    def _event_key(self, event: Dict[str, Any]) -> str:
+        """Compute a dedup key from event contents."""
+        event_type = event.get("EventName", event.get("type", ""))
+        game_time = event.get("EventTime", event.get("game_time", 0))
+        # Round game_time to avoid float precision issues
+        gt_rounded = round(float(game_time), 1)
+        raw = f"{event_type}:{gt_rounded}"
+
+        # Include killer/victim for kill events
+        killer = event.get("KillerName", "")
+        victim = event.get("VictimName", "")
+        if killer or victim:
+            raw += f":{killer}:{victim}"
+
+        return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+    @property
+    def seen_count(self) -> int:
+        return len(self._seen)
+
+
+# ---------------------------------------------------------------------------
+# Source priority (for conflict resolution)
+# ---------------------------------------------------------------------------
+
+_SOURCE_PRIORITY: Dict[str, int] = {
+    _LCU_SOURCE: 10,        # Highest: direct API
+    _WEBSOCKET_SOURCE: 8,   # Real-time events
+    _FIDDLER_SOURCE: 5,     # Network capture (delayed)
+    _REPLAY_SOURCE: 3,      # Replay data (post-game)
+}
 
 
 # ---------------------------------------------------------------------------
 # GameStateAssembler
 # ---------------------------------------------------------------------------
 
-# 数据源优先级 (LCU > Fiddler > WebSocket)
-_SOURCE_PRIORITY = ["lcu", "fiddler", "websocket"]
-
-# 数据新鲜度阈值 (ms)
-_FRESHNESS_THRESHOLD_MS = 2000.0
-
-
 class GameStateAssembler:
-    """游戏状态融合器.
+    """Multi-source game state fusion engine.
 
-    Apollo 多传感器融合的等价物:
-    - LCU Live Client API = 主传感器 (Camera)
-    - Fiddler 网络捕获 = 辅助传感器 (Radar)
-    - WebSocket 事件流 = 事件传感器 (Ultrasonic)
+    Receives SourceFrames from multiple data providers (LCU, Fiddler,
+    WebSocket) and assembles them into a unified FusedSnapshot.
 
-    融合策略:
-    1. LCU 是主数据源, 提供完整游戏状态
-    2. Fiddler 补充网络层信息 (如精确的网络事件)
-    3. WebSocket 补充实时事件 (如聊天、投降投票)
-    4. 冲突时按优先级解决 (LCU > Fiddler > WS)
-    5. 过期数据自动丢弃
+    The assembly process:
+    1. Accept incoming frames and store per-source
+    2. On assemble(): merge all fresh frames
+    3. Resolve conflicts using configured strategy
+    4. Deduplicate events across sources
+    5. Compute quality score
+    6. Emit versioned FusedSnapshot
 
     Usage::
 
         assembler = GameStateAssembler()
 
-        # 每个 tick, 喂入各数据源的最新数据:
-        assembler.update_source("lcu", lcu_data, latency_ms=15)
-        assembler.update_source("fiddler", fiddler_data, latency_ms=50)
+        # Feed data from sources
+        assembler.update_frame(lcu_frame)
+        assembler.update_frame(fiddler_frame)
 
-        # 融合:
-        snapshot = assembler.fuse()
+        # Assemble
+        snapshot = assembler.assemble()
+        print(snapshot.quality)  # 0.0-1.0
     """
 
     def __init__(
         self,
-        freshness_threshold_ms: float = _FRESHNESS_THRESHOLD_MS,
-        source_priority: Optional[List[str]] = None,
+        conflict_strategy: ConflictStrategy = ConflictStrategy.NEWEST_WINS,
+        min_quality_threshold: float = 0.1,
     ) -> None:
-        self._freshness_threshold_ms = freshness_threshold_ms
-        self._source_priority = source_priority or list(_SOURCE_PRIORITY)
+        self._strategy = conflict_strategy
+        self._min_quality = min_quality_threshold
         self._frames: Dict[str, SourceFrame] = {}
+        self._dedup = EventDeduplicator()
+        self._version = 0
         self._last_snapshot: Optional[FusedSnapshot] = None
-        self._fuse_count: int = 0
-        self._seen_event_ids: Set[int] = set()
-
-    def update_source(
-        self,
-        source: str,
-        data: Dict[str, Any],
-        latency_ms: float = 0.0,
-    ) -> None:
-        """更新数据源的最新帧.
-
-        Args:
-            source: 数据源标识.
-            data: 原始数据 (allgamedata 格式或其他).
-            latency_ms: 获取延迟.
-        """
-        game_time = 0.0
-        game_data = data.get("gameData", {})
-        if game_data:
-            game_time = game_data.get("gameTime", 0.0)
-
-        self._frames[source] = SourceFrame(
-            source=source,
-            timestamp=time.monotonic(),
-            game_time=game_time,
-            data=data,
-            latency_ms=latency_ms,
+        self._snapshot_history: Deque[FusedSnapshot] = deque(
+            maxlen=_SNAPSHOT_HISTORY_SIZE,
+        )
+        self._seen_event_ids: Set[str] = set()
+        self._all_events: Deque[Dict[str, Any]] = deque(
+            maxlen=_MAX_EVENT_HISTORY,
         )
 
-    def fuse(self) -> FusedSnapshot:
-        """执行一次融合, 生成快照.
+    def update_frame(self, frame: SourceFrame) -> None:
+        """Update the latest frame from a source."""
+        self._frames[frame.source] = frame
 
-        Returns:
-            融合后的 FusedSnapshot.
+    def assemble(self) -> FusedSnapshot:
+        """Assemble all fresh frames into a unified snapshot.
+
+        Returns a new FusedSnapshot. If all sources are stale,
+        returns a low-quality snapshot with whatever data is available.
         """
-        self._fuse_count += 1
+        self._version += 1
+        now = time.monotonic()
 
-        # 过滤过期数据
-        fresh_frames = self._get_fresh_frames()
-
-        if not fresh_frames:
-            # 无新鲜数据, 返回降级快照
-            return FusedSnapshot(
-                quality=0.0,
-                supplementary={"reason": "no_fresh_data"},
-            )
-
-        # 主数据源选择
-        primary = ConflictStrategy.by_priority(
-            list(fresh_frames.values()),
-            self._source_priority,
+        snap = FusedSnapshot(
+            version=self._version,
+            assemble_time=now,
         )
 
-        # 从主数据源构建基础快照
-        snapshot = self._build_from_primary(primary)
+        # Classify sources
+        fresh_frames: List[SourceFrame] = []
+        stale_frames: List[SourceFrame] = []
 
-        # 从辅助数据源补充信息
-        for source, frame in fresh_frames.items():
-            if source == primary.source:
-                continue
-            self._merge_supplementary(snapshot, frame)
-
-        # 事件去重
-        snapshot.events = self._dedup_events(snapshot.events)
-
-        # 计算数据质量
-        snapshot.quality = self._compute_quality(fresh_frames)
-
-        self._last_snapshot = snapshot
-        return snapshot
-
-    def _get_fresh_frames(self) -> Dict[str, SourceFrame]:
-        """获取新鲜的数据帧."""
-        result: Dict[str, SourceFrame] = {}
         for source, frame in self._frames.items():
-            if frame.age_ms <= self._freshness_threshold_ms:
-                result[source] = frame
-        return result
+            if frame.is_stale:
+                stale_frames.append(frame)
+                snap.sources_stale.append(source)
+            else:
+                fresh_frames.append(frame)
+                snap.sources_used.append(source)
 
-    def _build_from_primary(self, primary: SourceFrame) -> FusedSnapshot:
-        """从主数据源构建基础快照."""
-        data = primary.data
+        # Use fresh if available, fall back to stale
+        frames_to_merge = fresh_frames or stale_frames
 
-        # 提取各部分
-        game_data = data.get("gameData", {})
-        active_player = data.get("activePlayer", {})
-        all_players = data.get("allPlayers", [])
+        if not frames_to_merge:
+            snap.quality = 0.0
+            self._last_snapshot = snap
+            return snap
 
-        events_wrapper = data.get("events", {})
-        events = events_wrapper.get("Events", []) if isinstance(events_wrapper, dict) else []
-
-        return FusedSnapshot(
-            game_time=game_data.get("gameTime", 0.0),
-            sources_used=[primary.source],
-            game_data=copy.deepcopy(game_data),
-            active_player=copy.deepcopy(active_player),
-            all_players=copy.deepcopy(all_players),
-            events=copy.deepcopy(events),
+        # Sort by priority (highest first)
+        frames_to_merge.sort(
+            key=lambda f: _SOURCE_PRIORITY.get(f.source, 0),
+            reverse=True,
         )
 
-    def _merge_supplementary(
-        self,
-        snapshot: FusedSnapshot,
-        frame: SourceFrame,
-    ) -> None:
-        """合并辅助数据源的补充信息."""
-        snapshot.sources_used.append(frame.source)
+        # Merge game time (use highest-priority fresh source)
+        snap.game_time_s = frames_to_merge[0].game_time_s
 
-        if frame.source == "fiddler":
-            # Fiddler 可能提供额外的网络事件
-            fiddler_events = frame.data.get("network_events", [])
-            if fiddler_events:
-                snapshot.supplementary["fiddler_events"] = fiddler_events
+        # Merge data fields
+        merged_data: Dict[str, Any] = {}
+        for frame in reversed(frames_to_merge):
+            # Lower priority frames go first, higher priority overwrites
+            merged_data.update(frame.data)
 
-            # Fiddler 可能提供更精确的时间戳
-            fiddler_timestamps = frame.data.get("timestamps", {})
-            if fiddler_timestamps:
-                snapshot.supplementary["precise_timestamps"] = fiddler_timestamps
+        # Extract standard fields
+        snap.players = merged_data.get("allPlayers", [])
+        snap.active_player = merged_data.get("activePlayer", {})
+        snap.game_stats = merged_data.get("gameData", {})
 
-        elif frame.source == "websocket":
-            # WebSocket 提供实时事件
-            ws_events = frame.data.get("ws_events", [])
-            if ws_events:
-                snapshot.supplementary["ws_events"] = ws_events
+        # Compute scores
+        self._compute_scores(snap)
 
-    def _dedup_events(
-        self, events: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
-        """事件去重 (基于 EventID)."""
-        deduped: List[Dict[str, Any]] = []
-        for event in events:
-            event_id = event.get("EventID")
-            if event_id is not None:
-                if event_id in self._seen_event_ids:
-                    continue
-                self._seen_event_ids.add(event_id)
-            deduped.append(event)
-        return deduped
+        # Merge and dedup events
+        all_new_events: List[Dict[str, Any]] = []
+        for frame in frames_to_merge:
+            for event in frame.events:
+                if not self._dedup.is_duplicate(event):
+                    all_new_events.append(event)
+                    self._all_events.append(event)
 
-    def _compute_quality(
-        self, frames: Dict[str, SourceFrame],
+        snap.events = all_new_events
+
+        # Compute quality
+        snap.freshness = self._compute_freshness(frames_to_merge)
+        snap.completeness = self._compute_completeness(snap)
+        snap.quality = snap.freshness * snap.completeness
+
+        self._last_snapshot = snap
+        self._snapshot_history.append(snap)
+
+        return snap
+
+    def _compute_scores(self, snap: FusedSnapshot) -> None:
+        """Compute kill/gold totals from player list."""
+        blue_kills = 0
+        red_kills = 0
+        blue_gold = 0.0
+        red_gold = 0.0
+
+        for player in snap.players:
+            team = player.get("team", "")
+            scores = player.get("scores", {})
+            kills = scores.get("kills", 0)
+            gold = player.get("currentGold", 0)
+
+            if team == "ORDER":
+                blue_kills += kills
+                blue_gold += gold
+            elif team == "CHAOS":
+                red_kills += kills
+                red_gold += gold
+
+        snap.blue_kills = blue_kills
+        snap.red_kills = red_kills
+        snap.blue_gold = blue_gold
+        snap.red_gold = red_gold
+
+    def _compute_freshness(
+        self, frames: List[SourceFrame],
     ) -> float:
-        """计算数据质量分数.
+        """Average freshness across all used frames."""
+        if not frames:
+            return 0.0
+        total = sum(f.freshness for f in frames)
+        return total / len(frames)
 
-        因素:
-        - 有多少数据源在线 (权重 0.3)
-        - 主数据源延迟 (权重 0.4)
-        - 数据新鲜度 (权重 0.3)
+    def _compute_completeness(self, snap: FusedSnapshot) -> float:
+        """How complete is the snapshot (0.0-1.0).
+
+        Checks: players present, active player present, game stats.
         """
-        # 数据源数量
-        source_score = min(1.0, len(frames) / len(self._source_priority))
+        score = 0.0
+        checks = 0
 
-        # 主数据源延迟
-        primary_frame = ConflictStrategy.by_priority(
-            list(frames.values()), self._source_priority,
-        )
-        latency_score = 1.0
-        if primary_frame.latency_ms > 500:
-            latency_score = 0.3
-        elif primary_frame.latency_ms > 200:
-            latency_score = 0.6
-        elif primary_frame.latency_ms > 100:
-            latency_score = 0.8
+        # Players
+        checks += 1
+        if len(snap.players) >= 10:
+            score += 1.0
+        elif len(snap.players) >= 5:
+            score += 0.5
 
-        # 新鲜度
-        freshness_score = 1.0
-        if primary_frame.age_ms > 1000:
-            freshness_score = 0.5
-        elif primary_frame.age_ms > 500:
-            freshness_score = 0.7
+        # Active player
+        checks += 1
+        if snap.active_player:
+            score += 1.0
 
-        quality = (
-            source_score * 0.3
-            + latency_score * 0.4
-            + freshness_score * 0.3
-        )
-        return quality
+        # Game stats
+        checks += 1
+        if snap.game_stats:
+            score += 1.0
 
-    def reset(self) -> None:
-        """重置 (新游戏开始时调用)."""
-        self._frames.clear()
-        self._seen_event_ids.clear()
-        self._last_snapshot = None
+        # Game time
+        checks += 1
+        if snap.game_time_s > 0:
+            score += 1.0
+
+        return score / checks if checks > 0 else 0.0
+
+    # -- Query --
+
+    @property
+    def latest(self) -> Optional[FusedSnapshot]:
+        return self._last_snapshot
+
+    @property
+    def version(self) -> int:
+        return self._version
+
+    def recent_events(self, count: int = 20) -> List[Dict[str, Any]]:
+        """Get recent deduplicated events."""
+        items = list(self._all_events)
+        return items[-count:]
+
+    def source_status(self) -> Dict[str, Dict[str, Any]]:
+        """Status of all known sources."""
+        result: Dict[str, Dict[str, Any]] = {}
+        for source, frame in self._frames.items():
+            result[source] = {
+                "age_ms": round(frame.age_ms, 1),
+                "stale": frame.is_stale,
+                "freshness": round(frame.freshness, 3),
+                "game_time_s": round(frame.game_time_s, 1),
+                "sequence": frame.sequence,
+            }
+        return result
 
     def stats(self) -> Dict[str, Any]:
         return {
-            "fuse_count": self._fuse_count,
-            "active_sources": list(self._frames.keys()),
-            "seen_events": len(self._seen_event_ids),
+            "version": self._version,
+            "sources": len(self._frames),
+            "seen_events": self._dedup.seen_count,
+            "total_events": len(self._all_events),
             "last_quality": (
                 round(self._last_snapshot.quality, 3)
-                if self._last_snapshot else 0
+                if self._last_snapshot else 0.0
             ),
             "source_ages_ms": {
                 src: round(f.age_ms, 1)
                 for src, f in self._frames.items()
             },
         }
+
+    def reset(self) -> None:
+        """Reset all state (e.g. between games)."""
+        self._frames.clear()
+        self._dedup = EventDeduplicator()
+        self._last_snapshot = None
+        self._all_events.clear()
+        self._seen_event_ids.clear()

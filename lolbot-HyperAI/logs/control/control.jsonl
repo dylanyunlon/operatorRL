@@ -1,0 +1,2 @@
+{"timestamp": "2026-04-04T13:13:06.411Z", "level": "INFO", "module": "control", "message": "Initializing ControlComponent v2.0.0 ...", "correlation_id": "", "seq": 2, "extra": {"message": "Initializing ControlComponent v2.0.0 ...", "asctime": "2026-04-04 13:13:06,411"}}
+{"timestamp": "2026-04-04T13:13:06.411Z", "level": "INFO", "module": "control", "message": "ControlComponent initialized (3 channels)", "correlation_id": "", "seq": 4, "extra": {"message": "ControlComponent initialized (3 channels)", "asctime": "2026-04-04 13:13:06,411"}}

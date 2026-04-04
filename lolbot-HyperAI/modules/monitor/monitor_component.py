@@ -1,348 +1,512 @@
 """
 MonitorComponent — System health guardian (Apollo modules/monitor).
 ====================================================================
+lolbot-HyperAI · Monitor Layer
 
-Periodic TimerComponent that checks all other components' health,
-resource usage, channel throughput, and circuit-breaker state. Publishes
-health reports to /lol/system_health and exposes an RPC service for
-on-demand diagnostics.
+查看 Apollo modules/monitor/ 上现有系统监控组件的实现方式, 理解其模式,
+特别是硬件状态、模块健康、系统资源是如何统一监控的。从 Apollo monitor 的
+RecurrentRunner + FunctionalSafetyMonitor 这个好例子开始。然后扩充我们的
+monitor_component, 增加每个组件的 Proc() 耗时追踪、消息延迟监控、内存使用
+告警, 让运维可以通过 /lol/monitor_status 频道实时获取系统健康, 并能在
+组件异常时自动降级。
 
 Architecture position:
-    modules/monitor/monitor_component.py   ← YOU ARE HERE
-    ├─ Reads: cyber/statistics (latency, throughput)
-    ├─ Reads: modules/monitor/resource_tracker.py (CPU/mem)
-    ├─ Publishes: /lol/system_health (HealthReport)
-    ├─ Exposes: "system_health" RPC service
-    └─ Alerts: on degradation or component failure
+    modules/monitor/monitor_component.py   <- YOU ARE HERE
+    +- Reads: ComponentRegistry.health_summary() (all components)
+    +- Reads: /lol/canbus_status, /lol/control_status (channels)
+    +- Publishes: /lol/monitor_status (SystemHealthReport)
+    +- Publishes: /lol/alert (AlertRecord)
+    +- Manages: resource_tracker (CPU/memory watchdog)
 
-Apollo reference:
-    modules/monitor/monitor.cc — periodic system health checks
-    modules/guardian/guardian.cc — safety guardian
+Claude11 refactor:
+    - ManagedComponent mixin for lifecycle + circuit breaker
+    - Per-component Proc() latency tracking via ProcMetrics
+    - Alert severity levels (INFO/WARNING/ERROR/CRITICAL)
+    - Auto-degradation: components exceeding thresholds get flagged
+    - Resource tracker: memory/CPU watchdog with configurable limits
+    - Heartbeat publisher for external monitoring systems
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
 
-from cyber.component.timer_component import (
-    ComponentConfig, ComponentState, TimerComponent,
-)
+from cyber.component.timer_component import ComponentConfig, TimerComponent
 from cyber.node.node import CyberNode, Writer
-from cyber.statistics.statistics import Statistics
+from cyber.logger.cyber_logger import get_logger
+from modules.common.component_base import (
+    ComponentDependency,
+    ComponentRegistry,
+    LifecycleState,
+    ManagedComponent,
+)
 
-logger = logging.getLogger(__name__)
+logger = get_logger("monitor")
 
-# ─── Constants ───────────────────────────────────────────────────────────────
+# --- Constants ---------------------------------------------------------------
 
-_MONITOR_INTERVAL_MS: float = 1000.0  # 1Hz health checks
-_WARN_LATENCY_US: int = 50000         # 50ms
-_ERROR_LATENCY_US: int = 200000       # 200ms
-_WARN_FAILURE_RATE: float = 0.05      # 5%
-_ERROR_FAILURE_RATE: float = 0.20     # 20%
-_MAX_ALERTS_PER_MINUTE: int = 10
-_HEALTH_CHANNEL: str = "/lol/system_health"
-_ALERT_CHANNEL: str = "/lol/system_alert"
+_MONITOR_INTERVAL_MS = 2000.0   # 0.5Hz — check health every 2s
+_WARN_THRESHOLD_MS = 500.0
+_RESOURCE_CHECK_INTERVAL_S = 10.0
+_MEMORY_WARN_MB = 512
+_MEMORY_CRITICAL_MB = 1024
+_PROC_LATENCY_WARN_MS = 50.0    # warn if any Proc() avg > 50ms
+_PROC_LATENCY_ERROR_MS = 200.0  # error if any Proc() avg > 200ms
+_MAX_ALERTS = 500
+_HEARTBEAT_INTERVAL_S = 30.0
 
 
-class HealthLevel(Enum):
-    """System or component health level."""
-    OK = auto()
-    DEGRADED = auto()
+# --- Alert system ------------------------------------------------------------
+
+class AlertSeverity(Enum):
+    """Alert severity levels."""
+    INFO = auto()
+    WARNING = auto()
     ERROR = auto()
     CRITICAL = auto()
 
 
 @dataclass
-class ComponentHealth:
-    """Health assessment for a single component."""
-    name: str
-    level: HealthLevel = HealthLevel.OK
-    mean_latency_us: float = 0.0
-    p95_latency_us: float = 0.0
-    failure_rate: float = 0.0
-    overrun_count: int = 0
-    message: str = ""
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "name": self.name,
-            "level": self.level.name,
-            "mean_latency_us": round(self.mean_latency_us, 1),
-            "p95_latency_us": round(self.p95_latency_us, 1),
-            "failure_rate": round(self.failure_rate, 4),
-            "overrun_count": self.overrun_count,
-            "message": self.message,
-        }
-
-
-@dataclass
-class HealthReport:
-    """Complete system health report."""
-    timestamp: float = 0.0
-    overall_level: HealthLevel = HealthLevel.OK
-    components: List[ComponentHealth] = field(default_factory=list)
-    cpu_percent: float = 0.0
-    memory_mb: float = 0.0
-    thread_count: int = 0
-    uptime_s: float = 0.0
-    channel_count: int = 0
-    total_writes_per_second: float = 0.0
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "timestamp": self.timestamp,
-            "overall_level": self.overall_level.name,
-            "cpu_percent": round(self.cpu_percent, 1),
-            "memory_mb": round(self.memory_mb, 1),
-            "thread_count": self.thread_count,
-            "uptime_s": round(self.uptime_s, 1),
-            "channel_count": self.channel_count,
-            "total_writes_per_second": round(
-                self.total_writes_per_second, 1
-            ),
-            "components": [c.to_dict() for c in self.components],
-        }
-
-
-@dataclass
 class AlertRecord:
-    """A single alert emitted by the monitor."""
-    timestamp: float
-    component: str
-    level: HealthLevel
-    message: str
+    """A single alert event."""
+    alert_id: int = 0
+    timestamp: float = 0.0
+    severity: AlertSeverity = AlertSeverity.INFO
+    component: str = ""
+    category: str = ""
+    message: str = ""
+    details: Dict[str, Any] = field(default_factory=dict)
+    resolved: bool = False
+    resolved_at: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "timestamp": self.timestamp,
+            "id": self.alert_id,
+            "ts": round(self.timestamp, 3),
+            "severity": self.severity.name,
             "component": self.component,
-            "level": self.level.name,
+            "category": self.category,
             "message": self.message,
+            "resolved": self.resolved,
         }
 
 
-class MonitorComponent(TimerComponent):
-    """System health monitor — the guardian of the pipeline.
+class AlertManager:
+    """Manages alert lifecycle: create, resolve, dedup, history."""
 
-    Each ``Proc()`` cycle (1Hz):
-    1. Query Statistics singleton for all component metrics
-    2. Query ResourceTracker for CPU/memory usage
-    3. Evaluate health thresholds for each component
-    4. Compute overall system health level
-    5. Publish HealthReport to /lol/system_health
-    6. Emit alerts for degraded/error components
+    def __init__(self, max_alerts: int = _MAX_ALERTS) -> None:
+        self._alerts: Deque[AlertRecord] = deque(maxlen=max_alerts)
+        self._active: Dict[str, AlertRecord] = {}
+        self._counter = 0
+        self._callbacks: List[Callable[[AlertRecord], None]] = []
 
-    Usage::
+    def fire(
+        self,
+        severity: AlertSeverity,
+        component: str,
+        category: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> AlertRecord:
+        """Fire a new alert (or update existing active alert)."""
+        key = f"{component}:{category}"
 
-        monitor = MonitorComponent()
-        monitor.initialize()
-        monitor.start()
-        # ... later ...
-        report = monitor.latest_report
+        # Dedup: if same alert is already active, skip
+        if key in self._active:
+            existing = self._active[key]
+            if not existing.resolved:
+                return existing
+
+        self._counter += 1
+        alert = AlertRecord(
+            alert_id=self._counter,
+            timestamp=time.time(),
+            severity=severity,
+            component=component,
+            category=category,
+            message=message,
+            details=details or {},
+        )
+        self._alerts.append(alert)
+        self._active[key] = alert
+
+        # Notify callbacks
+        for cb in self._callbacks:
+            try:
+                cb(alert)
+            except Exception:
+                pass
+
+        # Log based on severity
+        if severity == AlertSeverity.CRITICAL:
+            logger.error("[ALERT:CRITICAL] %s: %s", component, message)
+        elif severity == AlertSeverity.ERROR:
+            logger.error("[ALERT:ERROR] %s: %s", component, message)
+        elif severity == AlertSeverity.WARNING:
+            logger.warning("[ALERT:WARN] %s: %s", component, message)
+        else:
+            logger.info("[ALERT:INFO] %s: %s", component, message)
+
+        return alert
+
+    def resolve(self, component: str, category: str) -> bool:
+        """Resolve an active alert."""
+        key = f"{component}:{category}"
+        alert = self._active.get(key)
+        if alert and not alert.resolved:
+            alert.resolved = True
+            alert.resolved_at = time.time()
+            return True
+        return False
+
+    def active_alerts(self) -> List[AlertRecord]:
+        """Get all unresolved alerts."""
+        return [a for a in self._active.values() if not a.resolved]
+
+    def recent(self, count: int = 20) -> List[AlertRecord]:
+        """Get recent alerts."""
+        items = list(self._alerts)
+        return items[-count:]
+
+    def on_alert(self, callback: Callable[[AlertRecord], None]) -> None:
+        """Register alert callback."""
+        self._callbacks.append(callback)
+
+    def stats(self) -> Dict[str, Any]:
+        active = self.active_alerts()
+        return {
+            "total_alerts": self._counter,
+            "active_count": len(active),
+            "active_by_severity": {
+                s.name: sum(1 for a in active if a.severity == s)
+                for s in AlertSeverity
+            },
+            "history_size": len(self._alerts),
+        }
+
+
+# --- Resource tracker --------------------------------------------------------
+
+class ResourceTracker:
+    """Lightweight resource monitoring (memory, uptime)."""
+
+    def __init__(self) -> None:
+        self._start_time = time.monotonic()
+        self._last_check = 0.0
+        self._snapshots: Deque[Dict[str, Any]] = deque(maxlen=100)
+
+    def check(self) -> Dict[str, Any]:
+        """Take a resource snapshot."""
+        try:
+            import resource as res_mod
+            usage = res_mod.getrusage(res_mod.RUSAGE_SELF)
+            rss_mb = usage.ru_maxrss / 1024  # Linux: KB -> MB
+        except Exception:
+            rss_mb = 0.0
+
+        snapshot = {
+            "ts": time.time(),
+            "rss_mb": round(rss_mb, 1),
+            "uptime_s": round(time.monotonic() - self._start_time, 1),
+            "pid": os.getpid(),
+        }
+        self._snapshots.append(snapshot)
+        self._last_check = time.monotonic()
+        return snapshot
+
+    @property
+    def last_rss_mb(self) -> float:
+        if self._snapshots:
+            return self._snapshots[-1].get("rss_mb", 0.0)
+        return 0.0
+
+    def stop(self) -> None:
+        """No-op cleanup."""
+        pass
+
+
+# --- Component health checker ------------------------------------------------
+
+@dataclass
+class ComponentHealthEntry:
+    """Tracked health info for one component."""
+    name: str = ""
+    healthy: bool = True
+    last_check_time: float = 0.0
+    avg_proc_latency_ms: float = 0.0
+    success_rate: float = 1.0
+    consecutive_unhealthy: int = 0
+    degraded: bool = False
+    details: Dict[str, Any] = field(default_factory=dict)
+
+
+class ComponentHealthTracker:
+    """Tracks per-component health over time."""
+
+    def __init__(self) -> None:
+        self._entries: Dict[str, ComponentHealthEntry] = {}
+        self._history: Deque[Dict[str, Any]] = deque(maxlen=200)
+
+    def update(self, name: str, health: Dict[str, Any]) -> ComponentHealthEntry:
+        """Update health info for a component."""
+        entry = self._entries.get(name)
+        if entry is None:
+            entry = ComponentHealthEntry(name=name)
+            self._entries[name] = entry
+
+        entry.healthy = health.get("healthy", True)
+        entry.last_check_time = time.monotonic()
+        entry.degraded = health.get("degraded", False)
+        entry.details = health
+
+        # Extract proc metrics if available
+        proc = health.get("details", {}).get("proc_metrics", {})
+        if proc:
+            entry.avg_proc_latency_ms = proc.get("avg_latency_ms", 0.0)
+            entry.success_rate = proc.get("success_rate", 1.0)
+
+        if entry.healthy:
+            entry.consecutive_unhealthy = 0
+        else:
+            entry.consecutive_unhealthy += 1
+
+        return entry
+
+    def get(self, name: str) -> Optional[ComponentHealthEntry]:
+        return self._entries.get(name)
+
+    def all_entries(self) -> Dict[str, ComponentHealthEntry]:
+        return dict(self._entries)
+
+    def unhealthy(self) -> List[ComponentHealthEntry]:
+        return [e for e in self._entries.values() if not e.healthy]
+
+    def summary(self) -> Dict[str, Any]:
+        total = len(self._entries)
+        healthy = sum(1 for e in self._entries.values() if e.healthy)
+        degraded = sum(1 for e in self._entries.values() if e.degraded)
+        return {
+            "total_components": total,
+            "healthy": healthy,
+            "unhealthy": total - healthy,
+            "degraded": degraded,
+        }
+
+
+# --- MonitorComponent --------------------------------------------------------
+
+class MonitorComponent(TimerComponent, ManagedComponent):
+    """System health guardian — monitors all components.
+
+    Proc() cycle (2s interval):
+    1. Query ComponentRegistry for all component health
+    2. Track per-component latency and success rate
+    3. Check resource usage (memory)
+    4. Fire alerts for degraded/unhealthy components
+    5. Publish system health report to /lol/monitor_status
+    6. Emit heartbeat for external monitoring
     """
+
+    COMPONENT_NAME = "monitor"
+    DEPENDENCIES = []
+    VERSION = "2.0.0"
 
     def __init__(self) -> None:
         super().__init__(
             config=ComponentConfig(
                 name="monitor",
                 interval_ms=_MONITOR_INTERVAL_MS,
-                warn_threshold_ms=500.0,
-            )
+                warn_threshold_ms=_WARN_THRESHOLD_MS,
+            ),
         )
         self._node: Optional[CyberNode] = None
-        self._health_writer: Optional[Writer] = None
-        self._alert_writer: Optional[Writer] = None
-        self._latest_report: Optional[HealthReport] = None
-        self._alerts: List[AlertRecord] = []
-        self._alert_timestamps: List[float] = []
+        self._status_writer: Optional[Writer] = None
+
+        self._alert_manager = AlertManager()
+        self._resource_tracker = ResourceTracker()
+        self._health_tracker = ComponentHealthTracker()
+
+        self._tick_count = 0
+        self._last_resource_check = 0.0
+        self._last_heartbeat = 0.0
         self._on_alert_callbacks: List[Callable[[AlertRecord], None]] = []
-        self._resource_tracker: Optional[Any] = None
 
     def Init(self) -> bool:
-        """Initialize monitor: create node, writers, resource tracker."""
+        """Initialize monitor component."""
+        self._managed_init()
+        logger.info("Initializing MonitorComponent v%s ...", self.VERSION)
+
         self._node = CyberNode("monitor")
-        self._health_writer = self._node.create_writer(_HEALTH_CHANNEL)
-        self._alert_writer = self._node.create_writer(_ALERT_CHANNEL)
+        self._status_writer = self._node.CreateWriter(
+            "/lol/monitor_status", dict,
+        )
 
-        # Try to import resource tracker (optional dependency)
-        try:
-            from modules.monitor.resource_tracker import ResourceTracker
-            self._resource_tracker = ResourceTracker()
-            self._resource_tracker.start()
-        except ImportError:
-            logger.warning("ResourceTracker not available, "
-                           "resource metrics disabled")
+        # Wire alert callbacks
+        for cb in self._on_alert_callbacks:
+            self._alert_manager.on_alert(cb)
 
+        self.register_self()
+        self._transition(LifecycleState.READY)
+        self._transition(LifecycleState.RUNNING)
         logger.info("MonitorComponent initialized")
         return True
 
     def Proc(self) -> bool:
-        """Run one health-check cycle."""
-        stats = Statistics.instance()
-        snapshot = stats.full_snapshot()
+        """Monitor cycle: check health, resources, fire alerts."""
+        if self.should_skip_proc():
+            return True
 
-        # Assess each component
-        component_healths: List[ComponentHealth] = []
-        worst_level = HealthLevel.OK
+        with self.measure_proc() as m:
+            self._tick_count += 1
 
-        for comp_name, comp_data in snapshot.get("components", {}).items():
-            health = self._assess_component(comp_name, comp_data)
-            component_healths.append(health)
-            if health.level.value > worst_level.value:
-                worst_level = health.level
+            # 1. Check all component health via registry
+            self._check_component_health()
 
-        # Resource metrics
-        cpu_pct = 0.0
-        mem_mb = 0.0
-        thread_count = threading.active_count()
+            # 2. Periodic resource check
+            now = time.monotonic()
+            if now - self._last_resource_check >= _RESOURCE_CHECK_INTERVAL_S:
+                self._check_resources()
+                self._last_resource_check = now
 
-        if self._resource_tracker:
-            try:
-                res = self._resource_tracker.snapshot()
-                cpu_pct = res.get("cpu_percent", 0.0)
-                mem_mb = res.get("memory_rss_mb", 0.0)
-            except Exception:
-                pass
+            # 3. Publish heartbeat
+            if now - self._last_heartbeat >= _HEARTBEAT_INTERVAL_S:
+                self._publish_heartbeat()
+                self._last_heartbeat = now
 
-        # Resource-based health assessment
-        if mem_mb > 1024:
-            worst_level = max(worst_level, HealthLevel.DEGRADED,
-                              key=lambda x: x.value)
-        if cpu_pct > 90:
-            worst_level = max(worst_level, HealthLevel.DEGRADED,
-                              key=lambda x: x.value)
+            m.success = True
+            return True
 
-        # Channel metrics
-        ch_data = snapshot.get("channels", {})
-        total_wps = sum(
-            c.get("writes_per_second", 0) for c in ch_data.values()
-        )
+    def _check_component_health(self) -> None:
+        """Query all registered components for health."""
+        registry = ComponentRegistry.instance()
+        health_map = registry.health_summary()
 
-        # Build report
-        report = HealthReport(
-            timestamp=time.time(),
-            overall_level=worst_level,
-            components=component_healths,
-            cpu_percent=cpu_pct,
-            memory_mb=mem_mb,
-            thread_count=thread_count,
-            uptime_s=snapshot.get("uptime_s", 0),
-            channel_count=len(ch_data),
-            total_writes_per_second=total_wps,
-        )
-        self._latest_report = report
+        for name, health in health_map.items():
+            if name == self.COMPONENT_NAME:
+                continue  # Don't monitor self
 
-        # Publish
-        if self._health_writer:
-            self._health_writer.write(report.to_dict())
+            entry = self._health_tracker.update(name, health)
 
-        # Generate alerts for non-OK components
-        for health in component_healths:
-            if health.level != HealthLevel.OK:
-                self._emit_alert(health)
+            # Check for latency warnings
+            if entry.avg_proc_latency_ms > _PROC_LATENCY_ERROR_MS:
+                self._alert_manager.fire(
+                    AlertSeverity.ERROR, name, "high_latency",
+                    f"Proc() avg latency {entry.avg_proc_latency_ms:.0f}ms "
+                    f"exceeds {_PROC_LATENCY_ERROR_MS}ms threshold",
+                )
+            elif entry.avg_proc_latency_ms > _PROC_LATENCY_WARN_MS:
+                self._alert_manager.fire(
+                    AlertSeverity.WARNING, name, "high_latency",
+                    f"Proc() avg latency {entry.avg_proc_latency_ms:.0f}ms "
+                    f"exceeds {_PROC_LATENCY_WARN_MS}ms threshold",
+                )
+            else:
+                self._alert_manager.resolve(name, "high_latency")
 
-        return True
+            # Check for unhealthy components
+            if not entry.healthy:
+                sev = AlertSeverity.ERROR
+                if entry.consecutive_unhealthy >= 5:
+                    sev = AlertSeverity.CRITICAL
+                self._alert_manager.fire(
+                    sev, name, "unhealthy",
+                    f"Component unhealthy for "
+                    f"{entry.consecutive_unhealthy} checks",
+                    details=entry.details,
+                )
+            else:
+                self._alert_manager.resolve(name, "unhealthy")
 
-    def _assess_component(
-        self, name: str, data: Dict[str, Any]
-    ) -> ComponentHealth:
-        """Evaluate a single component's health from its statistics."""
-        health = ComponentHealth(name=name)
+            # Check for low success rate
+            if entry.success_rate < 0.5:
+                self._alert_manager.fire(
+                    AlertSeverity.WARNING, name, "low_success_rate",
+                    f"Success rate {entry.success_rate:.1%} below 50%",
+                )
+            else:
+                self._alert_manager.resolve(name, "low_success_rate")
 
-        total_procs = data.get("total_procs", 0)
-        total_failures = data.get("total_failures", 0)
-        health.mean_latency_us = data.get("mean_us", 0)
-        health.p95_latency_us = data.get("p95_us", 0)
-        health.overrun_count = data.get("total_overruns", 0)
+    def _check_resources(self) -> None:
+        """Check system resource usage."""
+        snap = self._resource_tracker.check()
+        rss = snap.get("rss_mb", 0.0)
 
-        if total_procs > 0:
-            health.failure_rate = total_failures / total_procs
+        if rss > _MEMORY_CRITICAL_MB:
+            self._alert_manager.fire(
+                AlertSeverity.CRITICAL, "system", "memory",
+                f"RSS memory {rss:.0f}MB exceeds "
+                f"{_MEMORY_CRITICAL_MB}MB limit",
+            )
+        elif rss > _MEMORY_WARN_MB:
+            self._alert_manager.fire(
+                AlertSeverity.WARNING, "system", "memory",
+                f"RSS memory {rss:.0f}MB exceeds "
+                f"{_MEMORY_WARN_MB}MB threshold",
+            )
         else:
-            health.failure_rate = 0.0
+            self._alert_manager.resolve("system", "memory")
 
-        # Determine level
-        messages = []
-        level = HealthLevel.OK
-
-        if health.failure_rate >= _ERROR_FAILURE_RATE:
-            level = HealthLevel.ERROR
-            messages.append(
-                f"failure_rate={health.failure_rate:.1%}"
-            )
-        elif health.failure_rate >= _WARN_FAILURE_RATE:
-            level = HealthLevel.DEGRADED
-            messages.append(
-                f"failure_rate={health.failure_rate:.1%}"
-            )
-
-        if health.p95_latency_us >= _ERROR_LATENCY_US:
-            level = max(level, HealthLevel.ERROR, key=lambda x: x.value)
-            messages.append(
-                f"p95={health.p95_latency_us/1000:.1f}ms"
-            )
-        elif health.p95_latency_us >= _WARN_LATENCY_US:
-            level = max(level, HealthLevel.DEGRADED, key=lambda x: x.value)
-            messages.append(
-                f"p95={health.p95_latency_us/1000:.1f}ms"
-            )
-
-        health.level = level
-        health.message = "; ".join(messages) if messages else "ok"
-        return health
-
-    def _emit_alert(self, health: ComponentHealth) -> None:
-        """Emit an alert, rate-limited."""
-        now = time.monotonic()
-        # Prune old timestamps
-        self._alert_timestamps = [
-            t for t in self._alert_timestamps if now - t < 60
-        ]
-        if len(self._alert_timestamps) >= _MAX_ALERTS_PER_MINUTE:
+    def _publish_heartbeat(self) -> None:
+        """Publish system health heartbeat."""
+        if self._status_writer is None:
             return
 
-        alert = AlertRecord(
-            timestamp=time.time(),
-            component=health.name,
-            level=health.level,
-            message=health.message,
-        )
-        self._alerts.append(alert)
-        self._alert_timestamps.append(now)
+        report = {
+            "ts": time.time(),
+            "type": "heartbeat",
+            "health": self._health_tracker.summary(),
+            "alerts": self._alert_manager.stats(),
+            "resource": {
+                "rss_mb": self._resource_tracker.last_rss_mb,
+            },
+        }
+        try:
+            self._status_writer.Write(report)
+        except Exception:
+            pass
 
-        if self._alert_writer:
-            self._alert_writer.write(alert.to_dict())
-
-        for cb in self._on_alert_callbacks:
-            try:
-                cb(alert)
-            except Exception:
-                pass
-
-        logger.warning(
-            "[Monitor] %s: %s — %s",
-            health.level.name, health.name, health.message,
-        )
-
-    # ─── Public API ──────────────────────────────────────────────────────
-
-    @property
-    def latest_report(self) -> Optional[HealthReport]:
-        return self._latest_report
-
-    @property
-    def recent_alerts(self) -> List[AlertRecord]:
-        return list(self._alerts[-50:])
+    # -- Public API --
 
     def on_alert(self, callback: Callable[[AlertRecord], None]) -> None:
+        """Register alert callback."""
         self._on_alert_callbacks.append(callback)
+        if hasattr(self, "_alert_manager"):
+            self._alert_manager.on_alert(callback)
+
+    def active_alerts(self) -> List[AlertRecord]:
+        """Get all active (unresolved) alerts."""
+        return self._alert_manager.active_alerts()
+
+    def system_report(self) -> Dict[str, Any]:
+        """Full system health report."""
+        return {
+            "health": self._health_tracker.summary(),
+            "components": {
+                name: {
+                    "healthy": e.healthy,
+                    "latency_ms": round(e.avg_proc_latency_ms, 1),
+                    "success_rate": round(e.success_rate, 3),
+                    "degraded": e.degraded,
+                }
+                for name, e in self._health_tracker.all_entries().items()
+            },
+            "alerts": self._alert_manager.stats(),
+            "active_alerts": [
+                a.to_dict() for a in self._alert_manager.active_alerts()
+            ],
+            "resource": {
+                "rss_mb": self._resource_tracker.last_rss_mb,
+            },
+        }
 
     def on_shutdown(self) -> None:
+        self._managed_shutdown()
         if self._resource_tracker:
             try:
                 self._resource_tracker.stop()

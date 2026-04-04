@@ -1,0 +1,2 @@
+{"timestamp": "2026-04-04T13:13:06.378Z", "level": "INFO", "module": "perception", "message": "Initializing PerceptionComponent...", "correlation_id": "", "seq": 2, "extra": {"message": "Initializing PerceptionComponent...", "asctime": "2026-04-04 13:13:06,378"}}
+{"timestamp": "2026-04-04T13:13:06.379Z", "level": "INFO", "module": "perception", "message": "PerceptionComponent initialized (with KillFeed + Minimap)", "correlation_id": "", "seq": 4, "extra": {"message": "PerceptionComponent initialized (with KillFeed + Minimap)", "asctime": "2026-04-04 13:13:06,379"}}
