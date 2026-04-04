@@ -589,3 +589,44 @@ def dump_default_conf(filepath: Path) -> None:
         encoding="utf-8",
     )
     logger.info("默认配置已写入: %s", filepath)
+
+
+# ---------------------------------------------------------------------------
+# Config validation + env overrides (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+def validate_canbus_conf(conf: "CanbusConf") -> List[str]:
+    """Validate config ranges.  Returns list of error strings."""
+    errors: List[str] = []
+    if conf.poll_interval_ms < 50:
+        errors.append(f"poll_interval_ms={conf.poll_interval_ms} too aggressive (min 50)")
+    if conf.poll_interval_ms > 5000:
+        errors.append(f"poll_interval_ms={conf.poll_interval_ms} too slow (max 5000)")
+    if conf.resilience.backoff_initial_s <= 0:
+        errors.append("backoff_initial_s must be > 0")
+    if conf.resilience.backoff_max_s < conf.resilience.backoff_initial_s:
+        errors.append("backoff_max_s must be >= backoff_initial_s")
+    return errors
+
+def load_conf_with_env_overrides(filepath=None) -> "CanbusConf":
+    """Load config with LOLBOT_CANBUS__FIELD=value env overrides."""
+    import os as _os
+    from pathlib import Path as _P
+    if filepath and _P(filepath).exists():
+        conf = CanbusConf.from_file(_P(filepath))
+    else:
+        conf = CanbusConf()
+    prefix = "LOLBOT_CANBUS__"
+    for k, v in _os.environ.items():
+        if not k.startswith(prefix): continue
+        fn = k[len(prefix):].lower()
+        if hasattr(conf, fn):
+            old = getattr(conf, fn)
+            try:
+                if isinstance(old, bool): nv = v.lower() in ("true","1","yes")
+                elif isinstance(old, int): nv = int(v)
+                elif isinstance(old, float): nv = float(v)
+                else: nv = v
+                setattr(conf, fn, nv)
+            except (ValueError, TypeError): pass
+    return conf

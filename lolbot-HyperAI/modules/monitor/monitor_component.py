@@ -512,3 +512,104 @@ class MonitorComponent(TimerComponent, ManagedComponent):
                 self._resource_tracker.stop()
             except Exception:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# CircuitBreaker — per-component failure isolation (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class _CBState(Enum):
+    CLOSED = auto()
+    OPEN = auto()
+    HALF_OPEN = auto()
+
+
+@dataclass
+class CircuitBreaker:
+    """Per-component circuit breaker.  Trips after N consecutive failures,
+    auto-resets after timeout (half-open) to allow recovery."""
+    component: str
+    state: _CBState = _CBState.CLOSED
+    failure_count: int = 0
+    success_count: int = 0
+    last_failure_time: float = 0.0
+    last_state_change: float = 0.0
+    trip_count: int = 0
+    threshold: int = 5
+    reset_timeout_s: float = 30.0
+
+    def record_success(self) -> None:
+        self.success_count += 1
+        if self.state == _CBState.HALF_OPEN:
+            self._transition(_CBState.CLOSED)
+        self.failure_count = 0
+
+    def record_failure(self) -> None:
+        self.failure_count += 1
+        self.last_failure_time = time.monotonic()
+        if self.state == _CBState.CLOSED and self.failure_count >= self.threshold:
+            self._transition(_CBState.OPEN)
+            self.trip_count += 1
+        elif self.state == _CBState.HALF_OPEN:
+            self._transition(_CBState.OPEN)
+
+    def should_allow(self) -> bool:
+        if self.state == _CBState.CLOSED:
+            return True
+        if self.state == _CBState.OPEN:
+            if time.monotonic() - self.last_state_change >= self.reset_timeout_s:
+                self._transition(_CBState.HALF_OPEN)
+                return True
+            return False
+        return True
+
+    def _transition(self, new: _CBState) -> None:
+        self.state = new
+        self.last_state_change = time.monotonic()
+        if new == _CBState.CLOSED:
+            self.failure_count = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"component": self.component, "state": self.state.name,
+                "failure_count": self.failure_count, "trip_count": self.trip_count}
+
+
+# ---------------------------------------------------------------------------
+# LatencyHistogram — Proc() latency distribution (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class LatencyHistogram:
+    """Histogram of Proc() latencies for a single component."""
+    _BUCKETS = [1, 5, 10, 25, 50, 100, 250, 500, 1000]
+
+    def __init__(self) -> None:
+        self._counts: Dict[str, int] = {f"le_{b}ms": 0 for b in self._BUCKETS}
+        self._counts["le_inf"] = 0
+        self._total_count: int = 0
+        self._total_sum_ms: float = 0.0
+
+    def observe(self, latency_ms: float) -> None:
+        self._total_count += 1
+        self._total_sum_ms += latency_ms
+        for b in self._BUCKETS:
+            if latency_ms <= b:
+                self._counts[f"le_{b}ms"] += 1
+                return
+        self._counts["le_inf"] += 1
+
+    def percentile(self, p: float) -> float:
+        if self._total_count == 0:
+            return 0.0
+        target = self._total_count * p
+        cumulative = 0
+        for b in self._BUCKETS:
+            cumulative += self._counts[f"le_{b}ms"]
+            if cumulative >= target:
+                return float(b)
+        return float(self._BUCKETS[-1]) if self._BUCKETS else 0.0
+
+    def snapshot(self) -> Dict[str, Any]:
+        avg = self._total_sum_ms / self._total_count if self._total_count > 0 else 0
+        return {"count": self._total_count, "avg_ms": round(avg, 2),
+                "p50_ms": self.percentile(0.5), "p95_ms": self.percentile(0.95),
+                "p99_ms": self.percentile(0.99)}

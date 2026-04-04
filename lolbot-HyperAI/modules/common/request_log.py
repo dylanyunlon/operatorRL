@@ -457,3 +457,37 @@ def log_request(
         return sync_wrapper  # type: ignore[return-value]
 
     return decorator
+
+
+# ---------------------------------------------------------------------------
+# RequestAnalytics — aggregate statistics (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class RequestAnalytics:
+    """Compute aggregate stats from a RequestLog."""
+
+    def __init__(self, log: "RequestLog") -> None:
+        self._log = log
+
+    def summary(self, window_s: float = 300.0) -> Dict[str, Any]:
+        records = self._log.recent(1000)
+        now = time.time(); cutoff = now - window_s
+        iw = [r for r in records if r.timestamp >= cutoff]
+        if not iw:
+            return {"window_s": window_s, "total": 0, "success_rate": 0.0, "avg_latency_ms": 0.0}
+        total = len(iw); ok = sum(1 for r in iw if r.success)
+        lats = [r.latency_ms for r in iw]
+        return {
+            "window_s": window_s, "total": total,
+            "success_rate": round(ok/total, 4),
+            "avg_latency_ms": round(sum(lats)/total, 2),
+            "p95_latency_ms": round(sorted(lats)[int(len(lats)*0.95)], 2) if lats else 0,
+            "errors": total - ok,
+        }
+
+    def error_breakdown(self) -> Dict[str, int]:
+        counts: Dict[str, int] = {}
+        for r in self._log.recent(500):
+            if not r.success and r.error_type:
+                counts[r.error_type] = counts.get(r.error_type, 0) + 1
+        return counts

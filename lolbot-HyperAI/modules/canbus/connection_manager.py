@@ -502,3 +502,24 @@ class ConnectionManager:
             "stale_count": self._game_tracker.stale_count,
             "games_detected": self._game_detected_count,
         }
+
+    def health_score(self) -> float:
+        """Connection health [0,1] for monitor/fitness integration."""
+        if self._total_probes > 0:
+            sr = self._successful_probes / self._total_probes
+        else:
+            sr = 0.0
+        avg_lat = self._total_latency_ms / max(1, self._total_probes)
+        lf = max(0.0, 1.0 - avg_lat / 2000.0)
+        state_scores = {
+            ConnectionState.GAME_ACTIVE: 1.0, ConnectionState.CONNECTED: 0.8,
+            ConnectionState.STALE: 0.4, ConnectionState.CONNECTING: 0.3,
+            ConnectionState.DISCONNECTED: 0.1, ConnectionState.ERROR: 0.0,
+        }
+        sf = state_scores.get(self._state, 0.0)
+        return sr * 0.4 + lf * 0.3 + sf * 0.3
+
+    def force_reconnect(self) -> None:
+        """Force immediate reconnection (resets backoff)."""
+        self._backoff.reset()
+        self._state = ConnectionState.CONNECTING

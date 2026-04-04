@@ -615,3 +615,166 @@ class ControlComponent(TimerComponent, ManagedComponent):
             },
         })
         return base
+
+
+# ---------------------------------------------------------------------------
+# SafetyGuard — contradiction suppression (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class SafetyGuard:
+    """Suppress contradictory advice within a time window.
+
+    If we just said "play aggressive", don't immediately say "play safe"
+    within 5 seconds — it confuses the player.
+    """
+
+    _CONTRARY_PAIRS = {
+        "aggressive": "defensive",
+        "push": "retreat",
+        "engage": "disengage",
+        "fight": "avoid",
+        "all_in": "back_off",
+    }
+
+    def __init__(self, window_s: float = 5.0):
+        self._window_s = window_s
+        self._recent: List[Dict[str, Any]] = []
+
+    def check(self, action: "DispatchAction") -> Tuple[bool, str]:
+        """Return (allowed, reason).  False means suppress."""
+        now = time.monotonic()
+        direction = self._classify_direction(action.text)
+        if not direction:
+            return True, ""
+
+        full_contrary: Dict[str, str] = {}
+        for k, v in self._CONTRARY_PAIRS.items():
+            full_contrary[k] = v
+            full_contrary[v] = k
+
+        for recent in self._recent:
+            if now - recent["ts"] > self._window_s:
+                continue
+            if not recent.get("dir"):
+                continue
+            contrary = full_contrary.get(direction, "")
+            if contrary and contrary == recent["dir"]:
+                return False, (
+                    f"contradicts '{recent['text'][:40]}' from "
+                    f"{now - recent['ts']:.1f}s ago"
+                )
+        return True, ""
+
+    def record(self, action: "DispatchAction") -> None:
+        direction = self._classify_direction(action.text)
+        self._recent.append({
+            "dir": direction,
+            "ts": time.monotonic(),
+            "text": action.text,
+        })
+        if len(self._recent) > 50:
+            self._recent = self._recent[-50:]
+
+    def _classify_direction(self, text: str) -> str:
+        lower = text.lower()
+        for d in self._CONTRARY_PAIRS:
+            if d.replace("_", " ") in lower:
+                return d
+        for d, c in self._CONTRARY_PAIRS.items():
+            if c.replace("_", " ") in lower:
+                return c
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# CooldownTracker — per-category rate limiting (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class CooldownTracker:
+    """Per-category cooldown enforcement.  Prevents spamming 'back now!' every tick."""
+
+    def __init__(self, default_s: float = 10.0) -> None:
+        self._default_s = default_s
+        self._overrides: Dict[str, float] = {}
+        self._last_fire: Dict[str, float] = {}
+
+    def set_cooldown(self, category: str, seconds: float) -> None:
+        self._overrides[category] = seconds
+
+    def is_ready(self, category: str) -> bool:
+        cooldown = self._overrides.get(category, self._default_s)
+        last = self._last_fire.get(category, 0.0)
+        return (time.monotonic() - last) >= cooldown
+
+    def fire(self, category: str) -> None:
+        self._last_fire[category] = time.monotonic()
+
+    def time_remaining(self, category: str) -> float:
+        cooldown = self._overrides.get(category, self._default_s)
+        last = self._last_fire.get(category, 0.0)
+        return max(0.0, cooldown - (time.monotonic() - last))
+
+    def reset(self) -> None:
+        self._last_fire.clear()
+
+    def snapshot(self) -> Dict[str, Any]:
+        now = time.monotonic()
+        return {
+            cat: {"cooldown_s": self._overrides.get(cat, self._default_s),
+                  "remaining_s": round(self.time_remaining(cat), 2)}
+            for cat, ts in self._last_fire.items()
+        }
+
+
+# ---------------------------------------------------------------------------
+# DedupFilter — suppress identical advice within window (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class DedupFilter:
+    """Content-hash based deduplication within a sliding window."""
+
+    def __init__(self, window_s: float = 3.0) -> None:
+        import hashlib as _hl
+        self._window_s = window_s
+        self._seen: Dict[str, float] = {}
+        self._hl = _hl
+
+    def is_duplicate(self, action: "DispatchAction") -> bool:
+        h = self._hl.md5(
+            f"{action.dedup_key}:{action.text}".encode()
+        ).hexdigest()[:12]
+        now = time.monotonic()
+        if len(self._seen) > 500:
+            cutoff = now - self._window_s
+            self._seen = {k: v for k, v in self._seen.items() if v > cutoff}
+        last = self._seen.get(h, 0.0)
+        if now - last < self._window_s:
+            return True
+        self._seen[h] = now
+        return False
+
+
+# ---------------------------------------------------------------------------
+# DispatchRecord — audit trail entry (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DispatchRecord:
+    timestamp: float
+    action_text: str
+    category: str
+    priority: str
+    channels_delivered: List[str]
+    suppressed: bool = False
+    suppress_reason: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ts": round(self.timestamp, 3),
+            "text": self.action_text[:80],
+            "cat": self.category,
+            "prio": self.priority,
+            "channels": self.channels_delivered,
+            "suppressed": self.suppressed,
+            "reason": self.suppress_reason,
+        }

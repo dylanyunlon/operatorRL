@@ -462,3 +462,95 @@ class GameStateAssembler:
         self._last_snapshot = None
         self._all_events.clear()
         self._seen_event_ids.clear()
+
+
+# ---------------------------------------------------------------------------
+# TimestampAligner — align frames by corrected game_time (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class TimestampAligner:
+    """Aligns frames from sources with different latencies.
+    Corrects game_time by estimated source latency."""
+
+    _EXPECTED_LATENCY_MS = {"lcu": 100.0, "fiddler": 500.0, "websocket": 50.0}
+
+    def __init__(self, tolerance_ms: float = 200.0) -> None:
+        self._tolerance_ms = tolerance_ms
+
+    def align(self, frames: List["SourceFrame"]) -> List["SourceFrame"]:
+        import copy as _cp
+        aligned = []
+        for f in frames:
+            c = _cp.copy(f)
+            lat = self._EXPECTED_LATENCY_MS.get(f.source.lower(), 200.0)
+            c.game_time = f.game_time - lat / 1000.0
+            aligned.append(c)
+        aligned.sort(key=lambda x: x.game_time, reverse=True)
+        return aligned
+
+    def select_window(self, frames: List["SourceFrame"], target: float) -> List["SourceFrame"]:
+        tol = self._tolerance_ms / 1000.0
+        return [f for f in frames if abs(f.game_time - target) <= tol]
+
+
+# ---------------------------------------------------------------------------
+# ConflictResolver — trust-weighted field resolution (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class ConflictResolver:
+    """Resolves conflicts when sources disagree.  LCU (1.0) > WS (0.9) > Fiddler (0.7)."""
+    _TRUST = {"lcu": 1.0, "websocket": 0.9, "fiddler": 0.7, "replay": 1.0, "mock": 0.5}
+
+    def __init__(self) -> None:
+        self._conflict_count: int = 0
+
+    @property
+    def conflict_count(self) -> int:
+        return self._conflict_count
+
+    def resolve_field(self, field_name: str,
+                      candidates: List[Tuple[str, Any, float]]) -> Any:
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0][1]
+        values = [c[1] for c in candidates]
+        if all(v == values[0] for v in values):
+            return values[0]
+        self._conflict_count += 1
+        return max(candidates, key=lambda c: c[2])[1]
+
+    def resolve_numeric(self, field_name: str,
+                        candidates: List[Tuple[str, float, float]]) -> float:
+        if not candidates:
+            return 0.0
+        if len(candidates) == 1:
+            return candidates[0][1]
+        vals = [c[1] for c in candidates]
+        if max(vals) - min(vals) < max(abs(vals[0]) * 0.01, 0.1):
+            return vals[0]
+        self._conflict_count += 1
+        tw = sum(c[2] for c in candidates)
+        return sum(c[1] * c[2] for c in candidates) / tw if tw else vals[0]
+
+
+# ---------------------------------------------------------------------------
+# QualityScorer — fusion quality metric (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class QualityScorer:
+    """Compute data quality score [0,1] for a fused snapshot."""
+    _W = {"game_time": 0.15, "active_player": 0.25, "all_players": 0.25,
+          "game_data": 0.15, "events": 0.10, "supplementary": 0.10}
+
+    def score(self, snapshot: "FusedSnapshot", sources: int, staleness_ms: float) -> float:
+        comp = 0.0
+        if snapshot.game_time > 0: comp += self._W["game_time"]
+        if snapshot.active_player: comp += self._W["active_player"]
+        if snapshot.all_players:
+            comp += self._W["all_players"] * min(len(snapshot.all_players) / 10.0, 1.0)
+        if snapshot.game_data: comp += self._W["game_data"]
+        if snapshot.events: comp += self._W["events"]
+        src_f = min(sources / 2.0, 1.0)
+        stale_f = max(0.0, 1.0 - staleness_ms / 5000.0)
+        return min(max(comp * 0.6 + src_f * 0.2 + stale_f * 0.2, 0.0), 1.0)

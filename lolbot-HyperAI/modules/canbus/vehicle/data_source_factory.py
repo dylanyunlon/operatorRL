@@ -479,3 +479,31 @@ class DataSourceFactory:
             return DataSourceFactory.create("mock")
         else:
             return DataSourceFactory.create(data_source)
+
+    @staticmethod
+    def auto_detect() -> Tuple[str, "DataSource"]:
+        """Auto-detect best available data source (Apollo vehicle detection pattern)."""
+        import ssl, urllib.request, urllib.error
+        from pathlib import Path as _P
+        try:
+            ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.Request("https://127.0.0.1:2999/liveclientdata/gamestats")
+            urllib.request.urlopen(req, timeout=1.0, context=ctx)
+            return "lcu", DataSourceFactory.create("lcu")
+        except Exception: pass
+        td = _P(__file__).parent.parent / "testdata" / "sample_allgamedata.json"
+        if td.exists():
+            return "testdata", DataSourceFactory.create("replay", filepath=str(td), speed=1.0, loop=True)
+        return "mock", DataSourceFactory.create("mock")
+
+    @staticmethod
+    def probe_all() -> Dict[str, bool]:
+        """Probe all data source types for availability."""
+        results = {}
+        for st in DataSourceFactory.available_types():
+            try:
+                ds = DataSourceFactory.create(st)
+                results[st] = hasattr(ds, "probe") and ds.probe() or True
+            except Exception:
+                results[st] = False
+        return results

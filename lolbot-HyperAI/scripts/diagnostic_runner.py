@@ -477,3 +477,112 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Additional diagnostic checks (Claude11 additions)
+# ---------------------------------------------------------------------------
+
+def check_channel_gaps() -> Dict[str, Any]:
+    """Detect channels that lack writers or readers by scanning source."""
+    from pathlib import Path
+    root = Path(__file__).parent.parent
+    writers: Dict[str, List[str]] = {}
+    readers: Dict[str, List[str]] = {}
+    for py in (root / "modules").rglob("*.py"):
+        try:
+            content = py.read_text(encoding="utf-8", errors="replace")
+            rel = str(py.relative_to(root))
+            for line in content.splitlines():
+                s = line.strip()
+                if "CreateWriter" in s or "create_writer" in s:
+                    ch = _extract_ch(s)
+                    if ch: writers.setdefault(ch, []).append(rel)
+                elif "CreateReader" in s or "create_reader" in s:
+                    ch = _extract_ch(s)
+                    if ch: readers.setdefault(ch, []).append(rel)
+        except Exception:
+            continue
+    all_ch = set(writers) | set(readers)
+    return {
+        "total": len(all_ch),
+        "orphan_writers": [c for c in all_ch if c in writers and c not in readers],
+        "orphan_readers": [c for c in all_ch if c in readers and c not in writers],
+    }
+
+def _extract_ch(line: str) -> Optional[str]:
+    for q in ('"', "'"):
+        s = line.find(q)
+        if s >= 0:
+            e = line.find(q, s+1)
+            if e > s:
+                c = line[s+1:e]
+                if c.startswith("/lol/"): return c
+    return None
+
+def check_config() -> List[Dict[str, Any]]:
+    """Validate default config ranges."""
+    results = []
+    try:
+        from conf.default_config import LolBotConfig
+        c = LolBotConfig()
+        def chk(n, v, lo, hi):
+            ok = lo <= v <= hi
+            results.append({"field": n, "ok": ok, "value": v,
+                           "error": "" if ok else f"out of [{lo},{hi}]"})
+        chk("transport.history_size", c.transport.history_size, 1, 100000)
+        chk("output.tts_volume", c.output.tts_volume, 0.0, 1.0)
+    except Exception as e:
+        results.append({"field": "<import>", "ok": False, "error": str(e)})
+    return results
+
+def profile_component(name: str) -> Dict[str, Any]:
+    """Profile a single component's Init()+Proc() in isolation."""
+    _COMPS = [
+        ("modules.canbus.canbus_component", "CanbusComponent"),
+        ("modules.perception.perception_component", "PerceptionComponent"),
+        ("modules.prediction.prediction_component", "PredictionComponent"),
+        ("modules.planning.planning_component", "PlanningComponent"),
+        ("modules.control.control_component", "ControlComponent"),
+        ("modules.monitor.monitor_component", "MonitorComponent"),
+    ]
+    cls = None
+    for mp, cn in _COMPS:
+        if name.lower() in cn.lower():
+            try:
+                mod = importlib.import_module(mp); cls = getattr(mod, cn)
+            except Exception as e:
+                return {"component": name, "error": str(e)}
+            break
+    if cls is None:
+        return {"component": name, "error": "not found"}
+    try:
+        inst = cls()
+        t0 = time.monotonic(); inst.Init(); init_ms = (time.monotonic()-t0)*1000
+        proc_times = []
+        for i in range(10):
+            t0 = time.monotonic(); inst.Proc(); proc_times.append((time.monotonic()-t0)*1000)
+        return {"component": name, "init_ms": round(init_ms,2),
+                "proc_avg_ms": round(sum(proc_times)/len(proc_times),2)}
+    except Exception as e:
+        return {"component": name, "error": str(e)}
+
+def code_metrics() -> Dict[str, Any]:
+    """Compute code metrics across the project."""
+    from pathlib import Path
+    root = Path(__file__).parent.parent
+    total_files = total_lines = total_classes = total_funcs = 0
+    for py in root.rglob("*.py"):
+        if "__pycache__" in str(py): continue
+        total_files += 1
+        try:
+            lines = py.read_text(encoding="utf-8", errors="replace").splitlines()
+            total_lines += len(lines)
+            for l in lines:
+                s = l.strip()
+                if s.startswith("class "): total_classes += 1
+                elif s.startswith("def "): total_funcs += 1
+        except Exception:
+            pass
+    return {"files": total_files, "lines": total_lines,
+            "classes": total_classes, "functions": total_funcs}

@@ -686,3 +686,46 @@ class _ProcMeasureContext:
             latency_ms, self.success, self.failure_reason)
         self._breaker.record_result(self.success)
         return False  # 不吞异常
+
+
+# ---------------------------------------------------------------------------
+# ComponentGraph — static dependency analysis (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class ComponentGraph:
+    """Static dependency graph analysis for DAG validation."""
+
+    def __init__(self) -> None:
+        self._edges: Dict[str, List[str]] = {}
+
+    def add_component(self, name: str, depends_on: List[str]) -> None:
+        self._edges[name] = list(depends_on)
+
+    def has_cycle(self) -> bool:
+        visited: set = set(); in_stack: set = set()
+        def dfs(n):
+            visited.add(n); in_stack.add(n)
+            for d in self._edges.get(n, []):
+                if d not in visited:
+                    if dfs(d): return True
+                elif d in in_stack: return True
+            in_stack.discard(n); return False
+        for n in self._edges:
+            if n not in visited and dfs(n): return True
+        return False
+
+    def launch_order(self) -> List[str]:
+        from collections import deque
+        in_deg = {n: 0 for n in self._edges}
+        adj: Dict[str, List[str]] = {n: [] for n in self._edges}
+        for name, deps in self._edges.items():
+            for d in deps:
+                if d in adj: adj[d].append(name); in_deg[name] += 1
+        q = deque(n for n, d in in_deg.items() if d == 0)
+        result = []
+        while q:
+            n = q.popleft(); result.append(n)
+            for nb in adj.get(n, []):
+                in_deg[nb] -= 1
+                if in_deg[nb] == 0: q.append(nb)
+        return result

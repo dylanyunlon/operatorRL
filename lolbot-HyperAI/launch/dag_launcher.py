@@ -486,3 +486,100 @@ class DAGLauncher:
             "started": len(self._started),
             "start_order": self._start_order,
         }
+
+
+# ---------------------------------------------------------------------------
+# SimpleYAMLParser — stdlib-only YAML subset parser (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+class SimpleYAMLParser:
+    """Minimal YAML parser for DAG files. Supports mappings, lists, scalars."""
+
+    def parse(self, text: str) -> Any:
+        lines = text.splitlines()
+        result, _ = self._parse_mapping(lines, 0, 0)
+        return result
+
+    def parse_file(self, path) -> Any:
+        from pathlib import Path
+        return self.parse(Path(path).read_text(encoding="utf-8"))
+
+    def _parse_mapping(self, lines, start, indent):
+        result = {}
+        i = start
+        while i < len(lines):
+            line = lines[i]; stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                i += 1; continue
+            li = len(line) - len(line.lstrip())
+            if li < indent: break
+            if ":" not in stripped: break
+            cp = stripped.index(":"); key = stripped[:cp].strip(); vs = stripped[cp+1:].strip()
+            if vs:
+                result[key] = self._val(vs); i += 1
+            elif i+1 < len(lines):
+                nl = lines[i+1]; ns = nl.strip(); ni = len(nl) - len(nl.lstrip())
+                if ns.startswith("- "):
+                    lst, i = self._parse_list(lines, i+1, ni); result[key] = lst
+                elif ni > li:
+                    nested, i = self._parse_mapping(lines, i+1, ni); result[key] = nested
+                else:
+                    result[key] = None; i += 1
+            else:
+                result[key] = None; i += 1
+        return result, i
+
+    def _parse_list(self, lines, start, indent):
+        result = []; i = start
+        while i < len(lines):
+            line = lines[i]; stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                i += 1; continue
+            li = len(line) - len(line.lstrip())
+            if li < indent or not stripped.startswith("- "): break
+            item = stripped[2:].strip()
+            if ":" in item:
+                sub_lines = [f"  {item}"]; i += 1
+                while i < len(lines):
+                    nl = lines[i]; ns = nl.strip(); ni = len(nl) - len(nl.lstrip())
+                    if not ns or ns.startswith("#"): i += 1; continue
+                    if ni <= indent: break
+                    sub_lines.append(nl); i += 1
+                parsed = self.parse("\n".join(sub_lines))
+                result.append(parsed)
+            else:
+                result.append(self._val(item)); i += 1
+        return result, i
+
+    def _val(self, s):
+        if not s: return None
+        if (s[0] in "\"'" and s[-1] == s[0]): return s[1:-1]
+        lo = s.lower()
+        if lo in ("true","yes","on"): return True
+        if lo in ("false","no","off"): return False
+        if lo in ("null","none","~"): return None
+        try: return float(s) if "." in s else int(s)
+        except ValueError: pass
+        if s.startswith("[") and s.endswith("]"):
+            return [self._val(x.strip()) for x in s[1:-1].split(",")] if s[1:-1].strip() else []
+        return s
+
+
+# ---------------------------------------------------------------------------
+# infer_channel_dependencies (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+def infer_channel_dependencies(nodes: List["DAGNode"]) -> List["DAGNode"]:
+    """Add implicit dependencies based on channel reads/writes.
+    If A writes /lol/X and B reads /lol/X, B depends on A."""
+    writer_map: Dict[str, str] = {}
+    for n in nodes:
+        for ch in n.writes_channels:
+            writer_map[ch] = n.name
+    for n in nodes:
+        existing = set(n.depends_on)
+        for ch in n.reads_channels:
+            w = writer_map.get(ch)
+            if w and w != n.name and w not in existing:
+                n.depends_on.append(w)
+    return nodes

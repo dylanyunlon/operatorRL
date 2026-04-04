@@ -386,3 +386,31 @@ def need_game_active(
         check_game_active=True,
         log_block=log_block,
     )
+
+
+# ---------------------------------------------------------------------------
+# async_need_connection — async version (Claude11 addition)
+# ---------------------------------------------------------------------------
+
+def async_need_connection(
+    connectable_attr: str = "_connection_manager",
+    auto_reconnect: bool = True,
+    game_required: bool = False,
+) -> Callable:
+    """Async version of need_connection for coroutine methods."""
+    config = ConnectionGuardConfig(auto_reconnect=auto_reconnect, game_required=game_required)
+    def decorator(func: F) -> F:
+        guards: Dict[int, ConnectionGuard] = {}
+        @functools.wraps(func)
+        async def wrapper(self_obj: Any, *args: Any, **kwargs: Any) -> Any:
+            oid = id(self_obj)
+            if oid not in guards:
+                conn = getattr(self_obj, connectable_attr, None)
+                if conn is None:
+                    raise AttributeError(f"{type(self_obj).__name__} has no '{connectable_attr}'")
+                guards[oid] = ConnectionGuard(conn, config,
+                    name=f"{type(self_obj).__name__}.{func.__name__}")
+            guards[oid].check()
+            return await func(self_obj, *args, **kwargs)
+        return wrapper  # type: ignore
+    return decorator
