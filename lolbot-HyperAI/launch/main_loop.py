@@ -67,6 +67,7 @@ from evolution.generation_manager import GenerationManager
 from evolution.strategy_mutator import StrategyMutator
 from integration.agent_os_connector import AgentOSConnector, GovernanceMode
 from integration.riot_api_client import RiotAPIClient, Region
+from modules.common.component_base import ComponentRegistry
 from output.voice_announcer import VoiceAnnouncer, VoiceConfig
 from perception.game_state_parser import GameStateParser
 from perception.network_listener import NetworkListener
@@ -117,6 +118,9 @@ class MainLoop:
         self._tick_count = 0
         self._error_count = 0
         self._start_time = 0.0
+
+        # Reset component registry to avoid stale entries from crash-restart
+        ComponentRegistry.reset()
 
         # Components (initialized in _init_components)
         self._bus: Optional[MessageBus] = None
