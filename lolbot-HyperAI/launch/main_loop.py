@@ -1,49 +1,56 @@
 #!/usr/bin/env python3
 """
-launch/main_loop.py — Apollo-style While-True Main Loop
-==========================================================
+launch/main_loop.py — Apollo-style While-True Main Loop (Thread-per-Component)
+================================================================================
 lolbot-HyperAI · Launch Layer
 
 This is the entry point. It wires all modules together and runs
-the Apollo-style while-true Proc() loop:
+the Apollo-style while-true Proc() loop via Mainboard + TimerComponent
+threads.
 
-    while running:
-        perception.proc()       # Read sensors (network data)
-        prediction.proc()       # Extract features, predict
-        planning.proc()         # Generate recommendations
-        output.proc()           # Announce via TTS
-        evolution.proc()        # (post-game) evaluate and evolve
+Claude14 architecture overhaul:
+    OLD: MainLoop._tick() called await component.proc() sequentially in a
+         single asyncio loop — this bypassed TimerComponent's threading,
+         circuit-breaker, and latency tracking entirely.
+    NEW: Mainboard.start_all() spawns each component's _run_loop thread.
+         MainLoop only manages session state and evolution in a 1Hz
+         supervisor loop. Data flows via channel pub/sub (Apollo pattern).
 
 In Apollo autonomous driving:
-    timer_component.cc::Proc() is called every 10ms
+    timer_component.cc::Proc() is called every 10ms in its own thread
     Components process data from shared channels
-    The scheduler manages component lifecycle
+    mainboard.cc manages component lifecycle (Start/LoadModule)
 
-Here, our cycle runs at ~100ms (10 Hz), which is more than fast
-enough for a game assistant (human reaction time is ~200ms).
+Component threads (each runs Proc() independently):
+    CanbusComponent:     100ms (10Hz) → publishes /lol/raw_lcu
+    PerceptionComponent: 100ms (10Hz) → publishes /lol/game_state
+    PredictionComponent: 500ms  (2Hz) → publishes /lol/win_prediction
+    PlanningComponent:   500ms  (2Hz) → publishes /lol/strategy
+    ControlComponent:    200ms  (5Hz) → dispatches voice/overlay/log
+    MonitorComponent:   2000ms (0.5Hz) → publishes /lol/monitor_status
 
-The main loop also manages the session lifecycle:
-    1. Startup: init all components, load generation
-    2. Pre-game: monitor for game start
-    3. In-game: full perception-prediction-planning-output loop
+Session lifecycle (managed by 1Hz supervisor, NOT by Proc()):
+    1. Startup: create components, Mainboard.start_all(), init legacy layers
+    2. Pre-game: monitor for game start via transport channel
+    3. In-game: components run independently in threads
     4. Post-game: evaluate fitness, evolve, save state
-    5. Shutdown: graceful cleanup
+    5. Shutdown: Mainboard.stop_all() in reverse dependency order
 
 Usage:
     python -m lolbot-HyperAI.launch.main_loop
     # or
     from launch.main_loop import MainLoop
     loop = MainLoop()
-    asyncio.run(loop.run())
+    loop.run()
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import signal
 import sys
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -67,7 +74,14 @@ from evolution.generation_manager import GenerationManager
 from evolution.strategy_mutator import StrategyMutator
 from integration.agent_os_connector import AgentOSConnector, GovernanceMode
 from integration.riot_api_client import RiotAPIClient, Region
+from launch.mainboard import Mainboard
+from modules.canbus.canbus_component import CanbusComponent, CanbusConfig
 from modules.common.component_base import ComponentRegistry
+from modules.control.control_component import ControlComponent
+from modules.monitor.monitor_component import MonitorComponent
+from modules.perception.perception_component import PerceptionComponent
+from modules.planning.planning_component import PlanningComponent
+from modules.prediction.prediction_component import PredictionComponent
 from output.voice_announcer import VoiceAnnouncer, VoiceConfig
 from perception.game_state_parser import GameStateParser
 from perception.network_listener import NetworkListener
@@ -93,17 +107,23 @@ class SessionState:
 # ---------------------------------------------------------------------------
 class MainLoop:
     """
-    The Apollo-style main loop orchestrating all components.
+    The Apollo-style main loop orchestrating all components via Mainboard.
+
+    Claude14: Each *_component.py now runs its own Proc() in a dedicated
+    thread managed by TimerComponent._run_loop(). MainLoop does NOT call
+    Proc() directly — it only manages session state and evolution in a
+    1Hz supervisor loop. Data flows via channel pub/sub (Apollo pattern).
 
     This is the heart of lolbot-HyperAI. It:
         1. Creates and wires all components
-        2. Runs the Proc() cycle at ~100ms intervals
-        3. Manages session state transitions
-        4. Handles the evolution loop between games
+        2. Delegates to Mainboard.start_all() for threaded Proc() execution
+        3. Runs a 1Hz supervisor for session state + evolution + health
+        4. Handles graceful shutdown via Mainboard.stop_all()
     """
 
-    TICK_INTERVAL_SEC = 0.1     # 100ms = 10 Hz main loop
-    MAX_TICK_OVERRUN_MS = 50    # Warn if tick takes > 150ms
+    SUPERVISOR_INTERVAL_SEC = 1.0   # 1Hz supervisor loop
+    HEALTH_CHECK_INTERVAL_SEC = 5.0
+    HEARTBEAT_INTERVAL_SEC = 10.0
 
     def __init__(
         self,
@@ -118,11 +138,25 @@ class MainLoop:
         self._tick_count = 0
         self._error_count = 0
         self._start_time = 0.0
+        self._last_health_check = 0.0
+        self._last_heartbeat = 0.0
+        self._stop_event = threading.Event()
 
         # Reset component registry to avoid stale entries from crash-restart
         ComponentRegistry.reset()
 
-        # Components (initialized in _init_components)
+        # Claude14: Mainboard manages all component threads
+        self._mainboard = Mainboard()
+
+        # TimerComponents (registered with Mainboard, run in own threads)
+        self._canbus: Optional[CanbusComponent] = None
+        self._perception: Optional[PerceptionComponent] = None
+        self._prediction: Optional[PredictionComponent] = None
+        self._planning: Optional[PlanningComponent] = None
+        self._control: Optional[ControlComponent] = None
+        self._monitor: Optional[MonitorComponent] = None
+
+        # Legacy wrappers (initialized in _init_all, used by evolution)
         self._bus: Optional[MessageBus] = None
         self._transport: Optional[Transport] = None
         self._network_listener: Optional[NetworkListener] = None
@@ -160,17 +194,42 @@ class MainLoop:
             default_rate_limit=cfg.transport.default_rate_limit,
         )
 
-        # 2. Perception layer
+        # 2. TimerComponents — Claude14: each gets its own Proc() thread
+        #    Registration order = startup order = dependency order
+        canbus_cfg = CanbusConfig(
+            lcu_base_url=getattr(
+                cfg, 'lcu_base_url', 'https://127.0.0.1:2999'),
+            fiddler_enabled=getattr(cfg, 'fiddler_enabled', False),
+        )
+        self._canbus = CanbusComponent(canbus_cfg)
+        self._mainboard.register(self._canbus)
+
+        self._perception = PerceptionComponent()
+        self._mainboard.register(self._perception)
+
+        self._prediction = PredictionComponent()
+        self._mainboard.register(self._prediction)
+
+        self._planning = PlanningComponent()
+        self._mainboard.register(self._planning)
+
+        self._control = ControlComponent()
+        self._mainboard.register(self._control)
+
+        self._monitor = MonitorComponent()
+        self._mainboard.register(self._monitor)
+
+        # 3. Legacy perception/planning wrappers (used by evolution layer)
         self._network_listener = NetworkListener(self._transport)
         self._game_state_parser = GameStateParser(self._transport)
 
-        # 3. Prediction layer
+        # 4. Prediction layer (legacy wrappers)
         self._feature_pipeline = FeaturePipeline(self._transport)
         self._win_engine = WinProbabilityEngine(
             self._transport, self._feature_pipeline,
         )
 
-        # 4. Planning layer
+        # 5. Planning layer (legacy wrapper)
         self._strategy_planner = StrategyPlanner(self._transport)
 
         # 5. Output layer
@@ -270,86 +329,135 @@ class MainLoop:
 
     # -- Main loop ------------------------------------------------------
 
-    async def run(self) -> None:
+    def run(self) -> None:
         """
         Start the main loop. Runs until interrupted.
 
-        This is the top-level entry point. Call with:
-            asyncio.run(loop.run())
+        Claude14: No longer async. Components run Proc() in their own
+        threads via Mainboard. This method only runs the 1Hz supervisor.
+
+        Call with:
+            loop = MainLoop()
+            loop.run()
         """
         self._running = True
         self._start_time = time.monotonic()
 
         # Create components
         self._init_components()
+
+        # Claude14: Start component threads via Mainboard
+        print("[MainLoop] Starting component threads via Mainboard...")
+        self._mainboard.enable_channel_monitor()
+        all_ok = self._mainboard.start_all()
+        if not all_ok:
+            print("[MainLoop] WARNING: Some components failed to start")
+
+        # Initialize legacy wrappers (evolution, voice, etc)
         self._init_all()
 
         # Register signal handlers for graceful shutdown
-        loop = asyncio.get_event_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
-                loop.add_signal_handler(sig, self._signal_shutdown)
-            except (NotImplementedError, OSError):
-                pass  # Windows doesn't support add_signal_handler
+                signal.signal(sig, self._signal_handler)
+            except (OSError, ValueError):
+                pass  # Windows doesn't support signal in threads
 
-        print(f"\n[MainLoop] Running at {1/self.TICK_INTERVAL_SEC:.0f} Hz. Press Ctrl+C to stop.\n")
+        # Print startup summary
+        print(f"\n[MainLoop] System running. Supervisor at "
+              f"{1/self.SUPERVISOR_INTERVAL_SEC:.0f}Hz. "
+              f"Press Ctrl+C to stop.\n")
+        print(f"  Component threads:")
+        for name, info in self._mainboard.status()["components"].items():
+            print(f"    {name}: {info['state']}")
+        print()
 
-        # The while-true Proc() loop (Apollo pattern)
+        # Claude14: Supervisor loop (1Hz) — does NOT call Proc() directly
+        # Each component's Proc() runs in its own thread via TimerComponent
         try:
-            while self._running:
+            while self._running and not self._stop_event.is_set():
                 tick_start = time.monotonic()
 
-                await self._tick()
+                self._supervisor_tick()
 
-                # Sleep to maintain tick rate
+                # Sleep to maintain supervisor rate
                 elapsed = time.monotonic() - tick_start
-                sleep_time = self.TICK_INTERVAL_SEC - elapsed
+                sleep_time = self.SUPERVISOR_INTERVAL_SEC - elapsed
                 if sleep_time > 0:
-                    await asyncio.sleep(sleep_time)
-                elif elapsed > self.TICK_INTERVAL_SEC + self.MAX_TICK_OVERRUN_MS / 1000:
-                    self._warn_overrun(elapsed)
+                    self._stop_event.wait(timeout=sleep_time)
 
         except KeyboardInterrupt:
             pass
         finally:
-            await self._shutdown()
+            self._shutdown()
 
-    async def _tick(self) -> None:
+    def _supervisor_tick(self) -> None:
         """
-        Single tick of the main loop.
+        Single tick of the 1Hz supervisor loop.
 
-        Calls each component's proc() in order:
-            Perception → Prediction → Planning → Output
+        Claude14: This replaces the old _tick() which called
+        await component.proc() sequentially. Now components run in
+        their own threads — supervisor only manages session state,
+        evolution, and health.
         """
         self._tick_count += 1
 
         try:
-            # 1. Perception: read network data
-            await self._network_listener.proc()
-
-            # 2. Perception fusion: normalize game state
-            await self._game_state_parser.proc()
-
-            # 3. Feature extraction
-            await self._feature_pipeline.proc()
-
-            # 4. Win probability prediction
-            await self._win_engine.proc()
-
-            # 5. Strategy planning
-            await self._strategy_planner.proc()
-
-            # 6. Voice output
-            await self._voice_announcer.proc()
-
-            # 7. State transitions
+            # 1. Session state transitions
             self._check_state_transitions()
+
+            # 2. Periodic health check
+            now = time.monotonic()
+            if now - self._last_health_check >= self.HEALTH_CHECK_INTERVAL_SEC:
+                self._last_health_check = now
+                self._run_health_check()
+
+            # 3. Heartbeat
+            if now - self._last_heartbeat >= self.HEARTBEAT_INTERVAL_SEC:
+                self._last_heartbeat = now
+                self._publish_heartbeat()
 
         except Exception as exc:
             self._error_count += 1
-            self._publish_error("main_loop", exc)
+            self._publish_error("supervisor", exc)
             if self._config.system.debug_mode:
                 traceback.print_exc()
+
+    def _run_health_check(self) -> None:
+        """Poll component health via Mainboard and ComponentRegistry."""
+        registry = ComponentRegistry.instance()
+        health = registry.health_summary()
+
+        for comp_name, comp_health in health.items():
+            if isinstance(comp_health, dict):
+                if not comp_health.get("healthy", True):
+                    reason = comp_health.get("details", {}).get(
+                        "reason", "unknown")
+                    print(f"[Health] WARNING: {comp_name} unhealthy: "
+                          f"{reason}")
+
+        # Also check Mainboard component states
+        mb_status = self._mainboard.status()
+        for name, info in mb_status.get("components", {}).items():
+            if info.get("state") == "ERROR":
+                print(f"[Health] ERROR: {name} in ERROR state")
+
+    def _publish_heartbeat(self) -> None:
+        """Publish a heartbeat message on the system channel."""
+        if self._transport:
+            msg = self._factory.create(
+                CH_SYSTEM_HEARTBEAT,
+                {
+                    "state": self._state,
+                    "uptime_sec": round(
+                        time.monotonic() - self._start_time, 1),
+                    "tick_count": self._tick_count,
+                    "error_count": self._error_count,
+                    "session_id": self._session_id,
+                },
+                priority=0,
+            )
+            self._transport.publish(msg)
 
     def _check_state_transitions(self) -> None:
         """Check for game phase changes and manage session state."""
@@ -360,9 +468,7 @@ class MainLoop:
         phase = phase_msg.payload.get("phase", "None")
 
         if self._state == SessionState.IDLE:
-            if phase in ("Lobby", "Matchmaking", "ReadyCheck"):
-                self._transition_to(SessionState.PRE_GAME)
-            elif phase in ("ChampSelect",):
+            if phase in ("Lobby", "Matchmaking", "ReadyCheck", "ChampSelect"):
                 self._transition_to(SessionState.PRE_GAME)
             elif phase in ("InProgress", "Reconnect"):
                 self._transition_to(SessionState.IN_GAME)
@@ -519,26 +625,28 @@ class MainLoop:
             )
             self._transport.publish(msg)
 
-    def _warn_overrun(self, elapsed: float) -> None:
-        """Log a warning when tick takes too long."""
-        overrun_ms = (elapsed - self.TICK_INTERVAL_SEC) * 1000
-        if self._tick_count % 100 == 0:  # Don't spam
-            print(
-                f"[Warning] Tick #{self._tick_count} overran by "
-                f"{overrun_ms:.1f}ms"
-            )
-
     # -- Shutdown -------------------------------------------------------
 
-    def _signal_shutdown(self) -> None:
+    def _signal_handler(self, signum, frame) -> None:
         """Handle SIGINT/SIGTERM."""
         print("\n[MainLoop] Shutdown signal received.")
         self._running = False
+        self._stop_event.set()
 
-    async def _shutdown(self) -> None:
-        """Graceful shutdown of all components."""
+    def _shutdown(self) -> None:
+        """Graceful shutdown of all components.
+
+        Claude14: Uses Mainboard.stop_all() for component threads,
+        then shuts down legacy wrappers.
+        """
         print("[MainLoop] Shutting down...")
 
+        # 1. Stop all component threads via Mainboard
+        results = self._mainboard.stop_all(timeout=5.0)
+        for comp_name, final_state in results.items():
+            print(f"  {comp_name}: {final_state}")
+
+        # 2. Shutdown legacy wrappers
         components_stats = {}
 
         if self._voice_announcer:
@@ -569,7 +677,7 @@ class MainLoop:
         uptime = time.monotonic() - self._start_time
         print(f"\n[MainLoop] Final stats:")
         print(f"  Uptime: {uptime:.1f}s")
-        print(f"  Ticks: {self._tick_count}")
+        print(f"  Supervisor ticks: {self._tick_count}")
         print(f"  Errors: {self._error_count}")
         if self._generation_manager and self._generation_manager.current:
             gen = self._generation_manager.current
@@ -591,6 +699,7 @@ class MainLoop:
     def stop(self) -> None:
         """Request graceful stop."""
         self._running = False
+        self._stop_event.set()
 
     def stats(self) -> Dict[str, Any]:
         """Aggregate stats from all components."""
@@ -600,6 +709,7 @@ class MainLoop:
             "error_count": self._error_count,
             "uptime_sec": round(time.monotonic() - self._start_time, 1),
             "session_id": self._session_id,
+            "mainboard": self._mainboard.status(),
             "components": {
                 "listener": self._network_listener.stats()
                     if self._network_listener else {},
@@ -632,11 +742,12 @@ def main() -> None:
     print("  lolbot-HyperAI")
     print("  Apollo-style LoL Game Assistant")
     print("  Self-evolving via operatorRL governance kernel")
+    print("  Thread-per-component architecture (Apollo mainboard)")
     print("=" * 60)
     print()
 
     loop = MainLoop()
-    asyncio.run(loop.run())
+    loop.run()
 
 
 if __name__ == "__main__":
