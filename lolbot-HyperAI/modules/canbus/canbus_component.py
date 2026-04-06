@@ -366,10 +366,14 @@ class CanbusComponent(TimerComponent, ManagedComponent):
 
         Cycle:
             1. Check game active (lightweight probe)
-            2. Fetch allgamedata
+            2. Fetch allgamedata (with validation)
             3. Poll Fiddler (every Nth tick)
             4. Publish data on channels
             5. Publish status
+
+        Claude13: integrated measure_proc() for proper ProcMetrics
+        collection via ManagedComponent. Added _validate_lcu_response()
+        to guard against malformed LCU payloads reaching perception.
 
         Returns:
             True on success (even partial), False on hard failure.
@@ -378,59 +382,70 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             return True
 
         self._tick += 1
-        proc_start = time.monotonic()
 
-        # ── Step 1: Check if game is in progress ─────────────────────
-        if not self._game_active:
-            game_check = self._check_game_active()
-            if not game_check:
-                # Backoff: don't hammer the API
-                self._apply_backoff()
-                self._publish_status(Status.error(
-                    ErrorCode.CANBUS_GAME_NOT_IN_PROGRESS,
-                    "No active game detected",
-                ))
-                return True  # not a failure, just no game
+        with self.measure_proc() as m:
+            # ── Step 1: Check if game is in progress ─────────────────
+            if not self._game_active:
+                game_check = self._check_game_active()
+                if not game_check:
+                    self._apply_backoff()
+                    self._publish_status(Status.error(
+                        ErrorCode.CANBUS_GAME_NOT_IN_PROGRESS,
+                        "No active game detected",
+                    ))
+                    m.success = True  # not a failure, just no game
+                    return True
 
-        # ── Step 2: Fetch allgamedata from LCU ───────────────────────
-        lcu_data, lcu_status = self._fetch_allgamedata()
-        if lcu_data is not None:
-            self._connection_state = ConnectionState.CONNECTED
-            self._backoff_s = _BACKOFF_INITIAL_S  # reset backoff
-            self._check_stale(lcu_data)
+            # ── Step 2: Fetch allgamedata from LCU ───────────────────
+            lcu_data, lcu_status = self._fetch_allgamedata()
+            if lcu_data is not None:
+                self._connection_state = ConnectionState.CONNECTED
+                self._backoff_s = _BACKOFF_INITIAL_S
+                self._check_stale(lcu_data)
 
-            # Publish raw LCU data
-            raw = RawLCUData(
-                allgamedata=lcu_data,
-                timestamp=time.time(),
-                lcu_latency_ms=self._lcu_client._last_latency_ms if self._lcu_client else 0,
-                http_status=200,
-                source="lcu",
-            )
-            if self._raw_lcu_writer:
-                self._raw_lcu_writer.Write(raw)
-        else:
-            self._connection_state = ConnectionState.ERROR
-            logger.warning("LCU fetch failed: %s", lcu_status)
+                # Validate response before publishing
+                if not self._validate_lcu_response(lcu_data):
+                    logger.warning("LCU response missing required fields")
+                    self._publish_status(Status.error(
+                        ErrorCode.CANBUS_LCU_INVALID_RESPONSE,
+                        "Response missing required fields",
+                    ))
+                    m.success = False
+                    m.failure_reason = "invalid_lcu_response"
+                    return False
 
-        # ── Step 3: Fiddler polling (sub-sampled) ────────────────────
-        if (
-            self._fiddler_client is not None
-            and self._tick % _FIDDLER_POLL_INTERVAL_TICKS == 0
-        ):
-            self._poll_fiddler()
+                # Publish raw LCU data
+                raw = RawLCUData(
+                    allgamedata=lcu_data,
+                    timestamp=time.time(),
+                    lcu_latency_ms=(
+                        self._lcu_client._last_latency_ms
+                        if self._lcu_client else 0
+                    ),
+                    http_status=200,
+                    source="lcu",
+                )
+                if self._raw_lcu_writer:
+                    self._raw_lcu_writer.Write(raw)
+            else:
+                self._connection_state = ConnectionState.ERROR
+                logger.warning("LCU fetch failed: %s", lcu_status)
 
-        # ── Step 4: Publish status ───────────────────────────────────
-        self._publish_status(lcu_status)
+            # ── Step 3: Fiddler polling (sub-sampled) ────────────────
+            if (
+                self._fiddler_client is not None
+                and self._tick % _FIDDLER_POLL_INTERVAL_TICKS == 0
+            ):
+                self._poll_fiddler()
 
-        elapsed_ms = (time.monotonic() - proc_start) * 1000
-        if elapsed_ms > self._canbus_config.poll_interval_ms:
-            logger.warning(
-                "Canbus Proc() overrun: %.1fms > %.1fms",
-                elapsed_ms, self._canbus_config.poll_interval_ms,
-            )
+            # ── Step 4: Publish status ───────────────────────────────
+            self._publish_status(lcu_status)
 
-        return lcu_data is not None
+            m.success = lcu_data is not None
+            if not m.success:
+                m.failure_reason = "lcu_fetch_failed"
+
+        return m.success
 
     def on_shutdown(self) -> None:
         """Clean up resources on shutdown."""
@@ -491,6 +506,51 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             self._stale_count = 0
 
         self._last_game_time = game_time
+
+    def _validate_lcu_response(self, data: Dict[str, Any]) -> bool:
+        """Validate that the LCU allgamedata response has required fields.
+
+        The Live Client Data API returns a JSON object with these
+        top-level keys when a game is active:
+            - allPlayers: list of player objects
+            - activePlayer: the local player's data
+            - events: game event log
+            - gameData: game metadata (gameTime, gameMode, etc.)
+
+        Without allPlayers and gameData the perception pipeline will
+        produce garbage GameSnapshots. This guard prevents that.
+
+        Returns:
+            True if the response structure is valid for processing.
+        """
+        if not isinstance(data, dict):
+            return False
+
+        required_keys = ("allPlayers", "gameData")
+        for key in required_keys:
+            if key not in data:
+                logger.warning(
+                    "LCU response missing required key: %r (keys=%s)",
+                    key, list(data.keys()),
+                )
+                return False
+
+        players = data.get("allPlayers")
+        if not isinstance(players, list) or len(players) == 0:
+            logger.warning(
+                "LCU allPlayers is empty or not a list: %s",
+                type(players).__name__,
+            )
+            return False
+
+        game_data = data.get("gameData", {})
+        if not isinstance(game_data, dict):
+            return False
+        if "gameTime" not in game_data:
+            logger.warning("LCU gameData missing gameTime")
+            return False
+
+        return True
 
     def _poll_fiddler(self) -> None:
         """Poll Fiddler MCP bridge for network captures."""

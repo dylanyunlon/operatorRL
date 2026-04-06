@@ -335,7 +335,7 @@ class TestStatusSystem(TestCase):
 
     def test_status_ok(self):
         s = Status(code=ErrorCode.OK)
-        self.assertTrue(s.ok)
+        self.assertTrue(s.is_ok)
         self.assertTrue(bool(s))
         self.assertEqual(s.code, ErrorCode.OK)
 
@@ -343,7 +343,7 @@ class TestStatusSystem(TestCase):
         s = Status.error(
             ErrorCode.CANBUS_LCU_TIMEOUT, "Timed out after 2s"
         )
-        self.assertFalse(s.ok)
+        self.assertFalse(s.is_ok)
         self.assertEqual(s.module, "canbus")
 
     def test_status_chain(self):

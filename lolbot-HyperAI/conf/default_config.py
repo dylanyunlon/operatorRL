@@ -122,6 +122,24 @@ class SystemConfig:
     debug_mode: bool = False
 
 
+@dataclass
+class ReplayConfig:
+    """Replay/simulation configuration (Claude13).
+
+    Enables offline testing of the full pipeline without a live LoL
+    client. When enabled, CanbusComponent reads from recorded JSONL
+    files instead of polling the LCU API.
+
+    Apollo reference: modules/drivers/replay_driver
+    """
+    enabled: bool = False
+    recording_path: str = ""         # Path to JSONL recording file
+    speed_factor: float = 1.0        # 1.0 = realtime, 0 = max speed
+    loop: bool = False               # Loop at end of recording
+    start_game_time: float = 0.0     # Seek to this game time on start
+    auto_shutdown_on_finish: bool = True  # Shutdown when replay ends
+
+
 # ---------------------------------------------------------------------------
 # Root configuration
 # ---------------------------------------------------------------------------
@@ -140,6 +158,7 @@ class LolBotConfig:
     evolution: EvolutionConfig = field(default_factory=EvolutionConfig)
     integration: IntegrationConfig = field(default_factory=IntegrationConfig)
     system: SystemConfig = field(default_factory=SystemConfig)
+    replay: ReplayConfig = field(default_factory=ReplayConfig)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

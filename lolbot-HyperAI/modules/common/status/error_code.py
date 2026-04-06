@@ -159,7 +159,7 @@ class Status:
 
         # Wrapping an inner error
         inner = fetch_game_state()
-        if not inner.ok:
+        if not inner.is_ok:
             return Status.wrap(
                 inner,
                 ErrorCode.PERCEPTION_STATE_INCOMPLETE,
@@ -213,8 +213,13 @@ class Status:
     # ── Properties ───────────────────────────────────────────────────
 
     @property
-    def ok(self) -> bool:
-        """True if this status represents success."""
+    def is_ok(self) -> bool:
+        """True if this status represents success.
+
+        Claude13 fix: renamed from ``ok`` to ``is_ok`` because the
+        previous ``@property ok`` shadowed ``@staticmethod ok()``,
+        causing ``Status.ok()`` to raise TypeError at runtime.
+        """
         return self.code == ErrorCode.OK
 
     @property
@@ -250,7 +255,7 @@ class Status:
             "module": self.module,
             "message": self.message,
             "timestamp": self.timestamp,
-            "ok": self.ok,
+            "ok": self.is_ok,
         }
         if self.details:
             d["details"] = self.details
@@ -275,7 +280,7 @@ class Status:
     # ── Display ──────────────────────────────────────────────────────
 
     def __str__(self) -> str:
-        if self.ok:
+        if self.is_ok:
             return "Status(OK)"
         parts = [f"Status({self.code.name}"]
         if self.message:
@@ -287,7 +292,7 @@ class Status:
 
     def __bool__(self) -> bool:
         """Allow ``if status:`` to check for success."""
-        return self.ok
+        return self.is_ok
 
 
 # ─── Message envelope with status ────────────────────────────────────────────
@@ -314,7 +319,7 @@ class StatusMessage:
 
     @property
     def ok(self) -> bool:
-        return self.status.ok
+        return self.status.is_ok
 
     def to_dict(self) -> Dict[str, Any]:
         return {
