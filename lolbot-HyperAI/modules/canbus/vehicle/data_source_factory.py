@@ -207,12 +207,28 @@ class ReplayDataSource(DataSource):
 
         self._frames = []
         try:
-            with open(p, "r", encoding="utf-8") as f:
-                for line in f:
+            raw = p.read_text(encoding="utf-8").strip()
+            if not raw:
+                logger.error("回放文件为空: %s", p)
+                return False
+
+            # Claude16: support both single-JSON and JSONL formats.
+            # testdata/sample_allgamedata.json is single-JSON (one {} object).
+            # logs/recordings/*.jsonl is JSONL (one JSON per line).
+            if raw.startswith("{"):
+                try:
+                    single = json.loads(raw)
+                    self._frames.append(single)
+                except json.JSONDecodeError:
+                    pass  # Not valid single JSON, try JSONL below
+
+            if not self._frames:
+                for line in raw.splitlines():
                     line = line.strip()
                     if line:
                         frame = json.loads(line)
                         self._frames.append(frame)
+
         except (json.JSONDecodeError, IOError) as exc:
             logger.error("回放文件解析失败: %s", exc)
             return False

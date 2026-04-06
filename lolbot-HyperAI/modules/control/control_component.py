@@ -241,7 +241,7 @@ class VoiceOutputChannel(OutputChannel):
         cmd = VoiceCommand(
             text=text,
             priority=action.priority.value,
-            game_time=action.game_time,
+            game_time=action.data.get("game_time", 0.0),
         )
         self._writer.Write(cmd)
 
@@ -302,7 +302,7 @@ class LogOutputChannel(OutputChannel):
             "priority": action.priority.name,
             "text": action.text[:200],
             "source": action.source,
-            "game_time": action.game_time,
+            "game_time": action.data.get("game_time", 0.0),
         }
         self._log_buffer.append(entry)
         logger.info(
@@ -530,15 +530,20 @@ class ControlComponent(TimerComponent, ManagedComponent):
     def _advice_to_action(
         self, advice: StrategyAdvice,
     ) -> Optional[DispatchAction]:
-        """Convert StrategyAdvice to DispatchAction."""
-        if not advice.text:
+        """Convert StrategyAdvice to DispatchAction.
+
+        Claude16: Fixed to use StrategyAdvice's actual fields
+        (primary_action, reasoning, urgency) instead of removed
+        rec_type/text/priority. Removed game_time (not in DispatchAction).
+        """
+        if not advice.reasoning:
             return None
 
-        if advice.priority >= 3:
+        if advice.urgency >= 0.8:
             prio = ActionPriority.CRITICAL
-        elif advice.priority >= 2:
+        elif advice.urgency >= 0.6:
             prio = ActionPriority.HIGH
-        elif advice.priority >= 1:
+        elif advice.urgency >= 0.3:
             prio = ActionPriority.MEDIUM
         else:
             prio = ActionPriority.LOW
@@ -546,11 +551,11 @@ class ControlComponent(TimerComponent, ManagedComponent):
         return DispatchAction(
             category=ActionCategory.STRATEGY_ADVICE,
             priority=prio,
-            text=advice.text,
-            voice_text=advice.text,
-            source=f"planning.{advice.rec_type}",
-            dedup_key=f"strategy:{advice.rec_type}",
-            game_time=advice.game_time,
+            text=advice.reasoning,
+            voice_text=advice.reasoning,
+            source=f"planning.{advice.primary_action}",
+            dedup_key=f"strategy:{advice.primary_action}",
+            data={"game_time": advice.game_time},
         )
 
     def _maybe_win_announce(
@@ -583,7 +588,7 @@ class ControlComponent(TimerComponent, ManagedComponent):
             voice_text=text,
             source="prediction.win_probability",
             dedup_key="win_prob_announce",
-            game_time=win_pred.game_time,
+            data={"game_time": win_pred.game_time},
         )
 
     def _update_overlay_win_prob(

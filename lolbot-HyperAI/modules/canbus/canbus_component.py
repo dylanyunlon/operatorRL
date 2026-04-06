@@ -54,6 +54,11 @@ from modules.common.component_base import (
 )
 from modules.common.status.error_code import ErrorCode, Status, StatusMessage
 from modules.common.adapters.game_messages import RawLCUData, RawFiddlerData
+from modules.canbus.vehicle.data_source_factory import (
+    DataSource,
+    DataSourceFactory,
+    PollResult,
+)
 
 logger = get_logger("canbus")
 
@@ -91,6 +96,11 @@ class CanbusConfig:
     fiddler_mcp_url: str = "http://127.0.0.1:8866"
     poll_interval_ms: float = _CANBUS_INTERVAL_MS
     enable_ssl_verify: bool = False  # LCU uses self-signed cert
+    # Claude16: DataSourceFactory integration (Apollo vehicle_factory pattern)
+    data_source: str = "auto"
+    replay_file: str = ""
+    replay_speed: float = 1.0
+    replay_loop: bool = True
 
 
 # ─── SSL context for LCU (self-signed certificate) ──────────────────────────
@@ -298,6 +308,10 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         self._fiddler_client: Optional[FiddlerMCPClient] = None
         self._node: Optional[CyberNode] = None
 
+        # Claude16: Apollo vehicle_object_ equivalent
+        self._data_source: Optional[DataSource] = None
+        self._data_source_type: str = "auto"
+
         # Writers
         self._raw_lcu_writer: Optional[Writer[RawLCUData]] = None
         self._raw_fiddler_writer: Optional[Writer[RawFiddlerData]] = None
@@ -318,29 +332,58 @@ class CanbusComponent(TimerComponent, ManagedComponent):
     # ─── TimerComponent interface ────────────────────────────────────
 
     def Init(self) -> bool:
-        """Initialize LCU client, Fiddler client, and cyber node.
+        """Initialize data source, Fiddler client, and cyber node.
 
         Apollo equivalent: ``CanbusComponent::Init()``
+
+        Claude16: Uses DataSourceFactory (built by previous Claude but never
+        wired in) to create LCU/Replay/Mock data source. Matches Apollo's
+        vehicle_factory pattern. All existing LCU/Fiddler code preserved.
         """
         self._managed_init()
-        logger.info("Initializing CanbusComponent...")
+        cfg = self._canbus_config
+        logger.info("Initializing CanbusComponent v%s ...", self.VERSION)
 
-        # Create LCU HTTP client
+        # ── Step 1: Create data source via factory (Apollo vehicle_factory) ──
+        if cfg.data_source == "auto":
+            self._data_source_type, self._data_source = (
+                DataSourceFactory.auto_detect()
+            )
+            logger.info("Auto-detected data source: %s", self._data_source_type)
+        else:
+            self._data_source_type = cfg.data_source
+            self._data_source = DataSourceFactory.create_from_config(
+                data_source=cfg.data_source,
+                lcu_base_url=cfg.lcu_base_url,
+                lcu_timeout_s=cfg.lcu_timeout_s,
+                replay_file=cfg.replay_file,
+                replay_speed=cfg.replay_speed,
+                replay_loop=cfg.replay_loop,
+            )
+
+        # ── Step 2: Init data source (Apollo vehicle_object_->Start()) ───
+        if not self._data_source.init():
+            logger.error("Data source '%s' failed to init", self._data_source_type)
+            logger.info("Falling back to mock data source")
+            self._data_source = DataSourceFactory.create("mock")
+            self._data_source_type = "mock"
+            self._data_source.init()
+
+        # ── Keep LCU client for game-active probe (backward compat) ──────
         self._lcu_client = LCUClient(
-            base_url=self._canbus_config.lcu_base_url,
-            timeout=self._canbus_config.lcu_timeout_s,
+            base_url=cfg.lcu_base_url,
+            timeout=cfg.lcu_timeout_s,
         )
 
-        # Create Fiddler client if enabled
-        if self._canbus_config.fiddler_enabled:
+        # ── Keep Fiddler client (backward compat) ────────────────────────
+        if cfg.fiddler_enabled:
             self._fiddler_client = FiddlerMCPClient(
-                mcp_url=self._canbus_config.fiddler_mcp_url,
+                mcp_url=cfg.fiddler_mcp_url,
             )
             self._fiddler_client.enable()
-            logger.info("Fiddler MCP bridge enabled at %s",
-                        self._canbus_config.fiddler_mcp_url)
+            logger.info("Fiddler MCP bridge enabled at %s", cfg.fiddler_mcp_url)
 
-        # Create cyber node and channels
+        # ── Step 3: Create cyber writers (Apollo chassis_writer_) ────────
         self._node = CyberNode("canbus")
         self._raw_lcu_writer = self._node.CreateWriter(
             "/lol/raw_lcu", RawLCUData
@@ -356,7 +399,8 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         self.register_self()
         self._transition(LifecycleState.READY)
         self._transition(LifecycleState.RUNNING)
-        logger.info("CanbusComponent initialized")
+        logger.info("CanbusComponent initialized (source=%s)",
+                     self._data_source_type)
         return True
 
     def Proc(self) -> bool:
@@ -364,19 +408,10 @@ class CanbusComponent(TimerComponent, ManagedComponent):
 
         Apollo equivalent: ``CanbusComponent::Proc()``
 
-        Cycle:
-            1. Check game active (lightweight probe)
-            2. Fetch allgamedata (with validation)
-            3. Poll Fiddler (every Nth tick)
-            4. Publish data on channels
-            5. Publish status
-
-        Claude13: integrated measure_proc() for proper ProcMetrics
-        collection via ManagedComponent. Added _validate_lcu_response()
-        to guard against malformed LCU payloads reaching perception.
-
-        Returns:
-            True on success (even partial), False on hard failure.
+        Claude16: Refactored to Apollo 3-line Proc() pattern.
+        All original logic (game-active, validation, stale, backoff)
+        preserved in _poll_and_publish(). Claude13's measure_proc()
+        and _validate_lcu_response() kept intact.
         """
         if self.should_skip_proc():
             return True
@@ -384,72 +419,89 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         self._tick += 1
 
         with self.measure_proc() as m:
-            # ── Step 1: Check if game is in progress ─────────────────
-            if not self._game_active:
-                game_check = self._check_game_active()
-                if not game_check:
-                    self._apply_backoff()
-                    self._publish_status(Status.error(
-                        ErrorCode.CANBUS_GAME_NOT_IN_PROGRESS,
-                        "No active game detected",
-                    ))
-                    m.success = True  # not a failure, just no game
-                    return True
+            # Apollo pattern: Proc() = one core call + optional detail
+            m.success = self._poll_and_publish()
+            if not m.success:
+                m.failure_reason = "poll_failed"
 
-            # ── Step 2: Fetch allgamedata from LCU ───────────────────
-            lcu_data, lcu_status = self._fetch_allgamedata()
-            if lcu_data is not None:
-                self._connection_state = ConnectionState.CONNECTED
-                self._backoff_s = _BACKOFF_INITIAL_S
-                self._check_stale(lcu_data)
-
-                # Validate response before publishing
-                if not self._validate_lcu_response(lcu_data):
-                    logger.warning("LCU response missing required fields")
-                    self._publish_status(Status.error(
-                        ErrorCode.CANBUS_LCU_INVALID_RESPONSE,
-                        "Response missing required fields",
-                    ))
-                    m.success = False
-                    m.failure_reason = "invalid_lcu_response"
-                    return False
-
-                # Publish raw LCU data
-                raw = RawLCUData(
-                    allgamedata=lcu_data,
-                    timestamp=time.time(),
-                    lcu_latency_ms=(
-                        self._lcu_client._last_latency_ms
-                        if self._lcu_client else 0
-                    ),
-                    http_status=200,
-                    source="lcu",
-                )
-                if self._raw_lcu_writer:
-                    self._raw_lcu_writer.Write(raw)
-            else:
-                self._connection_state = ConnectionState.ERROR
-                logger.warning("LCU fetch failed: %s", lcu_status)
-
-            # ── Step 3: Fiddler polling (sub-sampled) ────────────────
+            # Fiddler sub-sampled (= Apollo PublishChassisDetail)
             if (
                 self._fiddler_client is not None
                 and self._tick % _FIDDLER_POLL_INTERVAL_TICKS == 0
             ):
                 self._poll_fiddler()
 
-            # ── Step 4: Publish status ───────────────────────────────
-            self._publish_status(lcu_status)
-
-            m.success = lcu_data is not None
-            if not m.success:
-                m.failure_reason = "lcu_fetch_failed"
-
         return m.success
 
+    def _poll_and_publish(self) -> bool:
+        """Poll data source and publish to channel.
+
+        Apollo equivalent: ``PublishChassis()`` → vehicle_object_->publish_chassis()
+
+        Claude16: Routes through DataSourceFactory. For LCU source, does
+        game-active probe first (original behavior). For mock/replay,
+        polls directly. All Claude13 validation logic preserved.
+        """
+        # ── LCU source: game-active probe (original behavior) ────────
+        if self._data_source_type == "lcu" and not self._game_active:
+            if not self._check_game_active():
+                self._apply_backoff()
+                self._publish_status(Status.error(
+                    ErrorCode.CANBUS_GAME_NOT_IN_PROGRESS,
+                    "No active game detected",
+                ))
+                return True  # not a failure, just no game
+
+        # ── Core poll via DataSource (= vehicle_object_->publish_chassis()) ──
+        result: PollResult = self._data_source.poll()
+
+        if not result.success:
+            self._connection_state = ConnectionState.ERROR
+            self._publish_status(Status.error(
+                ErrorCode.CANBUS_LCU_CONNECTION_FAILED,
+                result.error or "Poll failed",
+            ))
+            return False
+
+        data = result.data
+        if data is None:
+            return True
+
+        # ── Validate (Claude13's _validate_lcu_response, preserved) ──
+        if not self._validate_lcu_response(data):
+            logger.warning("Response missing required fields (source=%s)",
+                           self._data_source_type)
+            self._publish_status(Status.error(
+                ErrorCode.CANBUS_LCU_INVALID_RESPONSE,
+                "Response missing required fields",
+            ))
+            return False
+
+        # ── Stale detection (original, preserved) ────────────────────
+        self._check_stale(data)
+        self._connection_state = ConnectionState.CONNECTED
+        self._backoff_s = _BACKOFF_INITIAL_S
+        self._game_active = True
+
+        # ── Publish (= chassis_writer_->Write(chassis)) ──────────────
+        raw = RawLCUData(
+            allgamedata=data,
+            timestamp=time.time(),
+            lcu_latency_ms=result.latency_ms,
+            http_status=200,
+            source=self._data_source_type,
+        )
+        if self._raw_lcu_writer:
+            self._raw_lcu_writer.Write(raw)
+
+        self._publish_status(Status.ok())
+        return True
+
     def on_shutdown(self) -> None:
-        """Clean up resources on shutdown."""
+        """Clean up resources on shutdown. Apollo: Clear()"""
         self._managed_shutdown()
+        if self._data_source:
+            self._data_source.shutdown()
         if self._node:
             self._node.shutdown()
         logger.info("CanbusComponent shutdown complete")
@@ -607,5 +659,10 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             "stale_count": self._stale_count,
             "lcu_stats": self._lcu_client.stats if self._lcu_client else {},
             "fiddler_enabled": self._fiddler_client is not None,
+            # Claude16: data source introspection
+            "data_source_type": self._data_source_type,
+            "data_source_stats": (
+                self._data_source.stats() if self._data_source else {}
+            ),
         })
         return base

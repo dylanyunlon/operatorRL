@@ -213,10 +213,10 @@ class MacroDecisionEngine:
         game_time: float,
     ) -> StrategyAdvice:
         return StrategyAdvice(
-            rec_type=rec_type,
-            text=text,
+            primary_action=rec_type,
+            reasoning=text,
             confidence=confidence,
-            priority=2 if confidence > 0.7 else 1,
+            urgency=0.8 if confidence > 0.7 else 0.4,
             game_time=game_time,
         )
 
@@ -364,10 +364,10 @@ class PlanningComponent(TimerComponent, ManagedComponent):
                 # so voice announcer (which reads /lol/strategy) can pick it up.
                 if macro.action != MacroAction.IDLE and macro.confidence >= _MIN_ADVICE_CONFIDENCE:
                     legacy = StrategyAdvice(
-                        rec_type=f"macro_{macro.action.value}",
-                        text=macro.rationale,
+                        primary_action=f"macro_{macro.action.value}",
+                        reasoning=macro.rationale,
                         confidence=macro.confidence,
-                        priority=2 if macro.urgency.name in ("HIGH", "CRITICAL") else 1,
+                        urgency=0.9 if macro.urgency.name in ("HIGH", "CRITICAL") else 0.5,
                         game_time=snapshot.game_time,
                     )
                     if self._strategy_writer:
@@ -400,10 +400,10 @@ class PlanningComponent(TimerComponent, ManagedComponent):
                     top = advices[0]
                     if top.confidence >= _MIN_ADVICE_CONFIDENCE:
                         legacy = StrategyAdvice(
-                            rec_type=f"lane_{top.advice_type.value}",
-                            text=top.text,
+                            primary_action=f"lane_{top.advice_type.value}",
+                            reasoning=top.text,
                             confidence=top.confidence,
-                            priority=1,
+                            urgency=0.4,
                             game_time=snapshot.game_time,
                         )
                         if self._strategy_writer:
