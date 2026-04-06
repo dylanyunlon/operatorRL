@@ -498,18 +498,55 @@ class DataSourceFactory:
 
     @staticmethod
     def auto_detect() -> Tuple[str, "DataSource"]:
-        """Auto-detect best available data source (Apollo vehicle detection pattern)."""
+        """Auto-detect best available data source (Apollo vehicle detection pattern).
+
+        Priority: LCU (live game) → testdata (simulated, time-advancing)
+                  → mock (synthetic).
+
+        Claude18: Changed testdata fallback from raw ReplayDataSource to
+        SimulatedReplayDataSource. The raw replay loops the same JSON with
+        fixed gameTime=1680.5, causing stale-data WARNING floods (~10/sec).
+        SimulatedReplayDataSource advances gameTime on each poll(), giving
+        the full pipeline realistic progression without stale triggers.
+        """
         import ssl, urllib.request, urllib.error
         from pathlib import Path as _P
+
+        # Priority 1: Live LCU game client
         try:
-            ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-            req = urllib.request.Request("https://127.0.0.1:2999/liveclientdata/gamestats")
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            req = urllib.request.Request(
+                "https://127.0.0.1:2999/liveclientdata/gamestats"
+            )
             urllib.request.urlopen(req, timeout=1.0, context=ctx)
             return "lcu", DataSourceFactory.create("lcu")
-        except Exception: pass
+        except Exception:
+            pass
+
+        # Priority 2: Testdata with simulated time advancement
         td = _P(__file__).parent.parent / "testdata" / "sample_allgamedata.json"
         if td.exists():
-            return "testdata", DataSourceFactory.create("replay", filepath=str(td), speed=1.0, loop=True)
+            # Claude18: Use SimulatedReplayDataSource to avoid stale-data spam
+            try:
+                # Import triggers registration via module-level register_data_source
+                import modules.canbus.vehicle.simulated_replay  # noqa: F401
+                return "testdata", DataSourceFactory.create(
+                    "simulated",
+                    filepath=str(td),
+                    tick_delta_s=1.0,
+                    start_time_s=120.0,
+                    inject_events=True,
+                    max_game_time_s=2400.0,
+                )
+            except (ValueError, ImportError):
+                # Fallback to raw replay if simulated not available
+                return "testdata", DataSourceFactory.create(
+                    "replay", filepath=str(td), speed=1.0, loop=True,
+                )
+
+        # Priority 3: Mock data
         return "mock", DataSourceFactory.create("mock")
 
     @staticmethod
