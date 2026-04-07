@@ -316,3 +316,170 @@ class ModelCalibrator:
             "latest_ece": (self._latest_result.ece
                            if self._latest_result else None),
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude21: ModelCalibratorV2 — online recalibration, temperature scaling,
+# per-phase calibration curves, and calibration drift alerts
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class TemperatureConfig:
+    """Temperature scaling parameters.
+
+    Claude21: Temperature scaling is the simplest post-hoc calibration
+    method. Divides logits by temperature T before softmax.
+    T > 1 reduces overconfidence. T < 1 increases sharpness.
+    """
+    temperature: float = 1.0
+    learned: bool = False
+    fit_samples: int = 0
+    nll_before: float = 0.0
+    nll_after: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "T": round(self.temperature, 4),
+            "learned": self.learned,
+            "samples": self.fit_samples,
+            "nll_improvement": round(self.nll_before - self.nll_after, 4) if self.learned else 0,
+        }
+
+
+class ModelCalibratorV2(ModelCalibrator):
+    """Production-grade model calibrator with temperature scaling,
+    online recalibration, per-phase curves, and drift alerting.
+
+    Claude21: Extends ModelCalibrator with:
+    - Temperature scaling learned from validation data
+    - Online recalibration (update T as new outcomes arrive)
+    - Per-game-phase temperature (early/mid/late may need different T)
+    - Drift detection: alert when recalibration improves T significantly
+    - Calibration report for evolution fitness
+
+    Usage::
+        calibrator = ModelCalibratorV2()
+        calibrator.fit_temperature(predictions, outcomes)
+        calibrated_p = calibrator.apply(raw_p, phase="MID")
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._global_temp = TemperatureConfig()
+        self._phase_temps: Dict[str, TemperatureConfig] = {}
+        self._online_buffer: List[Tuple[float, float]] = []
+        self._online_buffer_max = 200
+        self._recalibration_count = 0
+
+    def fit_temperature(
+        self,
+        predictions: List[float],
+        outcomes: List[float],
+        phase: str = "all",
+    ) -> TemperatureConfig:
+        """Fit temperature by minimizing negative log-likelihood.
+
+        Claude21: Simple grid search over T in [0.1, 5.0].
+        """
+        if len(predictions) < 10:
+            return TemperatureConfig()
+
+        best_t = 1.0
+        best_nll = float("inf")
+        nll_before = self._compute_nll(predictions, outcomes, 1.0)
+
+        for t_candidate in [x * 0.1 for x in range(1, 51)]:
+            nll = self._compute_nll(predictions, outcomes, t_candidate)
+            if nll < best_nll:
+                best_nll = nll
+                best_t = t_candidate
+
+        config = TemperatureConfig(
+            temperature=best_t,
+            learned=True,
+            fit_samples=len(predictions),
+            nll_before=nll_before,
+            nll_after=best_nll,
+        )
+
+        if phase == "all":
+            self._global_temp = config
+        else:
+            self._phase_temps[phase] = config
+
+        return config
+
+    @staticmethod
+    def _compute_nll(
+        predictions: List[float],
+        outcomes: List[float],
+        temperature: float,
+    ) -> float:
+        """Compute negative log-likelihood with temperature scaling."""
+        eps = 1e-7
+        nll = 0.0
+        for p, y in zip(predictions, outcomes):
+            # Apply temperature (logit space)
+            logit = math.log(max(p, eps) / max(1 - p, eps))
+            scaled_logit = logit / max(temperature, 0.01)
+            scaled_p = 1.0 / (1.0 + math.exp(-scaled_logit))
+            scaled_p = max(eps, min(1 - eps, scaled_p))
+
+            if y > 0.5:
+                nll -= math.log(scaled_p)
+            else:
+                nll -= math.log(1 - scaled_p)
+
+        return nll / max(len(predictions), 1)
+
+    def apply(self, raw_prediction: float, phase: str = "all") -> float:
+        """Apply temperature scaling to a raw prediction."""
+        config = self._phase_temps.get(phase, self._global_temp)
+        if not config.learned:
+            return raw_prediction
+
+        eps = 1e-7
+        p = max(eps, min(1 - eps, raw_prediction))
+        logit = math.log(p / (1 - p))
+        scaled = logit / max(config.temperature, 0.01)
+        return 1.0 / (1.0 + math.exp(-scaled))
+
+    def record_online(self, prediction: float, outcome: float) -> None:
+        """Record prediction-outcome pair for online recalibration."""
+        self._online_buffer.append((prediction, outcome))
+        if len(self._online_buffer) >= self._online_buffer_max:
+            self._recalibrate_online()
+
+    def _recalibrate_online(self) -> None:
+        """Trigger online recalibration from buffer."""
+        preds = [p for p, _ in self._online_buffer]
+        outcomes = [o for _, o in self._online_buffer]
+        old_t = self._global_temp.temperature
+        self.fit_temperature(preds, outcomes)
+        new_t = self._global_temp.temperature
+        self._recalibration_count += 1
+
+        if abs(new_t - old_t) > 0.3:
+            logger.warning(
+                "Calibration drift: T changed %.2f → %.2f (recal #%d)",
+                old_t, new_t, self._recalibration_count,
+            )
+
+        self._online_buffer.clear()
+
+    def calibration_report(self) -> Dict[str, Any]:
+        """Generate calibration report for evolution."""
+        return {
+            "global": self._global_temp.to_dict(),
+            "phases": {
+                ph: cfg.to_dict() for ph, cfg in self._phase_temps.items()
+            },
+            "recalibrations": self._recalibration_count,
+            "online_buffer": len(self._online_buffer),
+        }
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.calibrator_stats() if hasattr(self, "calibrator_stats") else {}
+        base.update(self.calibration_report())
+        return base

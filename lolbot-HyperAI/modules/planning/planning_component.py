@@ -495,7 +495,7 @@ class PlanningComponent(TimerComponent, ManagedComponent):
                     if spike.impact.value >= SpikeImpact.MODERATE.value:
                         advice = StrategyAdvice(
                             primary_action=f"spike_{spike.spike_type.name.lower()}",
-                            reasoning=f"Power spike: {spike.champion} hit {spike.description}",
+                            reasoning=f"Power spike: {spike.champion_name} hit {spike.description}",
                             confidence=0.6,
                             urgency=0.7 if spike.is_ally else 0.5,
                             game_time=snapshot.game_time,

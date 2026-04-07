@@ -349,14 +349,30 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
             and self._phase_detector is not None
         ):
             try:
+                # Claude21: Fix kwarg names to match PhaseContext dataclass
+                # fields (dragons_killed, inhibitors_destroyed) and populate
+                # from real TeamState data instead of hardcoded zeros.
                 ctx = PhaseContext(
                     game_time=final.game_time,
                     total_kills=(
                         final.blue_team.total_kills + final.red_team.total_kills
                     ),
-                    towers_destroyed=0,  # TODO: track from events
-                    dragons_taken=0,
-                    inhibitors_down=0,
+                    towers_destroyed=(
+                        final.blue_team.towers_destroyed
+                        + final.red_team.towers_destroyed
+                    ),
+                    dragons_killed=(
+                        final.blue_team.dragons_taken
+                        + final.red_team.dragons_taken
+                    ),
+                    barons_killed=(
+                        final.blue_team.barons_taken
+                        + final.red_team.barons_taken
+                    ),
+                    inhibitors_destroyed=(
+                        final.blue_team.inhibitors_destroyed
+                        + final.red_team.inhibitors_destroyed
+                    ),
                 )
                 transition = self._phase_detector.update(ctx)
                 if transition is not None:

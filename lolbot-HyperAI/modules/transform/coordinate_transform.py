@@ -251,3 +251,230 @@ class CoordinateTransform:
                 "max": (self._game_bounds.max_x, self._game_bounds.max_y),
             },
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude21: CoordinateTransformV2 — minimap projection, champion-relative
+# coordinates, zone classification, and distance metrics for game analysis
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Summoner's Rift coordinate bounds (from League client)
+_SR_MIN_X = -120.0
+_SR_MAX_X = 14870.0
+_SR_MIN_Y = -120.0
+_SR_MAX_Y = 14980.0
+_SR_WIDTH = _SR_MAX_X - _SR_MIN_X
+_SR_HEIGHT = _SR_MAX_Y - _SR_MIN_Y
+
+# Minimap pixel dimensions (standard)
+_MINIMAP_PX = 512
+
+
+@dataclass
+class MinimapPoint:
+    """A point on the minimap in pixel coordinates.
+
+    Claude21: Used for overlay rendering and minimap analysis.
+    """
+    px: int
+    py: int
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"px": self.px, "py": self.py}
+
+
+@dataclass
+class GamePoint:
+    """A point in game world coordinates."""
+    x: float
+    y: float
+
+    def distance_to(self, other: "GamePoint") -> float:
+        return math.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+
+    def midpoint(self, other: "GamePoint") -> "GamePoint":
+        return GamePoint(x=(self.x + other.x) / 2, y=(self.y + other.y) / 2)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"x": round(self.x, 1), "y": round(self.y, 1)}
+
+
+# Key landmark positions on Summoner's Rift
+_LANDMARKS: Dict[str, GamePoint] = {
+    "blue_nexus": GamePoint(394.0, 461.0),
+    "red_nexus": GamePoint(14340.0, 14391.0),
+    "dragon_pit": GamePoint(9866.0, 4414.0),
+    "baron_pit": GamePoint(4966.0, 10542.0),
+    "blue_red_buff": GamePoint(7862.0, 4112.0),
+    "blue_blue_buff": GamePoint(3832.0, 7908.0),
+    "red_red_buff": GamePoint(7082.0, 10838.0),
+    "red_blue_buff": GamePoint(10952.0, 6990.0),
+    "mid_center": GamePoint(7400.0, 7600.0),
+    "top_river_bush": GamePoint(4562.0, 11752.0),
+    "bot_river_bush": GamePoint(10342.0, 3292.0),
+}
+
+
+class CoordinateTransformV2(CoordinateTransform):
+    """Production-grade coordinate transform with minimap projection,
+    champion-relative coordinates, and spatial analysis utilities.
+
+    Claude21: Extends CoordinateTransform with:
+    - World→minimap pixel projection and reverse
+    - Champion-relative coordinate system (for normalized features)
+    - Distance to landmarks (dragon, baron, nexus, etc.)
+    - Zone classification from coordinates
+    - Geometric utilities (midpoint, clustering, area)
+
+    Apollo reference: modules/transform/transform_component.cc handles
+    coordinate transforms between vehicle frame, world frame, and HD map.
+
+    Usage::
+        transform = CoordinateTransformV2()
+        mp = transform.world_to_minimap(x=9866, y=4414)
+        dist = transform.distance_to_landmark(x, y, "dragon_pit")
+    """
+
+    def world_to_minimap(self, x: float, y: float) -> MinimapPoint:
+        """Project game world coordinates to minimap pixel coordinates.
+
+        Claude21: The minimap is a top-down view with Y-axis inverted
+        (origin top-left). The game world has origin at bottom-left.
+        """
+        # Normalize to [0, 1]
+        nx = (x - _SR_MIN_X) / _SR_WIDTH
+        ny = (y - _SR_MIN_Y) / _SR_HEIGHT
+
+        # Clamp
+        nx = max(0.0, min(1.0, nx))
+        ny = max(0.0, min(1.0, ny))
+
+        # Map to pixel (Y inverted for minimap)
+        px = int(nx * _MINIMAP_PX)
+        py = int((1.0 - ny) * _MINIMAP_PX)
+
+        return MinimapPoint(px=px, py=py)
+
+    def minimap_to_world(self, px: int, py: int) -> GamePoint:
+        """Reverse projection: minimap pixel to game world coordinates."""
+        nx = px / _MINIMAP_PX
+        ny = 1.0 - (py / _MINIMAP_PX)
+
+        x = _SR_MIN_X + nx * _SR_WIDTH
+        y = _SR_MIN_Y + ny * _SR_HEIGHT
+
+        return GamePoint(x=x, y=y)
+
+    def to_champion_relative(
+        self, target_x: float, target_y: float,
+        champion_x: float, champion_y: float,
+    ) -> GamePoint:
+        """Transform to champion-relative coordinates.
+
+        Claude21: Useful for ML features — all positions expressed
+        relative to the active player, making features translation-invariant.
+        """
+        return GamePoint(
+            x=target_x - champion_x,
+            y=target_y - champion_y,
+        )
+
+    def distance_to_landmark(
+        self, x: float, y: float, landmark: str,
+    ) -> float:
+        """Compute distance from a position to a named landmark."""
+        lm = _LANDMARKS.get(landmark)
+        if not lm:
+            return float("inf")
+        return math.sqrt((x - lm.x) ** 2 + (y - lm.y) ** 2)
+
+    def nearest_landmark(
+        self, x: float, y: float,
+    ) -> Tuple[str, float]:
+        """Find the nearest landmark to a position.
+
+        Returns (landmark_name, distance).
+        """
+        best_name = ""
+        best_dist = float("inf")
+        for name, lm in _LANDMARKS.items():
+            d = math.sqrt((x - lm.x) ** 2 + (y - lm.y) ** 2)
+            if d < best_dist:
+                best_dist = d
+                best_name = name
+        return best_name, best_dist
+
+    def lane_proximity(self, x: float, y: float) -> Dict[str, float]:
+        """Compute proximity score to each lane.
+
+        Claude21: Returns dict of lane→proximity where 1.0 = in lane,
+        0.0 = far away. Used for classifying champion positions.
+        """
+        # Lane center lines (approximate)
+        lanes = {
+            "top": [(800, 14000), (800, 800), (800, 800)],
+            "mid": [(800, 800), (7400, 7600), (14200, 14200)],
+            "bot": [(14200, 800), (14200, 14200), (14200, 14200)],
+        }
+        # Simple: distance to lane midpoint
+        proximity = {}
+        for lane, points in lanes.items():
+            mid = points[len(points) // 2]
+            d = math.sqrt((x - mid[0]) ** 2 + (y - mid[1]) ** 2)
+            proximity[lane] = max(0.0, 1.0 - d / 10000.0)
+        return proximity
+
+    def group_champions(
+        self, positions: List[Tuple[str, float, float]],
+        cluster_radius: float = 2000.0,
+    ) -> List[List[str]]:
+        """Group champions into clusters by proximity.
+
+        Claude21: Simple single-linkage clustering. Champions within
+        cluster_radius of any cluster member are grouped together.
+        Useful for detecting teamfight formations.
+
+        Args:
+            positions: List of (name, x, y) tuples.
+            cluster_radius: Max distance to join a cluster.
+
+        Returns:
+            List of name-lists, one per cluster.
+        """
+        if not positions:
+            return []
+
+        assigned = [False] * len(positions)
+        clusters: List[List[str]] = []
+
+        for i, (name_i, xi, yi) in enumerate(positions):
+            if assigned[i]:
+                continue
+            cluster = [name_i]
+            assigned[i] = True
+
+            # Expand cluster
+            queue = [(xi, yi)]
+            while queue:
+                cx, cy = queue.pop(0)
+                for j, (name_j, xj, yj) in enumerate(positions):
+                    if assigned[j]:
+                        continue
+                    d = math.sqrt((cx - xj) ** 2 + (cy - yj) ** 2)
+                    if d <= cluster_radius:
+                        cluster.append(name_j)
+                        assigned[j] = True
+                        queue.append((xj, yj))
+
+            clusters.append(cluster)
+
+        return clusters
+
+    @staticmethod
+    def get_landmark(name: str) -> Optional[GamePoint]:
+        """Get a landmark position by name."""
+        return _LANDMARKS.get(name)
+
+    @staticmethod
+    def all_landmarks() -> Dict[str, Dict[str, float]]:
+        return {name: pt.to_dict() for name, pt in _LANDMARKS.items()}

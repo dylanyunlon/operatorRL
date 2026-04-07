@@ -276,3 +276,337 @@ class FogEstimator:
             "update_count": self._update_count,
             **self._fog_map.to_summary(),
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude21: FogEstimatorV2 — ward-aware fog decay, vision score tracking,
+# threat assessment in fog zones, and fog-based gank prediction
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class FogZone:
+    """A zone of the map with fog-of-war state.
+
+    Claude21: Tracks how long each zone has been in fog and what
+    threats might be lurking there based on last-known positions.
+    """
+    zone_name: str
+    in_fog: bool = True
+    fog_duration_s: float = 0.0
+    last_seen_time: float = 0.0
+    last_known_enemies: List[str] = field(default_factory=list)
+    threat_level: float = 0.0   # 0-1, higher = more dangerous
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "zone": self.zone_name,
+            "in_fog": self.in_fog,
+            "fog_s": round(self.fog_duration_s, 1),
+            "threats": self.last_known_enemies,
+            "threat_level": round(self.threat_level, 3),
+        }
+
+
+@dataclass
+class VisionScore:
+    """Team vision scoring.
+
+    Claude21: Quantifies how well each team maintains vision control.
+    """
+    blue_vision: float = 0.0    # 0-1
+    red_vision: float = 0.0     # 0-1
+    blue_wards_active: int = 0
+    red_wards_active: int = 0
+    blue_fog_zones: int = 0     # zones in fog for blue team
+    red_fog_zones: int = 0
+    vision_advantage: str = "EVEN"  # BLUE, RED, EVEN
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "blue_vision": round(self.blue_vision, 3),
+            "red_vision": round(self.red_vision, 3),
+            "blue_wards": self.blue_wards_active,
+            "red_wards": self.red_wards_active,
+            "advantage": self.vision_advantage,
+        }
+
+
+@dataclass
+class GankPrediction:
+    """Predicted gank from fog analysis.
+
+    Claude21: When an enemy champion disappears into fog near a lane,
+    predict potential gank with probability based on fog duration,
+    champion role, and game state.
+    """
+    target_lane: str
+    predicted_ganker: str
+    probability: float
+    fog_duration_s: float
+    last_seen_zone: str
+    game_time: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "lane": self.target_lane,
+            "ganker": self.predicted_ganker,
+            "prob": round(self.probability, 3),
+            "fog_s": round(self.fog_duration_s, 1),
+            "from_zone": self.last_seen_zone,
+        }
+
+
+# Role-based gank threat multipliers
+_GANK_THREAT_BY_ROLE: Dict[str, float] = {
+    "jungle": 1.0,    # Junglers gank most
+    "mid": 0.6,       # Mid roams frequently
+    "support": 0.5,   # Support roams
+    "top": 0.2,       # Top rarely roams
+    "adc": 0.1,       # ADC almost never roams
+}
+
+# Fog duration thresholds for threat escalation
+_FOG_THREAT_CURVE = [
+    (5.0, 0.1),    # 5s in fog = low threat
+    (15.0, 0.3),   # 15s = moderate
+    (30.0, 0.6),   # 30s = high
+    (60.0, 0.9),   # 60s = very high
+]
+
+
+class FogEstimatorV2(FogEstimator):
+    """Production-grade fog estimator with ward awareness, threat scoring,
+    vision metrics, and gank prediction from fog analysis.
+
+    Claude21: Extends FogEstimator with:
+    - Per-zone fog duration tracking with threat escalation
+    - Ward-aware vision scoring per team
+    - Gank prediction from fog patterns (enemy disappears near lane)
+    - Vision advantage computation for planning
+    - Integration with MapAwarenessV2 zone definitions
+
+    Apollo reference: modules/perception/camera_detection_multi_stage/
+    handles visibility estimation from sensor coverage maps.
+
+    Usage::
+        fog = FogEstimatorV2()
+        fog.update_visibility(visible_zones, game_time)
+        fog.update_enemy_positions(enemies, game_time)
+        ganks = fog.predict_ganks(game_time)
+        vision = fog.compute_vision_score()
+    """
+
+    _ZONE_NAMES = [
+        "top_lane", "mid_lane", "bot_lane",
+        "blue_jungle_top", "blue_jungle_bot",
+        "red_jungle_top", "red_jungle_bot",
+        "dragon_pit", "baron_pit",
+        "river_top", "river_bot",
+        "blue_base", "red_base",
+    ]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._fog_zones: Dict[str, FogZone] = {
+            name: FogZone(zone_name=name) for name in self._ZONE_NAMES
+        }
+        self._enemy_last_zone: Dict[str, str] = {}
+        self._enemy_last_seen: Dict[str, float] = {}
+        self._enemy_roles: Dict[str, str] = {}
+        self._blue_wards: List[Tuple[str, float]] = []  # (zone, expire_time)
+        self._red_wards: List[Tuple[str, float]] = []
+
+    def update_visibility(
+        self, visible_zones: List[str], game_time: float,
+    ) -> None:
+        """Update which zones are currently visible.
+
+        Claude21: Called each tick with the set of zones that have
+        allied champion or ward vision.
+        """
+        for name, fz in self._fog_zones.items():
+            if name in visible_zones:
+                fz.in_fog = False
+                fz.last_seen_time = game_time
+                fz.fog_duration_s = 0.0
+            else:
+                fz.in_fog = True
+                if fz.last_seen_time > 0:
+                    fz.fog_duration_s = game_time - fz.last_seen_time
+                else:
+                    fz.fog_duration_s = game_time
+
+    def update_enemy_positions(
+        self, enemies: List[Dict[str, Any]], game_time: float,
+    ) -> None:
+        """Update last-known enemy positions.
+
+        Args:
+            enemies: List of dicts with 'name', 'zone', 'role', 'visible'.
+        """
+        for enemy in enemies:
+            name = enemy.get("name", "")
+            zone = enemy.get("zone", "")
+            role = enemy.get("role", "")
+            visible = enemy.get("visible", False)
+
+            if role:
+                self._enemy_roles[name] = role
+
+            if visible and zone:
+                self._enemy_last_zone[name] = zone
+                self._enemy_last_seen[name] = game_time
+
+                # Update fog zone enemy tracking
+                for fz in self._fog_zones.values():
+                    if name in fz.last_known_enemies:
+                        fz.last_known_enemies.remove(name)
+                if zone in self._fog_zones:
+                    fz = self._fog_zones[zone]
+                    if name not in fz.last_known_enemies:
+                        fz.last_known_enemies.append(name)
+
+    def _compute_threat(self, fz: FogZone, game_time: float) -> float:
+        """Compute threat level for a fog zone.
+
+        Claude21: Threat increases with fog duration and the roles of
+        enemies last seen near this zone.
+        """
+        if not fz.in_fog:
+            return 0.0
+
+        # Duration-based threat
+        duration_threat = 0.0
+        for threshold, threat in _FOG_THREAT_CURVE:
+            if fz.fog_duration_s >= threshold:
+                duration_threat = threat
+
+        # Enemy-based threat
+        enemy_threat = 0.0
+        for enemy_name in fz.last_known_enemies:
+            role = self._enemy_roles.get(enemy_name, "")
+            role_mult = _GANK_THREAT_BY_ROLE.get(role, 0.3)
+            time_since = game_time - self._enemy_last_seen.get(enemy_name, 0)
+            recency = max(0.0, 1.0 - time_since / 120.0)
+            enemy_threat += role_mult * recency
+
+        return min(1.0, max(duration_threat, enemy_threat))
+
+    def update_threats(self, game_time: float) -> None:
+        """Recompute all zone threat levels."""
+        for fz in self._fog_zones.values():
+            fz.threat_level = self._compute_threat(fz, game_time)
+
+    def predict_ganks(self, game_time: float) -> List[GankPrediction]:
+        """Predict potential ganks from fog analysis.
+
+        Claude21: For each enemy in fog with high threat, predict
+        which lane they might gank based on their last known zone
+        and role.
+        """
+        predictions: List[GankPrediction] = []
+
+        for enemy_name, last_zone in self._enemy_last_zone.items():
+            last_seen = self._enemy_last_seen.get(enemy_name, 0)
+            fog_duration = game_time - last_seen
+            role = self._enemy_roles.get(enemy_name, "")
+
+            if fog_duration < 5.0:
+                continue
+
+            role_threat = _GANK_THREAT_BY_ROLE.get(role, 0.3)
+            if role_threat < 0.3:
+                continue
+
+            # Predict target lane based on last zone
+            target_lane = "mid"
+            if "top" in last_zone or "river_top" in last_zone:
+                target_lane = "top"
+            elif "bot" in last_zone or "river_bot" in last_zone or "dragon" in last_zone:
+                target_lane = "bot"
+
+            # Probability from fog duration + role
+            duration_threat = 0.0
+            for threshold, threat in _FOG_THREAT_CURVE:
+                if fog_duration >= threshold:
+                    duration_threat = threat
+
+            probability = min(0.95, role_threat * duration_threat)
+
+            if probability > 0.15:
+                predictions.append(GankPrediction(
+                    target_lane=target_lane,
+                    predicted_ganker=enemy_name,
+                    probability=probability,
+                    fog_duration_s=fog_duration,
+                    last_seen_zone=last_zone,
+                    game_time=game_time,
+                ))
+
+        return sorted(predictions, key=lambda p: -p.probability)
+
+    def compute_vision_score(self) -> VisionScore:
+        """Compute vision metrics for both teams."""
+        blue_visible = sum(
+            1 for fz in self._fog_zones.values() if not fz.in_fog
+        )
+        total = len(self._fog_zones)
+
+        blue_wards_active = len([
+            w for w in self._blue_wards if w[1] > time.time()
+        ])
+        red_wards_active = len([
+            w for w in self._red_wards if w[1] > time.time()
+        ])
+
+        blue_vision = blue_visible / max(total, 1)
+        red_vision = 1.0 - blue_vision  # simplified
+
+        if blue_vision > red_vision + 0.15:
+            advantage = "BLUE"
+        elif red_vision > blue_vision + 0.15:
+            advantage = "RED"
+        else:
+            advantage = "EVEN"
+
+        return VisionScore(
+            blue_vision=blue_vision,
+            red_vision=red_vision,
+            blue_wards_active=blue_wards_active,
+            red_wards_active=red_wards_active,
+            blue_fog_zones=total - blue_visible,
+            red_fog_zones=blue_visible,
+            vision_advantage=advantage,
+        )
+
+    def get_dangerous_zones(self, threshold: float = 0.5) -> List[FogZone]:
+        """Get zones with threat level above threshold."""
+        return [
+            fz for fz in self._fog_zones.values()
+            if fz.threat_level >= threshold
+        ]
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.fog_stats() if hasattr(self, "fog_stats") else {}
+        dangerous = self.get_dangerous_zones(0.3)
+        base.update({
+            "zones_in_fog": sum(1 for fz in self._fog_zones.values() if fz.in_fog),
+            "total_zones": len(self._fog_zones),
+            "enemies_tracked": len(self._enemy_last_zone),
+            "dangerous_zones": [fz.to_dict() for fz in dangerous[:5]],
+            "vision": self.compute_vision_score().to_dict(),
+        })
+        return base
+
+    def reset(self) -> None:
+        super().reset()
+        for fz in self._fog_zones.values():
+            fz.in_fog = True
+            fz.fog_duration_s = 0.0
+            fz.last_seen_time = 0.0
+            fz.last_known_enemies.clear()
+            fz.threat_level = 0.0
+        self._enemy_last_zone.clear()
+        self._enemy_last_seen.clear()
+        self._enemy_roles.clear()

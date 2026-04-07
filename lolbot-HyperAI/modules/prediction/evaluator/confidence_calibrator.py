@@ -183,3 +183,320 @@ class ConfidenceCalibrator:
             "calibration_count": self._calibration_count,
             "history_size": len(self._prediction_history),
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude21: ConfidenceCalibratorV2 — isotonic regression calibration,
+# reliability diagrams, calibration drift detection, per-phase calibration
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class CalibrationBin:
+    """A single bin in a reliability diagram.
+
+    Claude21: For calibration assessment, we bucket predictions by
+    confidence, then compare mean predicted probability vs actual
+    frequency of positive outcomes in each bin.
+    """
+    bin_lower: float
+    bin_upper: float
+    mean_predicted: float = 0.0
+    actual_positive_rate: float = 0.0
+    count: int = 0
+    gap: float = 0.0  # |predicted - actual|
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "range": f"[{self.bin_lower:.2f}, {self.bin_upper:.2f})",
+            "predicted": round(self.mean_predicted, 4),
+            "actual": round(self.actual_positive_rate, 4),
+            "count": self.count,
+            "gap": round(self.gap, 4),
+        }
+
+
+@dataclass
+class CalibrationReport:
+    """Full calibration assessment report.
+
+    Claude21: Published after each game for the evolution system to
+    use as a fitness signal. Well-calibrated predictions mean the
+    model's confidence matches reality.
+    """
+    ece: float = 0.0              # Expected Calibration Error
+    mce: float = 0.0              # Maximum Calibration Error
+    brier_score: float = 0.0      # Brier score (MSE of probabilities)
+    bins: List[CalibrationBin] = field(default_factory=list)
+    sample_count: int = 0
+    overconfidence_rate: float = 0.0
+    underconfidence_rate: float = 0.0
+    game_phase: str = "all"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ece": round(self.ece, 4),
+            "mce": round(self.mce, 4),
+            "brier": round(self.brier_score, 4),
+            "samples": self.sample_count,
+            "overconfident": round(self.overconfidence_rate, 4),
+            "underconfident": round(self.underconfidence_rate, 4),
+            "phase": self.game_phase,
+            "bins": [b.to_dict() for b in self.bins],
+        }
+
+
+class IsotonicCalibrator:
+    """Isotonic regression calibration function.
+
+    Claude21: Maps raw model outputs to calibrated probabilities using
+    a non-parametric monotonic function learned from historical data.
+    This is the gold standard for post-hoc probability calibration.
+
+    Based on: Zadrozny & Elkan (2002) "Transforming classifier scores
+    into accurate multiclass probability estimates."
+    """
+
+    def __init__(self) -> None:
+        self._x_points: List[float] = []  # raw predictions (sorted)
+        self._y_points: List[float] = []  # calibrated values
+        self._fitted: bool = False
+
+    def fit(
+        self, raw_predictions: List[float], actual_outcomes: List[float],
+    ) -> None:
+        """Fit isotonic regression from (prediction, outcome) pairs.
+
+        Claude21: Uses pool adjacent violators algorithm (PAVA).
+        """
+        if len(raw_predictions) < 3:
+            return
+
+        # Sort by raw prediction
+        paired = sorted(zip(raw_predictions, actual_outcomes))
+        xs = [p[0] for p in paired]
+        ys = [p[1] for p in paired]
+
+        # Pool Adjacent Violators
+        calibrated = list(ys)
+        n = len(calibrated)
+        i = 0
+        while i < n:
+            j = i
+            # Find extent of violation
+            while j < n - 1 and calibrated[j] > calibrated[j + 1]:
+                j += 1
+            if j > i:
+                # Pool: replace with average
+                pool_mean = sum(calibrated[i:j + 1]) / (j - i + 1)
+                for k in range(i, j + 1):
+                    calibrated[k] = pool_mean
+            i = j + 1
+
+        self._x_points = xs
+        self._y_points = calibrated
+        self._fitted = True
+
+    def calibrate(self, raw_prediction: float) -> float:
+        """Map a raw prediction to a calibrated probability.
+
+        Uses linear interpolation between fitted points.
+        """
+        if not self._fitted or not self._x_points:
+            return raw_prediction
+
+        # Clamp to range
+        if raw_prediction <= self._x_points[0]:
+            return self._y_points[0]
+        if raw_prediction >= self._x_points[-1]:
+            return self._y_points[-1]
+
+        # Binary search for interpolation bracket
+        lo, hi = 0, len(self._x_points) - 1
+        while lo < hi - 1:
+            mid = (lo + hi) // 2
+            if self._x_points[mid] <= raw_prediction:
+                lo = mid
+            else:
+                hi = mid
+
+        # Linear interpolation
+        x0, x1 = self._x_points[lo], self._x_points[hi]
+        y0, y1 = self._y_points[lo], self._y_points[hi]
+        if abs(x1 - x0) < 1e-10:
+            return y0
+        t = (raw_prediction - x0) / (x1 - x0)
+        return y0 + t * (y1 - y0)
+
+
+class ConfidenceCalibratorV2(ConfidenceCalibrator):
+    """Production-grade confidence calibration with isotonic regression,
+    reliability diagrams, drift detection, and per-phase calibration.
+
+    Claude21: Extends ConfidenceCalibrator with:
+    - Isotonic regression for post-hoc probability calibration
+    - Reliability diagram generation (ECE, MCE, Brier score)
+    - Calibration drift detection (alert when calibration degrades)
+    - Per-game-phase calibration (early/mid/late separately)
+    - Historical calibration tracking for evolution
+
+    Usage::
+        calibrator = ConfidenceCalibratorV2(n_bins=10)
+        # During game: collect raw predictions
+        calibrator.record(raw_prediction=0.72, game_phase="MID")
+        # Post-game: label outcomes and refit
+        calibrator.label_outcome(game_time=600.0, actual=1.0)
+        calibrator.refit()
+        # Use calibrated predictions
+        p = calibrator.calibrate(0.72)
+    """
+
+    def __init__(self, n_bins: int = 10) -> None:
+        super().__init__()
+        self._n_bins = n_bins
+        self._isotonic = IsotonicCalibrator()
+        self._phase_isotonics: Dict[str, IsotonicCalibrator] = {}
+        self._raw_history: List[Tuple[float, float, str]] = []  # (pred, outcome, phase)
+        self._drift_ece_history: List[float] = []
+        self._drift_threshold: float = 0.15  # Alert if ECE exceeds this
+
+    def record(
+        self, raw_prediction: float, game_phase: str = "all",
+    ) -> None:
+        """Record a raw prediction for later outcome labeling."""
+        self._raw_history.append((raw_prediction, -1.0, game_phase))
+
+    def label_outcome(
+        self, game_time: float, actual: float,
+    ) -> None:
+        """Label the most recent unlabeled prediction with actual outcome.
+
+        Claude21: Called when the ground truth becomes available
+        (e.g., game ended, or prediction time window expired).
+        """
+        for i in range(len(self._raw_history) - 1, -1, -1):
+            pred, outcome, phase = self._raw_history[i]
+            if outcome < 0:  # unlabeled
+                self._raw_history[i] = (pred, actual, phase)
+                return
+
+    def refit(self) -> None:
+        """Refit isotonic calibrators from labeled data."""
+        labeled = [(p, o, ph) for p, o, ph in self._raw_history if o >= 0]
+        if len(labeled) < 10:
+            return
+
+        # Global calibrator
+        preds = [x[0] for x in labeled]
+        outcomes = [x[1] for x in labeled]
+        self._isotonic.fit(preds, outcomes)
+
+        # Per-phase calibrators
+        phases: Dict[str, List[Tuple[float, float]]] = {}
+        for p, o, ph in labeled:
+            phases.setdefault(ph, []).append((p, o))
+
+        for phase, data in phases.items():
+            if len(data) >= 10:
+                iso = IsotonicCalibrator()
+                iso.fit([d[0] for d in data], [d[1] for d in data])
+                self._phase_isotonics[phase] = iso
+
+    def calibrate(
+        self, raw_prediction: float, game_phase: str = "all",
+    ) -> float:
+        """Get calibrated probability."""
+        iso = self._phase_isotonics.get(game_phase, self._isotonic)
+        return iso.calibrate(raw_prediction)
+
+    def compute_reliability_diagram(
+        self, phase: str = "all",
+    ) -> CalibrationReport:
+        """Compute reliability diagram with ECE, MCE, Brier score.
+
+        Claude21: The reliability diagram is the primary diagnostic tool
+        for calibration quality. Each bin shows predicted vs actual.
+        """
+        labeled = [
+            (p, o) for p, o, ph in self._raw_history
+            if o >= 0 and (phase == "all" or ph == phase)
+        ]
+        if not labeled:
+            return CalibrationReport(game_phase=phase)
+
+        bins: List[CalibrationBin] = []
+        bin_width = 1.0 / self._n_bins
+
+        total_ece = 0.0
+        max_gap = 0.0
+        brier_sum = 0.0
+        over_count = 0
+        under_count = 0
+
+        for i in range(self._n_bins):
+            lower = i * bin_width
+            upper = (i + 1) * bin_width
+            bin_items = [
+                (p, o) for p, o in labeled if lower <= p < upper
+            ]
+
+            b = CalibrationBin(bin_lower=lower, bin_upper=upper)
+            if bin_items:
+                b.count = len(bin_items)
+                b.mean_predicted = sum(p for p, _ in bin_items) / b.count
+                b.actual_positive_rate = sum(o for _, o in bin_items) / b.count
+                b.gap = abs(b.mean_predicted - b.actual_positive_rate)
+                total_ece += b.gap * (b.count / len(labeled))
+                max_gap = max(max_gap, b.gap)
+
+                if b.mean_predicted > b.actual_positive_rate:
+                    over_count += b.count
+                else:
+                    under_count += b.count
+
+            bins.append(b)
+
+        for p, o in labeled:
+            brier_sum += (p - o) ** 2
+        brier = brier_sum / len(labeled)
+
+        total_labeled = over_count + under_count
+        report = CalibrationReport(
+            ece=total_ece,
+            mce=max_gap,
+            brier_score=brier,
+            bins=bins,
+            sample_count=len(labeled),
+            overconfidence_rate=over_count / max(total_labeled, 1),
+            underconfidence_rate=under_count / max(total_labeled, 1),
+            game_phase=phase,
+        )
+
+        self._drift_ece_history.append(total_ece)
+        return report
+
+    def check_drift(self) -> Optional[str]:
+        """Check if calibration has drifted beyond threshold.
+
+        Returns warning message or None if OK.
+        """
+        if len(self._drift_ece_history) < 3:
+            return None
+        recent_ece = self._drift_ece_history[-1]
+        if recent_ece > self._drift_threshold:
+            return (
+                f"Calibration drift detected: ECE={recent_ece:.4f} "
+                f"exceeds threshold {self._drift_threshold:.4f}"
+            )
+        return None
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.calibrator_stats() if hasattr(self, "calibrator_stats") else {}
+        report = self.compute_reliability_diagram()
+        base.update({
+            "v2_report": report.to_dict(),
+            "drift_history": [round(e, 4) for e in self._drift_ece_history[-10:]],
+            "phase_calibrators": list(self._phase_isotonics.keys()),
+            "labeled_examples": sum(1 for _, o, _ in self._raw_history if o >= 0),
+        })
+        return base

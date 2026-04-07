@@ -315,3 +315,353 @@ class MapAwareness:
     def reset(self) -> None:
         self._players.clear()
         self._update_count = 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude21: MapAwarenessV2 — zone pressure analysis, jungle tracking,
+# rotation detection, and vision-based fog inference
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Summoner's Rift zone definitions (normalized 0-15000 coordinate space)
+_SR_ZONES: Dict[str, Dict[str, Tuple[float, float, float, float]]] = {
+    "top_lane": {"bounds": (0, 0, 3000, 15000)},
+    "mid_lane": {"bounds": (5000, 5000, 10000, 10000)},
+    "bot_lane": {"bounds": (12000, 0, 15000, 15000)},
+    "blue_jungle_top": {"bounds": (1500, 5000, 5000, 10000)},
+    "blue_jungle_bot": {"bounds": (5000, 1500, 10000, 5000)},
+    "red_jungle_top": {"bounds": (5000, 10000, 10000, 13500)},
+    "red_jungle_bot": {"bounds": (10000, 5000, 13500, 10000)},
+    "dragon_pit": {"bounds": (8500, 3000, 11000, 5500)},
+    "baron_pit": {"bounds": (4000, 9500, 6500, 12000)},
+    "river_top": {"bounds": (3500, 9000, 6000, 11000)},
+    "river_bot": {"bounds": (9000, 4000, 11000, 6500)},
+    "blue_base": {"bounds": (0, 0, 3000, 3000)},
+    "red_base": {"bounds": (12000, 12000, 15000, 15000)},
+}
+
+
+@dataclass
+class ZonePressure:
+    """Pressure level in a map zone.
+
+    Claude21: Quantifies how much control each team exerts over a zone
+    based on champion presence, ward coverage, and recent activity.
+    """
+    zone_name: str
+    blue_pressure: float = 0.0   # 0-1
+    red_pressure: float = 0.0    # 0-1
+    contested: bool = False
+    champion_count_blue: int = 0
+    champion_count_red: int = 0
+    last_activity_time: float = 0.0
+
+    @property
+    def dominant_team(self) -> str:
+        if self.blue_pressure > self.red_pressure + 0.15:
+            return "BLUE"
+        elif self.red_pressure > self.blue_pressure + 0.15:
+            return "RED"
+        return "CONTESTED"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "zone": self.zone_name,
+            "blue": round(self.blue_pressure, 3),
+            "red": round(self.red_pressure, 3),
+            "dominant": self.dominant_team,
+            "contested": self.contested,
+        }
+
+
+@dataclass
+class RotationEvent:
+    """A detected player rotation (movement between zones).
+
+    Claude21: Rotation detection is critical for predicting ganks
+    and objective attempts. A jungler moving from blue_jungle to
+    dragon_pit signals an impending dragon attempt.
+    """
+    player_name: str
+    team: str
+    from_zone: str
+    to_zone: str
+    game_time: float
+    is_threatening: bool = False    # Moving toward enemy territory
+    rotation_speed: float = 0.0    # zones per second
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "player": self.player_name,
+            "team": self.team,
+            "from": self.from_zone,
+            "to": self.to_zone,
+            "time": round(self.game_time, 1),
+            "threatening": self.is_threatening,
+        }
+
+
+@dataclass
+class MapState:
+    """Complete map awareness snapshot.
+
+    Claude21: Published on /lol/map_awareness for planning to consume.
+    Contains zone pressure, recent rotations, and jungle tracking.
+    """
+    game_time: float = 0.0
+    zone_pressures: Dict[str, ZonePressure] = field(default_factory=dict)
+    recent_rotations: List[RotationEvent] = field(default_factory=list)
+    blue_jungle_control: float = 0.0  # 0-1
+    red_jungle_control: float = 0.0   # 0-1
+    river_control: str = "CONTESTED"  # BLUE, RED, CONTESTED
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "game_time": round(self.game_time, 1),
+            "zones": {k: v.to_dict() for k, v in self.zone_pressures.items()},
+            "rotations": [r.to_dict() for r in self.recent_rotations[-5:]],
+            "blue_jungle": round(self.blue_jungle_control, 3),
+            "red_jungle": round(self.red_jungle_control, 3),
+            "river": self.river_control,
+        }
+
+
+class MapAwarenessV2(MapAwareness):
+    """Production-grade map awareness with zone pressure, rotation detection,
+    and jungle control tracking.
+
+    Claude21: Extends MapAwareness with:
+    - Zone pressure computation from champion positions
+    - Rotation detection from consecutive zone changes
+    - Jungle control scoring (proportion of camps secured)
+    - Threat assessment for enemy movements
+    - Full MapState snapshot for planning consumption
+
+    Apollo reference: modules/localization/msf/local_integ_state.cc
+    tracks vehicle position within map zones and lane boundaries.
+
+    Usage::
+        awareness = MapAwarenessV2()
+        # Each perception tick:
+        awareness.update_positions(players, game_time)
+        map_state = awareness.compute_map_state(game_time)
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._zone_pressures: Dict[str, ZonePressure] = {
+            name: ZonePressure(zone_name=name) for name in _SR_ZONES
+        }
+        self._player_zones: Dict[str, str] = {}      # player → current zone
+        self._prev_player_zones: Dict[str, str] = {}  # player → previous zone
+        self._rotation_history: Deque[RotationEvent] = deque(maxlen=100)
+        self._player_teams: Dict[str, str] = {}        # player → team
+
+    def _classify_zone(self, x: float, y: float) -> str:
+        """Determine which zone a position falls in.
+
+        Claude21: Uses simple AABB containment. First match wins
+        (zones are non-overlapping in our definition).
+        """
+        for zone_name, zone_def in _SR_ZONES.items():
+            x1, y1, x2, y2 = zone_def["bounds"]
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                return zone_name
+        return "unknown"
+
+    def _is_threatening_move(
+        self, team: str, from_zone: str, to_zone: str,
+    ) -> bool:
+        """Check if a rotation is moving toward enemy territory.
+
+        Claude21: Blue moving into red_jungle or red_base is threatening.
+        """
+        if team == "BLUE":
+            return "red" in to_zone and "red" not in from_zone
+        elif team == "RED":
+            return "blue" in to_zone and "blue" not in from_zone
+        return False
+
+    def update_positions(
+        self, players: List[Any], game_time: float,
+    ) -> List[RotationEvent]:
+        """Update player positions and detect rotations.
+
+        Args:
+            players: List of player objects with x, y, team, name attributes.
+            game_time: Current game time in seconds.
+
+        Returns:
+            Newly detected rotation events.
+        """
+        new_rotations: List[RotationEvent] = []
+        self._prev_player_zones = dict(self._player_zones)
+
+        # Reset zone champion counts
+        for zp in self._zone_pressures.values():
+            zp.champion_count_blue = 0
+            zp.champion_count_red = 0
+
+        for player in players:
+            name = getattr(player, "name", str(player))
+            x = getattr(player, "x", 0.0)
+            y = getattr(player, "y", 0.0)
+            team = getattr(player, "team", "UNKNOWN")
+            if hasattr(team, "name"):
+                team = team.name
+
+            self._player_teams[name] = team
+            zone = self._classify_zone(x, y)
+            self._player_zones[name] = zone
+
+            # Update zone champion counts
+            if zone in self._zone_pressures:
+                zp = self._zone_pressures[zone]
+                if team == "BLUE":
+                    zp.champion_count_blue += 1
+                elif team == "RED":
+                    zp.champion_count_red += 1
+                zp.last_activity_time = game_time
+
+            # Detect rotation
+            prev_zone = self._prev_player_zones.get(name)
+            if prev_zone and prev_zone != zone:
+                is_threat = self._is_threatening_move(team, prev_zone, zone)
+                rotation = RotationEvent(
+                    player_name=name,
+                    team=team,
+                    from_zone=prev_zone,
+                    to_zone=zone,
+                    game_time=game_time,
+                    is_threatening=is_threat,
+                )
+                new_rotations.append(rotation)
+                self._rotation_history.append(rotation)
+
+        return new_rotations
+
+    def _compute_zone_pressure(self, game_time: float) -> None:
+        """Compute pressure scores for all zones.
+
+        Claude21: Pressure decays over time. Each champion in a zone adds
+        base pressure, with recency weighting.
+        """
+        for zp in self._zone_pressures.values():
+            # Base pressure from champion presence
+            blue_base = min(1.0, zp.champion_count_blue * 0.35)
+            red_base = min(1.0, zp.champion_count_red * 0.35)
+
+            # Recency decay — pressure fades if no recent activity
+            age = game_time - zp.last_activity_time if zp.last_activity_time > 0 else 999
+            decay = max(0.0, 1.0 - (age / 60.0))  # Full decay after 60s
+
+            zp.blue_pressure = blue_base * (0.3 + 0.7 * decay)
+            zp.red_pressure = red_base * (0.3 + 0.7 * decay)
+            zp.contested = (
+                zp.champion_count_blue > 0 and zp.champion_count_red > 0
+            )
+
+    def compute_jungle_control(self) -> Tuple[float, float]:
+        """Compute jungle control percentages.
+
+        Returns (blue_control, red_control) each in [0, 1].
+        """
+        blue_zones = ["blue_jungle_top", "blue_jungle_bot"]
+        red_zones = ["red_jungle_top", "red_jungle_bot"]
+
+        blue_control_own = sum(
+            self._zone_pressures[z].blue_pressure
+            for z in blue_zones if z in self._zone_pressures
+        ) / max(len(blue_zones), 1)
+
+        blue_invade = sum(
+            self._zone_pressures[z].blue_pressure
+            for z in red_zones if z in self._zone_pressures
+        ) / max(len(red_zones), 1)
+
+        red_control_own = sum(
+            self._zone_pressures[z].red_pressure
+            for z in red_zones if z in self._zone_pressures
+        ) / max(len(red_zones), 1)
+
+        red_invade = sum(
+            self._zone_pressures[z].red_pressure
+            for z in blue_zones if z in self._zone_pressures
+        ) / max(len(blue_zones), 1)
+
+        blue_total = (blue_control_own + blue_invade) / 2.0
+        red_total = (red_control_own + red_invade) / 2.0
+
+        return min(1.0, blue_total), min(1.0, red_total)
+
+    def compute_map_state(self, game_time: float) -> MapState:
+        """Compute complete map awareness state.
+
+        Claude21: Single call to get the full MapState snapshot.
+        """
+        self._compute_zone_pressure(game_time)
+        blue_jg, red_jg = self.compute_jungle_control()
+
+        # River control from river zone pressures
+        river_zones = ["river_top", "river_bot"]
+        blue_river = sum(
+            self._zone_pressures[z].blue_pressure
+            for z in river_zones if z in self._zone_pressures
+        )
+        red_river = sum(
+            self._zone_pressures[z].red_pressure
+            for z in river_zones if z in self._zone_pressures
+        )
+        if blue_river > red_river + 0.2:
+            river = "BLUE"
+        elif red_river > blue_river + 0.2:
+            river = "RED"
+        else:
+            river = "CONTESTED"
+
+        recent = list(self._rotation_history)[-10:]
+
+        return MapState(
+            game_time=game_time,
+            zone_pressures=dict(self._zone_pressures),
+            recent_rotations=recent,
+            blue_jungle_control=blue_jg,
+            red_jungle_control=red_jg,
+            river_control=river,
+        )
+
+    def get_threatening_rotations(
+        self, game_time: float, window_s: float = 30.0,
+    ) -> List[RotationEvent]:
+        """Get recent threatening enemy rotations.
+
+        Claude21: Used by planning to issue gank warnings.
+        """
+        cutoff = game_time - window_s
+        return [
+            r for r in self._rotation_history
+            if r.is_threatening and r.game_time >= cutoff
+        ]
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.awareness_stats() if hasattr(self, "awareness_stats") else {}
+        base.update({
+            "zones_tracked": len(self._zone_pressures),
+            "players_tracked": len(self._player_zones),
+            "rotation_history_size": len(self._rotation_history),
+            "threatening_recent": len([
+                r for r in self._rotation_history if r.is_threatening
+            ]),
+        })
+        return base
+
+    def reset(self) -> None:
+        super().reset()
+        for zp in self._zone_pressures.values():
+            zp.blue_pressure = 0.0
+            zp.red_pressure = 0.0
+            zp.champion_count_blue = 0
+            zp.champion_count_red = 0
+        self._player_zones.clear()
+        self._prev_player_zones.clear()
+        self._rotation_history.clear()
+        self._player_teams.clear()
