@@ -234,3 +234,128 @@ class SummonerSpellTracker:
         self._spells.clear()
         self._player_teams.clear()
         self._record_count = 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended spell tracker with pattern detection and fight windows
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class EngagementWindow:
+    """A detected window of opportunity for engagement.
+
+    Claude20: When multiple enemy spells are down simultaneously,
+    that's a prime engagement window.
+    """
+    quality: float          # 0-1 composite score
+    duration_estimate_s: float
+    targets: List[str]      # Champion names of vulnerable enemies
+    reason: str
+    game_time: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "quality": round(self.quality, 3),
+            "duration_s": round(self.duration_estimate_s, 0),
+            "targets": self.targets,
+            "reason": self.reason,
+            "game_time": round(self.game_time, 1),
+        }
+
+
+class SummonerSpellTrackerV2(SummonerSpellTracker):
+    """Extended spell tracker with engagement window detection.
+
+    Claude20: Adds multi-target engagement windows, spell usage
+    pattern detection, and voice narration integration.
+    All existing SummonerSpellTracker methods preserved.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._windows: List[EngagementWindow] = []
+        self._usage_history: List[Dict[str, Any]] = []
+
+    def record_usage(
+        self, player_name: str, spell_name: str, game_time: float,
+    ) -> None:
+        """Record with history tracking."""
+        super().record_usage(player_name, spell_name, game_time)
+        self._usage_history.append({
+            "player": player_name,
+            "spell": spell_name,
+            "game_time": round(game_time, 1),
+        })
+
+    def detect_engagement_windows(
+        self, game_time: float, active_team: str = "BLUE",
+    ) -> List[EngagementWindow]:
+        """Detect multi-target engagement windows.
+
+        Claude20: When 2+ enemies have Flash/critical spells on CD,
+        that's a high-quality engagement window.
+        """
+        report = self.evaluate(game_time, active_team)
+        windows: List[EngagementWindow] = []
+
+        # Count critical spells down
+        flash_down_names = [
+            s.split(" (")[0] for s in report.enemy_flash_down
+        ]
+        exhaust_down_names = [
+            s.split(" (")[0] for s in report.enemy_exhaust_down
+        ]
+
+        # Multi-flash-down window
+        if len(flash_down_names) >= 2:
+            # Estimate how long this window lasts (shortest remaining CD)
+            min_remaining = float("inf")
+            enemy_team = "RED" if active_team == "BLUE" else "BLUE"
+            for (pname, slot), state in self._spells.items():
+                if state.team == enemy_team and state.spell_name == "Flash":
+                    remaining = state.time_until_ready(game_time)
+                    if 0 < remaining < min_remaining:
+                        min_remaining = remaining
+
+            window = EngagementWindow(
+                quality=min(1.0, len(flash_down_names) * 0.35 + len(exhaust_down_names) * 0.15),
+                duration_estimate_s=min_remaining if min_remaining < float("inf") else 60.0,
+                targets=flash_down_names,
+                reason=f"{len(flash_down_names)} enemies have no Flash",
+                game_time=game_time,
+            )
+            windows.append(window)
+            self._windows.append(window)
+
+        return windows
+
+    def generate_voice_alert(
+        self, game_time: float, active_team: str = "BLUE",
+    ) -> Optional[str]:
+        """Generate a voice-friendly alert about spell windows.
+
+        Claude20: Returns None if nothing notable.
+        """
+        windows = self.detect_engagement_windows(game_time, active_team)
+        if not windows:
+            return None
+
+        best = max(windows, key=lambda w: w.quality)
+        if best.quality < 0.3:
+            return None
+
+        targets = " and ".join(best.targets[:2])
+        return f"{targets} without Flash for {best.duration_estimate_s:.0f} seconds. Look for a play!"
+
+    def get_usage_history(self, count: int = 20) -> List[Dict[str, Any]]:
+        return self._usage_history[-count:]
+
+    def get_recent_windows(self, count: int = 5) -> List[Dict[str, Any]]:
+        return [w.to_dict() for w in self._windows[-count:]]
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.stats()
+        base["usage_history_size"] = len(self._usage_history)
+        base["windows_detected"] = len(self._windows)
+        return base

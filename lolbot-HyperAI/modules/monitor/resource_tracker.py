@@ -212,3 +212,232 @@ class ResourceTracker:
             f"<ResourceTracker running={self.is_running} "
             f"samples={len(self._history)}>"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended resource tracker with alerts, trends, and per-component
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class ResourceAlert:
+    """Alert generated when resource usage exceeds threshold."""
+    resource: str      # "cpu", "memory", "threads", "fd"
+    severity: str      # "warning", "critical"
+    value: float
+    threshold: float
+    message: str
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "resource": self.resource,
+            "severity": self.severity,
+            "value": round(self.value, 1),
+            "threshold": self.threshold,
+            "message": self.message,
+        }
+
+
+@dataclass
+class ResourceThresholds:
+    """Configurable thresholds for resource alerts."""
+    cpu_warning_pct: float = 70.0
+    cpu_critical_pct: float = 90.0
+    memory_warning_mb: float = 512.0
+    memory_critical_mb: float = 1024.0
+    thread_warning: int = 50
+    thread_critical: int = 100
+    fd_warning: int = 500
+    fd_critical: int = 900
+
+
+class ResourceTrackerV2(ResourceTracker):
+    """Extended resource tracker with alerts and trend analysis.
+
+    Claude20: Adds configurable threshold alerts, resource trend
+    detection, and per-component resource attribution (approximated
+    via thread naming convention).
+
+    All existing ResourceTracker methods preserved.
+    """
+
+    def __init__(
+        self,
+        interval_s: float = _SAMPLE_INTERVAL_S,
+        history_size: int = _HISTORY_SIZE,
+        thresholds: Optional[ResourceThresholds] = None,
+    ) -> None:
+        super().__init__(interval_s, history_size)
+        self._thresholds = thresholds or ResourceThresholds()
+        self._alerts: List[ResourceAlert] = []
+        self._alert_cooldown_s: float = 30.0
+        self._last_alert_time: Dict[str, float] = {}
+        self._check_count: int = 0
+
+    def check_alerts(self) -> List[ResourceAlert]:
+        """Check current resource levels against thresholds.
+
+        Claude20: Called by MonitorComponent periodically.
+        Returns list of new alerts (may be empty).
+        """
+        self._check_count += 1
+        sample = self._latest if hasattr(self, '_latest') else None
+        if sample is None:
+            return []
+
+        with self._lock:
+            current = self._latest
+
+        if current is None:
+            return []
+
+        new_alerts: List[ResourceAlert] = []
+        now = time.time()
+        th = self._thresholds
+
+        # CPU check
+        if current.cpu_percent >= th.cpu_critical_pct:
+            if self._can_alert("cpu_critical", now):
+                new_alerts.append(ResourceAlert(
+                    resource="cpu", severity="critical",
+                    value=current.cpu_percent, threshold=th.cpu_critical_pct,
+                    message=f"CPU at {current.cpu_percent:.1f}% (critical)",
+                ))
+        elif current.cpu_percent >= th.cpu_warning_pct:
+            if self._can_alert("cpu_warning", now):
+                new_alerts.append(ResourceAlert(
+                    resource="cpu", severity="warning",
+                    value=current.cpu_percent, threshold=th.cpu_warning_pct,
+                    message=f"CPU at {current.cpu_percent:.1f}% (warning)",
+                ))
+
+        # Memory check
+        if current.memory_rss_mb >= th.memory_critical_mb:
+            if self._can_alert("mem_critical", now):
+                new_alerts.append(ResourceAlert(
+                    resource="memory", severity="critical",
+                    value=current.memory_rss_mb, threshold=th.memory_critical_mb,
+                    message=f"Memory at {current.memory_rss_mb:.0f}MB (critical)",
+                ))
+        elif current.memory_rss_mb >= th.memory_warning_mb:
+            if self._can_alert("mem_warning", now):
+                new_alerts.append(ResourceAlert(
+                    resource="memory", severity="warning",
+                    value=current.memory_rss_mb, threshold=th.memory_warning_mb,
+                    message=f"Memory at {current.memory_rss_mb:.0f}MB (warning)",
+                ))
+
+        # Thread count check
+        if current.thread_count >= th.thread_critical:
+            if self._can_alert("thread_critical", now):
+                new_alerts.append(ResourceAlert(
+                    resource="threads", severity="critical",
+                    value=current.thread_count, threshold=th.thread_critical,
+                    message=f"Thread count: {current.thread_count} (critical)",
+                ))
+        elif current.thread_count >= th.thread_warning:
+            if self._can_alert("thread_warning", now):
+                new_alerts.append(ResourceAlert(
+                    resource="threads", severity="warning",
+                    value=current.thread_count, threshold=th.thread_warning,
+                    message=f"Thread count: {current.thread_count} (warning)",
+                ))
+
+        # FD check
+        if current.fd_count >= th.fd_critical:
+            if self._can_alert("fd_critical", now):
+                new_alerts.append(ResourceAlert(
+                    resource="fd", severity="critical",
+                    value=current.fd_count, threshold=th.fd_critical,
+                    message=f"File descriptors: {current.fd_count} (critical)",
+                ))
+
+        self._alerts.extend(new_alerts)
+        return new_alerts
+
+    def _can_alert(self, key: str, now: float) -> bool:
+        """Check alert cooldown."""
+        last = self._last_alert_time.get(key, 0.0)
+        if now - last < self._alert_cooldown_s:
+            return False
+        self._last_alert_time[key] = now
+        return True
+
+    def get_trend(self, metric: str = "cpu", window: int = 60) -> Dict[str, Any]:
+        """Compute trend for a metric over the last window samples.
+
+        Claude20: Returns direction, average, and rate of change.
+        """
+        with self._lock:
+            samples = list(self._history)
+
+        if len(samples) < 3:
+            return {"direction": "unknown", "avg": 0.0, "rate": 0.0}
+
+        recent = samples[-min(window, len(samples)):]
+        values = []
+        for s in recent:
+            if metric == "cpu":
+                values.append(s.cpu_percent)
+            elif metric == "memory":
+                values.append(s.memory_rss_mb)
+            elif metric == "threads":
+                values.append(float(s.thread_count))
+            else:
+                values.append(0.0)
+
+        if len(values) < 2:
+            return {"direction": "unknown", "avg": 0.0, "rate": 0.0}
+
+        avg = sum(values) / len(values)
+        first_half = sum(values[:len(values)//2]) / max(len(values)//2, 1)
+        second_half = sum(values[len(values)//2:]) / max(len(values) - len(values)//2, 1)
+        rate = second_half - first_half
+
+        if rate > avg * 0.05:
+            direction = "rising"
+        elif rate < -avg * 0.05:
+            direction = "falling"
+        else:
+            direction = "stable"
+
+        return {
+            "direction": direction,
+            "avg": round(avg, 1),
+            "rate": round(rate, 2),
+            "samples": len(values),
+        }
+
+    def get_component_threads(self) -> Dict[str, int]:
+        """Approximate per-component thread count.
+
+        Claude20: Uses thread name convention (cyber-*) to attribute
+        threads to components.
+        """
+        counts: Dict[str, int] = {}
+        for t in threading.enumerate():
+            name = t.name
+            if name.startswith("cyber-"):
+                comp = name[6:]  # Remove "cyber-" prefix
+                counts[comp] = counts.get(comp, 0) + 1
+            elif name.startswith("resource-"):
+                counts["monitor"] = counts.get("monitor", 0) + 1
+            elif name == "MainThread":
+                counts["main"] = 1
+            else:
+                counts["other"] = counts.get("other", 0) + 1
+        return counts
+
+    def recent_alerts(self, count: int = 10) -> List[Dict[str, Any]]:
+        """Get recent resource alerts."""
+        return [a.to_dict() for a in self._alerts[-count:]]
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.snapshot()
+        base["alerts_total"] = len(self._alerts)
+        base["check_count"] = self._check_count
+        base["cpu_trend"] = self.get_trend("cpu", 30)
+        base["memory_trend"] = self.get_trend("memory", 30)
+        base["component_threads"] = self.get_component_threads()
+        return base

@@ -266,3 +266,127 @@ class ObjectiveWindowAdvisor:
             "advice_count": self._advice_count,
             "active_cooldowns": len(self._last_advice_time),
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended objective advisor with risk/reward and voice generation
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class ObjectiveRiskReward:
+    """Risk/reward assessment for contesting an objective.
+
+    Claude20: Quantifies whether the team should contest, concede,
+    or trade (take another objective elsewhere).
+    """
+    objective_name: str
+    reward_score: float     # 0-1 how valuable this objective is
+    risk_score: float       # 0-1 how risky contesting is
+    recommendation: str     # "contest", "concede", "trade"
+    trade_target: str = ""  # If "trade", what to take instead
+    reasoning: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "objective": self.objective_name,
+            "reward": round(self.reward_score, 3),
+            "risk": round(self.risk_score, 3),
+            "recommendation": self.recommendation,
+            "trade": self.trade_target,
+            "reasoning": self.reasoning,
+        }
+
+
+class ObjectiveWindowAdvisorV2(ObjectiveWindowAdvisor):
+    """Extended objective advisor with risk/reward analysis.
+
+    Claude20: Adds risk/reward assessment, trade recommendations,
+    and voice narration generation. All existing methods preserved.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._risk_assessments: List[ObjectiveRiskReward] = []
+
+    def assess_risk_reward(
+        self,
+        objective_name: str,
+        game_time: float,
+        team_alive: int = 5,
+        enemy_alive: int = 5,
+        win_probability: float = 0.5,
+        team_vision_score: float = 0.5,
+    ) -> ObjectiveRiskReward:
+        """Assess risk/reward of contesting an objective.
+
+        Claude20: Goes beyond simple priority to consider whether
+        the team should contest, concede, or trade.
+        """
+        base_reward = _PRIORITY_WEIGHTS.get(objective_name, 0.5)
+
+        # Risk factors
+        outnumbered = enemy_alive > team_alive
+        low_vision = team_vision_score < 0.3
+        losing = win_probability < 0.40
+
+        risk = 0.0
+        if outnumbered:
+            risk += 0.3 * (enemy_alive - team_alive)
+        if low_vision:
+            risk += 0.2
+        if losing:
+            risk += 0.15
+
+        risk = min(1.0, risk)
+
+        # Decision
+        if risk > 0.7 and base_reward < 0.8:
+            # High risk, not worth it — concede or trade
+            if objective_name == "dragon":
+                rec = "trade"
+                trade_target = "tower or herald"
+                reasoning = f"Too risky to contest {objective_name} ({team_alive}v{enemy_alive}). Take a tower instead."
+            else:
+                rec = "concede"
+                trade_target = ""
+                reasoning = f"Outnumbered {team_alive}v{enemy_alive} — concede {objective_name}."
+        elif risk > 0.5 and base_reward < 0.6:
+            rec = "concede"
+            trade_target = ""
+            reasoning = f"Risk too high relative to reward. Farm and scale."
+        else:
+            rec = "contest"
+            trade_target = ""
+            reasoning = f"Favorable position to contest {objective_name}."
+
+        assessment = ObjectiveRiskReward(
+            objective_name=objective_name,
+            reward_score=base_reward,
+            risk_score=risk,
+            recommendation=rec,
+            trade_target=trade_target,
+            reasoning=reasoning,
+        )
+        self._risk_assessments.append(assessment)
+        return assessment
+
+    def generate_voice_text(self, advice: ObjectiveWindowAdvice) -> str:
+        """Generate TTS-friendly text from objective advice."""
+        return advice.voice_text
+
+    def get_assessment_history(self, count: int = 10) -> List[Dict[str, Any]]:
+        return [a.to_dict() for a in self._risk_assessments[-count:]]
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.stats()
+        base["risk_assessments"] = len(self._risk_assessments)
+        contest_count = sum(1 for a in self._risk_assessments if a.recommendation == "contest")
+        concede_count = sum(1 for a in self._risk_assessments if a.recommendation == "concede")
+        trade_count = sum(1 for a in self._risk_assessments if a.recommendation == "trade")
+        base["decisions"] = {
+            "contest": contest_count,
+            "concede": concede_count,
+            "trade": trade_count,
+        }
+        return base

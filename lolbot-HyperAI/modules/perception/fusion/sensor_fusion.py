@@ -288,3 +288,107 @@ class SensorFusion(TimerComponent):
             "fallback_count": self._fallback_count,
         })
         return base
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended fusion with quality scoring and source failover tracking
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class SourceQualityScore:
+    """Quality assessment for a data source.
+
+    Claude20: Tracks data freshness, completeness, and reliability.
+    """
+    source: str
+    freshness_score: float = 1.0   # 1.0 = fresh, decays with staleness
+    completeness_score: float = 1.0  # Fraction of expected fields present
+    reliability_score: float = 1.0   # Based on recent error rate
+    composite: float = 1.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source": self.source,
+            "freshness": round(self.freshness_score, 3),
+            "completeness": round(self.completeness_score, 3),
+            "reliability": round(self.reliability_score, 3),
+            "composite": round(self.composite, 3),
+        }
+
+
+class SensorFusionV2(SensorFusion):
+    """Extended sensor fusion with quality scoring and failover tracking.
+
+    Claude20: Adds per-source quality scoring, failover event tracking,
+    and data validation before fusion. All existing SensorFusion Proc()
+    logic preserved.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._failover_events: List[Dict[str, Any]] = []
+        self._quality_scores: Dict[str, SourceQualityScore] = {}
+
+    def compute_quality(self, source: str, data: Dict[str, Any], latency_ms: float) -> SourceQualityScore:
+        """Compute quality score for a data source payload.
+
+        Claude20: Uses freshness, completeness, and reliability to
+        decide which source to prefer when multiple are available.
+        """
+        # Freshness (decays with latency)
+        freshness = max(0.0, 1.0 - (latency_ms / 500.0))
+
+        # Completeness (check for expected keys)
+        expected_keys = {"allPlayers", "gameData", "events", "activePlayer"}
+        present = sum(1 for k in expected_keys if k in data)
+        completeness = present / len(expected_keys)
+
+        # Reliability (from source health)
+        if source == "lcu":
+            health = self._lcu_health
+        elif source == "fiddler":
+            health = self._fiddler_health
+        else:
+            health = None
+
+        reliability = 1.0
+        if health and health.message_count > 10:
+            err_rate = health.error_count / health.message_count
+            reliability = max(0.0, 1.0 - err_rate)
+
+        composite = (freshness * 0.4) + (completeness * 0.35) + (reliability * 0.25)
+
+        score = SourceQualityScore(
+            source=source,
+            freshness_score=freshness,
+            completeness_score=completeness,
+            reliability_score=reliability,
+            composite=composite,
+        )
+        self._quality_scores[source] = score
+        return score
+
+    def record_failover(self, from_source: str, to_source: str, reason: str) -> None:
+        """Record a source failover event."""
+        event = {
+            "from": from_source,
+            "to": to_source,
+            "reason": reason,
+            "timestamp": time.time(),
+        }
+        self._failover_events.append(event)
+        logger.warning("Source failover: %s → %s (%s)", from_source, to_source, reason)
+
+    def get_failover_history(self, count: int = 10) -> List[Dict[str, Any]]:
+        return self._failover_events[-count:]
+
+    def get_quality_scores(self) -> Dict[str, Dict[str, Any]]:
+        return {name: s.to_dict() for name, s in self._quality_scores.items()}
+
+    def extended_status(self) -> Dict[str, Any]:
+        base = self.fusion_status()
+        base["quality_scores"] = self.get_quality_scores()
+        base["failover_count"] = len(self._failover_events)
+        base["recent_failovers"] = self.get_failover_history(5)
+        return base

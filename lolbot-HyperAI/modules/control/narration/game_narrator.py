@@ -293,3 +293,139 @@ class GameNarrator:
     def reset(self) -> None:
         self._last_fire.clear()
         self._narration_count = 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended narrator with ace detection, baron calls, and analytics
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class NarrationAnalytics:
+    """Analytics for narration quality and throughput."""
+    total_lines: int = 0
+    lines_by_category: Dict[str, int] = field(default_factory=dict)
+    lines_by_priority: Dict[int, int] = field(default_factory=dict)
+    cooldown_blocks: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "total": self.total_lines,
+            "by_category": self.lines_by_category,
+            "by_priority": self.lines_by_priority,
+            "cooldown_blocks": self.cooldown_blocks,
+        }
+
+
+class GameNarratorV2(GameNarrator):
+    """Extended narrator with ace/baron calls and analytics.
+
+    Claude20: Adds ace narration, baron/dragon steal detection,
+    game-ending narration, and detailed analytics.
+    All existing GameNarrator methods preserved.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._analytics = NarrationAnalytics()
+        self._COOLDOWNS["ace"] = 5.0
+        self._COOLDOWNS["baron"] = 10.0
+        self._COOLDOWNS["game_end"] = 0.0
+
+    def _check_cooldown(self, category: str, game_time: float) -> bool:
+        result = super()._check_cooldown(category, game_time)
+        if not result:
+            self._analytics.cooldown_blocks += 1
+        return result
+
+    def _mark_fired(self, category: str, game_time: float) -> None:
+        super()._mark_fired(category, game_time)
+        self._analytics.total_lines += 1
+        self._analytics.lines_by_category[category] = (
+            self._analytics.lines_by_category.get(category, 0) + 1
+        )
+
+    def narrate_ace(
+        self, acing_team: str, is_ally: bool, game_time: float,
+    ) -> List[NarrationLine]:
+        """Narrate an ace (entire enemy team killed)."""
+        if not self._check_cooldown("ace", game_time):
+            return []
+
+        if is_ally:
+            text = random.choice([
+                "ACE! All enemies down — push your advantage!",
+                "That's an ACE! Go for objectives now!",
+            ])
+            prio = 0
+        else:
+            text = random.choice([
+                "We've been ACED. Defend and wait for respawns.",
+                "Full team wipe. Fall back and defend.",
+            ])
+            prio = 0
+
+        self._mark_fired("ace", game_time)
+        return [NarrationLine(
+            text=text, category="ace", priority=prio, game_time=game_time,
+        )]
+
+    def narrate_baron_secure(
+        self, team: str, is_ally: bool, game_time: float,
+        was_stolen: bool = False,
+    ) -> List[NarrationLine]:
+        """Narrate baron nashor kill (or steal)."""
+        if not self._check_cooldown("baron", game_time):
+            return []
+
+        if was_stolen:
+            if is_ally:
+                text = "BARON STOLEN! Incredible! Push with the buff!"
+            else:
+                text = "They stole our Baron! Regroup and play safe."
+            prio = 0
+        else:
+            if is_ally:
+                text = random.choice([
+                    "Baron secured! Use the buff to push lanes.",
+                    "Baron is ours. Group and siege.",
+                ])
+            else:
+                text = "Enemy team took Baron. Play defensive until buff expires."
+            prio = 0
+
+        self._mark_fired("baron", game_time)
+        return [NarrationLine(
+            text=text, category="baron", priority=prio, game_time=game_time,
+        )]
+
+    def narrate_game_end(
+        self, won: bool, game_time: float, final_kills: str = "",
+    ) -> List[NarrationLine]:
+        """Narrate game end."""
+        mins = int(game_time // 60)
+        secs = int(game_time % 60)
+
+        if won:
+            text = random.choice([
+                f"Victory! Well played. Game time: {mins}:{secs:02d}.",
+                f"GG! We won in {mins} minutes.",
+            ])
+        else:
+            text = random.choice([
+                f"Defeat. Game lasted {mins}:{secs:02d}. On to the next one.",
+                f"GG. Tough game at {mins} minutes.",
+            ])
+
+        self._mark_fired("game_end", game_time)
+        return [NarrationLine(
+            text=text, category="game_end", priority=0, game_time=game_time,
+        )]
+
+    def get_analytics(self) -> Dict[str, Any]:
+        return self._analytics.to_dict()
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.stats()
+        base["analytics"] = self._analytics.to_dict()
+        return base

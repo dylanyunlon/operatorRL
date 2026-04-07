@@ -305,3 +305,136 @@ class CompAnalyzer:
 
     def stats(self) -> Dict[str, Any]:
         return {"analysis_count": self._analysis_count}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended comp analyzer with meta awareness and voice summary
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class CompAnalyzerV2(CompAnalyzer):
+    """Extended composition analyzer with voice and meta features.
+
+    Claude20: Adds voice-friendly summaries, team scaling curves,
+    and fight-style recommendations. All existing CompAnalyzer
+    methods preserved.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._last_voice_time: float = 0.0
+        self._voice_cooldown_s: float = 120.0
+
+    def generate_voice_summary(
+        self,
+        report: CompAnalysisReport,
+        game_time: float,
+    ) -> Optional[str]:
+        """Generate a TTS-friendly comp summary.
+
+        Claude20: Called once at game start or on phase transition.
+        """
+        if game_time - self._last_voice_time < self._voice_cooldown_s:
+            return None
+
+        blue = report.blue_profile.primary_archetype.name.lower().replace("_", " ")
+        red = report.red_profile.primary_archetype.name.lower().replace("_", " ")
+
+        if report.blue_phase_advantage > 0.05:
+            advantage_text = "We have the comp advantage in this phase."
+        elif report.blue_phase_advantage < -0.05:
+            advantage_text = "Enemy comp is favored in this phase."
+        else:
+            advantage_text = "Compositions are evenly matched this phase."
+
+        text = (
+            f"Our comp is {blue}, theirs is {red}. "
+            f"{advantage_text} "
+            f"Our win condition: {report.win_condition_blue}."
+        )
+
+        self._last_voice_time = game_time
+        return text
+
+    def estimate_scaling_curve(
+        self, profile: CompProfile,
+    ) -> Dict[str, float]:
+        """Estimate team strength at each game phase.
+
+        Claude20: Returns normalized strength score per phase.
+        Used by prediction to weight time-based factors.
+        """
+        base_strength = 0.5
+        curve = {}
+        for phase in ("EARLY", "MID", "LATE"):
+            adj = profile.phase_advantages.get(phase, 0.0)
+            curve[phase] = round(base_strength + adj, 3)
+        return curve
+
+    def recommend_fight_style(
+        self, report: CompAnalysisReport,
+    ) -> str:
+        """Recommend how the team should approach fights.
+
+        Claude20: Translates comp archetype matchup into
+        actionable fight-style advice.
+        """
+        our_arch = report.blue_profile.primary_archetype
+        their_arch = report.red_profile.primary_archetype
+
+        if our_arch == CompArchetype.TEAMFIGHT:
+            if their_arch == CompArchetype.SPLIT_PUSH:
+                return "Force 5v5 — don't let them split. Group and push."
+            return "Look for big teamfights around objectives."
+
+        if our_arch == CompArchetype.PICK:
+            return "Set up vision and look for isolated targets. Avoid 5v5."
+
+        if our_arch == CompArchetype.SIEGE:
+            return "Poke before fights. Take towers with numbers advantage."
+
+        if our_arch == CompArchetype.SPLIT_PUSH:
+            if their_arch == CompArchetype.TEAMFIGHT:
+                return "Split the map. Avoid 5v5 at all costs."
+            return "Apply side lane pressure. Force them to respond."
+
+        if our_arch == CompArchetype.POKE:
+            return "Keep distance. Chip health before engaging."
+
+        if our_arch == CompArchetype.DIVE:
+            return "Hard engage onto their carries. Flash in and burst."
+
+        if our_arch == CompArchetype.PROTECT:
+            return "Peel for your carry. Let them scale and do damage safely."
+
+        return "Play to your strengths and adapt."
+
+    def full_analysis(
+        self,
+        blue_champions: List[str],
+        red_champions: List[str],
+        current_phase: str = "EARLY",
+        game_time: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Full analysis with voice, scaling, and fight style.
+
+        Claude20: One-call comprehensive comp analysis.
+        """
+        report = self.analyze(blue_champions, red_champions, current_phase)
+        voice = self.generate_voice_summary(report, game_time)
+        blue_curve = self.estimate_scaling_curve(report.blue_profile)
+        red_curve = self.estimate_scaling_curve(report.red_profile)
+        fight_style = self.recommend_fight_style(report)
+
+        return {
+            "report": report.to_dict(),
+            "voice": voice,
+            "blue_scaling": blue_curve,
+            "red_scaling": red_curve,
+            "fight_style": fight_style,
+        }
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.stats()
+        base["last_voice_time"] = self._last_voice_time
+        return base

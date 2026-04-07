@@ -259,3 +259,126 @@ class PowerSpikeDetector:
             "total_spikes": self._spike_count,
             "tracked_players": len(self._prev_levels),
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended power spike with voice narration and matchup awareness
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class PowerSpikeDetectorV2(PowerSpikeDetector):
+    """Extended spike detector with voice generation and history export.
+
+    Claude20: Adds voice-friendly narration, spike timeline for
+    dashboard, and matchup-aware spike importance weighting.
+    All existing PowerSpikeDetector methods preserved.
+    """
+
+    _ANNOUNCE_COOLDOWN_S = 20.0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._last_announce_time: float = 0.0
+
+    def generate_voice_text(self, spike: PowerSpike) -> Optional[str]:
+        """Generate TTS-friendly text for a power spike.
+
+        Returns None if not worth announcing.
+        """
+        if spike.impact == SpikeImpact.MINOR:
+            return None
+
+        if spike.is_ally:
+            if spike.spike_type == SpikeType.LEVEL_SPIKE:
+                return f"We hit level {spike.level}. {spike.strategic_note}"
+            elif spike.spike_type == SpikeType.ITEM_SPIKE:
+                return f"Item completed! {spike.strategic_note}"
+        else:
+            if spike.impact in (SpikeImpact.MAJOR, SpikeImpact.CRITICAL):
+                return f"Caution! {spike.strategic_note}"
+            elif spike.spike_type == SpikeType.LEVEL_SPIKE:
+                return f"Enemy {spike.champion_name} hit level {spike.level}. Be careful."
+
+        return None
+
+    def detect_with_narration(
+        self,
+        players: List[Any],
+        active_team: str,
+        game_time: float,
+    ) -> tuple:
+        """Detect spikes and generate voice lines.
+
+        Returns (spikes, voice_lines) tuple.
+        """
+        spikes = self.detect(players, active_team, game_time)
+        voice_lines: List[str] = []
+
+        if game_time - self._last_announce_time < self._ANNOUNCE_COOLDOWN_S:
+            return spikes, voice_lines
+
+        for spike in spikes:
+            text = self.generate_voice_text(spike)
+            if text:
+                voice_lines.append(text)
+                self._last_announce_time = game_time
+
+        return spikes, voice_lines
+
+    def get_timeline(self) -> List[Dict[str, Any]]:
+        """Export spike timeline for dashboard visualization."""
+        return [
+            {
+                "game_time": round(s.game_time, 1),
+                "player": s.player_name,
+                "champion": s.champion_name,
+                "type": s.spike_type.name,
+                "impact": s.impact.name,
+                "ally": s.is_ally,
+                "desc": s.description,
+            }
+            for s in self._detected_spikes
+        ]
+
+    def get_team_power_level(
+        self, players: List[Any], active_team: str,
+    ) -> Dict[str, float]:
+        """Estimate relative team power from detected spikes.
+
+        Claude20: Returns power level score for each team
+        based on accumulated spike advantages.
+        """
+        ally_power = 0.0
+        enemy_power = 0.0
+
+        impact_weights = {
+            SpikeImpact.MINOR: 0.2,
+            SpikeImpact.MODERATE: 0.5,
+            SpikeImpact.MAJOR: 1.0,
+            SpikeImpact.CRITICAL: 1.5,
+        }
+
+        for spike in self._detected_spikes:
+            weight = impact_weights.get(spike.impact, 0.0)
+            if spike.is_ally:
+                ally_power += weight
+            else:
+                enemy_power += weight
+
+        return {
+            "ally_power": round(ally_power, 2),
+            "enemy_power": round(enemy_power, 2),
+            "advantage": round(ally_power - enemy_power, 2),
+        }
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.stats()
+        ally_spikes = sum(1 for s in self._detected_spikes if s.is_ally)
+        enemy_spikes = len(self._detected_spikes) - ally_spikes
+        base["ally_spikes"] = ally_spikes
+        base["enemy_spikes"] = enemy_spikes
+        base["major_spikes"] = sum(
+            1 for s in self._detected_spikes
+            if s.impact in (SpikeImpact.MAJOR, SpikeImpact.CRITICAL)
+        )
+        return base

@@ -228,3 +228,152 @@ class LiveDataPusher(TimerComponent):
             "buffer_size": len(self._broadcast_buffer),
         })
         return base
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Delta compression, WebSocket protocol, and replay support
+# ═══════════════════════════════════════════════════════════════════════════
+
+import hashlib
+import time as _time
+
+
+class DeltaCompressor:
+    """Delta compression for dashboard frame broadcasts.
+
+    Claude20: Only sends changed fields to reduce bandwidth.
+    Dashboard reconnects get a full frame, subsequent frames are delta-only.
+    """
+
+    def __init__(self) -> None:
+        self._last_frame: Optional[Dict[str, Any]] = None
+        self._full_frame_interval: int = 50  # Send full frame every 50th
+        self._frame_count: int = 0
+        self._bytes_saved: int = 0
+
+    def compress(self, frame: DashboardFrame) -> str:
+        """Compress frame to JSON with delta encoding.
+
+        Returns full JSON on first frame or every N frames.
+        Returns delta JSON otherwise (only changed fields).
+        """
+        self._frame_count += 1
+        current = {
+            "game_time": round(frame.game_time, 1),
+            "phase": frame.phase,
+            "win_prediction": frame.win_prediction,
+            "teamfight": frame.teamfight,
+            "strategy": frame.strategy,
+            "objectives": frame.objectives,
+            "gold_diff": round(frame.gold_diff, 0),
+            "blue_kills": frame.blue_kills,
+            "red_kills": frame.red_kills,
+            "frame_seq": frame.frame_seq,
+            "server_ts": round(frame.server_ts, 3),
+        }
+
+        # Full frame on first send or periodic refresh
+        if self._last_frame is None or self._frame_count % self._full_frame_interval == 0:
+            self._last_frame = current
+            return json.dumps({"type": "full", "data": current})
+
+        # Delta: only changed fields
+        delta: Dict[str, Any] = {}
+        for key, val in current.items():
+            prev = self._last_frame.get(key)
+            if val != prev:
+                delta[key] = val
+
+        self._last_frame = current
+
+        if not delta:
+            # Nothing changed — send minimal heartbeat
+            return json.dumps({"type": "heartbeat", "seq": frame.frame_seq})
+
+        full_size = len(json.dumps(current))
+        delta_size = len(json.dumps(delta))
+        self._bytes_saved += full_size - delta_size
+
+        delta["frame_seq"] = frame.frame_seq
+        return json.dumps({"type": "delta", "data": delta})
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "frames_compressed": self._frame_count,
+            "bytes_saved": self._bytes_saved,
+        }
+
+
+class DashboardReplayBuffer:
+    """Ring buffer of dashboard frames for replay on reconnect.
+
+    Claude20: When a new WebSocket client connects, it gets the last
+    N frames so it can render a smooth catch-up animation.
+    """
+
+    def __init__(self, capacity: int = 100) -> None:
+        from collections import deque
+        self._buffer: deque = deque(maxlen=capacity)
+        self._write_count: int = 0
+
+    def append(self, frame_json: str) -> None:
+        self._buffer.append(frame_json)
+        self._write_count += 1
+
+    def get_replay(self, count: int = 20) -> List[str]:
+        """Get last N frames for replay."""
+        frames = list(self._buffer)
+        return frames[-count:]
+
+    def get_latest(self) -> Optional[str]:
+        if self._buffer:
+            return self._buffer[-1]
+        return None
+
+    @property
+    def size(self) -> int:
+        return len(self._buffer)
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "buffer_size": len(self._buffer),
+            "total_written": self._write_count,
+        }
+
+
+class LiveDataPusherV2(LiveDataPusher):
+    """Extended live data pusher with delta compression and replay.
+
+    Claude20: Adds DeltaCompressor for bandwidth reduction and
+    DashboardReplayBuffer for smooth reconnect experience.
+    All existing LiveDataPusher methods preserved.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._compressor = DeltaCompressor()
+        self._replay_buffer = DashboardReplayBuffer(capacity=200)
+        self._connected_clients: int = 0
+
+    def Proc(self) -> bool:
+        """Extended Proc with delta compression."""
+        result = super().Proc()
+        if result and self._latest_frame:
+            compressed = self._compressor.compress(self._latest_frame)
+            self._replay_buffer.append(compressed)
+        return result
+
+    def get_replay_frames(self, count: int = 30) -> List[str]:
+        """Get replay frames for a reconnecting client."""
+        return self._replay_buffer.get_replay(count)
+
+    def get_compressed_latest(self) -> Optional[str]:
+        """Get the latest compressed frame."""
+        return self._replay_buffer.get_latest()
+
+    def extended_status(self) -> Dict[str, Any]:
+        base = self.pusher_status()
+        base["compressor"] = self._compressor.stats()
+        base["replay_buffer"] = self._replay_buffer.stats()
+        base["connected_clients"] = self._connected_clients
+        return base

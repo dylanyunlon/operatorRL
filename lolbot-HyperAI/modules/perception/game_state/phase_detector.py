@@ -228,3 +228,183 @@ class PhaseDetector:
             "transitions": len(self._transition_history),
             "history": [t.to_dict() for t in self._transition_history[-5:]],
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended phase detector with sub-phase, tempo scoring, export
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class SubPhase(Enum):
+    """Fine-grained sub-phases within each DetailedPhase.
+
+    Claude20: Enables more granular strategy shifts within broad phases.
+    """
+    LANE_FARMING = auto()         # Pure CS focus
+    LANE_TRADING = auto()         # Active trading windows
+    FIRST_ROTATION = auto()       # First group movement
+    SKIRMISH_RIVER = auto()       # River/scuttle fights
+    TOWER_SIEGE = auto()          # Actively hitting towers
+    BARON_DANCE = auto()          # Both teams posturing at baron
+    DRAGON_FIGHT = auto()         # Dragon pit contest
+    SPLIT_PRESSURE = auto()       # 1-3-1 or 4-1 split map pressure
+    BASE_DEFENSE = auto()         # Defending inhibitors
+    ALL_IN_PUSH = auto()          # All 5 pushing to end
+
+
+@dataclass
+class TempoScore:
+    """Quantified game tempo measurement.
+
+    Claude20: Measures how fast or slow the game is progressing
+    relative to the expected pace. High tempo = lots of action.
+    """
+    kills_per_minute: float = 0.0
+    objectives_per_10min: float = 0.0
+    tower_plates_rate: float = 0.0
+    tempo_rating: str = "normal"  # slow, normal, fast, chaotic
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kpm": round(self.kills_per_minute, 2),
+            "obj_per_10": round(self.objectives_per_10min, 1),
+            "tempo": self.tempo_rating,
+        }
+
+
+class PhaseDetectorV2(PhaseDetector):
+    """Extended phase detector with sub-phases and tempo scoring.
+
+    Claude20: Adds sub-phase detection, quantified tempo scoring,
+    and phase prediction. All existing PhaseDetector logic preserved.
+
+    Usage::
+        detector = PhaseDetectorV2()
+        ctx = PhaseContext(game_time=600, total_kills=12, ...)
+        transition = detector.update(ctx)
+        sub = detector.detect_sub_phase(ctx)
+        tempo = detector.compute_tempo(ctx)
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._sub_phase: SubPhase = SubPhase.LANE_FARMING
+        self._tempo_history: List[TempoScore] = []
+        self._prev_kills: int = 0
+        self._prev_game_time: float = 0.0
+
+    @property
+    def sub_phase(self) -> SubPhase:
+        return self._sub_phase
+
+    def detect_sub_phase(self, ctx: PhaseContext) -> SubPhase:
+        """Detect the current sub-phase within the broad phase.
+
+        Claude20: Uses kill density, objective state, and tower count
+        to determine what the game is actually doing right now.
+        """
+        phase = self.current_phase
+
+        if phase == DetailedPhase.LANING:
+            if ctx.recent_kills_2min >= 3:
+                self._sub_phase = SubPhase.LANE_TRADING
+            else:
+                self._sub_phase = SubPhase.LANE_FARMING
+
+        elif phase == DetailedPhase.EARLY_SKIRMISH:
+            if ctx.towers_destroyed >= 1:
+                self._sub_phase = SubPhase.FIRST_ROTATION
+            else:
+                self._sub_phase = SubPhase.SKIRMISH_RIVER
+
+        elif phase in (DetailedPhase.MID_GAME, DetailedPhase.LATE_MID):
+            if ctx.barons_killed > 0 or ctx.game_time > 1200:
+                self._sub_phase = SubPhase.BARON_DANCE
+            elif ctx.dragons_killed > 2:
+                self._sub_phase = SubPhase.DRAGON_FIGHT
+            else:
+                self._sub_phase = SubPhase.TOWER_SIEGE
+
+        elif phase == DetailedPhase.LATE_GAME:
+            if ctx.inhibitors_destroyed > 0:
+                self._sub_phase = SubPhase.ALL_IN_PUSH
+            else:
+                self._sub_phase = SubPhase.BARON_DANCE
+
+        elif phase == DetailedPhase.ENDING:
+            if ctx.ace_occurred:
+                self._sub_phase = SubPhase.ALL_IN_PUSH
+            else:
+                self._sub_phase = SubPhase.BASE_DEFENSE
+
+        return self._sub_phase
+
+    def compute_tempo(self, ctx: PhaseContext) -> TempoScore:
+        """Compute current game tempo score.
+
+        Claude20: Quantifies how fast the game is developing.
+        Used by prediction to weight time-sensitive features differently.
+        """
+        dt = ctx.game_time - self._prev_game_time if self._prev_game_time > 0 else 1.0
+        dt = max(dt, 1.0)
+
+        # Kills per minute (short window)
+        kill_delta = ctx.total_kills - self._prev_kills
+        kpm = (kill_delta / dt) * 60.0 if dt > 0 else 0.0
+
+        # Overall KPM for the whole game
+        overall_kpm = (ctx.total_kills / max(ctx.game_time, 1.0)) * 60.0
+
+        # Objectives per 10 minutes
+        total_objectives = ctx.dragons_killed + ctx.barons_killed + ctx.towers_destroyed
+        obj_per_10 = (total_objectives / max(ctx.game_time, 1.0)) * 600.0
+
+        # Classify tempo
+        if overall_kpm > 1.5 and obj_per_10 > 3.0:
+            rating = "chaotic"
+        elif overall_kpm > 0.8 or obj_per_10 > 2.0:
+            rating = "fast"
+        elif overall_kpm < 0.3 and obj_per_10 < 1.0:
+            rating = "slow"
+        else:
+            rating = "normal"
+
+        score = TempoScore(
+            kills_per_minute=overall_kpm,
+            objectives_per_10min=obj_per_10,
+            tempo_rating=rating,
+        )
+
+        self._tempo_history.append(score)
+        self._prev_kills = ctx.total_kills
+        self._prev_game_time = ctx.game_time
+        return score
+
+    def predict_next_phase(self, ctx: PhaseContext) -> Optional[str]:
+        """Predict the next phase transition.
+
+        Claude20: Based on current trajectory, estimate when the next
+        phase transition will occur. Returns phase name or None.
+        """
+        current = self.current_phase
+        if current == DetailedPhase.LANING:
+            if ctx.total_kills >= 4:
+                return DetailedPhase.EARLY_SKIRMISH.name
+            if ctx.game_time > 400:
+                return DetailedPhase.EARLY_SKIRMISH.name
+        elif current == DetailedPhase.EARLY_SKIRMISH:
+            if ctx.towers_destroyed >= 1 or ctx.game_time > 700:
+                return DetailedPhase.MID_GAME.name
+        elif current == DetailedPhase.MID_GAME:
+            if ctx.game_time > 1400:
+                return DetailedPhase.LATE_MID.name
+        return None
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.stats()
+        base["sub_phase"] = self._sub_phase.name
+        if self._tempo_history:
+            latest_tempo = self._tempo_history[-1]
+            base["tempo"] = latest_tempo.to_dict()
+        base["tempo_history_size"] = len(self._tempo_history)
+        return base

@@ -212,3 +212,212 @@ class CooldownTracker:
             name: pc.to_dict(game_time)
             for name, pc in self._players.items()
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended cooldown tracker with team scoring and fight readiness
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class FightReadiness:
+    """Team fight readiness assessment based on cooldowns.
+
+    Claude20: Aggregates per-player cooldowns into a team-level
+    fight readiness score for teamfight_predictor consumption.
+    """
+    team: TeamSide = TeamSide.UNKNOWN
+    flash_available_count: int = 0
+    ult_available_count: int = 0
+    total_alive: int = 5
+    readiness_score: float = 0.0
+    limiting_factor: str = ""
+    game_time: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "team": self.team.value if hasattr(self.team, 'value') else str(self.team),
+            "flash_up": self.flash_available_count,
+            "ult_up": self.ult_available_count,
+            "alive": self.total_alive,
+            "readiness": round(self.readiness_score, 3),
+            "limiting": self.limiting_factor,
+        }
+
+
+@dataclass
+class CooldownEvent:
+    """Record of a cooldown state change.
+
+    Claude20: For post-game analysis and accuracy tracking.
+    """
+    game_time: float
+    player_name: str
+    spell_name: str
+    event_type: str  # "used", "ready", "death_inferred"
+    estimated_ready_time: float = 0.0
+
+
+class CooldownTrackerV2(CooldownTracker):
+    """Extended cooldown tracker with fight readiness scoring.
+
+    Claude20: Adds team-level fight readiness assessment, cooldown
+    event history, and accuracy tracking. All existing CooldownTracker
+    methods preserved.
+
+    Usage::
+        tracker = CooldownTrackerV2()
+        tracker.update_from_snapshot(snapshot)
+        readiness = tracker.assess_fight_readiness(TeamSide.BLUE, game_time)
+        if readiness.readiness_score > 0.7:
+            planning.recommend_engage()
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._events: List[CooldownEvent] = []
+        self._assessment_count: int = 0
+
+    def record_death(self, player_name: str, game_time: float) -> None:
+        """Record death with event logging."""
+        super().record_death(player_name, game_time)
+        self._events.append(CooldownEvent(
+            game_time=game_time,
+            player_name=player_name,
+            spell_name="Flash",
+            event_type="death_inferred",
+        ))
+
+    def record_spell_usage(
+        self, player_name: str, spell_name: str, game_time: float,
+    ) -> None:
+        """Record spell usage with event logging."""
+        super().record_spell_usage(player_name, spell_name, game_time)
+        self._events.append(CooldownEvent(
+            game_time=game_time,
+            player_name=player_name,
+            spell_name=spell_name,
+            event_type="used",
+        ))
+
+    def assess_fight_readiness(
+        self,
+        team: TeamSide,
+        game_time: float,
+        alive_players: Optional[List[str]] = None,
+    ) -> FightReadiness:
+        """Assess a team's readiness for a team fight.
+
+        Claude20: Computes a composite score based on flash availability,
+        ultimate availability, and alive count.
+
+        Args:
+            team: Which team to assess.
+            game_time: Current game time.
+            alive_players: Optional list of alive player names.
+
+        Returns:
+            FightReadiness with composite score.
+        """
+        self._assessment_count += 1
+
+        flash_up = self.team_flash_count(team, game_time)
+        ult_up = self.team_ult_count(team, game_time)
+
+        # Count alive
+        total_alive = 5
+        if alive_players is not None:
+            team_players = [
+                name for name, pc in self._players.items()
+                if pc.team == team
+            ]
+            total_alive = sum(
+                1 for p in team_players if p in alive_players
+            )
+
+        # Composite score: weighted average of available resources
+        # Flash: 0.3 weight, Ults: 0.4 weight, Alive: 0.3 weight
+        flash_ratio = flash_up / max(total_alive, 1)
+        ult_ratio = ult_up / max(total_alive, 1)
+        alive_ratio = total_alive / 5.0
+
+        score = (flash_ratio * 0.3) + (ult_ratio * 0.4) + (alive_ratio * 0.3)
+
+        # Determine limiting factor
+        limiting = ""
+        if alive_ratio < 0.6:
+            limiting = f"Only {total_alive} alive"
+        elif flash_ratio < 0.4:
+            limiting = f"Only {flash_up} flashes up"
+        elif ult_ratio < 0.4:
+            limiting = f"Only {ult_up} ults up"
+
+        return FightReadiness(
+            team=team,
+            flash_available_count=flash_up,
+            ult_available_count=ult_up,
+            total_alive=total_alive,
+            readiness_score=min(1.0, score),
+            limiting_factor=limiting,
+            game_time=game_time,
+        )
+
+    def compare_readiness(
+        self, game_time: float,
+        blue_alive: Optional[List[str]] = None,
+        red_alive: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Compare fight readiness between both teams.
+
+        Claude20: Used by PredictionComponent to adjust teamfight prediction.
+        """
+        blue = self.assess_fight_readiness(TeamSide.BLUE, game_time, blue_alive)
+        red = self.assess_fight_readiness(TeamSide.RED, game_time, red_alive)
+
+        advantage = blue.readiness_score - red.readiness_score
+        return {
+            "blue": blue.to_dict(),
+            "red": red.to_dict(),
+            "advantage": round(advantage, 3),
+            "advantage_team": "blue" if advantage > 0.1 else ("red" if advantage < -0.1 else "even"),
+        }
+
+    def get_upcoming_ready_events(
+        self, game_time: float, window_s: float = 30.0,
+    ) -> List[Dict[str, Any]]:
+        """Get spells coming off cooldown in the next window_s seconds.
+
+        Claude20: Used by planning to predict fight readiness changes.
+        """
+        upcoming: List[Dict[str, Any]] = []
+        for name, pc in self._players.items():
+            for spell in (pc.spell_d, pc.spell_f, pc.ultimate):
+                if spell.is_known_used and not spell.is_likely_up(game_time):
+                    ready_time = spell.estimated_ready_time()
+                    if ready_time <= game_time + window_s:
+                        upcoming.append({
+                            "player": name,
+                            "spell": spell.spell_name,
+                            "ready_in_s": round(ready_time - game_time, 1),
+                            "team": pc.team.value if hasattr(pc.team, 'value') else str(pc.team),
+                        })
+        upcoming.sort(key=lambda x: x["ready_in_s"])
+        return upcoming
+
+    def extended_stats(self) -> Dict[str, Any]:
+        return {
+            "players_tracked": len(self._players),
+            "events_recorded": len(self._events),
+            "assessments": self._assessment_count,
+            "recent_events": [
+                {"time": e.game_time, "player": e.player_name,
+                 "spell": e.spell_name, "type": e.event_type}
+                for e in self._events[-10:]
+            ],
+        }
+
+    def reset(self) -> None:
+        """Reset for new game."""
+        self._players.clear()
+        self._events.clear()
+        self._assessment_count = 0

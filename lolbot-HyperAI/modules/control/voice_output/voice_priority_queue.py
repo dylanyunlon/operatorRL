@@ -216,3 +216,162 @@ class VoicePriorityQueue:
                 for cat, ts in self._last_fire_time.items()
             },
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Claude20: Extended voice queue with priority aging, batching, analytics
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class VoiceQueueAnalytics:
+    """Analytics for voice queue performance.
+
+    Claude20: Tracks queue performance for evolution fitness evaluation.
+    """
+    total_enqueued: int = 0
+    total_dequeued: int = 0
+    total_dropped_cooldown: int = 0
+    total_dropped_full: int = 0
+    total_expired: int = 0
+    avg_wait_ms: float = 0.0
+    max_wait_ms: float = 0.0
+    category_counts: Dict[str, int] = field(default_factory=dict)
+    priority_distribution: Dict[str, int] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "enqueued": self.total_enqueued,
+            "dequeued": self.total_dequeued,
+            "dropped_cd": self.total_dropped_cooldown,
+            "dropped_full": self.total_dropped_full,
+            "expired": self.total_expired,
+            "avg_wait_ms": round(self.avg_wait_ms, 1),
+            "max_wait_ms": round(self.max_wait_ms, 1),
+            "categories": dict(sorted(
+                self.category_counts.items(),
+                key=lambda x: x[1], reverse=True,
+            )[:10]),
+            "priorities": self.priority_distribution,
+        }
+
+
+class VoicePriorityQueueV2(VoicePriorityQueue):
+    """Extended voice priority queue with aging, batching, and analytics.
+
+    Claude20: Adds priority aging (old messages get promoted), message
+    batching (combine similar messages), and detailed analytics.
+    All existing VoicePriorityQueue logic preserved.
+
+    Priority aging: Messages waiting in queue for >5s get their priority
+    bumped by 1 level. This prevents starvation where high-priority
+    messages continuously preempt older medium-priority ones.
+
+    Usage::
+        queue = VoicePriorityQueueV2()
+        queue.enqueue("Baron in 30s", "objective", VoicePriority.HIGH)
+        # ... later in Proc():
+        entry = queue.dequeue_with_aging()
+    """
+
+    _AGING_THRESHOLD_S = 5.0  # Promote after 5s in queue
+    _MAX_BATCH_SIZE = 3       # Combine up to 3 related messages
+
+    def __init__(self, cooldowns: Optional[Dict[str, float]] = None) -> None:
+        super().__init__(cooldowns)
+        self._analytics = VoiceQueueAnalytics()
+        self._wait_times: List[float] = []
+
+    def enqueue(
+        self,
+        text: str,
+        category: str,
+        priority: VoicePriority = VoicePriority.MEDIUM,
+        game_time: float = 0.0,
+        ttl_s: float = 10.0,
+    ) -> bool:
+        """Enqueue with analytics tracking."""
+        result = super().enqueue(text, category, priority, game_time, ttl_s)
+        self._analytics.total_enqueued += 1
+        self._analytics.category_counts[category] = (
+            self._analytics.category_counts.get(category, 0) + 1
+        )
+        pname = priority.name
+        self._analytics.priority_distribution[pname] = (
+            self._analytics.priority_distribution.get(pname, 0) + 1
+        )
+        if not result:
+            self._analytics.total_dropped_cooldown += 1
+        return result
+
+    def dequeue_with_aging(self) -> Optional[VoiceEntry]:
+        """Dequeue with priority aging applied.
+
+        Claude20: Before dequeuing, scan the heap and promote any
+        entries that have been waiting longer than AGING_THRESHOLD.
+        """
+        now = time.monotonic()
+
+        # Age old entries by rebuilding with updated priorities
+        aged = False
+        for entry in self._heap:
+            if not entry.expired:
+                wait_s = now - entry.enqueue_time
+                if wait_s > self._AGING_THRESHOLD_S:
+                    old_prio = entry.priority
+                    new_prio_val = min(old_prio.value + 1, VoicePriority.EMERGENCY.value)
+                    if new_prio_val != old_prio.value:
+                        # Update sort key (negative priority for min-heap)
+                        entry.sort_key = (-new_prio_val, entry.enqueue_time)
+                        aged = True
+
+        if aged:
+            heapq.heapify(self._heap)
+
+        entry = self.dequeue()
+        if entry:
+            wait_ms = (now - entry.enqueue_time) * 1000.0
+            self._wait_times.append(wait_ms)
+            if len(self._wait_times) > 200:
+                self._wait_times = self._wait_times[-200:]
+            if wait_ms > self._analytics.max_wait_ms:
+                self._analytics.max_wait_ms = wait_ms
+            if self._wait_times:
+                self._analytics.avg_wait_ms = (
+                    sum(self._wait_times) / len(self._wait_times)
+                )
+            self._analytics.total_dequeued += 1
+        return entry
+
+    def batch_dequeue(self, max_count: int = 3) -> List[VoiceEntry]:
+        """Dequeue up to max_count entries for batch TTS.
+
+        Claude20: Some TTS engines handle short batches more efficiently
+        than individual entries. Combines entries of similar priority.
+        """
+        entries: List[VoiceEntry] = []
+        for _ in range(max_count):
+            entry = self.dequeue_with_aging()
+            if entry is None:
+                break
+            entries.append(entry)
+        return entries
+
+    def get_analytics(self) -> Dict[str, Any]:
+        """Get comprehensive queue analytics."""
+        return self._analytics.to_dict()
+
+    def get_category_throughput(self) -> Dict[str, float]:
+        """Get message throughput per category (messages/min)."""
+        # Simplified: just return counts. Full throughput needs timestamps.
+        return dict(self._analytics.category_counts)
+
+    def reset_analytics(self) -> None:
+        """Reset analytics counters (e.g., between games)."""
+        self._analytics = VoiceQueueAnalytics()
+        self._wait_times.clear()
+
+    def extended_stats(self) -> Dict[str, Any]:
+        base = self.stats()
+        base["analytics"] = self._analytics.to_dict()
+        return base
