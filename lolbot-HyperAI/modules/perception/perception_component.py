@@ -74,6 +74,22 @@ from modules.perception.minimap.minimap_analyzer import (
     MinimapAnalyzer,
     MinimapState,
 )
+# Claude19: Wire Claude18 analysis modules + new momentum tracker into Proc()
+from modules.perception.game_state.phase_detector import (
+    DetailedPhase,
+    PhaseContext,
+    PhaseDetector,
+    PhaseTransition,
+)
+from modules.perception.fusion.gold_trend_analyzer import (
+    GoldTrendAnalyzer,
+    GoldTrendReport,
+)
+from modules.perception.fusion.momentum_tracker import (
+    MomentumTracker,
+    MomentumReport,
+    MomentumState,
+)
 
 logger = get_logger("perception")
 
@@ -144,6 +160,17 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
         self._minimap_tick_counter: int = 0
         self._last_minimap_state: Optional[MinimapState] = None
 
+        # Claude19: Wire Claude18 PhaseDetector + GoldTrendAnalyzer + new MomentumTracker
+        self._phase_detector: Optional[PhaseDetector] = None
+        self._gold_trend_analyzer: Optional[GoldTrendAnalyzer] = None
+        self._momentum_tracker: Optional[MomentumTracker] = None
+        self._last_phase_transition: Optional[PhaseTransition] = None
+        self._last_gold_trend: Optional[GoldTrendReport] = None
+        self._last_momentum: Optional[MomentumReport] = None
+        self._phase_transition_writer: Optional[Writer] = None
+        self._gold_trend_writer: Optional[Writer] = None
+        self._momentum_writer: Optional[Writer] = None
+
     def Init(self) -> bool:
         """Set up cyber node, readers, writers, and sub-analyzers."""
         self._managed_init()
@@ -181,6 +208,20 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
         # Phase 4: instantiate sub-analyzers
         self._kill_feed_analyzer = KillFeedAnalyzer()
         self._minimap_analyzer = MinimapAnalyzer()
+
+        # Claude19: Instantiate Claude18 PhaseDetector + GoldTrendAnalyzer + new MomentumTracker
+        self._phase_detector = PhaseDetector()
+        self._gold_trend_analyzer = GoldTrendAnalyzer()
+        self._momentum_tracker = MomentumTracker()
+        self._phase_transition_writer = self._node.CreateWriter(
+            "/lol/phase_transition", dict,
+        )
+        self._gold_trend_writer = self._node.CreateWriter(
+            "/lol/gold_trend", dict,
+        )
+        self._momentum_writer = self._node.CreateWriter(
+            "/lol/momentum", dict,
+        )
 
         self.register_self()
         self._transition(LifecycleState.READY)
@@ -297,6 +338,101 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
             except Exception as exc:
                 logger.warning(
                     "MinimapAnalyzer error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: PhaseDetector ──────────────────────────────────
+        # Runs every 5th tick (~500ms at 10Hz). Replaces pure time-based
+        # phase classification with tempo-aware multi-signal detection.
+        if (
+            self._snapshot_seq % 5 == 0
+            and self._phase_detector is not None
+        ):
+            try:
+                ctx = PhaseContext(
+                    game_time=final.game_time,
+                    total_kills=(
+                        final.blue_team.total_kills + final.red_team.total_kills
+                    ),
+                    towers_destroyed=0,  # TODO: track from events
+                    dragons_taken=0,
+                    inhibitors_down=0,
+                )
+                transition = self._phase_detector.update(ctx)
+                if transition is not None:
+                    self._last_phase_transition = transition
+                    if self._phase_transition_writer:
+                        self._phase_transition_writer.Write(transition.to_dict())
+                    logger.info(
+                        "Phase transition: %s → %s (%.1fs) — %s",
+                        transition.from_phase.name,
+                        transition.to_phase.name,
+                        transition.game_time,
+                        transition.trigger_reason,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "PhaseDetector error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: GoldTrendAnalyzer ──────────────────────────────
+        # Records every tick (sub-sampled internally at ~1Hz).
+        # Analysis runs every 10th tick (~1s) to provide gold momentum.
+        if self._gold_trend_analyzer is not None:
+            try:
+                self._gold_trend_analyzer.record(
+                    final.game_time, final.gold_diff,
+                )
+                if self._snapshot_seq % 10 == 0:
+                    report = self._gold_trend_analyzer.analyze()
+                    self._last_gold_trend = report
+                    if self._gold_trend_writer:
+                        self._gold_trend_writer.Write(report.to_dict())
+            except Exception as exc:
+                logger.warning(
+                    "GoldTrendAnalyzer error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: MomentumTracker ────────────────────────────────
+        # Records new kill/objective events and evaluates every 10th tick.
+        if self._momentum_tracker is not None:
+            try:
+                for evt in new_events:
+                    etype = (
+                        evt.event_type.value
+                        if hasattr(evt.event_type, "value")
+                        else str(evt.event_type)
+                    )
+                    killer_team = "BLUE"  # Simplified; ideally resolve from player
+                    if etype in ("ChampionKill",):
+                        self._momentum_tracker.record_kill(
+                            killer_team, evt.game_time,
+                        )
+                    elif "Dragon" in etype or "Baron" in etype:
+                        self._momentum_tracker.record_objective(
+                            killer_team, evt.game_time, etype.lower(),
+                        )
+
+                if self._gold_trend_analyzer:
+                    self._momentum_tracker.set_gold_velocity(
+                        self._last_gold_trend.short_momentum
+                        if self._last_gold_trend
+                        and hasattr(self._last_gold_trend, "short_momentum")
+                        else 0.0
+                    )
+
+                if self._snapshot_seq % 10 == 0:
+                    momentum_report = self._momentum_tracker.evaluate(
+                        final.game_time,
+                    )
+                    self._last_momentum = momentum_report
+                    if self._momentum_writer:
+                        self._momentum_writer.Write(momentum_report.to_dict())
+            except Exception as exc:
+                logger.warning(
+                    "MomentumTracker error (non-fatal): %s: %s",
                     type(exc).__name__, exc,
                 )
 
@@ -532,6 +668,17 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
             ),
             "last_minimap_state": (
                 self._last_minimap_state is not None
+            ),
+            # Claude19 additions
+            "phase_detector_active": self._phase_detector is not None,
+            "last_phase_transition": (
+                self._last_phase_transition.to_dict()
+                if self._last_phase_transition else None
+            ),
+            "gold_trend_analyzer_active": self._gold_trend_analyzer is not None,
+            "momentum_state": (
+                self._last_momentum.state.name
+                if self._last_momentum else "N/A"
             ),
         })
         return base

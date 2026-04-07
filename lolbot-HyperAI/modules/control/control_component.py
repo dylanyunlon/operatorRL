@@ -62,6 +62,16 @@ from modules.control.overlay.overlay_renderer import OverlayRenderer
 from modules.control.voice_output.voice_narrator import (
     VoiceNarratorComponent as VoiceNarrator,
 )
+# Claude19: Wire Claude18 VoicePriorityQueue + new GameNarrator
+from modules.control.voice_output.voice_priority_queue import (
+    VoicePriorityQueue,
+    VoicePriority,
+    VoiceEntry,
+)
+from modules.control.narration.game_narrator import (
+    GameNarrator,
+    NarrationLine,
+)
 
 logger = get_logger("control")
 
@@ -378,6 +388,11 @@ class ControlComponent(TimerComponent, ManagedComponent):
             maxlen=_MAX_OUTPUT_QUEUE,
         )
 
+        # Claude19: VoicePriorityQueue replaces simple dedup cooldown for voice
+        self._voice_priority_queue: Optional[VoicePriorityQueue] = None
+        self._game_narrator: Optional[GameNarrator] = None
+        self._last_narrated_win_prob: float = 0.5
+
     # -- Init / Shutdown (Apollo lifecycle) --
 
     def Init(self) -> bool:
@@ -424,6 +439,10 @@ class ControlComponent(TimerComponent, ManagedComponent):
         self.register_channel(voice_ch)
         self.register_channel(overlay_ch)
         self.register_channel(log_ch)
+
+        # Claude19: VoicePriorityQueue + GameNarrator
+        self._voice_priority_queue = VoicePriorityQueue()
+        self._game_narrator = GameNarrator()
 
         self.register_self()
         self._transition(LifecycleState.READY)
@@ -486,7 +505,12 @@ class ControlComponent(TimerComponent, ManagedComponent):
     # -- Internal Proc steps --
 
     def _drain_inputs(self) -> None:
-        """Step 1: Read all pending strategy and prediction messages."""
+        """Step 1: Read all pending strategy and prediction messages.
+
+        Claude19: Strategy advice voice text now routes through
+        VoicePriorityQueue for priority ordering and category cooldowns,
+        replacing the simple per-action dedup_key cooldown.
+        """
         # Strategy advice
         if self._strategy_reader:
             advices = self._strategy_reader.drain()
@@ -494,6 +518,15 @@ class ControlComponent(TimerComponent, ManagedComponent):
                 action = self._advice_to_action(advice)
                 if action:
                     self._pending_actions.append(action)
+                    # Claude19: Also enqueue into VoicePriorityQueue
+                    if self._voice_priority_queue and action.voice_text:
+                        prio = VoicePriority.HIGH if action.priority.value <= 1 else VoicePriority.MEDIUM
+                        self._voice_priority_queue.enqueue(
+                            action.voice_text,
+                            category=action.source or "strategy",
+                            priority=prio,
+                            game_time=action.data.get("game_time", 0.0) if action.data else 0.0,
+                        )
 
         # Win probability periodic announcement
         if self._win_pred_reader:
@@ -504,6 +537,24 @@ class ControlComponent(TimerComponent, ManagedComponent):
                 if win_action:
                     self._pending_actions.append(win_action)
                 self._update_overlay_win_prob(win_pred)
+
+                # Claude19: Generate natural language narration for win updates
+                if self._game_narrator:
+                    lines = self._game_narrator.narrate_win_update(
+                        win_pred.blue_win_prob,
+                        self._last_narrated_win_prob,
+                        "BLUE",
+                        win_pred.game_time,
+                    )
+                    for line in lines:
+                        if self._voice_priority_queue:
+                            self._voice_priority_queue.enqueue(
+                                line.text,
+                                category=line.category,
+                                priority=VoicePriority(min(line.priority, 3)),
+                                game_time=line.game_time,
+                            )
+                    self._last_narrated_win_prob = win_pred.blue_win_prob
 
     def _dispatch_pending(self) -> None:
         """Step 2: Route pending actions through all channels."""

@@ -68,6 +68,20 @@ from modules.prediction.team_fight.teamfight_predictor import (
     TeamfightPredictor,
     TeamfightAssessment,
 )
+# Claude19: Wire Claude18 ConfidenceCalibrator + new analyzers
+from modules.prediction.evaluator.confidence_calibrator import (
+    ConfidenceCalibrator,
+    CalibratedConfidence,
+    DataQualitySignal,
+)
+from modules.prediction.timing.death_timer_analyzer import (
+    DeathTimerAnalyzer,
+    DeathTimerReport,
+)
+from modules.prediction.composition.comp_analyzer import (
+    CompAnalyzer,
+    CompAnalysisReport,
+)
 
 logger = get_logger("prediction")
 
@@ -407,6 +421,16 @@ class PredictionComponent(TimerComponent, ManagedComponent):
         self._teamfight_tick_counter: int = 0
         self._last_teamfight_assessment: Optional[TeamfightAssessment] = None
 
+        # Claude19: Wire Claude18 ConfidenceCalibrator + new analyzers
+        self._confidence_calibrator: Optional[ConfidenceCalibrator] = None
+        self._death_timer_analyzer: Optional[DeathTimerAnalyzer] = None
+        self._comp_analyzer: Optional[CompAnalyzer] = None
+        self._last_calibrated_confidence: Optional[CalibratedConfidence] = None
+        self._last_death_report: Optional[DeathTimerReport] = None
+        self._last_comp_report: Optional[CompAnalysisReport] = None
+        self._death_window_writer: Optional[Writer] = None
+        self._comp_cached: bool = False
+
     def Init(self) -> bool:
         self._managed_init()
         logger.info("Initializing PredictionComponent...")
@@ -443,6 +467,14 @@ class PredictionComponent(TimerComponent, ManagedComponent):
 
         # Phase 4: instantiate TeamfightPredictor
         self._teamfight_predictor = TeamfightPredictor()
+
+        # Claude19: Instantiate ConfidenceCalibrator + DeathTimerAnalyzer + CompAnalyzer
+        self._confidence_calibrator = ConfidenceCalibrator()
+        self._death_timer_analyzer = DeathTimerAnalyzer()
+        self._comp_analyzer = CompAnalyzer()
+        self._death_window_writer = self._node.CreateWriter(
+            "/lol/death_windows", dict,
+        )
 
         self.register_self()
         self._transition(LifecycleState.READY)
@@ -500,7 +532,32 @@ class PredictionComponent(TimerComponent, ManagedComponent):
         )
 
         # Confidence ramps up with game time
-        confidence = min(1.0, snapshot.game_time / _CONFIDENCE_RAMP_TIME)
+        raw_confidence = min(1.0, snapshot.game_time / _CONFIDENCE_RAMP_TIME)
+
+        # Claude19: Replace raw confidence with ConfidenceCalibrator
+        # The calibrator integrates data quality, event richness, and stability
+        # on top of the base time ramp, per Claude18's design.
+        confidence = raw_confidence
+        if self._confidence_calibrator is not None:
+            try:
+                signal = DataQualitySignal(
+                    canbus_source_type="unknown",
+                    canbus_stale_count=0,
+                    canbus_error_rate=0.0,
+                    perception_snapshot_count=self._pred_count,
+                    perception_event_count=len(self._recent_events),
+                    game_time=snapshot.game_time,
+                )
+                cal = self._confidence_calibrator.calibrate(
+                    raw_confidence, signal,
+                )
+                self._last_calibrated_confidence = cal
+                confidence = cal.final_confidence
+            except Exception as exc:
+                logger.warning(
+                    "ConfidenceCalibrator error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
 
         # Feature importance
         top_features = self._win_predictor.feature_importance(features)
@@ -542,6 +599,65 @@ class PredictionComponent(TimerComponent, ManagedComponent):
                 # Non-fatal: legacy analyzer already published tf_pred above
                 logger.warning(
                     "TeamfightPredictor error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: DeathTimerAnalyzer ─────────────────────────────
+        # Runs every prediction tick (2Hz). Lightweight — just scans
+        # player is_dead flags and computes windows.
+        if self._death_timer_analyzer is not None:
+            try:
+                players = list(snapshot.all_players) if hasattr(snapshot, "all_players") else []
+                self._death_timer_analyzer.update_deaths(players, snapshot.game_time)
+
+                active_team = "BLUE"
+                if hasattr(snapshot, "active_team"):
+                    at = snapshot.active_team
+                    if hasattr(at, "name"):
+                        active_team = "BLUE" if "BLUE" in at.name.upper() else "RED"
+
+                report = self._death_timer_analyzer.analyze(
+                    snapshot.game_time, active_team,
+                )
+                self._last_death_report = report
+                if report.current_window and self._death_window_writer:
+                    self._death_window_writer.Write(report.to_dict())
+            except Exception as exc:
+                logger.warning(
+                    "DeathTimerAnalyzer error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: CompAnalyzer ───────────────────────────────────
+        # Runs ONCE per game (comp doesn't change). Caches result.
+        if self._comp_analyzer is not None and not self._comp_cached:
+            try:
+                players = list(snapshot.all_players) if hasattr(snapshot, "all_players") else []
+                blue_champs = [
+                    getattr(p, "champion_name", "")
+                    for p in players
+                    if hasattr(p, "team") and "BLUE" in str(getattr(p.team, "name", "")).upper()
+                ]
+                red_champs = [
+                    getattr(p, "champion_name", "")
+                    for p in players
+                    if hasattr(p, "team") and "RED" in str(getattr(p.team, "name", "")).upper()
+                ]
+                if len(blue_champs) == 5 and len(red_champs) == 5:
+                    phase_str = snapshot.phase.name if hasattr(snapshot, "phase") else "EARLY"
+                    self._last_comp_report = self._comp_analyzer.analyze(
+                        blue_champs, red_champs, phase_str,
+                    )
+                    self._comp_cached = True
+                    logger.info(
+                        "Comp analysis: blue=%s vs red=%s adj=%.3f",
+                        self._last_comp_report.blue_profile.primary_archetype.name,
+                        self._last_comp_report.red_profile.primary_archetype.name,
+                        self._last_comp_report.comp_adjustment,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "CompAnalyzer error (non-fatal): %s: %s",
                     type(exc).__name__, exc,
                 )
 

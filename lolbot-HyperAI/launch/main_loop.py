@@ -88,6 +88,8 @@ from perception.network_listener import NetworkListener
 from planning.strategy_planner import StrategyPlanner
 from prediction.feature_pipeline import FeaturePipeline
 from prediction.win_probability_engine import WinProbabilityEngine
+# Claude19: Wire Claude18 GameRecorder into session management
+from modules.common.adapters.game_record import GameRecorder
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +172,9 @@ class MainLoop:
         self._strategy_mutator: Optional[StrategyMutator] = None
         self._agent_os: Optional[AgentOSConnector] = None
         self._riot_api: Optional[RiotAPIClient] = None
+
+        # Claude19: GameRecorder for structured game session recording
+        self._game_recorder: Optional[GameRecorder] = None
 
         self._factory = MessageFactory("launch.main_loop")
 
@@ -507,6 +512,18 @@ class MainLoop:
         self._voice_announcer.force_announce(
             "Game started. Good luck!", priority=2,
         )
+        # Claude19: Start GameRecorder session
+        if self._game_recorder is None:
+            self._game_recorder = GameRecorder()
+        self._game_recorder.start_session(
+            self._session_id,
+            data_source=getattr(self._config, "data_source", "unknown"),
+            generation_id=(
+                self._generation_manager.current.generation_id
+                if self._generation_manager and self._generation_manager.current
+                else ""
+            ),
+        )
         print(f"[Session] Game started: {self._session_id}")
 
     def _on_game_end(self) -> None:
@@ -515,6 +532,18 @@ class MainLoop:
         self._voice_announcer.force_announce(
             "Game over.", priority=1,
         )
+        # Claude19: End GameRecorder session and save
+        if self._game_recorder and self._game_recorder.is_recording:
+            try:
+                record = self._game_recorder.end_session(
+                    game_duration=0.0,  # Will be populated from final snapshot
+                    final_gold_diff=0.0,
+                )
+                output_dir = Path(self._config.paths.output_dir if hasattr(self._config, "paths") else "data/generations")
+                self._game_recorder.save(record, str(output_dir))
+                print(f"[Session] Game record saved to {output_dir}")
+            except Exception as exc:
+                print(f"[Session] GameRecorder save error: {exc}")
         print(f"[Session] Game ended: {self._session_id}")
 
     def _on_post_game_complete(self) -> None:

@@ -68,6 +68,26 @@ from modules.planning.strategy.lane_advisor import (
     LaneAdvisor,
     LaneAdvice,
 )
+# Claude19: Wire Claude18 PowerSpikeDetector + ObjectiveWindowAdvisor + new modules
+from modules.planning.strategy.power_spike_detector import (
+    PowerSpikeDetector,
+    PowerSpike,
+    SpikeImpact,
+)
+from modules.prediction.objective.objective_window_advisor import (
+    ObjectiveWindowAdvisor,
+    ObjectiveWindowAdvice,
+)
+from modules.planning.objective.objective_timer import (
+    ObjectiveTimer,
+)
+from modules.planning.tempo.recall_advisor import (
+    RecallAdvisor,
+    RecallUrgency,
+)
+from modules.planning.summoner.spell_tracker import (
+    SummonerSpellTracker,
+)
 
 logger = get_logger("planning")
 
@@ -81,6 +101,8 @@ _LANE_ADVICE_MAX_PHASES = {GamePhase.EARLY, GamePhase.MID}
 
 # MacroPlanner runs every tick. LaneAdvisor every 4th tick (1Hz at 2Hz base).
 _LANE_ADVISOR_TICK_DIVISOR = 4
+# Claude19: PowerSpikeDetector and ObjectiveWindowAdvisor run every 2nd tick (1Hz)
+_SPIKE_ADVISOR_TICK_DIVISOR = 2
 
 
 # ─── Legacy MacroDecisionEngine (backward compat) ───────────────────────────
@@ -279,6 +301,14 @@ class PlanningComponent(TimerComponent, ManagedComponent):
         self._last_macro_decision: Optional[MacroDecision] = None
         self._recent_events: List[GameEvent] = []
 
+        # Claude19: PowerSpikeDetector + ObjectiveWindowAdvisor + RecallAdvisor + SpellTracker
+        self._power_spike_detector: Optional[PowerSpikeDetector] = None
+        self._objective_window_advisor: Optional[ObjectiveWindowAdvisor] = None
+        self._objective_timer: Optional[ObjectiveTimer] = None
+        self._recall_advisor: Optional[RecallAdvisor] = None
+        self._spell_tracker: Optional[SummonerSpellTracker] = None
+        self._spike_tick_counter: int = 0
+
     def Init(self) -> bool:
         self._managed_init()
         logger.info("Initializing PlanningComponent...")
@@ -314,6 +344,13 @@ class PlanningComponent(TimerComponent, ManagedComponent):
         # Phase 4: instantiate sub-planners
         self._macro_planner = MacroPlanner()
         self._lane_advisor = LaneAdvisor()
+
+        # Claude19: Instantiate Claude18 PowerSpikeDetector + ObjectiveWindowAdvisor + new modules
+        self._power_spike_detector = PowerSpikeDetector()
+        self._objective_window_advisor = ObjectiveWindowAdvisor()
+        self._objective_timer = ObjectiveTimer()
+        self._recall_advisor = RecallAdvisor()
+        self._spell_tracker = SummonerSpellTracker()
 
         self.register_self()
         self._transition(LifecycleState.READY)
@@ -413,6 +450,100 @@ class PlanningComponent(TimerComponent, ManagedComponent):
             except Exception as exc:
                 logger.warning(
                     "LaneAdvisor error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: ObjectiveTimer tick ────────────────────────────
+        # Updates spawn/respawn state from recent events (every tick).
+        if self._objective_timer is not None:
+            try:
+                for evt in self._recent_events:
+                    etype = (
+                        evt.event_type.value
+                        if hasattr(evt.event_type, "value")
+                        else str(evt.event_type)
+                    )
+                    self._objective_timer.process_event(
+                        etype, "BLUE", evt.game_time,
+                    )
+                self._objective_timer.tick(snapshot.game_time)
+            except Exception as exc:
+                logger.warning(
+                    "ObjectiveTimer error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: PowerSpikeDetector ─────────────────────────────
+        # Runs every 2nd tick (1Hz). Detects level/item power spikes
+        # and emits strategy advice when a significant spike occurs.
+        self._spike_tick_counter += 1
+        if (
+            self._spike_tick_counter >= _SPIKE_ADVISOR_TICK_DIVISOR
+            and self._power_spike_detector is not None
+        ):
+            self._spike_tick_counter = 0
+            try:
+                players = (
+                    list(snapshot.all_players)
+                    if hasattr(snapshot, "all_players") else []
+                )
+                active_team = snapshot.active_team if hasattr(snapshot, "active_team") else "BLUE"
+                spikes = self._power_spike_detector.detect(
+                    players, active_team, snapshot.game_time,
+                )
+                for spike in spikes:
+                    if spike.impact.value >= SpikeImpact.MODERATE.value:
+                        advice = StrategyAdvice(
+                            primary_action=f"spike_{spike.spike_type.name.lower()}",
+                            reasoning=f"Power spike: {spike.champion} hit {spike.description}",
+                            confidence=0.6,
+                            urgency=0.7 if spike.is_ally else 0.5,
+                            game_time=snapshot.game_time,
+                        )
+                        if self._strategy_writer:
+                            self._strategy_writer.Write(advice)
+                            self._advice_count += 1
+            except Exception as exc:
+                logger.warning(
+                    "PowerSpikeDetector error (non-fatal): %s: %s",
+                    type(exc).__name__, exc,
+                )
+
+        # ── Claude19: ObjectiveWindowAdvisor ──────────────────────────
+        # Runs every 2nd tick (1Hz). Evaluates objective windows
+        # using ObjectiveTimer state and publishes strategic advice.
+        if (
+            self._plan_count % 2 == 0
+            and self._objective_window_advisor is not None
+            and self._objective_timer is not None
+        ):
+            try:
+                obj_states = self._objective_timer.stats().get("objectives", {})
+                win_prob = (
+                    win_pred.blue_win_prob if win_pred else 0.5
+                )
+                windows = self._objective_window_advisor.evaluate(
+                    game_time=snapshot.game_time,
+                    objective_states=obj_states,
+                    team_alive_count=5,
+                    enemy_alive_count=5,
+                    win_probability=win_prob,
+                )
+                for w in windows:
+                    if w.strategic_priority > 0.6:
+                        advice = StrategyAdvice(
+                            primary_action=f"objective_{w.objective_name}",
+                            reasoning=w.advice_text,
+                            confidence=w.strategic_priority,
+                            urgency=0.8,
+                            game_time=snapshot.game_time,
+                        )
+                        if self._strategy_writer:
+                            self._strategy_writer.Write(advice)
+                            self._advice_count += 1
+            except Exception as exc:
+                logger.warning(
+                    "ObjectiveWindowAdvisor error (non-fatal): %s: %s",
                     type(exc).__name__, exc,
                 )
 
