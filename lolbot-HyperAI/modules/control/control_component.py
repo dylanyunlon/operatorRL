@@ -783,3 +783,190 @@ class DispatchRecord:
             "suppressed": self.suppressed,
             "reason": self.suppress_reason,
         }
+
+
+# ---------------------------------------------------------------------------
+# Claude17: DispatchRateLimiter — per-category rate limiting
+# ---------------------------------------------------------------------------
+
+class DispatchRateLimiter:
+    """Rate-limits dispatch actions by category to prevent spam.
+
+    Claude17: Ensures the voice/overlay output doesn't overwhelm the user.
+    Each category has its own cooldown. Actions within cooldown are
+    suppressed and logged but not dispatched.
+
+    Default cooldowns (seconds):
+        voice_announcement: 10.0
+        overlay_alert: 5.0
+        log_entry: 1.0
+        strategy_update: 15.0
+    """
+
+    DEFAULT_COOLDOWNS = {
+        "voice_announcement": 10.0,
+        "overlay_alert": 5.0,
+        "log_entry": 1.0,
+        "strategy_update": 15.0,
+        "win_probability": 20.0,
+    }
+
+    def __init__(
+        self,
+        cooldowns: Optional[Dict[str, float]] = None,
+    ) -> None:
+        self._cooldowns = dict(self.DEFAULT_COOLDOWNS)
+        if cooldowns:
+            self._cooldowns.update(cooldowns)
+        self._last_dispatch: Dict[str, float] = {}
+        self._suppressed_count: int = 0
+        self._total_checked: int = 0
+
+    def should_dispatch(self, category: str) -> bool:
+        """Check if a dispatch of this category is allowed.
+
+        Args:
+            category: The dispatch category string.
+
+        Returns:
+            True if dispatch is allowed, False if rate-limited.
+        """
+        self._total_checked += 1
+        now = time.time()
+        cooldown = self._cooldowns.get(category, 5.0)
+        last = self._last_dispatch.get(category, 0.0)
+
+        if now - last < cooldown:
+            self._suppressed_count += 1
+            return False
+
+        self._last_dispatch[category] = now
+        return True
+
+    def set_cooldown(self, category: str, cooldown_s: float) -> None:
+        """Update cooldown for a category (used by evolution)."""
+        self._cooldowns[category] = max(0.1, cooldown_s)
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "total_checked": self._total_checked,
+            "suppressed_count": self._suppressed_count,
+            "suppression_rate": round(
+                self._suppressed_count / max(self._total_checked, 1), 4
+            ),
+            "cooldowns": dict(self._cooldowns),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Claude17: ActionEffectivenessTracker
+# ---------------------------------------------------------------------------
+
+class ActionEffectivenessTracker:
+    """Tracks whether dispatched actions correlate with positive outcomes.
+
+    Claude17: After dispatching "take dragon", if the team actually
+    takes dragon within N seconds, the action is scored as "effective".
+    This feedback feeds into evolution's fitness evaluation.
+
+    Tracking flow:
+        1. Record dispatched action with timestamp and context
+        2. After game events arrive, check for matching outcomes
+        3. Score each action as effective/ineffective/unknown
+    """
+
+    def __init__(self, outcome_window_s: float = 60.0) -> None:
+        self._outcome_window_s = outcome_window_s
+        self._pending_actions: List[Dict[str, Any]] = []
+        self._scored_actions: List[Dict[str, Any]] = []
+        self._effective_count: int = 0
+        self._ineffective_count: int = 0
+
+    def record_action(
+        self,
+        action_text: str,
+        category: str,
+        expected_outcome: str = "",
+        game_time: float = 0.0,
+    ) -> None:
+        """Record a dispatched action for later effectiveness evaluation."""
+        self._pending_actions.append({
+            "ts": time.time(),
+            "game_time": game_time,
+            "action": action_text[:100],
+            "category": category,
+            "expected_outcome": expected_outcome,
+            "scored": False,
+        })
+        # Bound
+        if len(self._pending_actions) > 200:
+            self._pending_actions = self._pending_actions[-100:]
+
+    def score_against_events(
+        self, events: List[Any]
+    ) -> int:
+        """Score pending actions against recent game events.
+
+        Args:
+            events: List of GameEvent objects from perception.
+
+        Returns:
+            Number of actions scored in this call.
+        """
+        now = time.time()
+        scored = 0
+
+        for action in self._pending_actions:
+            if action["scored"]:
+                continue
+            if now - action["ts"] > self._outcome_window_s:
+                action["scored"] = True
+                action["result"] = "expired"
+                self._ineffective_count += 1
+                scored += 1
+                continue
+
+            expected = action["expected_outcome"].lower()
+            if not expected:
+                continue
+
+            for event in events:
+                event_type = ""
+                if hasattr(event, 'event_type'):
+                    et = event.event_type
+                    event_type = et.value if hasattr(et, 'value') else str(et)
+
+                if expected in event_type.lower():
+                    action["scored"] = True
+                    action["result"] = "effective"
+                    self._effective_count += 1
+                    scored += 1
+                    break
+
+        # Move scored to history
+        self._scored_actions.extend(
+            a for a in self._pending_actions if a["scored"]
+        )
+        self._pending_actions = [
+            a for a in self._pending_actions if not a["scored"]
+        ]
+        if len(self._scored_actions) > 500:
+            self._scored_actions = self._scored_actions[-250:]
+
+        return scored
+
+    @property
+    def effectiveness_rate(self) -> float:
+        total = self._effective_count + self._ineffective_count
+        if total == 0:
+            return 0.0
+        return round(self._effective_count / total, 4)
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "pending_actions": len(self._pending_actions),
+            "scored_actions": len(self._scored_actions),
+            "effective_count": self._effective_count,
+            "ineffective_count": self._ineffective_count,
+            "effectiveness_rate": self.effectiveness_rate,
+        }

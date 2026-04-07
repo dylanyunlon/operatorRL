@@ -613,3 +613,173 @@ class LatencyHistogram:
         return {"count": self._total_count, "avg_ms": round(avg, 2),
                 "p50_ms": self.percentile(0.5), "p95_ms": self.percentile(0.95),
                 "p99_ms": self.percentile(0.99)}
+
+
+# ---------------------------------------------------------------------------
+# Claude17: SystemResourceTracker
+# ---------------------------------------------------------------------------
+
+class SystemResourceTracker:
+    """Tracks process-level resource usage over time.
+
+    Claude17: Apollo monitors CAN bus health and system resources.
+    We track CPU, memory, thread count, and file descriptors to
+    detect resource leaks before they cause failures.
+
+    Usage::
+
+        tracker = SystemResourceTracker()
+        tracker.sample()  # called from MonitorComponent.Proc()
+        stats = tracker.get_trend(window=30)
+    """
+
+    def __init__(self, max_samples: int = 1000) -> None:
+        self._samples: List[Dict[str, Any]] = []
+        self._max_samples = max_samples
+
+    def sample(self) -> Dict[str, Any]:
+        """Take a resource usage sample.
+
+        Returns the sample dict for immediate use.
+        """
+        import os
+        import threading
+
+        sample: Dict[str, Any] = {
+            "ts": time.time(),
+            "thread_count": threading.active_count(),
+            "pid": os.getpid(),
+        }
+
+        # Memory via resource module (Linux/Mac)
+        try:
+            import resource
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+            sample["rss_mb"] = round(usage.ru_maxrss / 1024, 1)
+            sample["user_cpu_s"] = round(usage.ru_utime, 2)
+            sample["sys_cpu_s"] = round(usage.ru_stime, 2)
+        except (ImportError, AttributeError):
+            pass
+
+        # File descriptors (Linux)
+        try:
+            fd_path = f"/proc/{os.getpid()}/fd"
+            if os.path.isdir(fd_path):
+                sample["open_fds"] = len(os.listdir(fd_path))
+        except Exception:
+            pass
+
+        self._samples.append(sample)
+        if len(self._samples) > self._max_samples:
+            self._samples = self._samples[-self._max_samples // 2:]
+
+        return sample
+
+    def get_trend(self, window: int = 30) -> List[Dict[str, Any]]:
+        """Return last N resource samples."""
+        return self._samples[-window:]
+
+    def detect_leaks(self, threshold_pct: float = 20.0) -> List[str]:
+        """Detect potential resource leaks.
+
+        Claude17: Compares first-quarter samples to last-quarter.
+        If RSS or FD count increased by >threshold_pct, flag it.
+
+        Returns:
+            List of warning strings (empty = no leaks detected).
+        """
+        if len(self._samples) < 20:
+            return []
+
+        warnings: List[str] = []
+        quarter = len(self._samples) // 4
+
+        for metric in ("rss_mb", "open_fds", "thread_count"):
+            early = [
+                s[metric] for s in self._samples[:quarter]
+                if metric in s
+            ]
+            late = [
+                s[metric] for s in self._samples[-quarter:]
+                if metric in s
+            ]
+            if not early or not late:
+                continue
+
+            avg_early = sum(early) / len(early)
+            avg_late = sum(late) / len(late)
+
+            if avg_early > 0:
+                pct_change = ((avg_late - avg_early) / avg_early) * 100
+                if pct_change > threshold_pct:
+                    warnings.append(
+                        f"{metric}: +{pct_change:.1f}% "
+                        f"({avg_early:.1f} → {avg_late:.1f})"
+                    )
+
+        return warnings
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Latest resource snapshot with leak detection."""
+        latest = self._samples[-1] if self._samples else {}
+        leaks = self.detect_leaks()
+        return {
+            "latest": latest,
+            "sample_count": len(self._samples),
+            "potential_leaks": leaks,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Claude17: ChannelThroughputMonitor
+# ---------------------------------------------------------------------------
+
+class ChannelThroughputMonitor:
+    """Tracks message throughput on cyber channels.
+
+    Claude17: Measures messages/second on each channel to detect
+    stalls, backpressure, and throughput anomalies.
+    """
+
+    def __init__(self) -> None:
+        self._channel_counts: Dict[str, int] = {}
+        self._last_snapshot_time: float = time.monotonic()
+        self._last_counts: Dict[str, int] = {}
+        self._throughputs: Dict[str, float] = {}
+
+    def update_from_node(self, node_name: str, channel_summary: Dict[str, Any]) -> None:
+        """Update counts from a CyberNode's channel_summary().
+
+        Called periodically by MonitorComponent.
+        """
+        for writer_info in channel_summary.get("writers", []):
+            ch = writer_info.get("channel", "")
+            writes = writer_info.get("writes", 0)
+            self._channel_counts[ch] = writes
+
+    def compute_throughputs(self) -> Dict[str, float]:
+        """Compute messages/second for each channel since last call."""
+        now = time.monotonic()
+        elapsed = now - self._last_snapshot_time
+        if elapsed < 0.1:
+            return self._throughputs
+
+        for ch, count in self._channel_counts.items():
+            prev = self._last_counts.get(ch, 0)
+            delta = count - prev
+            self._throughputs[ch] = round(delta / elapsed, 2)
+
+        self._last_counts = dict(self._channel_counts)
+        self._last_snapshot_time = now
+        return dict(self._throughputs)
+
+    def detect_stalls(self, min_expected_hz: float = 0.5) -> List[str]:
+        """Detect channels with zero throughput that should be active.
+
+        Returns list of stalled channel names.
+        """
+        stalled = []
+        for ch, rate in self._throughputs.items():
+            if rate < min_expected_hz:
+                stalled.append(ch)
+        return stalled

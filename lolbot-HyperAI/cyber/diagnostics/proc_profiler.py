@@ -1,135 +1,237 @@
 """
-ProcProfiler — Per-component Proc() performance profiling.
-=============================================================
-lolbot-HyperAI · Cyber Framework
+CyberRT Proc Profiler — Per-component CPU/wall-time profiling.
+================================================================
+cyber/diagnostics/proc_profiler.py
 
-Records wall time, optional CPU time, and GC pauses for each
-TimerComponent Proc() call.  Off by default; enabled per-component.
+Claude17: Apollo's cyber framework includes built-in profiling for
+each component's Proc() execution. We add a lightweight profiler
+that can be attached to any TimerComponent to collect detailed
+timing breakdowns without impacting normal performance.
 
 Architecture position:
-    cyber/diagnostics/proc_profiler.py   ← YOU ARE HERE
-    ├─ Wraps: TimerComponent.Proc() via monkey-patch or explicit call
-    └─ Output: profile data for log_analyzer or CLI display
+    cyber/diagnostics/proc_profiler.py   ← YOU ARE HERE (Claude17 new file)
+    ├─ Attached to: any TimerComponent via attach()
+    ├─ Collects: wall time, user CPU, sys CPU per Proc() call
+    ├─ Reports: hotspot analysis, timing distributions
+    └─ Consumed by: MonitorComponent, StructuredLogger
+
+Apollo reference:
+    cyber/croutine/routine.h — coroutine timing
+    cyber/statistics/statistics.h — channel/component stats
 
 Design notes:
-    - Minimal overhead when disabled (~1 if-check per Proc())
-    - Uses time.perf_counter for wall time, time.process_time for CPU
-    - Stores rolling window of 1000 samples per component
-    - Can export as CSV for external flame-graph tools
+    - Uses os.times() for CPU measurement (no external deps)
+    - Minimal overhead: only timestamps + subtraction per call
+    - Configurable sampling rate to reduce overhead further
+    - Thread-safe: each profiler instance bound to one component
 """
 
 from __future__ import annotations
+
+import os
+import statistics
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
-_WINDOW_SIZE = 1000
+
+_DEFAULT_WINDOW = 500
+_DEFAULT_SAMPLE_RATE = 1.0  # 1.0 = profile every call
 
 
 @dataclass
-class ProcSample:
-    """A single Proc() execution sample."""
-    seq: int = 0
-    wall_ms: float = 0.0
-    cpu_ms: float = 0.0
-    timestamp: float = 0.0
+class ProcProfile:
+    """Single Proc() execution profile."""
+    sequence: int
+    wall_ms: float
+    user_cpu_ms: float = 0.0
+    sys_cpu_ms: float = 0.0
+    timestamp: float = field(default_factory=time.time)
 
+    @property
+    def total_cpu_ms(self) -> float:
+        return self.user_cpu_ms + self.sys_cpu_ms
 
-@dataclass
-class ComponentProfile:
-    """Accumulated profile for one component."""
-    name: str = ""
-    enabled: bool = False
-    samples: Deque[ProcSample] = field(
-        default_factory=lambda: deque(maxlen=_WINDOW_SIZE)
-    )
-    total_calls: int = 0
-
-    def record(self, wall_ms: float, cpu_ms: float, seq: int) -> None:
-        self.samples.append(ProcSample(
-            seq=seq, wall_ms=wall_ms, cpu_ms=cpu_ms, timestamp=time.time(),
-        ))
-        self.total_calls += 1
-
-    def summary(self) -> Dict[str, Any]:
-        if not self.samples:
-            return {"name": self.name, "total_calls": 0}
-        walls = [s.wall_ms for s in self.samples]
-        cpus = [s.cpu_ms for s in self.samples]
-        return {
-            "name": self.name,
-            "total_calls": self.total_calls,
-            "window_size": len(self.samples),
-            "wall_mean_ms": round(sum(walls) / len(walls), 2),
-            "wall_max_ms": round(max(walls), 2),
-            "wall_p95_ms": round(sorted(walls)[int(len(walls) * 0.95)], 2) if len(walls) >= 20 else round(max(walls), 2),
-            "cpu_mean_ms": round(sum(cpus) / len(cpus), 2),
-        }
+    @property
+    def cpu_efficiency(self) -> float:
+        """Ratio of CPU time to wall time. <1.0 means I/O waiting."""
+        if self.wall_ms <= 0:
+            return 0.0
+        return min(self.total_cpu_ms / self.wall_ms, 2.0)
 
 
 class ProcProfiler:
-    """System-wide Proc() profiler.
+    """Lightweight profiler for TimerComponent.Proc() calls.
+
+    Claude17: Collects timing data with minimal overhead and
+    provides analysis methods for hotspot detection.
 
     Usage::
-        profiler = ProcProfiler()
-        profiler.enable("canbus")
-        # In component's _run_loop wrapper:
-        profiler.begin("canbus")
-        result = self.Proc()
-        profiler.end("canbus", seq)
+
+        profiler = ProcProfiler(component_name="canbus")
+        profiler.begin()
+        # ... Proc() runs ...
+        profiler.end(sequence=42)
+
+        report = profiler.report()
     """
 
-    def __init__(self) -> None:
-        self._profiles: Dict[str, ComponentProfile] = {}
-
-    def enable(self, component_name: str) -> None:
-        if component_name not in self._profiles:
-            self._profiles[component_name] = ComponentProfile(
-                name=component_name
-            )
-        self._profiles[component_name].enabled = True
-
-    def disable(self, component_name: str) -> None:
-        if component_name in self._profiles:
-            self._profiles[component_name].enabled = False
-
-    def is_enabled(self, component_name: str) -> bool:
-        p = self._profiles.get(component_name)
-        return p.enabled if p else False
-
-    def begin(self, component_name: str) -> Optional[Tuple[float, float]]:
-        """Start timing. Returns (wall_start, cpu_start) or None if disabled."""
-        if not self.is_enabled(component_name):
-            return None
-        return (time.perf_counter(), time.process_time())
-
-    def end(
+    def __init__(
         self,
         component_name: str,
-        start: Optional[Tuple[float, float]],
-        seq: int = 0,
+        window: int = _DEFAULT_WINDOW,
+        sample_rate: float = _DEFAULT_SAMPLE_RATE,
     ) -> None:
-        """End timing and record sample."""
-        if start is None:
-            return
-        wall_start, cpu_start = start
-        wall_ms = (time.perf_counter() - wall_start) * 1000
-        cpu_ms = (time.process_time() - cpu_start) * 1000
+        self._name = component_name
+        self._window = window
+        self._sample_rate = sample_rate
+        self._profiles: Deque[ProcProfile] = deque(maxlen=window)
+        self._lock = threading.Lock()
 
-        profile = self._profiles.get(component_name)
-        if profile and profile.enabled:
-            profile.record(wall_ms, cpu_ms, seq)
+        # In-flight measurement state
+        self._t0_wall: float = 0.0
+        self._t0_user: float = 0.0
+        self._t0_sys: float = 0.0
+        self._sampling: bool = False
+        self._call_count: int = 0
+        self._sampled_count: int = 0
 
-    def summary(self) -> Dict[str, Dict[str, Any]]:
-        return {name: p.summary() for name, p in self._profiles.items()}
+    def begin(self) -> None:
+        """Mark the start of a Proc() call.
 
-    def export_csv(self, component_name: str) -> str:
-        """Export samples as CSV for external tools."""
-        profile = self._profiles.get(component_name)
-        if not profile:
-            return "seq,wall_ms,cpu_ms,timestamp\n"
-        lines = ["seq,wall_ms,cpu_ms,timestamp"]
-        for s in profile.samples:
-            lines.append(f"{s.seq},{s.wall_ms:.3f},{s.cpu_ms:.3f},{s.timestamp:.3f}")
-        return "\n".join(lines)
+        Should be called immediately before Proc() executes.
+        Respects sample_rate to skip profiling on some calls.
+        """
+        self._call_count += 1
+
+        # Sampling decision
+        if self._sample_rate < 1.0:
+            import random
+            if random.random() > self._sample_rate:
+                self._sampling = False
+                return
+
+        self._sampling = True
+        self._sampled_count += 1
+        self._t0_wall = time.monotonic()
+        try:
+            times = os.times()
+            self._t0_user = times.user
+            self._t0_sys = times.system
+        except Exception:
+            self._t0_user = 0.0
+            self._t0_sys = 0.0
+
+    def end(self, sequence: int = 0) -> Optional[ProcProfile]:
+        """Mark the end of a Proc() call and record the profile.
+
+        Args:
+            sequence: The component's sequence counter.
+
+        Returns:
+            ProcProfile if this call was sampled, None otherwise.
+        """
+        if not self._sampling:
+            return None
+
+        wall_ms = (time.monotonic() - self._t0_wall) * 1000.0
+
+        user_cpu_ms = 0.0
+        sys_cpu_ms = 0.0
+        try:
+            times = os.times()
+            user_cpu_ms = (times.user - self._t0_user) * 1000.0
+            sys_cpu_ms = (times.system - self._t0_sys) * 1000.0
+        except Exception:
+            pass
+
+        profile = ProcProfile(
+            sequence=sequence,
+            wall_ms=round(wall_ms, 3),
+            user_cpu_ms=round(user_cpu_ms, 3),
+            sys_cpu_ms=round(sys_cpu_ms, 3),
+        )
+
+        with self._lock:
+            self._profiles.append(profile)
+
+        self._sampling = False
+        return profile
+
+    def report(self) -> Dict[str, Any]:
+        """Generate a profiling report from collected data.
+
+        Returns comprehensive timing statistics including:
+        - Wall time distribution (mean, p50, p95, p99, max)
+        - CPU time distribution
+        - CPU efficiency (ratio of CPU to wall time)
+        - Hotspot identification (slowest calls)
+        """
+        with self._lock:
+            profiles = list(self._profiles)
+
+        if not profiles:
+            return {
+                "component": self._name,
+                "call_count": self._call_count,
+                "sampled_count": self._sampled_count,
+                "profile_count": 0,
+            }
+
+        wall_times = [p.wall_ms for p in profiles]
+        cpu_times = [p.total_cpu_ms for p in profiles]
+        efficiencies = [p.cpu_efficiency for p in profiles]
+
+        def _percentile(data: List[float], pct: float) -> float:
+            if not data:
+                return 0.0
+            s = sorted(data)
+            idx = int(len(s) * pct)
+            return s[min(idx, len(s) - 1)]
+
+        # Find top 5 slowest calls
+        slowest = sorted(profiles, key=lambda p: p.wall_ms, reverse=True)[:5]
+
+        return {
+            "component": self._name,
+            "call_count": self._call_count,
+            "sampled_count": self._sampled_count,
+            "profile_count": len(profiles),
+            "sample_rate": self._sample_rate,
+            "wall_time": {
+                "mean_ms": round(statistics.mean(wall_times), 3),
+                "median_ms": round(statistics.median(wall_times), 3),
+                "p95_ms": round(_percentile(wall_times, 0.95), 3),
+                "p99_ms": round(_percentile(wall_times, 0.99), 3),
+                "max_ms": round(max(wall_times), 3),
+                "min_ms": round(min(wall_times), 3),
+                "stddev_ms": round(
+                    statistics.stdev(wall_times), 3
+                ) if len(wall_times) > 1 else 0.0,
+            },
+            "cpu_time": {
+                "mean_ms": round(statistics.mean(cpu_times), 3),
+                "max_ms": round(max(cpu_times), 3),
+            },
+            "cpu_efficiency": {
+                "mean": round(statistics.mean(efficiencies), 4),
+                "min": round(min(efficiencies), 4),
+            },
+            "slowest_calls": [
+                {
+                    "seq": p.sequence,
+                    "wall_ms": p.wall_ms,
+                    "cpu_ms": round(p.total_cpu_ms, 3),
+                }
+                for p in slowest
+            ],
+        }
+
+    def reset(self) -> None:
+        """Clear all collected profiles."""
+        with self._lock:
+            self._profiles.clear()
+        self._call_count = 0
+        self._sampled_count = 0

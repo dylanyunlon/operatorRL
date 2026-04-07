@@ -121,6 +121,19 @@ class SessionManager(TimerComponent):
         self._on_game_end: List[Callable[[str, float], None]] = []
         self._on_post_game: List[Callable[[str], None]] = []
 
+        # Claude17: session history
+        self._session_history: List["SessionRecord"] = []
+        self._total_sessions: int = 0
+        self._total_game_time_s: float = 0.0
+        self._pause_count: int = 0
+        self._pause_start_time: float = 0.0
+        self._total_pause_time_s: float = 0.0
+        self._phase_durations: Dict[str, float] = {}
+        self._phase_enter_time: float = 0.0
+        self._on_session_record: List[
+            Callable[["SessionRecord"], None]
+        ] = []
+
     def register_game_start_callback(self, cb: Callable[[str], None]) -> None:
         """Register callback(session_id) for game start."""
         self._on_game_start.append(cb)
@@ -289,5 +302,116 @@ class SessionManager(TimerComponent):
             "session_id": self._session_id,
             "game_time": self._game_time,
             "transitions": self._transition_count,
+            # Claude17: extended session stats
+            "total_sessions": self._total_sessions,
+            "total_game_time_s": round(self._total_game_time_s, 1),
+            "avg_session_duration_s": round(
+                self._total_game_time_s / max(self._total_sessions, 1), 1
+            ),
+            "session_history_count": len(self._session_history),
+            "pause_count": self._pause_count,
         })
         return base
+
+    # ─── Claude17: Session History & Statistics ──────────────────────────
+
+    def __init_history(self) -> None:
+        """Initialize session history tracking. Called during __init__."""
+        self._session_history: List[SessionRecord] = []
+        self._total_sessions: int = 0
+        self._total_game_time_s: float = 0.0
+        self._pause_count: int = 0
+        self._pause_start_time: float = 0.0
+        self._total_pause_time_s: float = 0.0
+        self._phase_durations: Dict[str, float] = {}
+        self._phase_enter_time: float = 0.0
+        self._on_session_record: List[
+            Callable[["SessionRecord"], None]
+        ] = []
+
+    def register_session_record_callback(
+        self, cb: Callable[["SessionRecord"], None]
+    ) -> None:
+        """Register callback for completed session records.
+
+        Useful for evolution fitness evaluation.
+        """
+        self._on_session_record.append(cb)
+
+    def get_session_history(
+        self, last_n: int = 10
+    ) -> List["SessionRecord"]:
+        """Return the last N completed session records."""
+        return self._session_history[-last_n:]
+
+    def get_session_statistics(self) -> Dict[str, Any]:
+        """Aggregate statistics across all sessions.
+
+        Returns:
+            Dict with totals, averages, and distributions.
+        """
+        if not self._session_history:
+            return {
+                "total_sessions": 0,
+                "total_game_time_s": 0.0,
+                "avg_duration_s": 0.0,
+                "min_duration_s": 0.0,
+                "max_duration_s": 0.0,
+            }
+
+        durations = [s.duration_s for s in self._session_history]
+        return {
+            "total_sessions": len(self._session_history),
+            "total_game_time_s": round(sum(durations), 1),
+            "avg_duration_s": round(
+                sum(durations) / len(durations), 1
+            ),
+            "min_duration_s": round(min(durations), 1),
+            "max_duration_s": round(max(durations), 1),
+            "phase_durations": {
+                k: round(v, 1)
+                for k, v in self._phase_durations.items()
+            },
+        }
+
+    def pause_session(self) -> None:
+        """Manually pause the current session tracking.
+
+        Claude17: Used by operator to pause during AFK or interruption.
+        Does NOT stop component Proc() — only pauses session timing.
+        """
+        if self._phase != SessionPhase.IN_GAME:
+            return
+        self._pause_start_time = time.time()
+        self._pause_count += 1
+        logger.info("Session paused: %s", self._session_id)
+
+    def resume_session(self) -> None:
+        """Resume a paused session."""
+        if self._pause_start_time > 0:
+            pause_duration = time.time() - self._pause_start_time
+            self._total_pause_time_s += pause_duration
+            self._pause_start_time = 0.0
+            logger.info(
+                "Session resumed: %s (paused %.1fs)",
+                self._session_id, pause_duration,
+            )
+
+
+@dataclass
+class SessionRecord:
+    """Completed session record stored in history.
+
+    Claude17: Enables post-hoc analysis of session patterns,
+    duration trends, and phase distributions.
+    """
+    session_id: str
+    start_time: float
+    end_time: float
+    duration_s: float
+    game_time_at_end: float
+    transition_count: int
+    pause_count: int = 0
+    total_pause_time_s: float = 0.0
+    outcome: str = "unknown"  # win/loss/remake/unknown
+    timestamp: float = field(default_factory=time.time)

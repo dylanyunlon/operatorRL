@@ -639,4 +639,108 @@ class ComponentHealer:
         return {
             "restart_counts": dict(self._restart_counts),
             "disabled_components": list(self._disabled_components),
+            # Claude17: extended error stats
+            "cascade_events": self._cascade_event_count,
+            "total_errors_handled": self._total_errors_handled,
+            "error_pattern_summary": self._get_error_pattern_summary(),
         }
+
+    # ─── Claude17: Cascading Failure Detection ───────────────────────────
+
+    def __init_cascade(self) -> None:
+        """Initialize cascade detection. Called during __init__."""
+        self._cascade_event_count: int = 0
+        self._total_errors_handled: int = 0
+        self._error_timeline: List[Dict[str, Any]] = []
+        self._error_timeline_max: int = 500
+        self._cascade_window_s: float = 5.0
+        self._cascade_threshold: int = 3
+        self._on_cascade_callbacks: List[
+            Callable[[List[str]], None]
+        ] = []
+
+    def on_cascade_detected(
+        self, callback: Callable[[List[str]], None]
+    ) -> None:
+        """Register callback(affected_component_names) for cascade events."""
+        self._on_cascade_callbacks.append(callback)
+
+    def record_error(
+        self,
+        component_name: str,
+        error_type: str,
+        error_msg: str,
+        severity: str = "medium",
+    ) -> None:
+        """Record an error event for pattern analysis.
+
+        Claude17: Tracks error timeline for cascade detection.
+        If multiple components error within cascade_window_s,
+        it's flagged as a cascading failure.
+        """
+        now = time.time()
+        self._total_errors_handled += 1
+
+        event = {
+            "ts": now,
+            "component": component_name,
+            "error_type": error_type,
+            "error_msg": error_msg[:200],
+            "severity": severity,
+        }
+        self._error_timeline.append(event)
+        if len(self._error_timeline) > self._error_timeline_max:
+            self._error_timeline = self._error_timeline[
+                -self._error_timeline_max:
+            ]
+
+        # Check for cascade
+        recent = [
+            e for e in self._error_timeline
+            if now - e["ts"] < self._cascade_window_s
+        ]
+        affected = list(set(e["component"] for e in recent))
+        if len(affected) >= self._cascade_threshold:
+            self._cascade_event_count += 1
+            self._log.critical(
+                "CASCADING FAILURE detected: %d components errored "
+                "within %.1fs — %s",
+                len(affected), self._cascade_window_s,
+                ", ".join(affected),
+            )
+            for cb in self._on_cascade_callbacks:
+                try:
+                    cb(affected)
+                except Exception:
+                    self._log.exception("Cascade callback error")
+
+    def _get_error_pattern_summary(self) -> Dict[str, Any]:
+        """Analyze error timeline for patterns.
+
+        Returns frequency by component and error type.
+        """
+        by_component: Dict[str, int] = {}
+        by_type: Dict[str, int] = {}
+
+        for event in self._error_timeline[-100:]:
+            comp = event["component"]
+            etype = event["error_type"]
+            by_component[comp] = by_component.get(comp, 0) + 1
+            by_type[etype] = by_type.get(etype, 0) + 1
+
+        return {
+            "by_component": by_component,
+            "by_type": by_type,
+            "timeline_size": len(self._error_timeline),
+        }
+
+    def get_recent_errors(
+        self, component: Optional[str] = None, last_n: int = 20
+    ) -> List[Dict[str, Any]]:
+        """Get recent error events, optionally filtered by component."""
+        timeline = self._error_timeline
+        if component:
+            timeline = [
+                e for e in timeline if e["component"] == component
+            ]
+        return timeline[-last_n:]

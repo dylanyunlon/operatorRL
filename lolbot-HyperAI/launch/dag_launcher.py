@@ -583,3 +583,156 @@ def infer_channel_dependencies(nodes: List["DAGNode"]) -> List["DAGNode"]:
             if w and w != n.name and w not in existing:
                 n.depends_on.append(w)
     return nodes
+
+
+# ---------------------------------------------------------------------------
+# Claude17: DAG Visualization & Dry-Run
+# ---------------------------------------------------------------------------
+
+def visualize_dag(nodes: List["DAGNode"]) -> str:
+    """Generate ASCII art visualization of the DAG topology.
+
+    Claude17: Renders the dependency graph as a human-readable
+    tree for debugging and documentation.
+
+    Example output::
+
+        canbus (100ms)
+        ├── perception (100ms)
+        │   ├── prediction (500ms)
+        │   │   └── planning (500ms)
+        │   │       └── control (200ms)
+        │   └── monitor (2000ms)
+        └── session_manager (500ms)
+    """
+    # Build adjacency: parent -> children
+    children: Dict[str, List[str]] = {}
+    all_names = {n.name for n in nodes}
+    roots: List[str] = []
+
+    for n in nodes:
+        for dep in n.depends_on:
+            if dep in all_names:
+                children.setdefault(dep, []).append(n.name)
+
+    # Find roots (no dependencies)
+    has_parent = set()
+    for ch_list in children.values():
+        has_parent.update(ch_list)
+    for n in nodes:
+        if n.name not in has_parent:
+            roots.append(n.name)
+
+    if not roots:
+        roots = [nodes[0].name] if nodes else []
+
+    # Node info lookup
+    node_map = {n.name: n for n in nodes}
+    lines: List[str] = []
+
+    def _render(name: str, prefix: str, is_last: bool) -> None:
+        connector = "└── " if is_last else "├── "
+        node = node_map.get(name)
+        interval = f" ({node.interval_ms:.0f}ms)" if node and hasattr(
+            node, 'interval_ms') else ""
+        lines.append(f"{prefix}{connector}{name}{interval}")
+
+        child_prefix = prefix + ("    " if is_last else "│   ")
+        kids = children.get(name, [])
+        for i, kid in enumerate(kids):
+            _render(kid, child_prefix, i == len(kids) - 1)
+
+    for i, root in enumerate(roots):
+        node = node_map.get(root)
+        interval = f" ({node.interval_ms:.0f}ms)" if node and hasattr(
+            node, 'interval_ms') else ""
+        lines.append(f"{root}{interval}")
+        kids = children.get(root, [])
+        for j, kid in enumerate(kids):
+            _render(kid, "", j == len(kids) - 1)
+
+    return "\n".join(lines)
+
+
+def dry_run_dag(nodes: List["DAGNode"]) -> Dict[str, Any]:
+    """Validate a DAG configuration without actually starting anything.
+
+    Claude17: Pre-flight check that validates:
+    1. All dependencies exist
+    2. No circular dependencies
+    3. Channel writers/readers are consistent
+    4. All component classes can be imported
+
+    Returns:
+        Dict with validation results and any errors found.
+    """
+    errors: List[str] = []
+    warnings: List[str] = []
+    all_names = {n.name for n in nodes}
+
+    # Check dependencies exist
+    for n in nodes:
+        for dep in n.depends_on:
+            if dep not in all_names:
+                errors.append(
+                    f"{n.name}: dependency '{dep}' not found in DAG"
+                )
+
+    # Check circular dependencies
+    visited: set = set()
+    in_stack: set = set()
+
+    def _has_cycle(name: str) -> bool:
+        visited.add(name)
+        in_stack.add(name)
+        node = next((n for n in nodes if n.name == name), None)
+        if node:
+            for dep in node.depends_on:
+                if dep in all_names:
+                    if dep not in visited:
+                        if _has_cycle(dep):
+                            return True
+                    elif dep in in_stack:
+                        errors.append(
+                            f"Circular dependency: {name} -> {dep}"
+                        )
+                        return True
+        in_stack.discard(name)
+        return False
+
+    for n in nodes:
+        if n.name not in visited:
+            _has_cycle(n.name)
+
+    # Check channel consistency
+    writers: Dict[str, str] = {}
+    readers: Dict[str, List[str]] = {}
+    for n in nodes:
+        for ch in getattr(n, 'writes_channels', []):
+            if ch in writers:
+                warnings.append(
+                    f"Channel '{ch}' written by both "
+                    f"{writers[ch]} and {n.name}"
+                )
+            writers[ch] = n.name
+        for ch in getattr(n, 'reads_channels', []):
+            readers.setdefault(ch, []).append(n.name)
+
+    for ch, reader_names in readers.items():
+        if ch not in writers:
+            warnings.append(
+                f"Channel '{ch}' read by {reader_names} "
+                f"but no writer found"
+            )
+
+    return {
+        "valid": len(errors) == 0,
+        "node_count": len(nodes),
+        "errors": errors,
+        "warnings": warnings,
+        "topology": visualize_dag(nodes) if not errors else "",
+        "channels": {
+            "writers": writers,
+            "readers": {k: v for k, v in readers.items()},
+        },
+    }

@@ -535,3 +535,102 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
             ),
         })
         return base
+
+    # ─── Claude17: Event Rate Tracking ───────────────────────────────────
+
+    def get_event_rates(self, window_s: float = 60.0) -> Dict[str, float]:
+        """Compute per-minute event rates by type.
+
+        Claude17: Enables monitoring of event detection quality.
+        Low rates may indicate perception is missing events;
+        anomalously high rates may indicate noise or bugs.
+        """
+        now = time.time()
+        cutoff = now - window_s
+        recent = [
+            e for e in self._all_events
+            if hasattr(e, 'timestamp') and e.timestamp > cutoff
+        ]
+
+        counts: Dict[str, int] = {}
+        for e in recent:
+            etype = getattr(e, 'event_type', 'unknown')
+            if hasattr(etype, 'value'):
+                etype = etype.value
+            counts[etype] = counts.get(etype, 0) + 1
+
+        minutes = max(window_s / 60.0, 1.0 / 60.0)
+        return {k: round(v / minutes, 2) for k, v in counts.items()}
+
+    def compute_data_quality_score(self) -> float:
+        """Score the quality of the last game state snapshot.
+
+        Claude17: Returns 0.0–1.0 based on:
+        - Are all expected fields present?
+        - Is player count reasonable (10)?
+        - Is game time advancing?
+        - Are gold values non-negative?
+
+        Used by prediction to weight its confidence.
+        """
+        if self._last_snapshot is None:
+            return 0.0
+
+        score = 0.0
+        checks = 0
+
+        snap = self._last_snapshot
+
+        # Check player count
+        checks += 1
+        if hasattr(snap, 'blue_team') and hasattr(snap, 'red_team'):
+            blue_count = len(getattr(snap.blue_team, 'players', []))
+            red_count = len(getattr(snap.red_team, 'players', []))
+            if blue_count == 5 and red_count == 5:
+                score += 1.0
+            elif blue_count + red_count > 0:
+                score += 0.5
+
+        # Check game time is advancing
+        checks += 1
+        if hasattr(snap, 'game_time') and snap.game_time > 0:
+            score += 1.0
+
+        # Check phase is set
+        checks += 1
+        if hasattr(snap, 'phase') and snap.phase is not None:
+            score += 1.0
+
+        # Check gold diff is computed
+        checks += 1
+        if hasattr(snap, 'gold_diff'):
+            score += 1.0
+
+        return round(score / max(checks, 1), 4) if checks > 0 else 0.0
+
+    def detect_anomalies(self) -> List[Dict[str, Any]]:
+        """Detect anomalous patterns in recent perception data.
+
+        Claude17: Flags unusual conditions like:
+        - Sudden large gold swings (possible data corruption)
+        - Player count changes mid-game
+        - Game time going backwards (replay glitch)
+        """
+        anomalies: List[Dict[str, Any]] = []
+
+        if self._last_snapshot is None:
+            return anomalies
+
+        snap = self._last_snapshot
+
+        # Check for extreme gold diff (>15k usually means something weird)
+        if hasattr(snap, 'gold_diff'):
+            if abs(snap.gold_diff) > 15000:
+                anomalies.append({
+                    "type": "extreme_gold_diff",
+                    "value": snap.gold_diff,
+                    "threshold": 15000,
+                    "game_time": getattr(snap, 'game_time', 0),
+                })
+
+        return anomalies

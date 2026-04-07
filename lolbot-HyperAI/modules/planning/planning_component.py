@@ -465,3 +465,111 @@ class PlanningComponent(TimerComponent, ManagedComponent):
             ),
         })
         return base
+
+    # ─── Claude17: Advice History & Strategy Coherence ───────────────────
+
+    def get_advice_history(
+        self, last_n: int = 20
+    ) -> List[Dict[str, Any]]:
+        """Return the last N strategy advice records.
+
+        Claude17: Enables analysis of advice quality, frequency,
+        and whether the advice was acted upon.
+        """
+        if not hasattr(self, '_advice_history'):
+            self._advice_history: List[Dict[str, Any]] = []
+        return self._advice_history[-last_n:]
+
+    def _record_advice(self, advice: Any) -> None:
+        """Record an advice for history tracking.
+
+        Claude17: Called internally after each planning cycle
+        produces advice.
+        """
+        if not hasattr(self, '_advice_history'):
+            self._advice_history = []
+
+        record = {
+            "ts": time.time(),
+            "plan_count": self._plan_count,
+        }
+
+        if hasattr(advice, 'primary_action'):
+            action = advice.primary_action
+            record["action"] = action.value if hasattr(
+                action, 'value') else str(action)
+        if hasattr(advice, 'reasoning'):
+            record["reasoning"] = str(advice.reasoning)[:200]
+        if hasattr(advice, 'urgency'):
+            record["urgency"] = advice.urgency
+
+        self._advice_history.append(record)
+        # Bound the history
+        if len(self._advice_history) > 500:
+            self._advice_history = self._advice_history[-250:]
+
+    def compute_strategy_coherence(
+        self, window: int = 10
+    ) -> float:
+        """Measure how consistent recent advice has been.
+
+        Claude17: A coherence score of 1.0 means all recent advice
+        recommended the same action. Low coherence (<0.3) suggests
+        the planner is thrashing between strategies.
+
+        Used by evolution to penalize unstable planning.
+
+        Returns:
+            Float in [0.0, 1.0] where 1.0 = perfectly consistent.
+        """
+        history = self.get_advice_history(window)
+        if len(history) < 2:
+            return 1.0
+
+        actions = [h.get("action", "") for h in history if h.get("action")]
+        if not actions:
+            return 1.0
+
+        # Count most frequent action
+        from collections import Counter
+        counts = Counter(actions)
+        most_common_count = counts.most_common(1)[0][1]
+
+        return round(most_common_count / len(actions), 4)
+
+    def deduplicate_advice(
+        self, advice_list: List[Any], cooldown_s: float = 30.0
+    ) -> List[Any]:
+        """Remove duplicate advice within a cooldown window.
+
+        Claude17: Prevents spamming the same recommendation.
+        Two advices are "duplicate" if they have the same primary_action
+        within cooldown_s of each other.
+
+        Args:
+            advice_list: List of StrategyAdvice objects.
+            cooldown_s: Minimum seconds between same-action advice.
+
+        Returns:
+            Filtered list with duplicates removed.
+        """
+        if not advice_list:
+            return []
+
+        seen: Dict[str, float] = {}
+        result = []
+        now = time.time()
+
+        for advice in advice_list:
+            action = ""
+            if hasattr(advice, 'primary_action'):
+                action = str(advice.primary_action)
+            elif hasattr(advice, 'action'):
+                action = str(advice.action)
+
+            last_seen = seen.get(action, 0)
+            if now - last_seen >= cooldown_s:
+                result.append(advice)
+                seen[action] = now
+
+        return result

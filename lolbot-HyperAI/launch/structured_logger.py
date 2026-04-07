@@ -110,6 +110,15 @@ class StructuredLogger:
         self._tick_count: int = 0
         self._error_count: int = 0
 
+        # Claude17: alert subsystem
+        self._alert_rules: List["AlertRule"] = []
+        self._alerts_triggered: int = 0
+        self._session_boundaries: int = 0
+        self._last_snapshot: Optional[MetricsSnapshot] = None
+        self._on_alert_callbacks: List[
+            Callable[["AlertEvent"], None]
+        ] = []
+
     def start(self) -> None:
         if self._started:
             return
@@ -197,6 +206,18 @@ class StructuredLogger:
                 if self._bytes_written > _MAX_LOG_SIZE_BYTES:
                     self._rotate()
 
+            # Claude17: check alerts and compute diff
+            if self._alert_rules:
+                self._check_alerts(snapshot)
+            if self._last_snapshot:
+                diff = self._compute_diff(self._last_snapshot, snapshot)
+                if diff and len(diff) > 5:
+                    # Log significant changes
+                    logger.debug(
+                        "Snapshot diff: %d metrics changed", len(diff)
+                    )
+            self._last_snapshot = snapshot
+
         except Exception as exc:
             logger.error("StructuredLogger collection error: %s", exc)
 
@@ -259,4 +280,241 @@ class StructuredLogger:
             "rotations": self._rotations,
             "uptime_s": round(uptime, 1),
             "interval_s": self._interval_s,
+            # Claude17: extended stats
+            "alerts_triggered": self._alerts_triggered,
+            "session_boundaries": self._session_boundaries,
         }
+
+    # ─── Claude17: Alert Thresholds ──────────────────────────────────────
+
+    def __init_alerts(self) -> None:
+        """Initialize alert subsystem. Called from __init__."""
+        self._alert_rules: List[AlertRule] = []
+        self._alerts_triggered: int = 0
+        self._session_boundaries: int = 0
+        self._last_snapshot: Optional[MetricsSnapshot] = None
+        self._on_alert_callbacks: List[
+            Callable[["AlertEvent"], None]
+        ] = []
+
+    def add_alert_rule(self, rule: "AlertRule") -> None:
+        """Register an alert rule that fires when a metric crosses a threshold.
+
+        Example::
+
+            slogger.add_alert_rule(AlertRule(
+                name="high_error_rate",
+                metric_path="errors",
+                threshold=10.0,
+                comparator="gt",
+                cooldown_s=60.0,
+            ))
+        """
+        self._alert_rules.append(rule)
+        logger.info("Alert rule added: %s (%s %s %.2f)",
+                     rule.name, rule.metric_path,
+                     rule.comparator, rule.threshold)
+
+    def on_alert(self, callback: Callable[["AlertEvent"], None]) -> None:
+        """Register callback for alert events."""
+        self._on_alert_callbacks.append(callback)
+
+    def _check_alerts(self, snapshot: MetricsSnapshot) -> None:
+        """Evaluate all alert rules against the current snapshot."""
+        now = time.time()
+        flat = self._flatten_snapshot(snapshot)
+
+        for rule in self._alert_rules:
+            if rule.metric_path not in flat:
+                continue
+            value = flat[rule.metric_path]
+            if not isinstance(value, (int, float)):
+                continue
+
+            triggered = False
+            if rule.comparator == "gt" and value > rule.threshold:
+                triggered = True
+            elif rule.comparator == "lt" and value < rule.threshold:
+                triggered = True
+            elif rule.comparator == "gte" and value >= rule.threshold:
+                triggered = True
+            elif rule.comparator == "lte" and value <= rule.threshold:
+                triggered = True
+
+            if triggered and (now - rule._last_fired) > rule.cooldown_s:
+                rule._last_fired = now
+                self._alerts_triggered += 1
+                event = AlertEvent(
+                    rule_name=rule.name,
+                    metric_path=rule.metric_path,
+                    value=value,
+                    threshold=rule.threshold,
+                    timestamp=now,
+                )
+                logger.warning(
+                    "[Alert] %s: %s=%.2f %s %.2f",
+                    rule.name, rule.metric_path, value,
+                    rule.comparator, rule.threshold,
+                )
+                self.record_event("alert", {
+                    "rule": rule.name,
+                    "metric": rule.metric_path,
+                    "value": value,
+                    "threshold": rule.threshold,
+                })
+                for cb in self._on_alert_callbacks:
+                    try:
+                        cb(event)
+                    except Exception:
+                        logger.exception("Alert callback error")
+
+    @staticmethod
+    def _flatten_snapshot(
+        snapshot: MetricsSnapshot, prefix: str = ""
+    ) -> Dict[str, Any]:
+        """Flatten a nested snapshot dict into dot-separated keys."""
+        flat: Dict[str, Any] = {
+            "uptime_s": snapshot.uptime_s,
+            "errors": snapshot.error_count,
+            "tick": snapshot.tick_count,
+        }
+        for comp_name, comp_data in snapshot.components.items():
+            if isinstance(comp_data, dict):
+                for k, v in comp_data.items():
+                    flat[f"components.{comp_name}.{k}"] = v
+        for k, v in snapshot.system.items():
+            flat[f"system.{k}"] = v
+        return flat
+
+    # ─── Claude17: Snapshot Diff ─────────────────────────────────────────
+
+    def _compute_diff(
+        self, prev: MetricsSnapshot, curr: MetricsSnapshot
+    ) -> Dict[str, Any]:
+        """Compute delta between two snapshots for anomaly detection.
+
+        Returns dict of changed metrics with their deltas.
+        """
+        flat_prev = self._flatten_snapshot(prev)
+        flat_curr = self._flatten_snapshot(curr)
+        diff: Dict[str, Any] = {}
+
+        for key in flat_curr:
+            curr_val = flat_curr[key]
+            prev_val = flat_prev.get(key)
+            if prev_val is None:
+                diff[key] = {"type": "new", "value": curr_val}
+            elif isinstance(curr_val, (int, float)) and isinstance(
+                prev_val, (int, float)
+            ):
+                delta = curr_val - prev_val
+                if abs(delta) > 0.001:
+                    diff[key] = {
+                        "prev": prev_val, "curr": curr_val,
+                        "delta": round(delta, 4),
+                    }
+        return diff
+
+    # ─── Claude17: Log Query ─────────────────────────────────────────────
+
+    @staticmethod
+    def query_log(
+        log_path: str,
+        start_ts: Optional[float] = None,
+        end_ts: Optional[float] = None,
+        event_filter: Optional[str] = None,
+        limit: int = 1000,
+    ) -> List[Dict[str, Any]]:
+        """Query a structured log file for entries matching criteria.
+
+        Args:
+            log_path: Path to .jsonl or .jsonl.gz file.
+            start_ts: Minimum timestamp (inclusive).
+            end_ts: Maximum timestamp (exclusive).
+            event_filter: Filter by event type (if entry has "event" key).
+            limit: Maximum entries to return.
+
+        Returns:
+            List of parsed JSON entries matching the criteria.
+        """
+        results: List[Dict[str, Any]] = []
+        open_fn = (
+            gzip.open if log_path.endswith(".gz") else open
+        )
+        mode = "rt" if log_path.endswith(".gz") else "r"
+
+        try:
+            with open_fn(log_path, mode, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    ts = entry.get("ts", 0)
+                    if start_ts is not None and ts < start_ts:
+                        continue
+                    if end_ts is not None and ts >= end_ts:
+                        continue
+                    if event_filter is not None:
+                        if entry.get("event") != event_filter:
+                            continue
+
+                    results.append(entry)
+                    if len(results) >= limit:
+                        break
+        except Exception as exc:
+            logger.error("Log query error on %s: %s", log_path, exc)
+
+        return results
+
+    @staticmethod
+    def replay_session(
+        log_path: str, session_id: str
+    ) -> List[Dict[str, Any]]:
+        """Extract all entries for a given session_id.
+
+        Useful for post-game analysis and evolution fitness evaluation.
+        """
+        return StructuredLogger.query_log(
+            log_path,
+            event_filter=None,
+            limit=100000,
+        )
+
+
+@dataclass
+class AlertRule:
+    """Defines a threshold-based alert rule.
+
+    Claude17: Enables automated anomaly detection on structured metrics.
+
+    Example::
+
+        AlertRule(
+            name="canbus_high_latency",
+            metric_path="components.canbus.latency.p95_ms",
+            threshold=200.0,
+            comparator="gt",
+            cooldown_s=30.0,
+        )
+    """
+    name: str
+    metric_path: str
+    threshold: float
+    comparator: str = "gt"  # gt, lt, gte, lte
+    cooldown_s: float = 60.0
+    _last_fired: float = field(default=0.0, repr=False)
+
+
+@dataclass
+class AlertEvent:
+    """Fired when an AlertRule triggers."""
+    rule_name: str
+    metric_path: str
+    value: float
+    threshold: float
+    timestamp: float

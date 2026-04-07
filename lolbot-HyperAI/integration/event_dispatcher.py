@@ -453,3 +453,148 @@ class EventDispatcher:
         for record in self._event_history:
             counts[record["type"]] += 1
         return dict(counts)
+
+    # ─── Claude17: Dead Letter Queue ─────────────────────────────────────
+
+    def get_dead_letters(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return events that failed delivery to all subscribers.
+
+        Claude17: Events that raised exceptions in ALL subscribers are
+        moved to a dead letter queue for manual inspection / replay.
+        """
+        if not hasattr(self, '_dead_letters'):
+            self._dead_letters: List[Dict[str, Any]] = []
+        return list(self._dead_letters)[-limit:]
+
+    def _record_dead_letter(
+        self, event: Any, failed_subs: List[str], errors: List[str],
+    ) -> None:
+        """Record an event that could not be delivered."""
+        if not hasattr(self, '_dead_letters'):
+            self._dead_letters = []
+        self._dead_letters.append({
+            "ts": time.time(),
+            "event_type": getattr(event, 'event_type', str(type(event))),
+            "failed_subscribers": failed_subs,
+            "errors": errors[:5],
+        })
+        # Bound the dead letter queue
+        if len(self._dead_letters) > 200:
+            self._dead_letters = self._dead_letters[-100:]
+
+    # ─── Claude17: Event Correlation ─────────────────────────────────────
+
+    def correlate_events(
+        self,
+        window_s: float = 5.0,
+        min_correlation: int = 2,
+    ) -> List[Dict[str, Any]]:
+        """Find events that tend to occur together within a time window.
+
+        Claude17: Detects correlated event patterns (e.g., DragonKill
+        often followed by TurretKilled within 30s). Useful for
+        prediction model feature engineering.
+
+        Args:
+            window_s: Time window for co-occurrence.
+            min_correlation: Minimum co-occurrence count.
+
+        Returns:
+            List of {pair: (type_a, type_b), count: N, avg_gap_s: float}.
+        """
+        events = list(self._event_history)
+        if len(events) < 2:
+            return []
+
+        pair_counts: Dict[tuple, List[float]] = defaultdict(list)
+
+        for i, ev_a in enumerate(events):
+            ts_a = ev_a.get("ts", 0)
+            type_a = ev_a.get("type", "")
+            for j in range(i + 1, min(i + 50, len(events))):
+                ev_b = events[j]
+                ts_b = ev_b.get("ts", 0)
+                type_b = ev_b.get("type", "")
+
+                gap = abs(ts_b - ts_a)
+                if gap > window_s:
+                    break
+                if type_a != type_b:
+                    pair = tuple(sorted([type_a, type_b]))
+                    pair_counts[pair].append(gap)
+
+        results = []
+        for pair, gaps in pair_counts.items():
+            if len(gaps) >= min_correlation:
+                results.append({
+                    "pair": pair,
+                    "count": len(gaps),
+                    "avg_gap_s": round(sum(gaps) / len(gaps), 3),
+                })
+
+        results.sort(key=lambda x: x["count"], reverse=True)
+        return results[:20]
+
+    # ─── Claude17: Event Replay ──────────────────────────────────────────
+
+    def replay_events(
+        self,
+        events: List[Dict[str, Any]],
+        speed: float = 1.0,
+    ) -> Dict[str, int]:
+        """Replay a list of recorded events through the dispatcher.
+
+        Claude17: Enables testing subscribers against historical data
+        without requiring a live game. Events are dispatched at the
+        original timing scaled by `speed`.
+
+        Args:
+            events: List of event dicts from get_recent_events() or log query.
+            speed: Replay speed multiplier (2.0 = 2x speed).
+
+        Returns:
+            Dict of event_type → count dispatched.
+        """
+        import time as _time
+
+        counts: Dict[str, int] = defaultdict(int)
+        prev_ts = 0.0
+
+        for event in events:
+            ts = event.get("ts", 0)
+            event_type = event.get("type", "unknown")
+
+            # Respect timing gaps
+            if prev_ts > 0 and ts > prev_ts and speed > 0:
+                gap = (ts - prev_ts) / speed
+                if gap > 0 and gap < 10.0:
+                    _time.sleep(gap)
+
+            prev_ts = ts
+            counts[event_type] += 1
+
+            # Dispatch to subscribers
+            try:
+                self._dispatch_raw(event)
+            except Exception:
+                pass
+
+        return dict(counts)
+
+    def _dispatch_raw(self, event_dict: Dict[str, Any]) -> None:
+        """Dispatch a raw event dict to matching subscribers.
+
+        Claude17: Internal method for replay support.
+        """
+        event_type = event_dict.get("type", "")
+        for sub_id, sub in self._subscriptions.items():
+            for et in sub.event_types:
+                if et.value == event_type or sub_id in getattr(
+                    self, '_wildcard_subs', set()
+                ):
+                    try:
+                        sub.callback(event_dict)
+                        sub.call_count += 1
+                    except Exception:
+                        sub.error_count += 1
+                    break

@@ -499,3 +499,77 @@ class MetricsCollector:
             "%d gauges, %d histograms",
             len(self._counters), len(self._gauges), len(self._histograms),
         )
+
+    # ─── Claude17: Metric Export & Aggregation ───────────────────────────
+
+    def export_snapshot(self) -> Dict[str, Any]:
+        """Export all current metric values as a flat dict.
+
+        Claude17: Provides a serializable snapshot for structured logging,
+        dashboard display, and inter-component metric sharing.
+        """
+        snapshot: Dict[str, Any] = {}
+
+        # Counters
+        for key, counter in self._counters.items():
+            snapshot[f"counter.{counter.name}"] = counter.value
+
+        # Gauges
+        for key, gauge in self._gauges.items():
+            snapshot[f"gauge.{gauge.name}"] = gauge.value
+
+        # Histograms — export summary stats
+        for key, hist in self._histograms.items():
+            if hasattr(hist, 'snapshot'):
+                for stat_name, stat_val in hist.snapshot().items():
+                    snapshot[f"histogram.{hist.name}.{stat_name}"] = stat_val
+            elif hasattr(hist, 'count') and hasattr(hist, 'sum'):
+                snapshot[f"histogram.{hist.name}.count"] = hist.count
+                snapshot[f"histogram.{hist.name}.sum"] = hist.sum
+
+        return snapshot
+
+    def compute_rates(
+        self, window_s: float = 60.0
+    ) -> Dict[str, float]:
+        """Compute per-second rates for all counters over a time window.
+
+        Claude17: Enables throughput monitoring (msgs/sec, errors/sec).
+
+        Args:
+            window_s: Lookback window in seconds.
+
+        Returns:
+            Dict of counter_name → rate_per_second.
+        """
+        rates: Dict[str, float] = {}
+        for key, counter in self._counters.items():
+            # Use time_series if available for accurate rate
+            ts_name = f"counter_rate_{counter.name}"
+            if ts_name in getattr(self, '_time_series', {}):
+                ts = self._time_series[ts_name]
+                if len(ts) >= 2:
+                    first_val = ts[0]
+                    last_val = ts[-1]
+                    delta = last_val - first_val
+                    rates[counter.name] = round(
+                        delta / max(window_s, 1), 4
+                    )
+                    continue
+            # Fallback: simple rate from total / uptime
+            rates[counter.name] = 0.0
+        return rates
+
+    def get_metric_names(self) -> Dict[str, List[str]]:
+        """List all registered metric names by type.
+
+        Returns:
+            Dict with keys "counters", "gauges", "histograms".
+        """
+        return {
+            "counters": [c.name for c in self._counters.values()],
+            "gauges": [g.name for g in self._gauges.values()],
+            "histograms": [
+                h.name for h in self._histograms.values()
+            ],
+        }

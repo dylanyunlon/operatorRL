@@ -436,6 +436,10 @@ class CyberScheduler:
         entry = self._entries.get(name)
         return entry.component if entry else None
 
+    def get_entry(self, name: str) -> Optional[ComponentEntry]:
+        """Claude17: Access full component entry with metadata."""
+        return self._entries.get(name)
+
     def summary(self) -> Dict[str, Any]:
         """Return a serializable summary of the scheduler state."""
         return {
@@ -458,3 +462,346 @@ class CyberScheduler:
             f"<CyberScheduler state={self._state.name} "
             f"components={len(self._entries)}>"
         )
+
+
+# ─── Claude17: WatchdogTimer ────────────────────────────────────────────────
+
+_WATCHDOG_INTERVAL_S = 1.0
+_WATCHDOG_STUCK_THRESHOLD_S = 5.0
+
+
+class WatchdogTimer:
+    """Detects stuck components and triggers force-restart.
+
+    Claude17: Apollo's watchdog monitors CAN bus heartbeats. We monitor
+    Proc() execution via sequence counters. If a component's sequence
+    hasn't advanced within stuck_threshold_s, it is declared stuck.
+
+    Escalation levels:
+        Level 1 (>threshold):     warning log
+        Level 2 (>2x threshold):  auto-restart if restartable
+        Level 3 (>3x threshold):  escalate via callback
+    """
+
+    def __init__(
+        self,
+        scheduler: CyberScheduler,
+        stuck_threshold_s: float = _WATCHDOG_STUCK_THRESHOLD_S,
+    ) -> None:
+        self._scheduler = scheduler
+        self._stuck_threshold_s = stuck_threshold_s
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()
+        self._on_stuck_callbacks: List[
+            Callable[[str, float], None]
+        ] = []
+        # Track last-seen sequence per component
+        self._last_seq: Dict[str, int] = {}
+        self._last_advance_time: Dict[str, float] = {}
+        self._stuck_counts: Dict[str, int] = defaultdict(int)
+        self._restart_counts: Dict[str, int] = defaultdict(int)
+        self._total_restarts: int = 0
+        self._total_checks: int = 0
+
+    def start(self) -> None:
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._watchdog_loop,
+            name="scheduler-watchdog",
+            daemon=True,
+        )
+        self._thread.start()
+        logger.info(
+            "WatchdogTimer started (threshold=%.1fs)",
+            self._stuck_threshold_s,
+        )
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3.0)
+
+    def on_stuck(self, callback: Callable[[str, float], None]) -> None:
+        """Register callback(component_name, stuck_duration_s)."""
+        with self._lock:
+            self._on_stuck_callbacks.append(callback)
+
+    def _watchdog_loop(self) -> None:
+        while not self._stop_event.is_set():
+            self._stop_event.wait(timeout=_WATCHDOG_INTERVAL_S)
+            if self._stop_event.is_set():
+                break
+            self._check_all()
+
+    def _check_all(self) -> None:
+        self._total_checks += 1
+        now = time.monotonic()
+
+        for name in self._scheduler.component_names:
+            comp = self._scheduler.get_component(name)
+            if comp is None or comp.state != ComponentState.RUNNING:
+                continue
+
+            current_seq = comp.sequence
+
+            if name not in self._last_seq:
+                self._last_seq[name] = current_seq
+                self._last_advance_time[name] = now
+                continue
+
+            if current_seq != self._last_seq[name]:
+                # Component is alive — sequence advanced
+                self._last_seq[name] = current_seq
+                self._last_advance_time[name] = now
+                self._stuck_counts[name] = 0
+            else:
+                # Sequence hasn't changed — possibly stuck
+                elapsed = now - self._last_advance_time[name]
+                if elapsed > self._stuck_threshold_s:
+                    self._stuck_counts[name] += 1
+                    self._handle_stuck(name, comp, elapsed)
+
+    def _handle_stuck(
+        self, name: str, comp: TimerComponent, elapsed: float,
+    ) -> None:
+        threshold = self._stuck_threshold_s
+        entry = self._scheduler.get_entry(name) if hasattr(
+            self._scheduler, "get_entry"
+        ) else None
+
+        if elapsed < threshold * 2:
+            logger.warning(
+                "[Watchdog] %s may be stuck (no Proc() for %.1fs)",
+                name, elapsed,
+            )
+        elif elapsed < threshold * 3:
+            restartable = (
+                getattr(entry, "restartable", True) if entry else True
+            )
+            if restartable:
+                logger.error(
+                    "[Watchdog] %s stuck for %.1fs — attempting restart",
+                    name, elapsed,
+                )
+                self._restart_component(name, comp)
+        else:
+            logger.critical(
+                "[Watchdog] %s stuck for %.1fs — escalating",
+                name, elapsed,
+            )
+
+        # Fire callbacks
+        with self._lock:
+            for cb in self._on_stuck_callbacks:
+                try:
+                    cb(name, elapsed)
+                except Exception:
+                    logger.exception("Watchdog callback error")
+
+    def _restart_component(self, name: str, comp: TimerComponent) -> None:
+        try:
+            comp.stop(timeout=2.0)
+            if comp.initialize() and comp.start():
+                self._restart_counts[name] += 1
+                self._total_restarts += 1
+                self._stuck_counts[name] = 0
+                self._last_advance_time[name] = time.monotonic()
+                self._last_seq[name] = comp.sequence
+                logger.info(
+                    "[Watchdog] %s restarted (total=%d)",
+                    name, self._restart_counts[name],
+                )
+            else:
+                logger.error("[Watchdog] %s restart failed", name)
+        except Exception as exc:
+            logger.error(
+                "[Watchdog] %s restart error: %s: %s",
+                name, type(exc).__name__, exc,
+            )
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "total_checks": self._total_checks,
+            "total_restarts": self._total_restarts,
+            "stuck_counts": dict(self._stuck_counts),
+            "restart_counts": dict(self._restart_counts),
+        }
+
+
+# ─── Claude17: AdaptiveIntervalTuner ────────────────────────────────────────
+
+_ADAPTIVE_TUNING_INTERVAL_S = 10.0
+_MAX_OVERRUN_RATIO = 0.3
+_MIN_ADAPTIVE_INTERVAL_MS = 50.0
+_MAX_ADAPTIVE_INTERVAL_MS = 5000.0
+
+
+class AdaptiveIntervalTuner:
+    """Auto-adjusts component Proc() intervals based on overrun rates.
+
+    Claude17: When a component consistently overruns its time budget,
+    we slow it down rather than letting it starve other components.
+    When load drops, we restore original intervals.
+
+    Algorithm:
+        1. Every 10s, check each component's overrun ratio
+        2. If overrun_ratio > 30%: increase interval by 20%
+        3. If overrun_ratio < 15%: decrease toward original by 10%
+        4. Clamp to [50ms, 5000ms]
+        5. Never adjust components marked as non-tunable
+    """
+
+    def __init__(self, scheduler: CyberScheduler) -> None:
+        self._scheduler = scheduler
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._original_intervals: Dict[str, float] = {}
+        self._last_overrun_counts: Dict[str, int] = {}
+        self._last_call_counts: Dict[str, int] = {}
+        self._total_adjustments: int = 0
+
+    def start(self) -> None:
+        self._stop_event.clear()
+        # Snapshot original intervals
+        for name in self._scheduler.component_names:
+            comp = self._scheduler.get_component(name)
+            if comp:
+                self._original_intervals[name] = comp.interval_ms
+        self._thread = threading.Thread(
+            target=self._tuning_loop,
+            name="scheduler-adaptive-tuner",
+            daemon=True,
+        )
+        self._thread.start()
+        logger.info("AdaptiveIntervalTuner started")
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3.0)
+        # Restore original intervals
+        for name, original in self._original_intervals.items():
+            comp = self._scheduler.get_component(name)
+            if comp and comp.interval_ms != original:
+                comp.interval_ms = original
+                logger.info(
+                    "[AdaptiveTuner] Restored %s to %.0fms",
+                    name, original,
+                )
+
+    def _tuning_loop(self) -> None:
+        while not self._stop_event.is_set():
+            self._stop_event.wait(timeout=_ADAPTIVE_TUNING_INTERVAL_S)
+            if self._stop_event.is_set():
+                break
+            self._tune_all()
+
+    def _tune_all(self) -> None:
+        for name in self._scheduler.component_names:
+            comp = self._scheduler.get_component(name)
+            if comp is None or comp.state != ComponentState.RUNNING:
+                continue
+
+            stats = comp.latency_stats
+            if stats is None or stats.total_calls < 10:
+                continue
+
+            prev_overruns = self._last_overrun_counts.get(name, 0)
+            prev_calls = self._last_call_counts.get(name, 0)
+            delta_overruns = stats.total_overruns - prev_overruns
+            delta_calls = stats.total_calls - prev_calls
+
+            self._last_overrun_counts[name] = stats.total_overruns
+            self._last_call_counts[name] = stats.total_calls
+
+            if delta_calls < 5:
+                continue
+
+            overrun_ratio = delta_overruns / max(delta_calls, 1)
+            original = self._original_intervals.get(
+                name, comp.interval_ms
+            )
+
+            if overrun_ratio > _MAX_OVERRUN_RATIO:
+                new_interval = min(
+                    comp.interval_ms * 1.2,
+                    _MAX_ADAPTIVE_INTERVAL_MS,
+                )
+                if abs(new_interval - comp.interval_ms) > 1.0:
+                    comp.interval_ms = new_interval
+                    self._total_adjustments += 1
+                    logger.info(
+                        "[AdaptiveTuner] %s slowed: %.0fms → %.0fms "
+                        "(overrun=%.1f%%)",
+                        name, original, new_interval,
+                        overrun_ratio * 100,
+                    )
+            elif (
+                overrun_ratio < _MAX_OVERRUN_RATIO / 2
+                and comp.interval_ms > original
+            ):
+                new_interval = max(
+                    comp.interval_ms * 0.9,
+                    original,
+                    _MIN_ADAPTIVE_INTERVAL_MS,
+                )
+                if abs(new_interval - comp.interval_ms) > 1.0:
+                    comp.interval_ms = new_interval
+                    self._total_adjustments += 1
+                    logger.info(
+                        "[AdaptiveTuner] %s restored: → %.0fms",
+                        name, new_interval,
+                    )
+
+    def status(self) -> Dict[str, Any]:
+        current = {}
+        for name in self._scheduler.component_names:
+            comp = self._scheduler.get_component(name)
+            if comp:
+                current[name] = {
+                    "original_ms": self._original_intervals.get(
+                        name, comp.interval_ms
+                    ),
+                    "current_ms": comp.interval_ms,
+                }
+        return {
+            "total_adjustments": self._total_adjustments,
+            "intervals": current,
+        }
+
+
+# ─── Claude17: SchedulerMetrics ─────────────────────────────────────────────
+
+@dataclass
+class SchedulerMetrics:
+    """Aggregated scheduler-level performance metrics.
+
+    Claude17: Provides visibility into scheduler overhead itself,
+    not just individual component latencies.
+    """
+    startup_duration_s: float = 0.0
+    shutdown_duration_s: float = 0.0
+    total_health_checks: int = 0
+    total_hot_reloads: int = 0
+    peak_component_count: int = 0
+    _start_time: float = field(default=0.0, repr=False)
+
+    def mark_start(self) -> None:
+        self._start_time = time.monotonic()
+
+    @property
+    def uptime_s(self) -> float:
+        if self._start_time > 0:
+            return time.monotonic() - self._start_time
+        return 0.0
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "startup_duration_s": round(self.startup_duration_s, 3),
+            "shutdown_duration_s": round(self.shutdown_duration_s, 3),
+            "uptime_s": round(self.uptime_s, 1),
+            "total_health_checks": self.total_health_checks,
+            "total_hot_reloads": self.total_hot_reloads,
+            "peak_component_count": self.peak_component_count,
+        }

@@ -526,3 +526,162 @@ class ModuleRegistry:
     @property
     def enabled_count(self) -> int:
         return sum(1 for d in self._modules.values() if d.enabled)
+
+    # ─── Claude17: Module Dependency Validation ──────────────────────────
+
+    def validate_dependencies(self) -> List[str]:
+        """Validate that all declared dependencies are registered.
+
+        Claude17: Catches misconfiguration at startup rather than
+        letting it surface as mysterious runtime failures.
+
+        Returns:
+            List of error messages (empty = all valid).
+        """
+        errors: List[str] = []
+
+        for name, desc in self._modules.items():
+            if not desc.enabled:
+                continue
+            for dep in desc.dependencies:
+                if dep not in self._modules:
+                    errors.append(
+                        f"{name} depends on '{dep}' which is not registered"
+                    )
+                elif not self._modules[dep].enabled:
+                    errors.append(
+                        f"{name} depends on '{dep}' which is disabled"
+                    )
+
+        # Check for circular dependencies
+        try:
+            self._topological_sort()
+        except Exception as exc:
+            errors.append(f"Circular dependency detected: {exc}")
+
+        return errors
+
+    def _topological_sort(self) -> List[str]:
+        """Topological sort of modules by dependency graph.
+
+        Raises RuntimeError on circular dependencies.
+        """
+        from collections import deque
+
+        enabled = {
+            name: desc for name, desc in self._modules.items()
+            if desc.enabled
+        }
+        in_degree: Dict[str, int] = {name: 0 for name in enabled}
+        graph: Dict[str, List[str]] = {name: [] for name in enabled}
+
+        for name, desc in enabled.items():
+            for dep in desc.dependencies:
+                if dep in enabled:
+                    graph[dep].append(name)
+                    in_degree[name] += 1
+
+        queue = deque(n for n in enabled if in_degree[n] == 0)
+        order: List[str] = []
+
+        while queue:
+            current = queue.popleft()
+            order.append(current)
+            for neighbor in graph[current]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        if len(order) != len(enabled):
+            missing = set(enabled) - set(order)
+            raise RuntimeError(f"Circular dependency among: {missing}")
+        return order
+
+    def get_initialization_order(self) -> List[str]:
+        """Return module names in dependency-safe initialization order.
+
+        Claude17: Used by DAGLauncher and Mainboard to start
+        components in the correct sequence.
+        """
+        try:
+            return self._topological_sort()
+        except RuntimeError:
+            # Fallback: return in registration order
+            return list(self._modules.keys())
+
+    # ─── Claude17: Module Health Aggregation ─────────────────────────────
+
+    def aggregate_health(self) -> Dict[str, Any]:
+        """Aggregate health status across all registered modules.
+
+        Returns:
+            Dict with healthy_count, unhealthy list, and per-module status.
+        """
+        healthy_count = 0
+        unhealthy: List[str] = []
+        per_module: Dict[str, str] = {}
+
+        for name, desc in self._modules.items():
+            if not desc.enabled:
+                per_module[name] = "disabled"
+                continue
+
+            # Check if module has a health attribute
+            if hasattr(desc, 'healthy'):
+                if desc.healthy:
+                    healthy_count += 1
+                    per_module[name] = "healthy"
+                else:
+                    unhealthy.append(name)
+                    per_module[name] = "unhealthy"
+            else:
+                healthy_count += 1
+                per_module[name] = "assumed_healthy"
+
+        return {
+            "total": len(self._modules),
+            "enabled": self.enabled_count,
+            "healthy": healthy_count,
+            "unhealthy": unhealthy,
+            "per_module": per_module,
+        }
+
+    # ─── Claude17: Config Diff ───────────────────────────────────────────
+
+    def diff_configs(
+        self,
+        module_name: str,
+        old_config: Dict[str, Any],
+        new_config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Compute differences between two module configs.
+
+        Claude17: Used during hot-reload and evolution to track
+        exactly what changed.
+
+        Returns:
+            Dict with added, removed, changed keys.
+        """
+        added = {
+            k: v for k, v in new_config.items()
+            if k not in old_config
+        }
+        removed = {
+            k: v for k, v in old_config.items()
+            if k not in new_config
+        }
+        changed = {}
+        for k in set(old_config) & set(new_config):
+            if old_config[k] != new_config[k]:
+                changed[k] = {
+                    "old": old_config[k],
+                    "new": new_config[k],
+                }
+
+        return {
+            "module": module_name,
+            "added": added,
+            "removed": removed,
+            "changed": changed,
+            "has_changes": bool(added or removed or changed),
+        }

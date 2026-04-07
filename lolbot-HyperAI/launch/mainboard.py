@@ -69,6 +69,9 @@ class Mainboard:
         self._health_check_interval_sec: float = 5.0
         self._health_thread: Optional[threading.Thread] = None
         self._health_stop_event = threading.Event()
+        # Claude17: startup timing and restart tracking
+        self._startup_duration_s: float = 0.0
+        self._total_restarts: int = 0
 
     def register(self, component: TimerComponent) -> None:
         """Register a component for lifecycle management.
@@ -118,6 +121,7 @@ class Mainboard:
 
             logger.info("Starting %d components...", len(self._components))
             all_ok = True
+            _t0 = time.monotonic()
 
             for comp in self._components:
                 # Initialize
@@ -154,8 +158,10 @@ class Mainboard:
                 self._health_thread.start()
 
             self._started = True
-            logger.info("Mainboard: %d components started (all_ok=%s)",
-                       len(self._components), all_ok)
+            self._startup_duration_s = time.monotonic() - _t0
+            logger.info("Mainboard: %d components started (all_ok=%s, %.2fs)",
+                       len(self._components), all_ok,
+                       self._startup_duration_s)
             return all_ok
 
     def stop_all(self, timeout: float = 5.0) -> Dict[str, str]:
@@ -253,4 +259,107 @@ class Mainboard:
                 "backpressure": rpt.backpressure_count,
                 "dead": rpt.dead_count,
             }
+        # Claude17: add startup timing and watchdog info
+        result["startup_duration_s"] = round(self._startup_duration_s, 3)
+        result["total_restarts"] = self._total_restarts
         return result
+
+    # ─── Claude17: Component Restart ─────────────────────────────────────
+
+    def restart_component(
+        self, name: str, timeout: float = 5.0
+    ) -> bool:
+        """Stop and restart a specific component by name.
+
+        Claude17: Enables targeted recovery without full system restart.
+        Preserves all other components' state.
+
+        Args:
+            name: Component name to restart.
+            timeout: Max seconds to wait for stop.
+
+        Returns:
+            True if restart succeeded.
+        """
+        with self._lock:
+            comp = self._component_map.get(name)
+            if comp is None:
+                logger.error("Cannot restart unknown component: %s", name)
+                return False
+
+        logger.info("Restarting component: %s", name)
+        try:
+            comp.stop(timeout=timeout)
+            if comp.initialize() and comp.start():
+                self._total_restarts += 1
+                logger.info("Component %s restarted successfully", name)
+                return True
+            else:
+                logger.error("Component %s restart failed", name)
+                return False
+        except Exception as exc:
+            logger.error(
+                "Component %s restart error: %s: %s",
+                name, type(exc).__name__, exc,
+            )
+            return False
+
+    def get_startup_order(self) -> List[str]:
+        """Return component names in their registration (startup) order.
+
+        Claude17: Useful for dependency debugging and DAG visualization.
+        """
+        return [c.name for c in self._components]
+
+    def get_running_components(self) -> List[str]:
+        """Return names of currently RUNNING components."""
+        return [
+            c.name for c in self._components
+            if c.state == ComponentState.RUNNING
+        ]
+
+    def get_failed_components(self) -> List[str]:
+        """Return names of components in ERROR state."""
+        return [
+            c.name for c in self._components
+            if c.state == ComponentState.ERROR
+        ]
+
+    def pause_component(self, name: str) -> bool:
+        """Pause a specific component (its thread stays alive but idle).
+
+        Claude17: Useful for graceful degradation — pause non-critical
+        components when system is overloaded.
+        """
+        comp = self._component_map.get(name)
+        if comp is None:
+            return False
+        comp.pause()
+        logger.info("Component %s paused", name)
+        return True
+
+    def resume_component(self, name: str) -> bool:
+        """Resume a paused component."""
+        comp = self._component_map.get(name)
+        if comp is None:
+            return False
+        comp.resume()
+        logger.info("Component %s resumed", name)
+        return True
+
+    def component_summary(self) -> str:
+        """Return a human-readable summary of all component states.
+
+        Claude17: For CLI diagnostics and structured logging.
+        """
+        lines = [f"Mainboard: {len(self._components)} components"]
+        for comp in self._components:
+            state = comp.state.name
+            seq = comp.sequence
+            latency = ""
+            if comp.latency_stats and comp.latency_stats.total_calls > 0:
+                latency = f" (mean={comp.latency_stats.mean_ms:.1f}ms)"
+            lines.append(
+                f"  {comp.name:20s} {state:12s} seq={seq:6d}{latency}"
+            )
+        return "\n".join(lines)

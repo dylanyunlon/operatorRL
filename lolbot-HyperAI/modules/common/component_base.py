@@ -729,3 +729,174 @@ class ComponentGraph:
                 in_deg[nb] -= 1
                 if in_deg[nb] == 0: q.append(nb)
         return result
+
+    # ─── Claude17: Dependency Graph Visualization ────────────────────────
+
+    def visualize(self) -> str:
+        """Return ASCII representation of the dependency graph.
+
+        Claude17: Useful for debugging and documentation.
+        """
+        lines = ["Dependency Graph:"]
+        order = self.launch_order()
+        for name in order:
+            deps = self._edges.get(name, [])
+            dep_str = " → ".join(deps) if deps else "(root)"
+            lines.append(f"  {name}: depends on {dep_str}")
+        return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Claude17: ComponentCapability — declare what a component provides
+# ---------------------------------------------------------------------------
+
+class ComponentCapability:
+    """Declares the capabilities and channels a component provides.
+
+    Claude17: Enables dynamic discovery. Instead of hardcoding
+    channel names, components declare their capabilities and
+    consumers discover them through the registry.
+
+    Usage::
+
+        class MyComponent(ManagedComponent):
+            CAPABILITIES = ComponentCapability(
+                provides_channels=["/lol/game_state"],
+                consumes_channels=["/lol/raw_lcu"],
+                provides_services=["game_state_query"],
+            )
+    """
+
+    def __init__(
+        self,
+        provides_channels: Optional[List[str]] = None,
+        consumes_channels: Optional[List[str]] = None,
+        provides_services: Optional[List[str]] = None,
+        requires_services: Optional[List[str]] = None,
+    ) -> None:
+        self.provides_channels = provides_channels or []
+        self.consumes_channels = consumes_channels or []
+        self.provides_services = provides_services or []
+        self.requires_services = requires_services or []
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "provides_channels": self.provides_channels,
+            "consumes_channels": self.consumes_channels,
+            "provides_services": self.provides_services,
+            "requires_services": self.requires_services,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Claude17: ProcBudgetTracker — track time budget per Proc() call
+# ---------------------------------------------------------------------------
+
+class ProcBudgetTracker:
+    """Tracks per-Proc() time budget utilization.
+
+    Claude17: Each component has an interval (e.g., 100ms). This
+    tracker measures what fraction of that budget Proc() actually
+    uses. If utilization exceeds 80%, the component is at risk
+    of overrun.
+
+    Used by AdaptiveIntervalTuner to decide when to slow down.
+    """
+
+    def __init__(self, budget_ms: float) -> None:
+        self._budget_ms = budget_ms
+        self._utilizations: List[float] = []
+        self._max_window = 200
+        self._overbudget_count = 0
+
+    def record(self, actual_ms: float) -> float:
+        """Record actual Proc() duration and return utilization ratio.
+
+        Returns:
+            Float ratio (0.0–1.0+). >1.0 means over budget.
+        """
+        utilization = actual_ms / max(self._budget_ms, 0.1)
+        self._utilizations.append(utilization)
+        if len(self._utilizations) > self._max_window:
+            self._utilizations = self._utilizations[-self._max_window:]
+        if utilization > 1.0:
+            self._overbudget_count += 1
+        return utilization
+
+    @property
+    def mean_utilization(self) -> float:
+        if not self._utilizations:
+            return 0.0
+        return sum(self._utilizations) / len(self._utilizations)
+
+    @property
+    def peak_utilization(self) -> float:
+        return max(self._utilizations) if self._utilizations else 0.0
+
+    @property
+    def overbudget_rate(self) -> float:
+        if not self._utilizations:
+            return 0.0
+        return self._overbudget_count / len(self._utilizations)
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "budget_ms": self._budget_ms,
+            "mean_utilization": round(self.mean_utilization, 4),
+            "peak_utilization": round(self.peak_utilization, 4),
+            "overbudget_rate": round(self.overbudget_rate, 4),
+            "overbudget_count": self._overbudget_count,
+            "samples": len(self._utilizations),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Claude17: GracefulDegradation — protocol for component degradation
+# ---------------------------------------------------------------------------
+
+class DegradationLevel:
+    """Defines degradation levels for graceful degradation.
+
+    Claude17: Components can operate at reduced capacity when
+    the system is under stress, rather than failing entirely.
+    """
+    FULL = "full"           # Normal operation
+    REDUCED = "reduced"     # Skip non-essential work
+    MINIMAL = "minimal"     # Only critical path
+    SUSPENDED = "suspended" # Paused, waiting for recovery
+
+
+class DegradationPolicy:
+    """Policy for when and how a component should degrade.
+
+    Claude17: Configurable thresholds for automatic degradation.
+
+    Usage::
+
+        policy = DegradationPolicy(
+            reduce_at_utilization=0.7,
+            minimize_at_utilization=0.9,
+            suspend_at_utilization=1.0,
+        )
+    """
+
+    def __init__(
+        self,
+        reduce_at_utilization: float = 0.7,
+        minimize_at_utilization: float = 0.9,
+        suspend_at_utilization: float = 1.0,
+    ) -> None:
+        self.reduce_at = reduce_at_utilization
+        self.minimize_at = minimize_at_utilization
+        self.suspend_at = suspend_at_utilization
+
+    def recommend_level(self, utilization: float) -> str:
+        """Recommend a degradation level based on current utilization."""
+        if utilization >= self.suspend_at:
+            return DegradationLevel.SUSPENDED
+        elif utilization >= self.minimize_at:
+            return DegradationLevel.MINIMAL
+        elif utilization >= self.reduce_at:
+            return DegradationLevel.REDUCED
+        else:
+            return DegradationLevel.FULL

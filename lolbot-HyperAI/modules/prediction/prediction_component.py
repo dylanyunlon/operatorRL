@@ -599,3 +599,113 @@ class PredictionComponent(TimerComponent, ManagedComponent):
             ),
         })
         return base
+
+    # ─── Claude17: Prediction Accuracy Tracking ──────────────────────────
+
+    def record_actual_outcome(self, won: bool) -> Dict[str, Any]:
+        """Record the actual game outcome for accuracy evaluation.
+
+        Claude17: After each game, compare predicted win probability
+        at various checkpoints against the actual result. This feeds
+        into the evolution fitness evaluator.
+
+        Args:
+            won: True if our team won.
+
+        Returns:
+            Dict with accuracy metrics for this session.
+        """
+        actual = 1.0 if won else 0.0
+        errors = []
+        calibration_bins: Dict[str, List[float]] = {
+            "0.0-0.2": [], "0.2-0.4": [], "0.4-0.6": [],
+            "0.6-0.8": [], "0.8-1.0": [],
+        }
+
+        for pred in self._prediction_history:
+            prob = pred if isinstance(pred, float) else getattr(
+                pred, 'win_probability', 0.5
+            )
+            error = abs(prob - actual)
+            errors.append(error)
+
+            # Calibration: group by predicted prob range
+            if prob < 0.2:
+                calibration_bins["0.0-0.2"].append(actual)
+            elif prob < 0.4:
+                calibration_bins["0.2-0.4"].append(actual)
+            elif prob < 0.6:
+                calibration_bins["0.4-0.6"].append(actual)
+            elif prob < 0.8:
+                calibration_bins["0.6-0.8"].append(actual)
+            else:
+                calibration_bins["0.8-1.0"].append(actual)
+
+        mae = sum(errors) / max(len(errors), 1)
+        brier = sum(e ** 2 for e in errors) / max(len(errors), 1)
+
+        # Final prediction accuracy (did we call it right?)
+        final_prob = self._smoothed_win_prob
+        correct_call = (final_prob > 0.5) == won
+
+        return {
+            "actual_outcome": "win" if won else "loss",
+            "final_prediction": round(final_prob, 4),
+            "correct_call": correct_call,
+            "mae": round(mae, 4),
+            "brier_score": round(brier, 4),
+            "prediction_count": len(self._prediction_history),
+            "calibration": {
+                k: {
+                    "count": len(v),
+                    "actual_rate": round(sum(v) / max(len(v), 1), 4),
+                }
+                for k, v in calibration_bins.items() if v
+            },
+        }
+
+    def get_prediction_trend(
+        self, last_n: int = 20
+    ) -> List[float]:
+        """Return the last N win probability values.
+
+        Claude17: Used by planning to detect momentum shifts.
+        A rising trend suggests our team is gaining advantage.
+        """
+        history = self._prediction_history[-last_n:]
+        return [
+            p if isinstance(p, float) else getattr(
+                p, 'win_probability', 0.5
+            )
+            for p in history
+        ]
+
+    def get_momentum(self, window: int = 10) -> float:
+        """Compute momentum: rate of change of win probability.
+
+        Claude17: Positive = gaining, Negative = losing.
+        Used by planning to decide aggression level.
+
+        Returns:
+            Float rate per minute (positive = improving).
+        """
+        trend = self.get_prediction_trend(window)
+        if len(trend) < 2:
+            return 0.0
+
+        # Simple linear regression slope
+        n = len(trend)
+        x_mean = (n - 1) / 2.0
+        y_mean = sum(trend) / n
+        numerator = sum(
+            (i - x_mean) * (trend[i] - y_mean) for i in range(n)
+        )
+        denominator = sum((i - x_mean) ** 2 for i in range(n))
+
+        if abs(denominator) < 1e-10:
+            return 0.0
+
+        slope_per_tick = numerator / denominator
+        # Convert to per-minute based on component interval
+        ticks_per_min = 60000.0 / max(self.interval_ms, 1)
+        return round(slope_per_tick * ticks_per_min, 6)

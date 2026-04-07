@@ -710,3 +710,103 @@ class HealthMonitor:
                 self._log.error(
                     "Dependency check %s failed: %s", dep_type.value, exc
                 )
+
+    # ─── Claude17: Health Score & SLA Monitoring ─────────────────────────
+
+    def compute_health_score(self) -> float:
+        """Compute an aggregate health score for the entire system.
+
+        Claude17: Single number (0.0–1.0) representing overall system health.
+        Weighted average of component health, dependency reachability,
+        and resource utilization.
+
+        Returns:
+            Float in [0.0, 1.0] where 1.0 = fully healthy.
+        """
+        scores: List[float] = []
+        weights: List[float] = []
+
+        # Component health (weight: 3.0 per component)
+        for comp_name in self._component_health:
+            ch = self._component_health[comp_name]
+            if hasattr(ch, 'healthy'):
+                scores.append(1.0 if ch.healthy else 0.0)
+            elif isinstance(ch, dict):
+                scores.append(1.0 if ch.get("healthy", True) else 0.0)
+            else:
+                scores.append(0.5)
+            weights.append(3.0)
+
+        # Dependency health (weight: 2.0 per dependency)
+        for dep_type, dh in self._dependency_health.items():
+            scores.append(1.0 if dh.reachable else 0.0)
+            weights.append(2.0)
+
+        if not scores:
+            return 1.0
+
+        weighted_sum = sum(s * w for s, w in zip(scores, weights))
+        total_weight = sum(weights)
+        return round(weighted_sum / total_weight, 4)
+
+    def get_health_trend(self, window: int = 30) -> List[float]:
+        """Return recent health score history.
+
+        Claude17: Tracks health scores over time for trend analysis.
+        Useful for detecting gradual degradation.
+        """
+        if not hasattr(self, '_health_history'):
+            self._health_history: List[float] = []
+
+        score = self.compute_health_score()
+        self._health_history.append(score)
+        # Keep bounded
+        if len(self._health_history) > 1000:
+            self._health_history = self._health_history[-500:]
+        return self._health_history[-window:]
+
+    def check_sla(
+        self,
+        min_health_score: float = 0.8,
+        max_downtime_s: float = 60.0,
+    ) -> Dict[str, Any]:
+        """Check if the system meets SLA requirements.
+
+        Claude17: Simple SLA checker for production monitoring.
+
+        Args:
+            min_health_score: Minimum acceptable health score.
+            max_downtime_s: Maximum tolerable unhealthy duration.
+
+        Returns:
+            Dict with sla_met, current_score, violation details.
+        """
+        score = self.compute_health_score()
+        trend = self.get_health_trend(window=10)
+
+        # Check for sustained unhealthy period
+        unhealthy_duration = 0.0
+        check_interval = getattr(
+            self, '_check_interval_s', 5.0
+        )
+        for h in reversed(trend):
+            if h < min_health_score:
+                unhealthy_duration += check_interval
+            else:
+                break
+
+        sla_met = (
+            score >= min_health_score
+            and unhealthy_duration <= max_downtime_s
+        )
+
+        return {
+            "sla_met": sla_met,
+            "current_score": score,
+            "min_required": min_health_score,
+            "unhealthy_duration_s": round(unhealthy_duration, 1),
+            "max_downtime_s": max_downtime_s,
+            "trend_avg": round(
+                sum(trend) / max(len(trend), 1), 4
+            ),
+        }
