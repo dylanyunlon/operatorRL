@@ -1,0 +1,58 @@
+name: Build Seraphine
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-seraphine:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+          cache: 'pip'
+      - name: Pack Seraphine
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller==5.13
+          .\make.ps1
+          echo "SUCCESS=true" >> $GITHUB_ENV
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ env.SUCCESS }} == 'true'
+        with:
+          name: Seraphine
+          path: .\Seraphine.7z
+
+  release:
+    needs: build-seraphine
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup environment variables
+      run: |
+        export VERSION=$(cat app/common/config.py | grep -Po "(?<=VERSION = \")(.*[^\"])")
+        echo "VERSION=v$VERSION" >> $GITHUB_ENV
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: Seraphine
+        path: ./
+    - name: Push to release
+      uses: ncipollo/release-action@v1
+      with:
+        name: ${{ env.VERSION }}
+        tag: ${{ env.VERSION }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        replacesArtifacts: false
+        artifacts: Seraphine.7z
