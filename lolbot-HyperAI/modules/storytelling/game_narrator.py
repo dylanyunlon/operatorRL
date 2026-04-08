@@ -400,3 +400,330 @@ class GameNarrator:
         self._last_event_times.clear()
         self._kill_count = 0
         self._narration_count = 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Claude22 V3: Momentum-aware narrative engine + bilingual + chain composition
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Design spec (Apollo pattern):
+#   从 GameNarrator 的事件→叙事转换管道 这个好例子开始。
+#   然后，遵循该模式实现 MomentumNarrator，让 叙事系统 可以 根据比赛势头
+#   自动调整语气和内容密度，并能 在团战/关键事件时切换到高能模式。
+#   接着 在 NarrationPipeline 引入 多阶段处理管道，使 事件 能够 经过
+#   过滤→丰富→格式化→去重 四个阶段，同时 NarrationContext 优化 上下文注入。
+
+from modules.storytelling.commentary_template import (
+    BilingualLibrary,
+    Language,
+    MomentumAwareSelector,
+    TemplateCategory,
+    TemplateChain,
+    create_default_bilingual_library,
+)
+
+
+# ─── Narration context — enriched game state for template rendering ──────────
+
+@dataclass
+class NarrationContext:
+    """Enriched context for template rendering.
+
+    Aggregates data from multiple channels into a single variable dict
+    suitable for template rendering. Updated every Proc() cycle.
+
+    Apollo parallel: planning uses fused perception + prediction context.
+    """
+    game_time_s: float = 0.0
+    game_phase: str = "early_game"
+    momentum_score: float = 0.0
+    win_probability: float = 0.5
+    gold_diff: int = 0
+    kill_diff: int = 0
+    dragon_count: int = 0
+    baron_active: bool = False
+    recent_kill_streak: int = 0
+    active_player_champion: str = ""
+    active_player_team: str = ""
+
+    def to_template_vars(self) -> Dict[str, Any]:
+        """Convert to template variable dict."""
+        return {
+            "game_time": f"{int(self.game_time_s // 60)}:{int(self.game_time_s % 60):02d}",
+            "phase": self.game_phase,
+            "prob": round(self.win_probability * 100),
+            "gold_diff": self.gold_diff,
+            "kill_diff": self.kill_diff,
+            "momentum": "positive" if self.momentum_score > 0.1 else (
+                "negative" if self.momentum_score < -0.1 else "neutral"),
+            "champion": self.active_player_champion,
+            "team": self.active_player_team,
+        }
+
+
+# ─── Narration pipeline stage ───────────────────────────────────────────────
+
+class NarrationStage:
+    """Base class for narration pipeline stages."""
+
+    def process(
+        self,
+        segment: NarrationSegment,
+        context: NarrationContext,
+    ) -> Optional[NarrationSegment]:
+        """Process a narration segment. Return None to drop it."""
+        return segment
+
+
+class RelevanceFilter(NarrationStage):
+    """Drop narrations that are not relevant to the current game state.
+
+    Examples:
+    - Drop "consider warding" if game just started (< 90s)
+    - Drop item suggestions if the player just died
+    """
+
+    def process(
+        self,
+        segment: NarrationSegment,
+        context: NarrationContext,
+    ) -> Optional[NarrationSegment]:
+        # Very early game: suppress strategy narrations
+        if context.game_time_s < 90.0 and segment.event_type == "strategy":
+            return None
+        return segment
+
+
+class PriorityBooster(NarrationStage):
+    """Boost priority for narrations during key moments.
+
+    During teamfights, baron, or close games, boost priority to ensure
+    important narrations get through the rate limiter.
+    """
+
+    def process(
+        self,
+        segment: NarrationSegment,
+        context: NarrationContext,
+    ) -> Optional[NarrationSegment]:
+        boosted = False
+
+        # Boost during baron
+        if context.baron_active and segment.event_type == "objective":
+            segment = NarrationSegment(
+                text=segment.text,
+                tone=segment.tone,
+                priority=NarrationPriority.CRITICAL,
+                timestamp=segment.timestamp,
+                event_type=segment.event_type,
+                duration_hint_s=segment.duration_hint_s,
+            )
+            boosted = True
+
+        # Boost during close games
+        if 0.4 < context.win_probability < 0.6 and not boosted:
+            if segment.priority == NarrationPriority.MEDIUM:
+                segment = NarrationSegment(
+                    text=segment.text,
+                    tone=segment.tone,
+                    priority=NarrationPriority.HIGH,
+                    timestamp=segment.timestamp,
+                    event_type=segment.event_type,
+                    duration_hint_s=segment.duration_hint_s,
+                )
+
+        return segment
+
+
+class ToneAdapter(NarrationStage):
+    """Adapt narration tone based on momentum.
+
+    Uses MomentumAwareSelector to override tone based on game state.
+    """
+
+    def __init__(self) -> None:
+        self._selector = MomentumAwareSelector()
+
+    def process(
+        self,
+        segment: NarrationSegment,
+        context: NarrationContext,
+    ) -> Optional[NarrationSegment]:
+        suggested = self._selector.suggest_tone(
+            momentum_score=context.momentum_score,
+            win_probability=context.win_probability,
+            game_phase=context.game_phase,
+        )
+
+        # Map MomentumAwareSelector tone to NarrationTone
+        tone_map = {
+            "NEUTRAL": NarrationTone.NEUTRAL,
+            "HYPE": NarrationTone.EXCITED,
+            "TENSE": NarrationTone.TENSE,
+            "CALM": NarrationTone.ENCOURAGING,
+            "URGENT": NarrationTone.WARNING,
+        }
+        new_tone = tone_map.get(suggested.name, segment.tone)
+
+        return NarrationSegment(
+            text=segment.text,
+            tone=new_tone,
+            priority=segment.priority,
+            timestamp=segment.timestamp,
+            event_type=segment.event_type,
+            duration_hint_s=segment.duration_hint_s,
+        )
+
+
+# ─── Narration pipeline ─────────────────────────────────────────────────────
+
+class NarrationPipeline:
+    """Multi-stage narration processing pipeline.
+
+    Events flow through: Filter → Enrich → Tone-adapt → Boost → Output
+
+    Apollo parallel: perception pipeline (lidar → fusion → tracking).
+
+    Usage::
+        pipeline = NarrationPipeline()
+        pipeline.add_stage(RelevanceFilter())
+        pipeline.add_stage(ToneAdapter())
+        pipeline.add_stage(PriorityBooster())
+
+        result = pipeline.process(segment, context)
+        if result is not None:
+            # publish to /lol/narration
+    """
+
+    def __init__(self) -> None:
+        self._stages: List[NarrationStage] = []
+        self._processed_count: int = 0
+        self._dropped_count: int = 0
+
+    def add_stage(self, stage: NarrationStage) -> None:
+        self._stages.append(stage)
+
+    def process(
+        self,
+        segment: NarrationSegment,
+        context: NarrationContext,
+    ) -> Optional[NarrationSegment]:
+        """Process a segment through all pipeline stages."""
+        self._processed_count += 1
+        current = segment
+        for stage in self._stages:
+            current = stage.process(current, context)
+            if current is None:
+                self._dropped_count += 1
+                return None
+        return current
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "stages": len(self._stages),
+            "processed": self._processed_count,
+            "dropped": self._dropped_count,
+            "pass_rate": round(
+                (self._processed_count - self._dropped_count)
+                / max(1, self._processed_count), 3
+            ),
+        }
+
+
+# ─── MomentumNarrator — V3 game narrator with momentum awareness ────────────
+
+class MomentumNarrator:
+    """V3 narrator with momentum-aware tone, bilingual support, and pipeline.
+
+    Wraps the existing GameNarrator event processing with:
+    1. NarrationPipeline for multi-stage processing
+    2. BilingualLibrary for EN/ZH output
+    3. MomentumAwareSelector for dynamic tone
+    4. TemplateChain for multi-sentence composition
+
+    Not a subclass of GameNarrator — composes with it.
+    GameNarrator handles event→segment conversion (unchanged).
+    MomentumNarrator handles segment post-processing (new).
+
+    Usage::
+        narrator = MomentumNarrator(language=Language.ZH)
+        narrator.set_context(NarrationContext(
+            momentum_score=0.5, win_probability=0.65,
+        ))
+
+        # Process segments from GameNarrator
+        enhanced = narrator.enhance(raw_segment)
+        if enhanced:
+            publish(enhanced)
+    """
+
+    def __init__(self, language: Language = Language.EN) -> None:
+        self._library = create_default_bilingual_library(language)
+        self._selector = MomentumAwareSelector()
+        self._pipeline = NarrationPipeline()
+        self._chain = TemplateChain(self._library.base)
+        self._context = NarrationContext()
+        self._enhanced_count: int = 0
+
+        # Build default pipeline
+        self._pipeline.add_stage(RelevanceFilter())
+        self._pipeline.add_stage(ToneAdapter())
+        self._pipeline.add_stage(PriorityBooster())
+
+    def set_context(self, ctx: NarrationContext) -> None:
+        """Update the current game context."""
+        self._context = ctx
+
+    def set_language(self, lang: Language) -> None:
+        self._library.set_language(lang)
+
+    def enhance(self, segment: NarrationSegment) -> Optional[NarrationSegment]:
+        """Enhance a raw narration segment through the pipeline.
+
+        This is called after GameNarrator produces a segment.
+        Applies momentum-aware tone, priority boosting, and filtering.
+        """
+        result = self._pipeline.process(segment, self._context)
+        if result is not None:
+            self._enhanced_count += 1
+        return result
+
+    def compose_commentary(
+        self,
+        event_type: str,
+        variables: Dict[str, Any],
+    ) -> Optional[str]:
+        """Generate momentum-aware bilingual commentary for an event.
+
+        Maps event_type to TemplateCategory and generates appropriate text.
+        """
+        cat_map = {
+            "kill": TemplateCategory.KILL,
+            "objective": TemplateCategory.OBJECTIVE,
+            "teamfight": TemplateCategory.TEAMFIGHT,
+            "win_prob": TemplateCategory.WIN_PROB,
+            "strategy": TemplateCategory.STRATEGY,
+            "item": TemplateCategory.ITEM,
+        }
+        category = cat_map.get(event_type, TemplateCategory.GENERIC)
+
+        # Merge context variables with event variables
+        merged = {**self._context.to_template_vars(), **variables}
+
+        return self._selector.select_with_momentum(
+            library=self._library.base,
+            category=category,
+            variables=merged,
+            momentum_score=self._context.momentum_score,
+            win_probability=self._context.win_probability,
+            game_phase=self._context.game_phase,
+            game_time_s=int(self._context.game_time_s),
+        )
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "enhanced_count": self._enhanced_count,
+            "library": self._library.stats(),
+            "pipeline": self._pipeline.stats(),
+            "language": self._library.language.value,
+        }

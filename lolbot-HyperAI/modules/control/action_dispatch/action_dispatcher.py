@@ -525,3 +525,339 @@ class ActionDispatcher:
         self._recent_dedup_keys.clear()
         self._pending.clear()
         self._log.clear()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Claude22 V3: Overlay + voice joint scheduling + adaptive rate control
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Design spec (Apollo pattern):
+#   从 ActionDispatcher 的 voice/overlay/log 三路分发 这个好例子开始。
+#   然后，遵循该模式实现 JointScheduler，让 voice 和 overlay 可以 协同调度，
+#   并能 避免同时发出冲突信息。
+#   接着 AdaptiveRateController 引入 自适应速率控制，使 系统 能够 根据
+#   游戏节奏自动调整输出频率（团战时更频繁/平淡期更稀疏），
+#   同时 ActionHistory 优化 历史追溯以支撑回放分析。
+
+from modules.control.overlay.overlay_protocol import (
+    OverlayBatch,
+    OverlayCommand,
+    OverlayAction,
+    OverlayElementDef,
+    OverlayWebSocketSender,
+    Position,
+    ElementType,
+)
+
+
+# ─── Joint scheduling state ─────────────────────────────────────────────────
+
+@dataclass
+class ScheduleSlot:
+    """A time slot for joint voice + overlay scheduling.
+
+    Prevents voice and overlay from delivering conflicting or
+    overlapping messages in the same time window.
+    """
+    start_time: float = 0.0
+    duration_s: float = 3.0
+    voice_text: str = ""
+    overlay_elements: List[Dict[str, Any]] = field(default_factory=list)
+    priority: int = 5
+    source: str = ""
+    delivered: bool = False
+
+    @property
+    def end_time(self) -> float:
+        return self.start_time + self.duration_s
+
+    @property
+    def is_expired(self) -> bool:
+        return time.time() > self.end_time
+
+
+class JointScheduler:
+    """Coordinates voice and overlay output to avoid conflicts.
+
+    Rules:
+    1. Voice and overlay should deliver the same information
+       (voice says it, overlay shows it)
+    2. Don't show contradictory overlay while voice is speaking
+    3. High-urgency voice preempts overlay updates
+    4. During teamfights, reduce overlay updates (reduce distraction)
+
+    Apollo parallel: control/controller_agent.cc coordinates
+    brake/throttle/steering commands.
+    """
+
+    def __init__(
+        self,
+        slot_duration_s: float = 3.0,
+        max_slots: int = 8,
+    ) -> None:
+        self._slot_duration = slot_duration_s
+        self._max_slots = max_slots
+        self._slots: Deque[ScheduleSlot] = deque(maxlen=max_slots)
+        self._voice_busy_until: float = 0.0
+        self._last_voice_category: str = ""
+        self._scheduled_count: int = 0
+        self._conflict_count: int = 0
+
+    def schedule(
+        self,
+        action: "DispatchAction",
+        voice_text: str,
+        overlay_elements: Optional[List[Dict[str, Any]]] = None,
+    ) -> ScheduleSlot:
+        """Schedule a joint voice + overlay action.
+
+        Checks for conflicts with existing slots and adjusts timing.
+        """
+        now = time.time()
+
+        # Find the earliest available time
+        earliest = now
+        if self._slots:
+            last_slot = self._slots[-1]
+            if not last_slot.is_expired and last_slot.voice_text:
+                earliest = max(earliest, last_slot.end_time)
+
+        # Check for conflict: same category within slot_duration
+        for slot in self._slots:
+            if (not slot.is_expired
+                    and slot.source == action.source
+                    and now - slot.start_time < self._slot_duration):
+                self._conflict_count += 1
+                # Merge into existing slot (update overlay, keep voice)
+                if overlay_elements:
+                    slot.overlay_elements.extend(overlay_elements)
+                return slot
+
+        slot = ScheduleSlot(
+            start_time=earliest,
+            duration_s=self._slot_duration,
+            voice_text=voice_text,
+            overlay_elements=overlay_elements or [],
+            priority=action.priority.value if hasattr(action.priority, 'value') else 5,
+            source=action.source,
+        )
+        self._slots.append(slot)
+        self._scheduled_count += 1
+        return slot
+
+    def get_ready_slots(self) -> List[ScheduleSlot]:
+        """Get slots that are ready to be delivered."""
+        now = time.time()
+        ready = []
+        for slot in self._slots:
+            if not slot.delivered and slot.start_time <= now:
+                slot.delivered = True
+                ready.append(slot)
+        return ready
+
+    def is_voice_busy(self) -> bool:
+        return time.time() < self._voice_busy_until
+
+    def mark_voice_busy(self, duration_s: float) -> None:
+        self._voice_busy_until = time.time() + duration_s
+
+    def clear_expired(self) -> int:
+        """Remove expired slots."""
+        initial = len(self._slots)
+        self._slots = deque(
+            (s for s in self._slots if not s.is_expired),
+            maxlen=self._max_slots,
+        )
+        return initial - len(self._slots)
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "pending_slots": sum(1 for s in self._slots if not s.delivered),
+            "total_scheduled": self._scheduled_count,
+            "conflicts_resolved": self._conflict_count,
+        }
+
+
+# ─── Adaptive rate controller ────────────────────────────────────────────────
+
+class AdaptiveRateController:
+    """Adjusts output rate based on game tempo.
+
+    During teamfights or rapid objective sequences, increases the
+    rate of voice/overlay output. During laning phases, reduces it
+    to avoid annoying the player.
+
+    Apollo parallel: control rate adaptation based on driving scenario
+    (highway vs city vs parking).
+    """
+
+    # Game tempo → rate multiplier
+    _TEMPO_MULTIPLIERS = {
+        "idle": 0.3,        # barely any output
+        "laning": 0.5,      # reduced rate
+        "roaming": 0.8,     # moderate
+        "skirmish": 1.0,    # normal rate
+        "teamfight": 1.5,   # increased rate
+        "objective": 1.2,   # slightly increased
+        "baron": 2.0,       # maximum rate
+    }
+
+    def __init__(
+        self,
+        base_voice_interval_s: float = _VOICE_COOLDOWN_S,
+        base_overlay_interval_s: float = _OVERLAY_COOLDOWN_S,
+    ) -> None:
+        self._base_voice_interval = base_voice_interval_s
+        self._base_overlay_interval = base_overlay_interval_s
+        self._current_tempo: str = "laning"
+        self._multiplier: float = 0.5
+        self._events_per_minute: float = 0.0
+        self._last_event_times: Deque[float] = deque(maxlen=30)
+
+    def update_tempo(self, tempo: str) -> None:
+        """Update the current game tempo."""
+        self._current_tempo = tempo
+        self._multiplier = self._TEMPO_MULTIPLIERS.get(tempo, 1.0)
+
+    def record_event(self) -> None:
+        """Record that an event occurred (for events-per-minute tracking)."""
+        self._last_event_times.append(time.time())
+        self._recalc_epm()
+
+    def _recalc_epm(self) -> None:
+        now = time.time()
+        recent = [t for t in self._last_event_times if now - t < 60.0]
+        self._events_per_minute = len(recent)
+
+        # Auto-detect tempo from event rate
+        if self._events_per_minute > 15:
+            self.update_tempo("teamfight")
+        elif self._events_per_minute > 8:
+            self.update_tempo("skirmish")
+        elif self._events_per_minute > 3:
+            self.update_tempo("roaming")
+        elif self._events_per_minute > 0:
+            self.update_tempo("laning")
+        else:
+            self.update_tempo("idle")
+
+    @property
+    def voice_interval_s(self) -> float:
+        """Current voice output interval (adjusted for tempo)."""
+        return self._base_voice_interval / max(0.1, self._multiplier)
+
+    @property
+    def overlay_interval_s(self) -> float:
+        """Current overlay update interval (adjusted for tempo)."""
+        return self._base_overlay_interval / max(0.1, self._multiplier)
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "tempo": self._current_tempo,
+            "multiplier": self._multiplier,
+            "events_per_minute": round(self._events_per_minute, 1),
+            "voice_interval_s": round(self.voice_interval_s, 2),
+            "overlay_interval_s": round(self.overlay_interval_s, 2),
+        }
+
+
+# ─── Action history for replay analysis ─────────────────────────────────────
+
+@dataclass
+class HistoryEntry:
+    """Immutable record of a dispatched action for post-game analysis."""
+    timestamp: float
+    category: str
+    priority: str
+    text: str
+    channels: List[str]
+    game_time_s: float = 0.0
+    momentum_score: float = 0.0
+    win_prob: float = 0.5
+    was_spoken: bool = False
+    was_displayed: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "t": round(self.timestamp, 3),
+            "cat": self.category,
+            "pri": self.priority,
+            "text": self.text[:100],
+            "ch": self.channels,
+            "gt": round(self.game_time_s, 1),
+            "mom": round(self.momentum_score, 2),
+            "wp": round(self.win_prob, 3),
+            "spoken": self.was_spoken,
+            "displayed": self.was_displayed,
+        }
+
+
+class ActionHistory:
+    """Append-only history of all dispatched actions.
+
+    Used for post-game analysis: which advice was given, when,
+    and whether it was actually delivered to the player.
+
+    Supports export for correlation with game outcomes.
+    """
+
+    def __init__(self, max_entries: int = 5000) -> None:
+        self._entries: List[HistoryEntry] = []
+        self._max_entries = max_entries
+
+    def record(self, entry: HistoryEntry) -> None:
+        self._entries.append(entry)
+        if len(self._entries) > self._max_entries:
+            # Drop oldest 10%
+            drop = self._max_entries // 10
+            self._entries = self._entries[drop:]
+
+    def query(
+        self,
+        start_time: Optional[float] = None,
+        end_time: Optional[float] = None,
+        category: Optional[str] = None,
+    ) -> List[HistoryEntry]:
+        """Query history with optional filters."""
+        results = self._entries
+        if start_time is not None:
+            results = [e for e in results if e.timestamp >= start_time]
+        if end_time is not None:
+            results = [e for e in results if e.timestamp <= end_time]
+        if category is not None:
+            results = [e for e in results if e.category == category]
+        return results
+
+    def export(self) -> List[Dict[str, Any]]:
+        """Export full history for post-game analysis."""
+        return [e.to_dict() for e in self._entries]
+
+    @property
+    def count(self) -> int:
+        return len(self._entries)
+
+    def summary(self) -> Dict[str, Any]:
+        """Summary statistics of dispatch history."""
+        if not self._entries:
+            return {"count": 0}
+
+        spoken = sum(1 for e in self._entries if e.was_spoken)
+        displayed = sum(1 for e in self._entries if e.was_displayed)
+        cats: Dict[str, int] = {}
+        for e in self._entries:
+            cats[e.category] = cats.get(e.category, 0) + 1
+
+        return {
+            "count": len(self._entries),
+            "spoken": spoken,
+            "displayed": displayed,
+            "delivery_rate": round(
+                (spoken + displayed) / max(1, len(self._entries) * 2), 3),
+            "by_category": cats,
+            "time_range_s": round(
+                self._entries[-1].timestamp - self._entries[0].timestamp, 1
+            ) if len(self._entries) > 1 else 0,
+        }
+
+    def clear(self) -> None:
+        self._entries.clear()
