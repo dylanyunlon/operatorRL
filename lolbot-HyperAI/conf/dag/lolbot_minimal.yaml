@@ -1,0 +1,37 @@
+# =============================================================================
+# lolbot-HyperAI Minimal DAG — Debug / Test Configuration
+# =============================================================================
+#
+# Starts only canbus + perception for quick LCU connectivity testing.
+# No prediction/planning/control — minimal resource usage.
+#
+# Usage: python run.py --dag conf/dag/lolbot_minimal.yaml --mock
+#
+# 位置: lolbot-HyperAI/conf/dag/lolbot_minimal.yaml
+
+pipeline:
+  name: lolbot-HyperAI-minimal
+  version: "1.0.0-claude24"
+  description: "Minimal pipeline for connectivity testing"
+
+components:
+  - name: canbus
+    module_path: modules.canbus.canbus_component
+    class_name: CanbusComponent
+    interval_ms: 100
+    enabled: true
+    depends_on: []
+    provides:
+      - /lol/raw_lcu
+    config:
+      data_source: mock
+
+  - name: perception
+    module_path: modules.perception.perception_component
+    class_name: PerceptionComponent
+    interval_ms: 200
+    enabled: true
+    depends_on: [canbus]
+    provides:
+      - /lol/game_state
+    config: {}

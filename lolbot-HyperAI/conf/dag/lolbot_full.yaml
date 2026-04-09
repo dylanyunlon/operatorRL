@@ -1,0 +1,113 @@
+# =============================================================================
+# lolbot-HyperAI Full Pipeline DAG — Apollo-style Component Graph
+# =============================================================================
+#
+# 查看 Apollo ``modules/canbus/dag/canbus.dag`` 上现有 DAG protobuf 的定义方式,
+# 理解其模式——module_library 指定 .so 路径, components / timer_components
+# 列出类名和配置文件。从 Apollo canbus.dag + prediction.dag 这两个好例子开始。
+# 然后遵循该模式实现一个 YAML 等价物, 让 dag_launcher 可以声明式加载全部组件,
+# 并能通过 depends_on 指定启动依赖顺序。
+#
+# Apollo .dag format reference:
+#   module_config {
+#     module_library: "/apollo/modules/canbus/libcanbus_component.so"
+#     timer_components {
+#       class_name: "apollo::canbus::CanbusComponent"
+#       config { name: "canbus" config_file_path: "/apollo/modules/canbus/conf" }
+#     }
+#   }
+#
+# Startup order (topological): canbus → perception → prediction → planning → control → monitor
+# Data flow: canbus ─→ perception ─→ prediction ─→ planning ─→ control
+#                                                            └→ voice_narrator
+#
+# 位置: lolbot-HyperAI/conf/dag/lolbot_full.yaml
+
+pipeline:
+  name: lolbot-HyperAI-full
+  version: "1.0.0-claude24"
+  description: "Full game assistant pipeline with evolution"
+
+components:
+  # ── Layer 0: Data Bus (CAN Bus equivalent) ─────────────────────────────
+  - name: canbus
+    module_path: modules.canbus.canbus_component
+    class_name: CanbusComponent
+    interval_ms: 100
+    enabled: true
+    depends_on: []
+    provides:
+      - /lol/raw_lcu
+      - /lol/raw_fiddler
+      - /lol/canbus_status
+    config:
+      lcu_base_url: "https://127.0.0.1:2999"
+      fiddler_enabled: false
+      data_source: lcu         # lcu | mock | replay
+
+  # ── Layer 1: Perception (Sensor Fusion equivalent) ─────────────────────
+  - name: perception
+    module_path: modules.perception.perception_component
+    class_name: PerceptionComponent
+    interval_ms: 100
+    enabled: true
+    depends_on: [canbus]
+    provides:
+      - /lol/game_state
+      - /lol/events
+      - /lol/kill_feed
+      - /lol/minimap_state
+    config: {}
+
+  # ── Layer 2: Prediction (Obstacle Prediction equivalent) ───────────────
+  - name: prediction
+    module_path: modules.prediction.prediction_component
+    class_name: PredictionComponent
+    interval_ms: 500
+    enabled: true
+    depends_on: [perception]
+    provides:
+      - /lol/win_prediction
+      - /lol/teamfight_assessment
+      - /lol/death_window
+    config:
+      smoothing_alpha: 0.3
+      min_game_time_s: 120.0
+
+  # ── Layer 3: Planning (Planning + Routing equivalent) ──────────────────
+  - name: planning
+    module_path: modules.planning.planning_component
+    class_name: PlanningComponent
+    interval_ms: 500
+    enabled: true
+    depends_on: [prediction]
+    provides:
+      - /lol/strategy
+      - /lol/macro_decision
+      - /lol/lane_advice
+    config:
+      macro_cooldown_s: 5.0
+      min_confidence: 0.3
+
+  # ── Layer 4: Control (Command Dispatch equivalent) ─────────────────────
+  - name: control
+    module_path: modules.control.control_component
+    class_name: ControlComponent
+    interval_ms: 200
+    enabled: true
+    depends_on: [planning]
+    provides:
+      - /lol/voice_command
+      - /lol/overlay_command
+    config: {}
+
+  # ── Layer 5: Monitor (Guardian equivalent) ─────────────────────────────
+  - name: monitor
+    module_path: modules.monitor.monitor_component
+    class_name: MonitorComponent
+    interval_ms: 2000
+    enabled: true
+    depends_on: [canbus]
+    provides:
+      - /lol/monitor_status
+    config: {}

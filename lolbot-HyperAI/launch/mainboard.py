@@ -384,7 +384,8 @@ class Mainboard:
         deadline = _time.monotonic() + timeout_s
 
         with self._lock:
-            components = list(self._components.items())
+            # Claude24 fix: _components is a List, _component_map is the Dict
+            components = list(self._component_map.items())
 
         for name, comp in components:
             healthy = False
@@ -419,8 +420,9 @@ class Mainboard:
         """
         missing = []
         with self._lock:
-            registered_names = set(self._components.keys())
-            for name, comp in self._components.items():
+            # Claude24 fix: _component_map is the Dict, _components is List
+            registered_names = set(self._component_map.keys())
+            for name, comp in self._component_map.items():
                 deps = getattr(comp, "DEPENDENCIES", [])
                 for dep in deps:
                     if dep not in registered_names:
@@ -438,7 +440,8 @@ class Mainboard:
         Useful for recovering from ERROR state without full system restart.
         """
         with self._lock:
-            comp = self._components.get(name)
+            # Claude24 fix: _component_map is the Dict
+            comp = self._component_map.get(name)
             if comp is None:
                 return False
 
@@ -447,6 +450,7 @@ class Mainboard:
             ok = comp.initialize()
             if ok:
                 ok = comp.start()
+            self._total_restarts += 1
             return ok
         except Exception as exc:
             import logging
@@ -454,3 +458,50 @@ class Mainboard:
                 "Failed to restart %s: %s", name, exc
             )
             return False
+
+    # ─── Claude24: Pipeline Diagnostics Integration ──────────────────────
+
+    def enable_pipeline_diagnostics(
+        self,
+        auto_report_interval_sec: float = 10.0,
+    ) -> None:
+        """Enable pipeline flow diagnostics (Apollo cyber_monitor equivalent).
+
+        Claude24: Integrates PipelineDiagnostics into the Mainboard lifecycle.
+        The diagnostics thread prints a channel flow report periodically.
+        """
+        try:
+            from launch.pipeline_diagnostics import PipelineDiagnostics
+            self._pipeline_diag = PipelineDiagnostics()
+            self._pipeline_diag_interval = auto_report_interval_sec
+            self._pipeline_diag.register_channels([
+                "/lol/raw_lcu", "/lol/raw_fiddler",
+                "/lol/game_state", "/lol/events",
+                "/lol/win_prediction", "/lol/teamfight_assessment",
+                "/lol/strategy", "/lol/macro_decision",
+                "/lol/voice_command",
+            ])
+            self._pipeline_diag.on_anomaly(
+                lambda atype, desc: logger.warning(
+                    "Pipeline anomaly [%s]: %s", atype, desc
+                )
+            )
+            logger.info(
+                "Pipeline diagnostics enabled (interval=%.0fs)",
+                auto_report_interval_sec,
+            )
+        except ImportError as exc:
+            logger.warning("PipelineDiagnostics not available: %s", exc)
+            self._pipeline_diag = None
+
+    @property
+    def pipeline_diagnostics(self):
+        """Access the PipelineDiagnostics instance (if enabled)."""
+        return getattr(self, "_pipeline_diag", None)
+
+    def diagnostics_snapshot(self) -> dict:
+        """Return pipeline diagnostics snapshot (if enabled)."""
+        diag = getattr(self, "_pipeline_diag", None)
+        if diag is None:
+            return {}
+        return diag.snapshot()

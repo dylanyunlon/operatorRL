@@ -354,9 +354,28 @@ class MainLoop:
         # Claude14: Start component threads via Mainboard
         print("[MainLoop] Starting component threads via Mainboard...")
         self._mainboard.enable_channel_monitor()
+
+        # Claude24: Enable pipeline flow diagnostics if requested
+        if os.environ.get("LOLBOT_DIAGNOSTICS") == "1":
+            self._mainboard.enable_pipeline_diagnostics(
+                auto_report_interval_sec=10.0,
+            )
+            print("[MainLoop] Pipeline diagnostics enabled (10s interval)")
+
+        # Claude23: Validate startup dependencies before launching
+        startup_issues = self._validate_startup()
+
         all_ok = self._mainboard.start_all()
         if not all_ok:
             print("[MainLoop] WARNING: Some components failed to start")
+
+        # Claude23: Health probe after start
+        self._startup_health_probe()
+
+        # Claude24: Start diagnostics auto-report after components are running
+        diag = self._mainboard.pipeline_diagnostics
+        if diag is not None:
+            diag.start_auto_report()
 
         # Initialize legacy wrappers (evolution, voice, etc)
         self._init_all()
@@ -404,6 +423,7 @@ class MainLoop:
         await component.proc() sequentially. Now components run in
         their own threads — supervisor only manages session state,
         evolution, and health.
+        Claude23: Added SafeMode check.
         """
         self._tick_count += 1
 
@@ -421,6 +441,9 @@ class MainLoop:
             if now - self._last_heartbeat >= self.HEARTBEAT_INTERVAL_SEC:
                 self._last_heartbeat = now
                 self._publish_heartbeat()
+
+            # 4. Claude23: SafeMode supervision
+            self._check_safe_mode()
 
         except Exception as exc:
             self._error_count += 1
@@ -446,6 +469,12 @@ class MainLoop:
         for name, info in mb_status.get("components", {}).items():
             if info.get("state") == "ERROR":
                 print(f"[Health] ERROR: {name} in ERROR state")
+
+        # Claude24: Check pipeline diagnostics for stale channels
+        diag = self._mainboard.pipeline_diagnostics
+        if diag is not None:
+            for atype, desc in diag.check_anomalies():
+                print(f"[Health] PIPELINE: {desc}")
 
     def _publish_heartbeat(self) -> None:
         """Publish a heartbeat message on the system channel."""
@@ -667,8 +696,15 @@ class MainLoop:
 
         Claude14: Uses Mainboard.stop_all() for component threads,
         then shuts down legacy wrappers.
+        Claude24: Also stops pipeline diagnostics auto-report.
         """
         print("[MainLoop] Shutting down...")
+
+        # Claude24: Stop pipeline diagnostics first
+        diag = self._mainboard.pipeline_diagnostics
+        if diag is not None:
+            diag.stop_auto_report()
+            print("  Pipeline diagnostics stopped")
 
         # 1. Stop all component threads via Mainboard
         results = self._mainboard.stop_all(timeout=5.0)
@@ -732,7 +768,7 @@ class MainLoop:
 
     def stats(self) -> Dict[str, Any]:
         """Aggregate stats from all components."""
-        return {
+        result = {
             "state": self._state,
             "tick_count": self._tick_count,
             "error_count": self._error_count,
@@ -760,34 +796,16 @@ class MainLoop:
                     if self._riot_api else {},
             },
         }
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-def main() -> None:
-    """CLI entry point."""
-    print("=" * 60)
-    print("  lolbot-HyperAI")
-    print("  Apollo-style LoL Game Assistant")
-    print("  Self-evolving via operatorRL governance kernel")
-    print("  Thread-per-component architecture (Apollo mainboard)")
-    print("=" * 60)
-    print()
-
-    loop = MainLoop()
-    loop.run()
-
-
-if __name__ == "__main__":
-    main()
-
+        # Claude24: Include pipeline diagnostics if enabled
+        diag_snap = self._mainboard.diagnostics_snapshot()
+        if diag_snap:
+            result["pipeline_diagnostics"] = diag_snap
+        return result
 
     # ─── Apollo-aligned supervisor hardening (Claude23) ──────────────────
     #
-    # Apollo mainboard validates all modules before entering the main loop.
-    # We add: startup health probe, SafeMode supervisor integration,
-    # and structured error escalation.
+    # Claude24 fix: These methods were placed after `if __name__` by Claude23
+    # (dead code — outside the class body). Moved here into MainLoop class.
 
     def _startup_health_probe(self) -> bool:
         """Probe all components for health after Mainboard.start_all().
@@ -859,3 +877,24 @@ if __name__ == "__main__":
                 print(f"[Startup] WARNING: {issue}")
 
         return issues
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+def main() -> None:
+    """CLI entry point."""
+    print("=" * 60)
+    print("  lolbot-HyperAI")
+    print("  Apollo-style LoL Game Assistant")
+    print("  Self-evolving via operatorRL governance kernel")
+    print("  Thread-per-component architecture (Apollo mainboard)")
+    print("=" * 60)
+    print()
+
+    loop = MainLoop()
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()
