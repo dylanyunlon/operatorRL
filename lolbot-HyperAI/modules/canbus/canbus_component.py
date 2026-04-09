@@ -58,6 +58,11 @@ from modules.canbus.vehicle.data_source_factory import (
 # Claude25: Extracted (Apollo: can_client/ in own module)
 from modules.canbus.vehicle.lcu_client import LCUClient
 from modules.canbus.vehicle.fiddler_client import FiddlerMCPClient
+# Claude28: Apollo latency_recorder parity — pipeline latency tracking
+from modules.common.latency_recorder.latency_recorder import (
+    LatencyRecorder,
+    PipelineLatencyTracker,
+)
 
 logger = get_logger("canbus")
 
@@ -178,6 +183,11 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         # Claude27: Apollo communication fault state (cc:155)
         self._is_communication_fault: bool = False
 
+        # Claude28: Apollo latency_recorder parity
+        # (modules/common/latency_recorder/latency_recorder.cc)
+        self._latency_recorder = LatencyRecorder("canbus")
+        self._pipeline_tracker = PipelineLatencyTracker.instance()
+
     # ─── TimerComponent interface ────────────────────────────────────
 
     def Init(self) -> bool:
@@ -274,6 +284,9 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         self._tick += 1
 
         with self.measure_proc() as m:
+            # Claude28: capture frame start for latency recording
+            self._frame_start_t = time.monotonic()
+
             # Claude27: Apollo cc:184 — check communication fault BEFORE poll
             # (canbus_component.cc: vehicle_object_->CheckChassisCommunicationFault())
             if self._check_communication_fault():
@@ -290,6 +303,10 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             if not m.success:
                 m.failure_reason = "poll_failed"
 
+            # Claude28: Record Proc() latency in LatencyRecorder
+            # (Apollo: latency_recorder records per-component timing)
+            proc_elapsed_ms = (time.monotonic() - self._frame_start_t) * 1000.0 if hasattr(self, '_frame_start_t') else 0.0
+
             # Fiddler sub-sampled (= Apollo PublishChassisDetail)
             if (
                 self._fiddler_client is not None
@@ -300,6 +317,11 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             # Claude27: Apollo cc:206 — update heartbeat after publish
             # (canbus_component.cc: vehicle_object_->UpdateHeartbeat())
             self._update_heartbeat()
+
+            # Claude28: Record canbus Proc() latency
+            self._latency_recorder.record(
+                (time.monotonic() - self._frame_start_t) * 1000.0
+            )
 
         return m.success
 
@@ -361,8 +383,14 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             http_status=200,
             source=self._data_source_type,
         )
+        # Claude28: Begin pipeline message tracking
+        msg_id = self._pipeline_tracker.begin_message()
+        self._pipeline_tracker.stamp_enter(msg_id, "canbus")
         if self._raw_lcu_writer:
+            # Attach msg_id to raw data for downstream tracking
+            raw.pipeline_message_id = msg_id
             self._raw_lcu_writer.Write(raw)
+        self._pipeline_tracker.stamp_exit(msg_id, "canbus")
 
         self._publish_status(Status.ok())
         return True
@@ -617,5 +645,7 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             "data_source_stats": (
                 self._data_source.stats() if self._data_source else {}
             ),
+            # Claude28: Apollo latency_recorder stats
+            "latency": self._latency_recorder.snapshot(),
         })
         return base

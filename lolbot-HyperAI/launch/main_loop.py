@@ -82,6 +82,10 @@ from modules.monitor.monitor_component import MonitorComponent
 from modules.perception.perception_component import PerceptionComponent
 from modules.planning.planning_component import PlanningComponent
 from modules.prediction.prediction_component import PredictionComponent
+# Claude28: Apollo storytelling module parity
+from modules.storytelling.storytelling_component import StorytellingComponent
+# Claude28: Apollo latency_recorder parity
+from modules.common.latency_recorder.latency_recorder import PipelineLatencyTracker
 from output.voice_announcer import VoiceAnnouncer, VoiceConfig
 from perception.game_state_parser import GameStateParser
 from perception.network_listener import NetworkListener
@@ -167,6 +171,8 @@ class MainLoop:
         self._planning: Optional[PlanningComponent] = None
         self._control: Optional[ControlComponent] = None
         self._monitor: Optional[MonitorComponent] = None
+        # Claude28: Apollo storytelling module
+        self._storytelling: Optional[StorytellingComponent] = None
 
         # Legacy wrappers (initialized in _init_all, used by evolution)
         self._bus: Optional[MessageBus] = None
@@ -230,6 +236,11 @@ class MainLoop:
 
         self._control = ControlComponent()
         self._mainboard.register(self._control)
+
+        # Claude28: Storytelling component (Apollo storytelling.cc parity)
+        # 1Hz, reads /lol/events + /lol/game_state, publishes /lol/narration
+        self._storytelling = StorytellingComponent()
+        self._mainboard.register(self._storytelling)
 
         self._monitor = MonitorComponent()
         self._mainboard.register(self._monitor)
@@ -810,6 +821,8 @@ class MainLoop:
         diag_snap = self._mainboard.diagnostics_snapshot()
         if diag_snap:
             result["pipeline_diagnostics"] = diag_snap
+        # Claude28: Include pipeline latency tracker summary
+        result["pipeline_latency"] = PipelineLatencyTracker.instance().summary()
         # Claude27: Include environment and global_data info
         result["environment"] = self._environment.snapshot()
         result["global_data"] = self._global_data.snapshot()

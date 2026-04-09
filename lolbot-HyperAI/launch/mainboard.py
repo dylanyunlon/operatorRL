@@ -493,6 +493,7 @@ class Mainboard:
                 "/lol/win_prediction", "/lol/teamfight_assessment",
                 "/lol/strategy", "/lol/macro_decision",
                 "/lol/voice_command",
+                "/lol/narration",  # Claude28: storytelling output channel
             ])
             self._pipeline_diag.on_anomaly(
                 lambda atype, desc: logger.warning(
