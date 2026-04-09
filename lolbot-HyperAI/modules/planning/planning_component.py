@@ -88,6 +88,8 @@ from modules.planning.tempo.recall_advisor import (
 from modules.planning.summoner.spell_tracker import (
     SummonerSpellTracker,
 )
+# Claude25: Extracted (Apollo: tasks/deciders/ separate from component)
+from modules.planning.engine.macro_decision_engine import MacroDecisionEngine
 
 logger = get_logger("planning")
 
@@ -105,143 +107,7 @@ _LANE_ADVISOR_TICK_DIVISOR = 4
 _SPIKE_ADVISOR_TICK_DIVISOR = 2
 
 
-# ─── Legacy MacroDecisionEngine (backward compat) ───────────────────────────
-
-class MacroDecisionEngine:
-    """Simple strategy engine kept for backward compatibility.
-
-    Phase 4 replaces this with MacroPlanner as the primary decision source.
-    This class is still importable by external code but PlanningComponent
-    no longer uses it as primary.
-    """
-
-    def __init__(self) -> None:
-        self._last_advice_time: float = 0.0
-        self._cooldown_sec: float = 5.0
-
-    def decide(
-        self,
-        snapshot: GameSnapshot,
-        win_pred: Optional[WinPrediction] = None,
-    ) -> Optional[StrategyAdvice]:
-        """Generate a strategy recommendation based on game state."""
-        now = time.monotonic()
-        if now - self._last_advice_time < self._cooldown_sec:
-            return None
-
-        phase = snapshot.phase
-
-        if phase == GamePhase.EARLY:
-            advice = self._early_game_strategy(snapshot, win_pred)
-        elif phase == GamePhase.MID:
-            advice = self._mid_game_strategy(snapshot, win_pred)
-        elif phase in (GamePhase.LATE, GamePhase.ENDING):
-            advice = self._late_game_strategy(snapshot, win_pred)
-        else:
-            return None
-
-        if advice is not None:
-            self._last_advice_time = now
-        return advice
-
-    def _early_game_strategy(
-        self,
-        snapshot: GameSnapshot,
-        win_pred: Optional[WinPrediction],
-    ) -> Optional[StrategyAdvice]:
-        """Early game: focus on laning fundamentals."""
-        our_team = (
-            snapshot.blue_team
-            if snapshot.active_team == TeamSide.BLUE
-            else snapshot.red_team
-        )
-        their_team = (
-            snapshot.red_team
-            if snapshot.active_team == TeamSide.BLUE
-            else snapshot.blue_team
-        )
-
-        kill_diff = our_team.total_kills - their_team.total_kills
-        if kill_diff <= -3:
-            return self._make_advice(
-                "play_safe",
-                "We're behind in kills. Focus on safe farming and vision.",
-                0.7, snapshot.game_time,
-            )
-        if kill_diff >= 3:
-            return self._make_advice(
-                "press_advantage",
-                "Kill lead — look for aggressive plays and invades.",
-                0.6, snapshot.game_time,
-            )
-        return None
-
-    def _mid_game_strategy(
-        self,
-        snapshot: GameSnapshot,
-        win_pred: Optional[WinPrediction],
-    ) -> Optional[StrategyAdvice]:
-        """Mid game: objectives and grouping."""
-        if win_pred and win_pred.blue_win_prob is not None:
-            prob = win_pred.blue_win_prob
-            if snapshot.active_team == TeamSide.RED:
-                prob = 1.0 - prob
-
-            if prob < 0.35:
-                return self._make_advice(
-                    "defend_and_scale",
-                    "We're behind. Avoid fights, farm safely, wait for power spikes.",
-                    0.8, snapshot.game_time,
-                )
-            if prob > 0.65:
-                return self._make_advice(
-                    "force_objectives",
-                    "We're ahead. Group for dragon/baron and force fights.",
-                    0.7, snapshot.game_time,
-                )
-        return None
-
-    def _late_game_strategy(
-        self,
-        snapshot: GameSnapshot,
-        win_pred: Optional[WinPrediction],
-    ) -> Optional[StrategyAdvice]:
-        """Late game: decisive plays."""
-        our_team = (
-            snapshot.blue_team
-            if snapshot.active_team == TeamSide.BLUE
-            else snapshot.red_team
-        )
-        their_team = (
-            snapshot.red_team
-            if snapshot.active_team == TeamSide.BLUE
-            else snapshot.blue_team
-        )
-
-        their_dead = sum(1 for p in their_team.players if p.is_dead)
-        if their_dead >= 2:
-            return self._make_advice(
-                "push_advantage",
-                f"{their_dead} enemies dead — take baron or push for inhibitor!",
-                0.9, snapshot.game_time,
-            )
-        return None
-
-    def _make_advice(
-        self,
-        rec_type: str,
-        text: str,
-        confidence: float,
-        game_time: float,
-    ) -> StrategyAdvice:
-        return StrategyAdvice(
-            primary_action=rec_type,
-            reasoning=text,
-            confidence=confidence,
-            urgency=0.8 if confidence > 0.7 else 0.4,
-            game_time=game_time,
-        )
-
+# Claude25: MacroDecisionEngine → engine/macro_decision_engine.py
 
 # ─── PlanningComponent ──────────────────────────────────────────────────────
 
