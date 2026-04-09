@@ -90,6 +90,9 @@ from modules.perception.fusion.momentum_tracker import (
     MomentumReport,
     MomentumState,
 )
+# Claude26: Apollo-style code/interface separation — delegate to sub-modules
+from modules.perception.assembler.snapshot_assembler import SnapshotAssembler
+from modules.perception.detector.event_detector import EventDetector
 
 logger = get_logger("perception")
 
@@ -158,6 +161,10 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
         self._kill_feed_analyzer: Optional[KillFeedAnalyzer] = None
         self._minimap_analyzer: Optional[MinimapAnalyzer] = None
         self._minimap_tick_counter: int = 0
+
+        # Claude26: Delegate to extracted sub-modules (Apollo pattern)
+        self._assembler = SnapshotAssembler()
+        self._event_detector = EventDetector()
         self._last_minimap_state: Optional[MinimapState] = None
 
         # Claude19: Wire Claude18 PhaseDetector + GoldTrendAnalyzer + new MomentumTracker
@@ -516,195 +523,31 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
     def _assemble_snapshot(self, data: Dict[str, Any]) -> GameSnapshot:
         """Parse allgamedata into a GameSnapshot.
 
-        Extracts:
-            - gameData → phase, mode, time
-            - activePlayer → active player stats
-            - allPlayers → per-player states, team aggregation
+        Claude26: Delegates to SnapshotAssembler (Apollo fusion_system pattern).
+        All parsing logic preserved in assembler/snapshot_assembler.py.
         """
-        # Game metadata
-        game_data = data.get("gameData", {})
-        game_time = game_data.get("gameTime", 0.0)
-        game_mode = game_data.get("gameMode", "CLASSIC")
-        map_number = game_data.get("mapNumber", 11)
-        phase = GamePhase.from_game_time(game_time)
+        snapshot = self._assembler.assemble(data)
+        # Sync state back (backward compat with _internal_proc references)
+        self._active_summoner = self._assembler.active_summoner
+        self._active_team = self._assembler.active_team
+        return snapshot
 
-        # Active player
-        active_raw = data.get("activePlayer", {})
-        active_name = active_raw.get("riotIdGameName",
-                      active_raw.get("summonerName", ""))
-        self._active_summoner = active_name
-
-        # Parse all players
-        all_players_raw = data.get("allPlayers", [])
-        players: List[PlayerState] = []
-        blue_players: List[PlayerState] = []
-        red_players: List[PlayerState] = []
-
-        for p_raw in all_players_raw:
-            player = self._parse_player(p_raw, active_raw)
-            players.append(player)
-            if player.team == TeamSide.BLUE:
-                blue_players.append(player)
-            elif player.team == TeamSide.RED:
-                red_players.append(player)
-
-            if player.is_active_player:
-                self._active_team = player.team
-
-        # Build team states
-        blue_team = self._build_team_state(TeamSide.BLUE, blue_players)
-        red_team = self._build_team_state(TeamSide.RED, red_players)
-
-        # Gold diff
-        gold_diff = blue_team.total_gold - red_team.total_gold
-
-        # Find active player state
-        active_state = None
-        for p in players:
-            if p.is_active_player:
-                active_state = p
-                break
-
-        return GameSnapshot(
-            game_time=game_time,
-            phase=phase,
-            game_mode=game_mode,
-            map_number=map_number,
-            blue_team=blue_team,
-            red_team=red_team,
-            active_player=active_state,
-            active_team=self._active_team,
-            all_players=tuple(players),
-            gold_diff=gold_diff,
-        )
-
-    def _parse_player(
-        self,
-        p_raw: Dict[str, Any],
-        active_raw: Dict[str, Any],
-    ) -> PlayerState:
-        """Parse a single player from allPlayers array."""
-        name = p_raw.get("riotIdGameName",
-               p_raw.get("summonerName", ""))
-        is_active = (name == self._active_summoner)
-
-        # Scores
-        scores_raw = p_raw.get("scores", {})
-        scores = PlayerScore(
-            kills=scores_raw.get("kills", 0),
-            deaths=scores_raw.get("deaths", 0),
-            assists=scores_raw.get("assists", 0),
-            creep_score=scores_raw.get("creepScore", 0),
-            ward_score=scores_raw.get("wardScore", 0.0),
-        )
-
-        # Items
-        items_raw = p_raw.get("items", [])
-        item_ids = tuple(item.get("itemID", 0) for item in items_raw)
-        gold_spent = sum(item.get("price", 0) for item in items_raw)
-        items = PlayerItems(item_ids=item_ids, gold_spent=gold_spent)
-
-        # Abilities (only available for active player)
-        abilities = PlayerAbilities()
-        if is_active and active_raw:
-            ab_raw = active_raw.get("abilities", {})
-            abilities = PlayerAbilities(
-                q_level=ab_raw.get("Q", {}).get("abilityLevel", 0),
-                w_level=ab_raw.get("W", {}).get("abilityLevel", 0),
-                e_level=ab_raw.get("E", {}).get("abilityLevel", 0),
-                r_level=ab_raw.get("R", {}).get("abilityLevel", 0),
-            )
-
-        # Champion stats
-        stats_raw = active_raw.get("championStats", {}) if is_active else {}
-
-        # Summoner spells
-        spells = p_raw.get("summonerSpells", {})
-        spell_d = spells.get("summonerSpellOne", {}).get("displayName", "")
-        spell_f = spells.get("summonerSpellTwo", {}).get("displayName", "")
-
-        return PlayerState(
-            summoner_name=name,
-            champion_name=p_raw.get("championName", ""),
-            team=TeamSide.from_riot(p_raw.get("team", "")),
-            level=p_raw.get("level", 1),
-            position=p_raw.get("position", ""),
-            is_active_player=is_active,
-            is_dead=p_raw.get("isDead", False),
-            respawn_timer=p_raw.get("respawnTimer", 0.0),
-            current_health=stats_raw.get("currentHealth", 0.0) if is_active
-                           else 0.0,
-            max_health=stats_raw.get("maxHealth", 0.0) if is_active
-                       else 0.0,
-            current_mana=stats_raw.get("resourceValue", 0.0) if is_active
-                         else 0.0,
-            max_mana=stats_raw.get("resourceMax", 0.0) if is_active
-                     else 0.0,
-            attack_damage=stats_raw.get("attackDamage", 0.0),
-            ability_power=stats_raw.get("abilityPower", 0.0),
-            armor=stats_raw.get("armor", 0.0),
-            magic_resist=stats_raw.get("magicResist", 0.0),
-            move_speed=stats_raw.get("moveSpeed", 0.0),
-            current_gold=active_raw.get("currentGold", 0.0) if is_active
-                         else 0.0,
-            scores=scores,
-            items=items,
-            abilities=abilities,
-            spell_d=spell_d,
-            spell_f=spell_f,
-        )
-
-    def _build_team_state(
-        self, side: TeamSide, players: List[PlayerState]
-    ) -> TeamState:
-        """Aggregate player states into a team state."""
-        total_kills = sum(p.scores.kills for p in players)
-        total_deaths = sum(p.scores.deaths for p in players)
-        total_gold = sum(p.current_gold for p in players)
-
-        return TeamState(
-            side=side,
-            players=tuple(players),
-            total_kills=total_kills,
-            total_deaths=total_deaths,
-            total_gold=total_gold,
-        )
+    # Claude26: _parse_player and _build_team_state moved to
+    # modules/perception/assembler/snapshot_assembler.py
+    # Called via self._assembler.assemble() in _assemble_snapshot() above.
 
     # ─── Event Detection ─────────────────────────────────────────────
 
     def _detect_new_events(self, data: Dict[str, Any]) -> List[GameEvent]:
-        """Detect events that haven't been seen in previous ticks.
+        """Detect events not seen in previous ticks.
 
-        Uses event ID for deduplication.
+        Claude26: Delegates to EventDetector (Apollo detector/ pattern).
+        All dedup logic preserved in detector/event_detector.py.
         """
-        events_wrapper = data.get("events", {})
-        raw_events = events_wrapper.get("Events", [])
-        new_events: List[GameEvent] = []
-
-        for evt_raw in raw_events:
-            evt_id = evt_raw.get("EventID", 0)
-            if evt_id in self._seen_event_ids:
-                continue
-            self._seen_event_ids.add(evt_id)
-
-            # Map event name to our enum
-            evt_name = evt_raw.get("EventName", "")
-            try:
-                evt_type = EventType(evt_name)
-            except ValueError:
-                evt_type = EventType.GAME_START  # unknown, default
-
-            event = GameEvent(
-                event_id=evt_id,
-                event_type=evt_type,
-                game_time=evt_raw.get("EventTime", 0.0),
-                killer=evt_raw.get("KillerName", ""),
-                victim=evt_raw.get("VictimName", ""),
-                assisters=tuple(evt_raw.get("Assisters", [])),
-            )
-            new_events.append(event)
-            self._all_events.append(event)
-
+        new_events = self._event_detector.detect_new(data)
+        # Sync back for backward compat (_all_events, _seen_event_ids)
+        self._all_events = self._event_detector.all_events
+        self._seen_event_ids = self._event_detector.seen_event_ids
         return new_events
 
     # ─── Status ──────────────────────────────────────────────────────
@@ -754,101 +597,16 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
     # ─── Claude17: Event Rate Tracking ───────────────────────────────────
 
     def get_event_rates(self, window_s: float = 60.0) -> Dict[str, float]:
-        """Compute per-minute event rates by type.
-
-        Claude17: Enables monitoring of event detection quality.
-        Low rates may indicate perception is missing events;
-        anomalously high rates may indicate noise or bugs.
-        """
-        now = time.time()
-        cutoff = now - window_s
-        recent = [
-            e for e in self._all_events
-            if hasattr(e, 'timestamp') and e.timestamp > cutoff
-        ]
-
-        counts: Dict[str, int] = {}
-        for e in recent:
-            etype = getattr(e, 'event_type', 'unknown')
-            if hasattr(etype, 'value'):
-                etype = etype.value
-            counts[etype] = counts.get(etype, 0) + 1
-
-        minutes = max(window_s / 60.0, 1.0 / 60.0)
-        return {k: round(v / minutes, 2) for k, v in counts.items()}
+        """Claude26: Delegates to EventDetector."""
+        return self._event_detector.event_rates(window_s)
 
     def compute_data_quality_score(self) -> float:
-        """Score the quality of the last game state snapshot.
-
-        Claude17: Returns 0.0–1.0 based on:
-        - Are all expected fields present?
-        - Is player count reasonable (10)?
-        - Is game time advancing?
-        - Are gold values non-negative?
-
-        Used by prediction to weight its confidence.
-        """
-        if self._last_snapshot is None:
-            return 0.0
-
-        score = 0.0
-        checks = 0
-
-        snap = self._last_snapshot
-
-        # Check player count
-        checks += 1
-        if hasattr(snap, 'blue_team') and hasattr(snap, 'red_team'):
-            blue_count = len(getattr(snap.blue_team, 'players', []))
-            red_count = len(getattr(snap.red_team, 'players', []))
-            if blue_count == 5 and red_count == 5:
-                score += 1.0
-            elif blue_count + red_count > 0:
-                score += 0.5
-
-        # Check game time is advancing
-        checks += 1
-        if hasattr(snap, 'game_time') and snap.game_time > 0:
-            score += 1.0
-
-        # Check phase is set
-        checks += 1
-        if hasattr(snap, 'phase') and snap.phase is not None:
-            score += 1.0
-
-        # Check gold diff is computed
-        checks += 1
-        if hasattr(snap, 'gold_diff'):
-            score += 1.0
-
-        return round(score / max(checks, 1), 4) if checks > 0 else 0.0
+        """Claude26: Delegates to EventDetector."""
+        return self._event_detector.data_quality_score(self._last_snapshot)
 
     def detect_anomalies(self) -> List[Dict[str, Any]]:
-        """Detect anomalous patterns in recent perception data.
-
-        Claude17: Flags unusual conditions like:
-        - Sudden large gold swings (possible data corruption)
-        - Player count changes mid-game
-        - Game time going backwards (replay glitch)
-        """
-        anomalies: List[Dict[str, Any]] = []
-
-        if self._last_snapshot is None:
-            return anomalies
-
-        snap = self._last_snapshot
-
-        # Check for extreme gold diff (>15k usually means something weird)
-        if hasattr(snap, 'gold_diff'):
-            if abs(snap.gold_diff) > 15000:
-                anomalies.append({
-                    "type": "extreme_gold_diff",
-                    "value": snap.gold_diff,
-                    "threshold": 15000,
-                    "game_time": getattr(snap, 'game_time', 0),
-                })
-
-        return anomalies
+        """Claude26: Delegates to EventDetector."""
+        return self._event_detector.detect_anomalies(self._last_snapshot)
 
 
     # ─── Apollo-style input validation (Claude23) ────────────────────────
@@ -857,59 +615,10 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
     # processing. We add _validate_input() for structured pre-checks.
 
     def _validate_input(self, allgamedata: Dict[str, Any]) -> bool:
-        """Validate input data before perception processing.
-
-        Apollo pattern: InternalProc() checks message validity before
-        running the pipeline. Returns False to skip this tick gracefully.
-
-        Checks:
-        1. Required top-level keys present
-        2. allPlayers is non-empty list
-        3. gameData has gameTime > 0
-        4. Data is not a duplicate of last processed tick
-        """
-        if not isinstance(allgamedata, dict):
-            logger.warning("Input is not a dict: %s", type(allgamedata).__name__)
-            return False
-
-        required = ("allPlayers", "gameData")
-        for key in required:
-            if key not in allgamedata:
-                logger.warning("Input missing required key: %r", key)
-                return False
-
-        players = allgamedata.get("allPlayers")
-        if not isinstance(players, list) or len(players) == 0:
-            return False
-
-        game_data = allgamedata.get("gameData", {})
-        game_time = game_data.get("gameTime", 0.0)
-        if game_time <= 0:
-            return False
-
-        # Duplicate detection: skip if same gameTime as last tick
-        if hasattr(self, "_last_processed_game_time"):
-            if game_time == self._last_processed_game_time:
-                return False  # duplicate, skip
-
-        self._last_processed_game_time = game_time
-        return True
+        """Claude26: Delegates to EventDetector."""
+        return self._event_detector.validate_input(allgamedata)
 
     def _check_upstream_health(self) -> bool:
-        """Check if canbus upstream is providing fresh data.
-
-        Apollo pattern: components check their readers for staleness
-        before proceeding with Proc().
-
-        Returns True if upstream data is fresh enough to process.
-        """
-        if not hasattr(self, "_raw_lcu_reader") or self._raw_lcu_reader is None:
-            return True  # no reader = legacy mode, skip check
-
-        if hasattr(self._raw_lcu_reader, "is_stale"):
-            if self._raw_lcu_reader.is_stale(max_age_s=3.0):
-                logger.warning(
-                    "Upstream canbus data is stale (>3s old)"
-                )
-                return False
-        return True
+        """Claude26: Delegates to EventDetector."""
+        reader = getattr(self, "_raw_lcu_reader", None)
+        return self._event_detector.check_upstream_health(reader)
