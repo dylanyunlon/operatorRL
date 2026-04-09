@@ -805,3 +805,67 @@ class SchedulerMetrics:
             "total_hot_reloads": self.total_hot_reloads,
             "peak_component_count": self.peak_component_count,
         }
+
+
+# ─── Priority-based component scheduling (Claude23) ─────────────────────────
+#
+# Apollo scheduler uses processor groups and CRoutines for priority.
+# Python threads don't support true priority, but we can order component
+# startup and assign thread names for profiling.
+#
+# This class wraps the existing Scheduler with priority awareness.
+
+class ComponentPriority:
+    """Priority levels for component scheduling.
+
+    Higher priority components are started first and get more
+    favorable scheduling treatment (shorter cooldowns, etc).
+
+    Apollo equivalent: CRoutine priority in scheduler_choreography.
+    """
+    CRITICAL = 0    # canbus — data backbone, must run first
+    HIGH = 1        # perception — processes raw data
+    MEDIUM = 2      # prediction, planning — derived data
+    LOW = 3         # control, monitor — output/observability
+    BACKGROUND = 4  # recording, diagnostics
+
+    # Default priority mapping for lolbot components
+    COMPONENT_PRIORITIES = {
+        "canbus": CRITICAL,
+        "perception": HIGH,
+        "prediction": MEDIUM,
+        "planning": MEDIUM,
+        "control": LOW,
+        "monitor": LOW,
+    }
+
+    @classmethod
+    def get_priority(cls, component_name: str) -> int:
+        """Get the scheduling priority for a named component."""
+        return cls.COMPONENT_PRIORITIES.get(
+            component_name, cls.BACKGROUND
+        )
+
+    @classmethod
+    def sort_by_priority(
+        cls, components: List[Any]
+    ) -> List[Any]:
+        """Sort components by priority (lowest number = highest priority).
+
+        Used by Mainboard to determine startup order.
+        Components are started in priority order so upstream data
+        producers initialize before downstream consumers.
+        """
+        def _key(comp):
+            name = getattr(comp, "name", getattr(comp, "COMPONENT_NAME", ""))
+            return cls.get_priority(name)
+        return sorted(components, key=_key)
+
+    @classmethod
+    def startup_order(cls) -> List[str]:
+        """Return component names in recommended startup order."""
+        sorted_items = sorted(
+            cls.COMPONENT_PRIORITIES.items(),
+            key=lambda x: x[1],
+        )
+        return [name for name, _ in sorted_items]

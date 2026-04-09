@@ -744,3 +744,61 @@ class ComponentHealer:
                 e for e in timeline if e["component"] == component
             ]
         return timeline[-last_n:]
+
+
+    # ─── Apollo estop-aligned circuit breaker (Claude23) ─────────────────
+    #
+    # Apollo ProcessGuardianCmdTimeout() is the "estop" — triggered when
+    # commands are stale. Our circuit breaker should integrate with SafeMode
+    # for a unified degradation pathway.
+
+    def trigger_safe_mode_on_threshold(
+        self,
+        component: str,
+        error_count: int,
+        threshold: int = 10,
+    ) -> bool:
+        """Activate SafeMode when a component exceeds error threshold.
+
+        Apollo pattern: after max_control_miss_num exceeded,
+        ProcessGuardianCmdTimeout() fires estop.
+
+        Returns True if SafeMode was activated.
+        """
+        if error_count < threshold:
+            return False
+
+        try:
+            from modules.common.component_base import SafeMode
+            safe = SafeMode.instance()
+            safe.activate(
+                component,
+                f"Error threshold exceeded: {error_count}/{threshold}",
+            )
+            return True
+        except ImportError:
+            return False
+
+    def clear_safe_mode_on_recovery(
+        self,
+        component: str,
+        consecutive_successes: int,
+        threshold: int = 5,
+    ) -> bool:
+        """Deactivate SafeMode when component recovers.
+
+        Requires N consecutive successes to avoid flapping.
+        Returns True if SafeMode was deactivated.
+        """
+        if consecutive_successes < threshold:
+            return False
+
+        try:
+            from modules.common.component_base import SafeMode
+            safe = SafeMode.instance()
+            if component in safe.active_sources:
+                safe.deactivate(component)
+                return True
+        except ImportError:
+            pass
+        return False

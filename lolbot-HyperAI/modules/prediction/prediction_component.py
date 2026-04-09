@@ -842,3 +842,60 @@ class PredictionComponent(TimerComponent, ManagedComponent):
         # Convert to per-minute based on component interval
         ticks_per_min = 60000.0 / max(self.interval_ms, 1)
         return round(slope_per_tick * ticks_per_min, 6)
+
+
+    # ─── Apollo-aligned data freshness and confidence (Claude23) ─────────
+    #
+    # Apollo prediction_component.cc checks ADCTrajectory freshness before
+    # running prediction. We add feature staleness check and confidence bounds.
+
+    def _check_features_fresh(self, snapshot: Any) -> bool:
+        """Check if the GameSnapshot is fresh enough for prediction.
+
+        Apollo pattern: prediction checks localization/perception timestamps
+        before computing. Stale input → stale prediction → dangerous.
+
+        Returns True if snapshot is fresh enough to trust.
+        """
+        if snapshot is None:
+            return False
+
+        snap_time = getattr(snapshot, "game_time", 0.0)
+        if snap_time <= 0:
+            return False
+
+        # Check if this is a duplicate (same game_time as last prediction)
+        if hasattr(self, "_last_predicted_game_time"):
+            if snap_time <= self._last_predicted_game_time:
+                return False  # stale or duplicate
+
+        return True
+
+    def _clamp_confidence(
+        self, raw_prob: float, min_conf: float = 0.05, max_conf: float = 0.95
+    ) -> float:
+        """Clamp win probability to avoid extreme overconfidence.
+
+        No model should output 0% or 100% — even in clearly won/lost games,
+        throws and comebacks happen. This guard prevents the voice announcer
+        from making embarrassing absolute statements.
+
+        Args:
+            raw_prob: Raw win probability from model (0.0 to 1.0).
+            min_conf: Floor (default 5%).
+            max_conf: Ceiling (default 95%).
+
+        Returns:
+            Clamped probability.
+        """
+        return max(min_conf, min(max_conf, raw_prob))
+
+    def _safe_mode_prediction(self) -> float:
+        """Return a neutral prediction when in safe mode.
+
+        Apollo equivalent: when data is stale, don't compute new predictions.
+        Return 0.5 (neutral) or last-known value if available.
+        """
+        if hasattr(self, "_last_win_prob") and self._last_win_prob > 0:
+            return self._last_win_prob
+        return 0.5

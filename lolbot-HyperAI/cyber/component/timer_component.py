@@ -522,6 +522,97 @@ class TimerComponent(abc.ABC):
             if sleep_s > 0:
                 self._stop_event.wait(timeout=sleep_s)
 
+
+    # ─── Apollo Proc() Timing Guard (Claude23) ───────────────────────────
+    #
+    # Apollo canbus_component.cc:162-217:
+    #   const auto start_time = Time::Now().ToMicrosecond();
+    #   ... Proc() body ...
+    #   const auto end_time = Time::Now().ToMicrosecond();
+    #   if (time_diff_ms > (1 / FLAGS_chassis_freq * 1e3)) { AWARN; }
+    #
+    # Adds deadline enforcement + context manager for subclass Proc().
+    # All existing _run_loop logic preserved — this is additive only.
+
+    def should_skip_proc(self) -> bool:
+        """Check if Proc() should be skipped this tick.
+
+        Returns True if component is in cooldown, paused, or not RUNNING.
+        Subclasses call this at top of Proc() for uniform gating.
+
+        Apollo equivalent: implicit in timer_component.cc — timer doesn't
+        fire Proc() unless state is ready.
+        """
+        if self._state != ComponentState.RUNNING:
+            return True
+        if self._pause_event.is_set():
+            return True
+        if self._last_cooldown_time > 0:
+            elapsed = time.monotonic() - self._last_cooldown_time
+            if elapsed < self._config.cooldown_s:
+                return True
+        return False
+
+    class _ProcMeasurement:
+        """Context manager measuring Proc() body execution time.
+
+        Apollo reference: every Proc() measures start→end, warns if
+        exceeds budget (1/FLAGS_chassis_freq * 1e3 ms).
+
+        Usage in subclass::
+
+            with self.measure_proc() as m:
+                m.success = self._do_work()
+                if not m.success:
+                    m.failure_reason = "upstream_timeout"
+        """
+        __slots__ = ("success", "failure_reason", "_component", "_t0")
+
+        def __init__(self, component: "TimerComponent") -> None:
+            self._component = component
+            self._t0 = time.monotonic()
+            self.success: bool = True
+            self.failure_reason: str = ""
+
+        def __enter__(self) -> "TimerComponent._ProcMeasurement":
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+            elapsed_ms = (time.monotonic() - self._t0) * 1000.0
+            comp = self._component
+
+            # Apollo pattern: warn if Proc() exceeds its frequency budget
+            deadline_ms = comp._config.interval_ms
+            if elapsed_ms > deadline_ms:
+                logger.warning(
+                    "[%s] Proc() deadline violation: %.1f ms > %.1f ms "
+                    "budget (seq=%d)",
+                    comp.name, elapsed_ms, deadline_ms, comp._seq,
+                )
+                if comp._latency is not None:
+                    comp._latency.record_overrun()
+
+            if comp._latency is not None:
+                comp._latency.record(elapsed_ms, self.success)
+
+            if exc_type is not None:
+                logger.error(
+                    "[%s] Proc() exception in measure_proc: %s: %s",
+                    comp.name, exc_type.__name__, exc_val,
+                )
+                self.success = False
+                return False  # re-raise
+
+            return False
+
+    def measure_proc(self) -> "_ProcMeasurement":
+        """Return context manager measuring and recording Proc() timing.
+
+        Primary instrumentation point for subclass Proc() methods.
+        See _ProcMeasurement docstring for usage.
+        """
+        return self._ProcMeasurement(self)
+
     # ─── Debug / Introspection ───────────────────────────────────────────
 
     def status(self) -> Dict[str, Any]:

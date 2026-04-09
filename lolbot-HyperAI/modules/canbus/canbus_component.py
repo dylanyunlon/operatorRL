@@ -618,7 +618,90 @@ class CanbusComponent(TimerComponent, ManagedComponent):
             )
             self._raw_fiddler_writer.Write(raw)
 
+
+    # ─── Apollo patterns added by Claude23 ───────────────────────────────
+    #
+    # 1. CheckChassisCommunicationFault() → Apollo canbus_component.cc:196
+    # 2. UpdateHeartbeat() → Apollo canbus_component.cc:214
+    # 3. Absolute time-diff stale detection → Apollo OnControlCommandCheck()
+
+    _HEARTBEAT_INTERVAL_TICKS: int = 50  # every 5s at 10Hz
+    _COMM_FAULT_THRESHOLD_S: float = 10.0  # no data for 10s = fault
+
+    def _check_communication_fault(self) -> bool:
+        """Check if data source communication has failed.
+
+        Apollo equivalent: vehicle_object_->CheckChassisCommunicationFault()
+        (canbus_component.cc:196-203).
+
+        Returns True if communication is faulted (no data for threshold).
+        """
+        if self._data_source is None:
+            return True
+        ds_stats = self._data_source.stats()
+        last_success = ds_stats.get("last_success_time", 0.0)
+        if last_success <= 0:
+            # Never succeeded — not necessarily a fault during startup
+            return self._tick > 100  # fault after 10s of startup
+        age = time.time() - last_success
+        if age > self._COMM_FAULT_THRESHOLD_S:
+            logger.error(
+                "Communication fault: no successful poll for %.1f s "
+                "(threshold=%.1f s)",
+                age, self._COMM_FAULT_THRESHOLD_S,
+            )
+            return True
+        return False
+
+    def _update_heartbeat(self) -> None:
+        """Publish heartbeat for health monitoring.
+
+        Apollo equivalent: vehicle_object_->UpdateHeartbeat()
+        (canbus_component.cc:214). Called every N ticks inside Proc().
+        """
+        if self._tick % self._HEARTBEAT_INTERVAL_TICKS != 0:
+            return
+        if self._status_writer is None:
+            return
+        heartbeat = StatusMessage(
+            status=Status.ok("heartbeat"),
+            sequence=self._tick,
+            source_component="canbus",
+            game_time=self._last_game_time,
+        )
+        self._status_writer.Write(heartbeat)
+
+    def _check_stale_by_time(self, data: Dict[str, Any]) -> bool:
+        """Detect stale data using absolute time difference.
+
+        Apollo equivalent: OnControlCommandCheck() (canbus_component.cc:239)
+        computes cmd_time_diff = current_timestamp - header.timestamp_sec.
+
+        Unlike the tick-counter _check_stale(), this uses wall-clock time
+        to detect frozen game state — more reliable across varying tick rates.
+
+        Returns True if data appears stale.
+        """
+        game_data = data.get("gameData", {})
+        game_time = game_data.get("gameTime", 0.0)
+
+        if self._last_game_time <= 0 or game_time <= 0:
+            return False
+
+        # If game_time hasn't advanced and real time has passed significantly
+        if game_time <= self._last_game_time:
+            real_elapsed = time.monotonic() - self._last_backoff_time                 if self._last_backoff_time > 0 else 0.0
+            if real_elapsed > _STALE_THRESHOLD_S:
+                logger.warning(
+                    "Time-diff stale: gameTime=%.1f stuck, "
+                    "real elapsed=%.1f s > threshold=%.1f s",
+                    game_time, real_elapsed, _STALE_THRESHOLD_S,
+                )
+                return True
+        return False
+
     def _apply_backoff(self) -> None:
+
         """Apply exponential backoff between reconnection attempts."""
         now = time.monotonic()
         if now - self._last_backoff_time < self._backoff_s:

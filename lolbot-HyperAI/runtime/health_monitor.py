@@ -810,3 +810,83 @@ class HealthMonitor:
                 sum(trend) / max(len(trend), 1), 4
             ),
         }
+
+
+    # ─── Per-component deadline tracking (Claude23) ──────────────────────
+    #
+    # Apollo Proc() timing guard pattern: each component has a deadline.
+    # Health monitor tracks deadline violations across all components.
+
+    def track_deadline_violations(
+        self,
+        component_statuses: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Track Proc() deadline violations across all components.
+
+        Reads latency stats from each component's status and identifies
+        which components are consistently exceeding their time budget.
+
+        Args:
+            component_statuses: Map of component_name → status dict
+                (from TimerComponent.status())
+
+        Returns:
+            Summary of deadline health.
+        """
+        violations = {}
+        total_overruns = 0
+
+        for name, status in component_statuses.items():
+            latency = status.get("latency", {})
+            overruns = latency.get("total_overruns", 0)
+            total_calls = latency.get("total_calls", 0)
+            p99 = latency.get("p99_ms", 0.0)
+            interval = status.get("interval_ms", 100.0)
+
+            total_overruns += overruns
+
+            if total_calls > 0:
+                overrun_rate = overruns / total_calls
+            else:
+                overrun_rate = 0.0
+
+            if overrun_rate > 0.05:  # >5% overrun rate
+                violations[name] = {
+                    "overrun_rate": round(overrun_rate, 4),
+                    "total_overruns": overruns,
+                    "p99_ms": p99,
+                    "budget_ms": interval,
+                    "severity": "critical" if overrun_rate > 0.2 else "warning",
+                }
+
+        return {
+            "total_overruns": total_overruns,
+            "violating_components": len(violations),
+            "violations": violations,
+            "system_healthy": len(violations) == 0,
+        }
+
+    def recommend_interval_adjustment(
+        self,
+        component_name: str,
+        current_interval_ms: float,
+        p99_ms: float,
+    ) -> Optional[float]:
+        """Recommend interval adjustment if component consistently overruns.
+
+        If p99 latency exceeds 80% of the interval budget, recommend
+        increasing the interval. This prevents cascading deadline violations.
+
+        Returns recommended new interval_ms, or None if no change needed.
+        """
+        if p99_ms <= 0 or current_interval_ms <= 0:
+            return None
+
+        utilization = p99_ms / current_interval_ms
+        if utilization > 0.8:
+            # Recommend 2x the p99 as the new interval
+            recommended = p99_ms * 2.0
+            # But cap at 10x original to prevent runaway
+            recommended = min(recommended, current_interval_ms * 10.0)
+            return round(recommended, 1)
+        return None

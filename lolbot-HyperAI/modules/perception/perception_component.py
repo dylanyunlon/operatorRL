@@ -849,3 +849,67 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
                 })
 
         return anomalies
+
+
+    # ─── Apollo-style input validation (Claude23) ────────────────────────
+    #
+    # Apollo perception InternalProc() validates input message before
+    # processing. We add _validate_input() for structured pre-checks.
+
+    def _validate_input(self, allgamedata: Dict[str, Any]) -> bool:
+        """Validate input data before perception processing.
+
+        Apollo pattern: InternalProc() checks message validity before
+        running the pipeline. Returns False to skip this tick gracefully.
+
+        Checks:
+        1. Required top-level keys present
+        2. allPlayers is non-empty list
+        3. gameData has gameTime > 0
+        4. Data is not a duplicate of last processed tick
+        """
+        if not isinstance(allgamedata, dict):
+            logger.warning("Input is not a dict: %s", type(allgamedata).__name__)
+            return False
+
+        required = ("allPlayers", "gameData")
+        for key in required:
+            if key not in allgamedata:
+                logger.warning("Input missing required key: %r", key)
+                return False
+
+        players = allgamedata.get("allPlayers")
+        if not isinstance(players, list) or len(players) == 0:
+            return False
+
+        game_data = allgamedata.get("gameData", {})
+        game_time = game_data.get("gameTime", 0.0)
+        if game_time <= 0:
+            return False
+
+        # Duplicate detection: skip if same gameTime as last tick
+        if hasattr(self, "_last_processed_game_time"):
+            if game_time == self._last_processed_game_time:
+                return False  # duplicate, skip
+
+        self._last_processed_game_time = game_time
+        return True
+
+    def _check_upstream_health(self) -> bool:
+        """Check if canbus upstream is providing fresh data.
+
+        Apollo pattern: components check their readers for staleness
+        before proceeding with Proc().
+
+        Returns True if upstream data is fresh enough to process.
+        """
+        if not hasattr(self, "_raw_lcu_reader") or self._raw_lcu_reader is None:
+            return True  # no reader = legacy mode, skip check
+
+        if hasattr(self._raw_lcu_reader, "is_stale"):
+            if self._raw_lcu_reader.is_stale(max_age_s=3.0):
+                logger.warning(
+                    "Upstream canbus data is stale (>3s old)"
+                )
+                return False
+        return True

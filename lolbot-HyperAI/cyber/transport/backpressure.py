@@ -677,3 +677,83 @@ def create_bounded_buffer(
     if register:
         BackpressureRegistry.instance().register_buffer(channel_name, buffer)
     return buffer
+
+
+# ─── Apollo-style flow control metrics (Claude23) ────────────────────────────
+#
+# Apollo's transport layer monitors channel utilization and applies
+# back-pressure when buffers fill. We add system-wide flow control
+# metrics for the monitoring dashboard.
+
+
+class FlowControlMetrics:
+    """System-wide back-pressure health metrics.
+
+    Aggregates utilization across all registered bounded buffers.
+    Used by MonitorComponent to detect system overload.
+
+    Usage::
+
+        metrics = FlowControlMetrics.collect()
+        if metrics["any_full"]:
+            logger.warning("Back-pressure detected!")
+    """
+
+    @staticmethod
+    def collect() -> Dict[str, Any]:
+        """Collect flow control metrics from all registered buffers.
+
+        Returns dict with per-channel and aggregate utilization.
+        """
+        registry = BackpressureRegistry.instance()
+        channels = {}
+        total_capacity = 0
+        total_used = 0
+        any_full = False
+        drops_total = 0
+
+        for name, buf in registry._buffers.items():
+            stats = buf.stats()
+            capacity = stats.get("capacity", 0)
+            current = stats.get("current_depth", 0)
+            drops = stats.get("drops_total", stats.get("total_drops", 0))
+
+            total_capacity += capacity
+            total_used += current
+            drops_total += drops
+
+            utilization = current / max(capacity, 1)
+            if utilization >= 1.0:
+                any_full = True
+
+            channels[name] = {
+                "utilization": round(utilization, 3),
+                "current_depth": current,
+                "capacity": capacity,
+                "drops": drops,
+            }
+
+        overall_util = total_used / max(total_capacity, 1)
+
+        return {
+            "channels": channels,
+            "total_capacity": total_capacity,
+            "total_used": total_used,
+            "overall_utilization": round(overall_util, 3),
+            "any_full": any_full,
+            "drops_total": drops_total,
+            "channel_count": len(channels),
+        }
+
+    @staticmethod
+    def find_bottlenecks(threshold: float = 0.8) -> List[str]:
+        """Find channels with utilization above threshold.
+
+        Returns list of channel names that are potential bottlenecks.
+        """
+        metrics = FlowControlMetrics.collect()
+        bottlenecks = []
+        for name, info in metrics["channels"].items():
+            if info["utilization"] >= threshold:
+                bottlenecks.append(name)
+        return bottlenecks

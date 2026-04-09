@@ -781,3 +781,81 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+    # ─── Apollo-aligned supervisor hardening (Claude23) ──────────────────
+    #
+    # Apollo mainboard validates all modules before entering the main loop.
+    # We add: startup health probe, SafeMode supervisor integration,
+    # and structured error escalation.
+
+    def _startup_health_probe(self) -> bool:
+        """Probe all components for health after Mainboard.start_all().
+
+        Apollo pattern: mainboard waits for all modules to Init() OK.
+        Returns True if all critical components are healthy.
+        """
+        probe = self._mainboard.health_probe(timeout_s=5.0)
+        all_ok = True
+        for name, healthy in probe.items():
+            status = "OK" if healthy else "FAILED"
+            print(f"  Health probe: {name} = {status}")
+            if not healthy:
+                all_ok = False
+        return all_ok
+
+    def _check_safe_mode(self) -> None:
+        """Check and respond to SafeMode in the supervisor tick.
+
+        When SafeMode activates, the supervisor should:
+        1. Log the activation
+        2. Notify voice output to suppress
+        3. Hold current state until safe mode deactivates
+        """
+        try:
+            from modules.common.component_base import SafeMode
+            safe = SafeMode.instance()
+            if safe.is_active:
+                sources = safe.active_sources
+                if not hasattr(self, "_safe_mode_notified"):
+                    self._safe_mode_notified = False
+                if not self._safe_mode_notified:
+                    print(f"[SafeMode] ACTIVE — sources: {sources}")
+                    if self._voice_announcer:
+                        self._voice_announcer.force_announce(
+                            "System entering safe mode. Data may be stale.",
+                            priority=3,
+                        )
+                    self._safe_mode_notified = True
+            else:
+                if hasattr(self, "_safe_mode_notified") and self._safe_mode_notified:
+                    print("[SafeMode] Deactivated — resuming normal operation")
+                    self._safe_mode_notified = False
+        except ImportError:
+            pass
+
+    def _validate_startup(self) -> List[str]:
+        """Validate component dependencies before starting.
+
+        Apollo pattern: DAG validation in mainboard module loading.
+        Returns list of issues (empty = all OK).
+        """
+        issues = []
+
+        # Check mainboard dependency graph
+        dep_issues = self._mainboard.validate_dependencies()
+        issues.extend(dep_issues)
+
+        # Check critical components are registered
+        critical = ["canbus", "perception", "prediction", "planning"]
+        mb_status = self._mainboard.status()
+        registered = set(mb_status.get("components", {}).keys())
+        for comp in critical:
+            if comp not in registered:
+                issues.append(f"Critical component '{comp}' not registered")
+
+        if issues:
+            for issue in issues:
+                print(f"[Startup] WARNING: {issue}")
+
+        return issues

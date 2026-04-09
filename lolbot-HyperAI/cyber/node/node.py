@@ -240,7 +240,51 @@ class Reader(Generic[T]):
             self._sub.queue.clear()
         return msgs
 
+
+    # ── Apollo-style data freshness check (Claude23) ─────────────────────
+    #
+    # Apollo canbus_component.cc:239-275 OnControlCommandCheck():
+    #   cmd_time_diff = current_timestamp - header.timestamp_sec
+    #   if cmd_time_diff > max_miss_num * period: trigger timeout
+    #
+    # Reader now exposes freshness metrics so components can detect stale
+    # upstream data — matching Apollo's time-delay detection pattern.
+
+    def is_stale(self, max_age_s: float = 5.0) -> bool:
+        """Check if the latest observed message is older than max_age_s.
+
+        Apollo equivalent: OnControlCommandCheck() time-delay detection.
+        Returns True if no message observed or message is stale.
+        """
+        if self._observed_ts <= 0:
+            return True
+        age = time.monotonic() - self._observed_ts
+        return age > max_age_s
+
+    def observed_age_s(self) -> float:
+        """Seconds since the latest observed message was published.
+
+        Returns float('inf') if no message has been observed yet.
+        """
+        if self._observed_ts <= 0:
+            return float("inf")
+        return time.monotonic() - self._observed_ts
+
+    def wait_for_message(self, timeout_s: float = 1.0) -> bool:
+        """Block until a message arrives or timeout expires.
+
+        Useful during Init() to wait for upstream data before starting
+        the Proc() loop. Returns True if a message is available.
+        """
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if self.has_message:
+                return True
+            time.sleep(0.01)
+        return self.has_message
+
     def close(self) -> None:
+
         """Unsubscribe from the channel."""
         channel = _get_or_create_channel(self._channel_name)
         channel.remove_subscriber(self._id)

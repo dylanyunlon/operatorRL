@@ -1021,3 +1021,67 @@ class ActionEffectivenessTracker:
             "ineffective_count": self._ineffective_count,
             "effectiveness_rate": self.effectiveness_rate,
         }
+
+
+    # ─── Apollo command freshness check (Claude23) ───────────────────────
+    #
+    # Apollo canbus_component.cc:218-275 OnControlCommandCheck():
+    # Checks if incoming commands are stale (cmd_time_diff > threshold).
+    # If stale, triggers ProcessGuardianCmdTimeout() → estop.
+    #
+    # Control is the output layer — if planning advice is stale,
+    # we should suppress voice announcements to avoid misleading the player.
+
+    _CMD_FRESHNESS_THRESHOLD_S: float = 15.0  # planning runs at 2Hz, 15s is generous
+
+    def _check_command_freshness(self, advice: Any) -> bool:
+        """Check if planning advice is fresh enough to act on.
+
+        Apollo equivalent: OnControlCommandCheck() time-delay detection.
+        Stale advice = wrong advice. Better to say nothing than mislead.
+
+        Returns True if advice is fresh enough to announce/display.
+        """
+        if advice is None:
+            return False
+
+        # Check advice timestamp
+        advice_time = 0.0
+        if hasattr(advice, "timestamp"):
+            advice_time = advice.timestamp
+        elif isinstance(advice, dict):
+            advice_time = advice.get("timestamp", 0.0)
+
+        if advice_time <= 0:
+            return True  # no timestamp = legacy format, pass through
+
+        import time as _time
+        age = _time.time() - advice_time
+        if age > self._CMD_FRESHNESS_THRESHOLD_S:
+            logger.warning(
+                "Planning advice is stale: age=%.1f s > threshold=%.1f s",
+                age, self._CMD_FRESHNESS_THRESHOLD_S,
+            )
+            return False
+        return True
+
+    def _throttle_on_safe_mode(self) -> bool:
+        """Check SafeMode and throttle output if active.
+
+        Apollo equivalent: ProcessGuardianCmdTimeout() sets throttle=0.
+        When SafeMode is active, suppress new voice announcements.
+
+        Returns True if output should be suppressed.
+        """
+        try:
+            from modules.common.component_base import SafeMode
+            safe = SafeMode.instance()
+            if safe.is_active:
+                logger.debug(
+                    "SafeMode active — throttling control output: %s",
+                    safe.active_sources,
+                )
+                return True
+        except ImportError:
+            pass
+        return False

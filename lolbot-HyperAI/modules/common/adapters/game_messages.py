@@ -481,3 +481,96 @@ class VoiceCommand:
     @property
     def is_expired(self) -> bool:
         return (time.time() - self.timestamp) > self.max_age_s
+
+
+# ─── Apollo FillHeader pattern (Claude23) ────────────────────────────────────
+#
+# Apollo canbus_component.cc:153:
+#   common::util::FillHeader(node_->Name(), &chassis);
+#
+# Every published message should have a header with:
+# - timestamp_sec: wall-clock time
+# - module_name: which component published it
+# - sequence_num: monotonic counter
+#
+# This function stamps messages before publishing, enabling downstream
+# components to check data freshness (OnControlCommandCheck pattern).
+
+
+@dataclass
+class MessageHeader:
+    """Apollo-style message header for all channel messages.
+
+    Every message published on a CyberNode channel should carry this
+    header so downstream readers can detect staleness.
+
+    Apollo reference: common/proto/header.proto
+    """
+    timestamp_sec: float = 0.0
+    module_name: str = ""
+    sequence_num: int = 0
+
+    def age_s(self) -> float:
+        """Seconds since this header was stamped."""
+        if self.timestamp_sec <= 0:
+            return float("inf")
+        return time.time() - self.timestamp_sec
+
+
+def fill_header(
+    module_name: str,
+    message: Any,
+    sequence: int = 0,
+) -> None:
+    """Stamp a message with Apollo-style header fields.
+
+    Apollo equivalent: common::util::FillHeader(node_->Name(), &msg)
+
+    If the message is a dataclass or has settable attributes,
+    sets header fields directly. Otherwise, if it's a dict, adds
+    a "_header" key.
+
+    Args:
+        module_name: Name of the publishing component.
+        message: The message to stamp.
+        sequence: Monotonic sequence number.
+    """
+    header = MessageHeader(
+        timestamp_sec=time.time(),
+        module_name=module_name,
+        sequence_num=sequence,
+    )
+
+    if isinstance(message, dict):
+        message["_header"] = {
+            "timestamp_sec": header.timestamp_sec,
+            "module_name": header.module_name,
+            "sequence_num": header.sequence_num,
+        }
+    elif hasattr(message, "header"):
+        try:
+            message.header = header
+        except (AttributeError, TypeError):
+            pass
+    elif hasattr(message, "_header"):
+        try:
+            message._header = header
+        except (AttributeError, TypeError):
+            pass
+
+
+def get_header_age(message: Any) -> float:
+    """Get the age in seconds of a message's header.
+
+    Returns float('inf') if no header found.
+    """
+    if isinstance(message, dict):
+        h = message.get("_header", {})
+        ts = h.get("timestamp_sec", 0.0)
+        if ts > 0:
+            return time.time() - ts
+    elif hasattr(message, "header") and hasattr(message.header, "timestamp_sec"):
+        ts = message.header.timestamp_sec
+        if ts > 0:
+            return time.time() - ts
+    return float("inf")

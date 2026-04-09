@@ -90,6 +90,39 @@ class DataSource(abc.ABC):
         """状态信息 (子类可覆盖)."""
         return {"source_type": self.source_type}
 
+    # ── Apollo vehicle_object_ protocol extensions (Claude23) ────────────
+    #
+    # Apollo canbus_component.cc:
+    #   vehicle_object_->UpdateHeartbeat()           line 214
+    #   vehicle_object_->CheckChassisCommunicationFault()  line 196
+
+    def update_heartbeat(self) -> None:
+        """Update internal heartbeat timestamp.
+
+        Apollo equivalent: vehicle_object_->UpdateHeartbeat().
+        Default implementation: no-op. Override in live data sources.
+        """
+        pass
+
+    def check_communication_fault(self) -> bool:
+        """Check if communication with the data source is faulted.
+
+        Apollo equivalent: vehicle_object_->CheckChassisCommunicationFault().
+        Returns True if the data source is unreachable or failing.
+        Default: False (no fault).
+        """
+        return False
+
+    @property
+    def last_success_time(self) -> float:
+        """Wall-clock time of last successful data poll.
+
+        Returns 0.0 if no successful poll has occurred.
+        Subclasses should update this in poll().
+        """
+        return getattr(self, "_last_success_time", 0.0)
+
+
 
 # ---------------------------------------------------------------------------
 # LCU data source

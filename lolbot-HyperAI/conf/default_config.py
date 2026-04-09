@@ -278,3 +278,64 @@ def set_config(config: LolBotConfig) -> None:
     """Override the default config (for testing)."""
     global _default_config
     _default_config = config
+
+
+# ─── Apollo-style FLAGS for timing and deadlines (Claude23) ──────────────────
+#
+# Apollo uses gflags (FLAGS_chassis_freq, FLAGS_control_period, etc.)
+# for all timing constants. We centralize them here for consistency.
+#
+# These match Apollo's pattern where every timing constant is configurable
+# via flags, not hardcoded in component code.
+
+class TimingFlags:
+    """Centralized timing constants (Apollo gflags equivalent).
+
+    Apollo reference:
+        modules/canbus/common/canbus_gflags.cc
+        modules/common/adapters/adapter_gflags.cc
+
+    All intervals in milliseconds, periods in seconds.
+    """
+    # Component Proc() intervals (ms)
+    CANBUS_INTERVAL_MS: float = 100.0       # 10Hz
+    PERCEPTION_INTERVAL_MS: float = 100.0   # 10Hz
+    PREDICTION_INTERVAL_MS: float = 500.0   # 2Hz
+    PLANNING_INTERVAL_MS: float = 500.0     # 2Hz
+    CONTROL_INTERVAL_MS: float = 200.0      # 5Hz
+    MONITOR_INTERVAL_MS: float = 2000.0     # 0.5Hz
+
+    # Data freshness thresholds (seconds)
+    CANBUS_STALE_THRESHOLD_S: float = 5.0
+    PERCEPTION_STALE_THRESHOLD_S: float = 3.0
+    PREDICTION_STALE_THRESHOLD_S: float = 10.0
+    PLANNING_STALE_THRESHOLD_S: float = 15.0
+
+    # Communication fault thresholds
+    COMM_FAULT_THRESHOLD_S: float = 10.0
+    MAX_CONSECUTIVE_FAILURES: int = 10
+    CIRCUIT_BREAKER_COOLDOWN_S: float = 2.0
+
+    # Apollo-style command check
+    MAX_CONTROL_MISS_NUM: int = 10
+    CONTROL_PERIOD_S: float = 0.2   # 5Hz
+    MIN_CMD_INTERVAL_MS: float = 5.0
+
+    # Heartbeat
+    HEARTBEAT_INTERVAL_S: float = 5.0
+
+    # Safe mode
+    SAFE_MODE_ACTIVATION_THRESHOLD: int = 10
+    SAFE_MODE_RECOVERY_THRESHOLD: int = 5
+
+    # Supervisor
+    SUPERVISOR_INTERVAL_S: float = 1.0
+    HEALTH_CHECK_INTERVAL_S: float = 5.0
+
+    @classmethod
+    def to_dict(cls) -> Dict[str, Any]:
+        """Export all flags as a dict for serialization."""
+        return {
+            k: v for k, v in cls.__dict__.items()
+            if not k.startswith("_") and k.isupper()
+        }

@@ -783,3 +783,98 @@ class ChannelThroughputMonitor:
             if rate < min_expected_hz:
                 stalled.append(ch)
         return stalled
+
+
+    # ─── Apollo-style structured health aggregation (Claude23) ───────────
+    #
+    # Apollo monitor publishes structured health status for all components.
+    # We add error budget tracking (SRE pattern) and SafeMode integration.
+
+    def _aggregate_component_health(self) -> Dict[str, Any]:
+        """Aggregate health status from all registered components.
+
+        Apollo monitor aggregates canbus/perception/planning/prediction
+        health into a unified dashboard view. We do the same via
+        ComponentRegistry.
+
+        Returns dict with per-component health + system-level summary.
+        """
+        try:
+            from modules.common.component_base import ComponentRegistry
+            registry = ComponentRegistry.instance()
+            health = registry.health_summary()
+        except Exception:
+            health = {}
+
+        total = len(health)
+        healthy_count = 0
+        degraded = []
+        errored = []
+
+        for comp_name, comp_health in health.items():
+            if isinstance(comp_health, dict):
+                if comp_health.get("healthy", True):
+                    healthy_count += 1
+                else:
+                    details = comp_health.get("details", {})
+                    reason = details.get("reason", "unknown")
+                    if details.get("severity", "error") == "warning":
+                        degraded.append({"name": comp_name, "reason": reason})
+                    else:
+                        errored.append({"name": comp_name, "reason": reason})
+            else:
+                healthy_count += 1
+
+        return {
+            "total_components": total,
+            "healthy": healthy_count,
+            "degraded": len(degraded),
+            "errored": len(errored),
+            "degraded_list": degraded,
+            "errored_list": errored,
+            "system_healthy": len(errored) == 0,
+        }
+
+    def _check_error_budget(self) -> Dict[str, Any]:
+        """Track error budget: ratio of failed Proc() ticks to total.
+
+        SRE-style: if error rate exceeds budget, recommend SafeMode.
+
+        Returns dict with error budget status.
+        """
+        if not hasattr(self, "_latency") or self._latency is None:
+            return {"budget_remaining": 1.0}
+
+        stats = self._latency
+        if hasattr(stats, "snapshot"):
+            snap = stats.snapshot()
+        else:
+            snap = {}
+
+        total = snap.get("total_calls", 0)
+        failures = snap.get("total_failures", 0)
+
+        if total == 0:
+            return {"budget_remaining": 1.0, "error_rate": 0.0}
+
+        error_rate = failures / total
+        # Error budget: allow up to 1% failure rate
+        budget = 0.01
+        budget_remaining = max(0.0, budget - error_rate) / budget
+
+        return {
+            "error_rate": round(error_rate, 6),
+            "budget": budget,
+            "budget_remaining": round(budget_remaining, 4),
+            "budget_exhausted": budget_remaining <= 0,
+            "total_calls": total,
+            "total_failures": failures,
+        }
+
+    def _check_safe_mode_status(self) -> Dict[str, Any]:
+        """Report SafeMode status for the monitoring dashboard."""
+        try:
+            from modules.common.component_base import SafeMode
+            return SafeMode.instance().status()
+        except ImportError:
+            return {"is_active": False, "note": "SafeMode not available"}

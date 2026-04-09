@@ -363,3 +363,94 @@ class Mainboard:
                 f"  {comp.name:20s} {state:12s} seq={seq:6d}{latency}"
             )
         return "\n".join(lines)
+
+
+    # ─── Apollo-style dependency-ordered lifecycle (Claude23) ────────────
+    #
+    # Apollo mainboard loads modules in DAG order. We add explicit
+    # dependency validation and health probe after start.
+
+    def health_probe(self, timeout_s: float = 5.0) -> Dict[str, bool]:
+        """Probe all components for health after startup.
+
+        Waits up to timeout_s for each component to report RUNNING state.
+        Returns map of component_name → is_healthy.
+
+        Apollo equivalent: mainboard waits for module Init() success
+        before proceeding to the next module.
+        """
+        import time as _time
+        results = {}
+        deadline = _time.monotonic() + timeout_s
+
+        with self._lock:
+            components = list(self._components.items())
+
+        for name, comp in components:
+            healthy = False
+            while _time.monotonic() < deadline:
+                try:
+                    state = comp.state
+                    if hasattr(state, 'name'):
+                        state_name = state.name
+                    else:
+                        state_name = str(state)
+
+                    if state_name == "RUNNING":
+                        healthy = True
+                        break
+                    elif state_name in ("ERROR", "SHUTDOWN"):
+                        break
+                except Exception:
+                    break
+                _time.sleep(0.1)
+            results[name] = healthy
+
+        return results
+
+    def validate_dependencies(self) -> List[str]:
+        """Check that all component dependencies are registered.
+
+        Returns list of missing dependencies (empty = all OK).
+
+        Apollo equivalent: DAG validation in mainboard module loading.
+        Components declare DEPENDENCIES class attribute listing required
+        upstream components.
+        """
+        missing = []
+        with self._lock:
+            registered_names = set(self._components.keys())
+            for name, comp in self._components.items():
+                deps = getattr(comp, "DEPENDENCIES", [])
+                for dep in deps:
+                    if dep not in registered_names:
+                        missing.append(
+                            f"{name} requires '{dep}' but it's not registered"
+                        )
+        return missing
+
+    def restart_component(self, name: str, timeout: float = 5.0) -> bool:
+        """Restart a single component by name.
+
+        Stops then re-initializes and starts the component.
+        Returns True if restart succeeded.
+
+        Useful for recovering from ERROR state without full system restart.
+        """
+        with self._lock:
+            comp = self._components.get(name)
+            if comp is None:
+                return False
+
+        try:
+            comp.stop(timeout=timeout)
+            ok = comp.initialize()
+            if ok:
+                ok = comp.start()
+            return ok
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(
+                "Failed to restart %s: %s", name, exc
+            )
+            return False

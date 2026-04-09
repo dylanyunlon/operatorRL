@@ -329,3 +329,63 @@ class StatusMessage:
             "game_time": self.game_time,
             "has_payload": self.payload is not None,
         }
+
+
+# ─── Severity Levels (Claude23) ──────────────────────────────────────────────
+#
+# Apollo uses monitor_logger_buffer_.ERROR/WARN/INFO for severity.
+# We formalize this as an enum for structured error propagation.
+
+class ErrorSeverity:
+    """Error severity levels matching Apollo monitor_logger_buffer_ levels."""
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+    @staticmethod
+    def from_error_code(code: "ErrorCode") -> str:
+        """Infer severity from error code category.
+
+        Communication faults and timeouts are ERROR.
+        Invalid responses are WARNING (may self-heal).
+        Game-not-in-progress is INFO (expected during queue).
+        """
+        name = code.name if hasattr(code, "name") else str(code)
+        if "TIMEOUT" in name or "FAULT" in name or "FAILED" in name:
+            return ErrorSeverity.ERROR
+        if "INVALID" in name or "MISSING" in name:
+            return ErrorSeverity.WARNING
+        if "NOT_RUNNING" in name or "NOT_IN_PROGRESS" in name:
+            return ErrorSeverity.INFO
+        return ErrorSeverity.ERROR
+
+
+# ─── Additional error codes for Claude23 Apollo patterns ─────────────────────
+
+class ErrorCodeClaude23:
+    """Extended error codes for Apollo-aligned patterns.
+
+    These supplement the existing ErrorCode enum without modifying it,
+    so all Claude1-22 code using ErrorCode continues to work.
+    """
+    # SafeMode triggers
+    SAFE_MODE_ACTIVATED = "SAFE_MODE_ACTIVATED"
+    SAFE_MODE_DEACTIVATED = "SAFE_MODE_DEACTIVATED"
+
+    # Communication fault (Apollo CheckChassisCommunicationFault)
+    COMM_FAULT_DETECTED = "COMM_FAULT_DETECTED"
+    COMM_FAULT_RECOVERED = "COMM_FAULT_RECOVERED"
+
+    # Data freshness (Apollo OnControlCommandCheck time-delay)
+    DATA_FRESHNESS_VIOLATION = "DATA_FRESHNESS_VIOLATION"
+    UPSTREAM_STALE = "UPSTREAM_STALE"
+
+    # Input validation (Apollo CheckInput)
+    INPUT_VALIDATION_FAILED = "INPUT_VALIDATION_FAILED"
+    UPSTREAM_NOT_READY = "UPSTREAM_NOT_READY"
+
+    # Heartbeat
+    HEARTBEAT_MISSED = "HEARTBEAT_MISSED"
+    HEARTBEAT_OK = "HEARTBEAT_OK"

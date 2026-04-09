@@ -900,3 +900,151 @@ class DegradationPolicy:
             return DegradationLevel.REDUCED
         else:
             return DegradationLevel.FULL
+
+
+# ─── SafeMode (Claude23) ────────────────────────────────────────────────────
+#
+# Apollo equivalent: ProcessGuardianCmdTimeout() in canbus_component.cc:376
+# When data goes stale, Apollo sets throttle=0, brake=estop_brake.
+# Our SafeMode: when upstream data is stale, components degrade gracefully.
+#
+# Also adds on_error() structured error propagation matching Apollo's
+# common::Status CanbusComponent::OnError() pattern (line 344).
+
+class SafeMode:
+    """System-wide safe mode for data staleness or communication fault.
+
+    When activated, all components should:
+    - Continue running (don't crash)
+    - Use last-known-good data
+    - Suppress new predictions/planning with low confidence
+    - Publish degraded status
+
+    Apollo reference: ProcessGuardianCmdTimeout() sets throttle=0, brake=estop.
+    Our equivalent: suppress voice output, hold last prediction, warn user.
+
+    Usage::
+
+        safe = SafeMode.instance()
+        safe.activate("canbus", "LCU data stale for 10s")
+        # In prediction Proc():
+        if safe.is_active:
+            return last_known_prediction  # don't compute new
+        safe.deactivate("canbus")
+    """
+
+    _instance: Optional["SafeMode"] = None
+    _lock = threading.Lock()
+
+    def __init__(self) -> None:
+        self._active_reasons: Dict[str, str] = {}
+        self._activated_at: Dict[str, float] = {}
+        self._activation_count: int = 0
+        self._lock = threading.Lock()
+
+    @classmethod
+    def instance(cls) -> "SafeMode":
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset singleton — for tests only."""
+        cls._instance = None
+
+    def activate(self, source: str, reason: str) -> None:
+        """Activate safe mode from a given source.
+
+        Multiple sources can activate safe mode independently.
+        Safe mode stays active as long as any source is active.
+        """
+        with self._lock:
+            if source not in self._active_reasons:
+                self._activation_count += 1
+                logger.warning(
+                    "SafeMode ACTIVATED by %s: %s (total activations: %d)",
+                    source, reason, self._activation_count,
+                )
+            self._active_reasons[source] = reason
+            self._activated_at[source] = time.time()
+
+    def deactivate(self, source: str) -> None:
+        """Deactivate safe mode from a given source."""
+        with self._lock:
+            if source in self._active_reasons:
+                duration = time.time() - self._activated_at.get(source, 0)
+                logger.info(
+                    "SafeMode deactivated by %s (was active %.1f s)",
+                    source, duration,
+                )
+                del self._active_reasons[source]
+                self._activated_at.pop(source, None)
+
+    @property
+    def is_active(self) -> bool:
+        """True if any source has activated safe mode."""
+        return len(self._active_reasons) > 0
+
+    @property
+    def active_sources(self) -> Dict[str, str]:
+        """Map of source → reason for all active safe mode triggers."""
+        with self._lock:
+            return dict(self._active_reasons)
+
+    def status(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "is_active": self.is_active,
+                "active_sources": dict(self._active_reasons),
+                "activation_count": self._activation_count,
+            }
+
+
+class StructuredError:
+    """Structured error for Apollo-style OnError() propagation.
+
+    Apollo canbus_component.cc:344:
+        common::Status CanbusComponent::OnError(const string& error_msg) {
+            monitor_logger_buffer_.ERROR(error_msg);
+            return Status(ErrorCode::CANBUS_ERROR, error_msg);
+        }
+
+    Usage::
+
+        err = StructuredError("canbus", ErrorCode.CANBUS_LCU_TIMEOUT,
+                              "LCU timeout after 2s", severity="error")
+        component._report_error(err)
+    """
+
+    __slots__ = ("component", "code", "message", "severity", "timestamp")
+
+    def __init__(
+        self,
+        component: str,
+        code: Any,
+        message: str,
+        severity: str = "error",
+    ) -> None:
+        self.component = component
+        self.code = code
+        self.message = message
+        self.severity = severity  # "warning", "error", "critical"
+        self.timestamp = time.time()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "component": self.component,
+            "code": str(self.code),
+            "message": self.message,
+            "severity": self.severity,
+            "timestamp": self.timestamp,
+        }
+
+    def __repr__(self) -> str:
+        return (
+            f"<StructuredError {self.component}/{self.code}: "
+            f"{self.message}>"
+        )

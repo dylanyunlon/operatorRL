@@ -719,3 +719,83 @@ class PlanningComponent(TimerComponent, ManagedComponent):
                 seen[action] = now
 
         return result
+
+
+    # ─── Apollo CheckInput() pattern (Claude23) ─────────────────────────
+    #
+    # Apollo planning_component.cc:284-320:
+    #   bool PlanningComponent::CheckInput() {
+    #     ... validates ADCTrajectory, localization_reader_, chassis_reader_
+    #     ... all non-null before planning runs
+    #   }
+
+    def _check_input(self, snapshot: Any) -> bool:
+        """Validate all upstream inputs before planning.
+
+        Apollo equivalent: PlanningComponent::CheckInput()
+        Validates that perception snapshot AND prediction data are available
+        and fresh before running the planning pipeline.
+
+        Returns True if all inputs are valid and fresh.
+        """
+        # 1. Snapshot must exist
+        if snapshot is None:
+            logger.warning("CheckInput: no snapshot available")
+            return False
+
+        # 2. Snapshot must have required fields
+        if not hasattr(snapshot, "game_time") or snapshot.game_time <= 0:
+            logger.warning("CheckInput: snapshot has no valid game_time")
+            return False
+
+        if not hasattr(snapshot, "game_phase"):
+            logger.warning("CheckInput: snapshot missing game_phase")
+            return False
+
+        # 3. Check perception reader freshness (if available)
+        if hasattr(self, "_perception_reader") and self._perception_reader is not None:
+            if hasattr(self._perception_reader, "is_stale"):
+                if self._perception_reader.is_stale(max_age_s=5.0):
+                    logger.warning(
+                        "CheckInput: perception data stale (>5s)"
+                    )
+                    return False
+
+        # 4. Check prediction reader freshness (if available)
+        if hasattr(self, "_prediction_reader") and self._prediction_reader is not None:
+            if hasattr(self._prediction_reader, "is_stale"):
+                if self._prediction_reader.is_stale(max_age_s=10.0):
+                    # Prediction can be slightly older — it runs at 2Hz
+                    logger.warning(
+                        "CheckInput: prediction data stale (>10s)"
+                    )
+                    # Don't fail — planning can run without fresh prediction
+                    # but should note degraded mode
+                    pass
+
+        # 5. Players must exist
+        if hasattr(snapshot, "blue_team") and hasattr(snapshot, "red_team"):
+            blue_players = getattr(snapshot.blue_team, "players", [])
+            red_players = getattr(snapshot.red_team, "players", [])
+            if len(blue_players) == 0 or len(red_players) == 0:
+                logger.warning("CheckInput: empty team players")
+                return False
+
+        return True
+
+    def _safe_fallback_advice(self) -> Any:
+        """Return safe fallback advice when inputs are invalid.
+
+        Apollo equivalent: when CheckInput() fails, planning returns
+        last-known trajectory. We return conservative "play safe" advice.
+        """
+        if hasattr(self, "_last_advice") and self._last_advice is not None:
+            return self._last_advice
+
+        # Return a minimal safe advice
+        return {
+            "action": "play_safe",
+            "confidence": 0.0,
+            "reason": "Upstream data unavailable — holding position",
+            "is_fallback": True,
+        }
