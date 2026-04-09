@@ -90,6 +90,9 @@ from prediction.feature_pipeline import FeaturePipeline
 from prediction.win_probability_engine import WinProbabilityEngine
 # Claude19: Wire Claude18 GameRecorder into session management
 from modules.common.adapters.game_record import GameRecorder
+# Claude27: Apollo parity — Environment detection + GlobalData singleton
+from cyber.common.environment import Environment
+from cyber.common.global_data import GlobalData
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +149,13 @@ class MainLoop:
 
         # Reset component registry to avoid stale entries from crash-restart
         ComponentRegistry.reset()
+
+        # Claude27: Initialize GlobalData + Environment before Mainboard
+        # Apollo pattern: global singletons initialized before module loading
+        self._global_data = GlobalData.instance()
+        self._global_data.init()
+        self._environment = Environment()
+        self._environment.detect()
 
         # Claude14: Mainboard manages all component threads
         self._mainboard = Mainboard()
@@ -800,6 +810,9 @@ class MainLoop:
         diag_snap = self._mainboard.diagnostics_snapshot()
         if diag_snap:
             result["pipeline_diagnostics"] = diag_snap
+        # Claude27: Include environment and global_data info
+        result["environment"] = self._environment.snapshot()
+        result["global_data"] = self._global_data.snapshot()
         return result
 
     # ─── Apollo-aligned supervisor hardening (Claude23) ──────────────────

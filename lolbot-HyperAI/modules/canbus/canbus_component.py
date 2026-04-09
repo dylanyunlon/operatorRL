@@ -175,6 +175,9 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         # Tick counter for fiddler sub-sampling
         self._tick: int = 0
 
+        # Claude27: Apollo communication fault state (cc:155)
+        self._is_communication_fault: bool = False
+
     # ─── TimerComponent interface ────────────────────────────────────
 
     def Init(self) -> bool:
@@ -258,6 +261,12 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         All original logic (game-active, validation, stale, backoff)
         preserved in _poll_and_publish(). Claude13's measure_proc()
         and _validate_lcu_response() kept intact.
+
+        Claude27: Added Apollo canbus_component.cc:162-217 parity:
+          1. _check_communication_fault() before poll (cc:184-192)
+          2. _update_heartbeat() after publish (cc:206)
+          Both were already defined by Claude23 but never wired into
+          Proc(). Now they are. Zero Claude1-26 logic removed.
         """
         if self.should_skip_proc():
             return True
@@ -265,6 +274,17 @@ class CanbusComponent(TimerComponent, ManagedComponent):
         self._tick += 1
 
         with self.measure_proc() as m:
+            # Claude27: Apollo cc:184 — check communication fault BEFORE poll
+            # (canbus_component.cc: vehicle_object_->CheckChassisCommunicationFault())
+            if self._check_communication_fault():
+                self._is_communication_fault = True
+                logger.error(
+                    "Communication fault detected (no data for >%.1fs)",
+                    self._COMM_FAULT_THRESHOLD_S,
+                )
+            else:
+                self._is_communication_fault = False
+
             # Apollo pattern: Proc() = one core call + optional detail
             m.success = self._poll_and_publish()
             if not m.success:
@@ -276,6 +296,10 @@ class CanbusComponent(TimerComponent, ManagedComponent):
                 and self._tick % _FIDDLER_POLL_INTERVAL_TICKS == 0
             ):
                 self._poll_fiddler()
+
+            # Claude27: Apollo cc:206 — update heartbeat after publish
+            # (canbus_component.cc: vehicle_object_->UpdateHeartbeat())
+            self._update_heartbeat()
 
         return m.success
 

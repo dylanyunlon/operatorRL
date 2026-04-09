@@ -33,6 +33,10 @@ from typing import Any, Dict, List, Optional
 
 from cyber.logger.cyber_logger import get_logger
 from cyber.component.timer_component import ComponentState, TimerComponent
+# Claude27: Apollo parity — BlockerManager for intra-process pub/sub,
+# GlobalData for runtime config singleton
+from cyber.blocker.blocker_manager import BlockerManager
+from cyber.common.global_data import GlobalData
 
 logger = get_logger("mainboard")
 
@@ -73,6 +77,11 @@ class Mainboard:
         self._startup_duration_s: float = 0.0
         self._total_restarts: int = 0
 
+        # Claude27: Initialize BlockerManager and GlobalData singletons
+        # Apollo pattern: mainboard.cc owns the lifecycle of global singletons
+        self._blocker_manager = BlockerManager.instance()
+        self._global_data = GlobalData.instance()
+
     def register(self, component: TimerComponent) -> None:
         """Register a component for lifecycle management.
 
@@ -85,6 +94,8 @@ class Mainboard:
                 self._components = [c for c in self._components if c.name != name]
             self._components.append(component)
             self._component_map[name] = component
+            # Claude27: Register with GlobalData (Apollo: module_controller tracks names)
+            self._global_data.register_component(name)
             logger.info("Registered component: %s", name)
 
     def enable_channel_monitor(self) -> None:
@@ -207,6 +218,8 @@ class Mainboard:
                     results[comp.name] = "ERROR"
 
             self._started = False
+            # Claude27: Shutdown BlockerManager (Apollo: mainboard cleans up global state)
+            self._blocker_manager.shutdown()
             logger.info("Mainboard: all components stopped")
             return results
 
