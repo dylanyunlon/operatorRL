@@ -230,23 +230,44 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
         return True
 
     def Proc(self) -> bool:
-        """One perception cycle: raw data -> GameSnapshot -> sub-analyzers.
+        """One perception cycle — Apollo pattern: Proc() → _internal_proc().
+
+        Claude22 refactor: Thin shell matching Apollo lidar_tracking_component
+        (Proc 18 lines → InternalProc 50 lines). All Claude1-21 logic moved
+        to _internal_proc() and its sub-delegates. Zero logic removed.
 
         Returns:
-            True if a valid snapshot was produced.
+            True if cycle completed (even if no data available).
         """
         if self.should_skip_proc():
             return True
 
-        # ── Read latest raw data ─────────────────────────────────────
+        # ── READ: Observe raw data from canbus ───────────────────────
         self._raw_lcu_reader.Observe()
         raw: Optional[RawLCUData] = self._raw_lcu_reader.GetLatestObserved()
 
         if raw is None or not raw.allgamedata:
             return True  # No data yet, not an error
 
-        allgamedata = raw.allgamedata
+        # ── VALIDATE + PROCESS: delegate to _internal_proc ───────────
+        if not self._internal_proc(raw.allgamedata):
+            return False
 
+        # ── MONITOR: status heartbeat ────────────────────────────────
+        self._publish_status(Status.ok())
+        return True
+
+    # ── Apollo-style InternalProc (Claude22: all Proc() logic moved here) ──
+
+    def _internal_proc(self, allgamedata: Dict[str, Any]) -> bool:
+        """Core perception processing — called by Proc() after read/validate.
+
+        Apollo reference: LidarTrackingComponent::InternalProc()
+        Claude22: Contains all Claude1-21 Proc() logic, verbatim.
+
+        Returns:
+            True on success, False on parse failure.
+        """
         # ── Parse into structured types ──────────────────────────────
         try:
             snapshot = self._assemble_snapshot(allgamedata)
@@ -296,7 +317,22 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
 
         self._last_snapshot = final
 
-        # ── Phase 4: KillFeedAnalyzer ────────────────────────────────
+        # ── Run all sub-analyzers ────────────────────────────────────
+        self._run_kill_feed(new_events, final)
+        self._run_minimap(final)
+        self._run_phase_detector(final)
+        self._run_gold_trend(final)
+        self._run_momentum(new_events, final)
+
+        return True
+
+    def _run_kill_feed(
+        self, new_events: List[GameEvent], final: GameSnapshot
+    ) -> None:
+        """Phase 4: KillFeedAnalyzer — every tick (kill timing critical).
+
+        Claude22: Extracted verbatim from Proc().
+        """
         # Runs every tick because kill timing is critical for multi-kill
         # detection (10s window between consecutive kills).
         if new_events and self._kill_feed_analyzer is not None:
@@ -321,7 +357,11 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
                     type(exc).__name__, exc,
                 )
 
-        # ── Phase 4: MinimapAnalyzer ─────────────────────────────────
+    def _run_minimap(self, final: GameSnapshot) -> None:
+        """Phase 4: MinimapAnalyzer — every _MINIMAP_TICK_DIVISOR ticks.
+
+        Claude22: Extracted verbatim from Proc().
+        """
         # Runs every _MINIMAP_TICK_DIVISOR ticks (~500ms at 10Hz).
         # Position data changes slowly; running every tick wastes CPU.
         self._minimap_tick_counter += 1
@@ -341,7 +381,12 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
                     type(exc).__name__, exc,
                 )
 
-        # ── Claude19: PhaseDetector ──────────────────────────────────
+    def _run_phase_detector(self, final: GameSnapshot) -> None:
+        """Claude19: PhaseDetector — every 5th tick (~500ms at 10Hz).
+
+        Claude21: Fixed kwarg names to match PhaseContext dataclass.
+        Claude22: Extracted verbatim from Proc().
+        """
         # Runs every 5th tick (~500ms at 10Hz). Replaces pure time-based
         # phase classification with tempo-aware multi-signal detection.
         if (
@@ -392,7 +437,11 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
                     type(exc).__name__, exc,
                 )
 
-        # ── Claude19: GoldTrendAnalyzer ──────────────────────────────
+    def _run_gold_trend(self, final: GameSnapshot) -> None:
+        """Claude19: GoldTrendAnalyzer — records every tick, analyzes every 10th.
+
+        Claude22: Extracted verbatim from Proc().
+        """
         # Records every tick (sub-sampled internally at ~1Hz).
         # Analysis runs every 10th tick (~1s) to provide gold momentum.
         if self._gold_trend_analyzer is not None:
@@ -411,7 +460,13 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
                     type(exc).__name__, exc,
                 )
 
-        # ── Claude19: MomentumTracker ────────────────────────────────
+    def _run_momentum(
+        self, new_events: List[GameEvent], final: GameSnapshot
+    ) -> None:
+        """Claude19: MomentumTracker — records events, evaluates every 10th tick.
+
+        Claude22: Extracted verbatim from Proc().
+        """
         # Records new kill/objective events and evaluates every 10th tick.
         if self._momentum_tracker is not None:
             try:
@@ -451,9 +506,6 @@ class PerceptionComponent(TimerComponent, ManagedComponent):
                     "MomentumTracker error (non-fatal): %s: %s",
                     type(exc).__name__, exc,
                 )
-
-        self._publish_status(Status.ok())
-        return True
 
     def on_shutdown(self) -> None:
         if self._node:

@@ -486,10 +486,13 @@ class PredictionComponent(TimerComponent, ManagedComponent):
         return True
 
     def Proc(self) -> bool:
-        """One prediction cycle.
+        """One prediction cycle — Apollo pattern: Proc() → _internal_proc().
 
-        Apollo equivalent: ``PredictionComponent::Proc()``
+        Claude22 refactor: Thin shell matching Apollo PredictionComponent::Proc()
+        (real Apollo: 7 lines, delegates to PredictionEndToEndProc 130 lines).
+        All Claude1-21 logic moved to _internal_proc(). Zero logic removed.
         """
+        # ── READ: Observe game state ─────────────────────────────────
         self._game_state_reader.Observe()
         snapshot: Optional[GameSnapshot] = (
             self._game_state_reader.GetLatestObserved()
@@ -502,6 +505,23 @@ class PredictionComponent(TimerComponent, ManagedComponent):
         if snapshot.game_time < _MIN_GAME_TIME_FOR_PREDICTION:
             return True
 
+        # ── PROCESS: delegate to _internal_proc (Apollo EndToEnd equiv) ─
+        self._internal_proc(snapshot)
+
+        # ── MONITOR: status heartbeat ────────────────────────────────
+        self._publish_status(Status.ok())
+        return True
+
+    # ── Apollo-style InternalProc (Claude22: all Proc() logic moved here) ──
+
+    def _internal_proc(self, snapshot: GameSnapshot) -> None:
+        """Core prediction processing — called by Proc() after read/validate.
+
+        Apollo reference: PredictionComponent::PredictionEndToEndProc()
+        Claude22: Contains all Claude1-21 Proc() logic, verbatim.
+        The only structural change: tf_pred and confidence are now local
+        to this method (they were local to Proc() before — same scope).
+        """
         self._snapshot_history.append(snapshot)
         self._pred_count += 1
 
@@ -679,9 +699,6 @@ class PredictionComponent(TimerComponent, ManagedComponent):
                 tf_pred.likelihood * 100,
                 tf_action,
             )
-
-        self._publish_status(Status.ok())
-        return True
 
     def on_shutdown(self) -> None:
         if self._node:

@@ -359,11 +359,14 @@ class PlanningComponent(TimerComponent, ManagedComponent):
         return True
 
     def Proc(self) -> bool:
-        """One planning cycle.
+        """One planning cycle — Apollo pattern: Proc() → _internal_proc().
 
-        Apollo equivalent: ``PlanningComponent::Proc()``
+        Claude22 refactor: Thin shell matching Apollo PlanningComponent::Proc().
+        Apollo's real planning Proc() is 135 lines but follows a clear pattern:
+        Read inputs → CheckInput → RunOnce → Publish → Status.
+        We match that with Read → _internal_proc → Monitor.
         """
-        # Read game state
+        # ── READ: Observe all input channels at top (Apollo pattern) ─
         self._game_state_reader.Observe()
         snapshot: Optional[GameSnapshot] = (
             self._game_state_reader.GetLatestObserved()
@@ -371,13 +374,11 @@ class PlanningComponent(TimerComponent, ManagedComponent):
         if snapshot is None:
             return True
 
-        # Read win prediction
         self._win_pred_reader.Observe()
         win_pred: Optional[WinPrediction] = (
             self._win_pred_reader.GetLatestObserved()
         )
 
-        # Collect events
         if self._events_reader:
             self._events_reader.Observe()
             evts = self._events_reader.GetLatestObserved()
@@ -386,6 +387,37 @@ class PlanningComponent(TimerComponent, ManagedComponent):
 
         self._plan_count += 1
 
+        # ── PROCESS: delegate to _internal_proc (Apollo RunOnce equiv) ─
+        self._internal_proc(snapshot, win_pred)
+
+        # ── MONITOR: status + periodic logging ───────────────────────
+        self._publish_status(Status.ok())
+
+        if self._plan_count % 40 == 0:
+            macro_str = (
+                self._last_macro_decision.action.value
+                if self._last_macro_decision else "N/A"
+            )
+            logger.info(
+                "Planning tick=%d advice=%d macro=%s phase=%s",
+                self._plan_count, self._advice_count, macro_str,
+                snapshot.phase.name,
+            )
+
+        return True
+
+    # ── Apollo-style InternalProc (Claude22: all sub-planner logic here) ──
+
+    def _internal_proc(
+        self,
+        snapshot: GameSnapshot,
+        win_pred: Optional[WinPrediction],
+    ) -> None:
+        """Core planning processing — called by Proc() after read.
+
+        Apollo reference: planning_base_->RunOnce(local_view_, &trajectory)
+        Claude22: Contains all Claude1-21 Proc() sub-planner logic, verbatim.
+        """
         # ── Phase 4: MacroPlanner ────────────────────────────────────
         # Runs every tick (2Hz). Has internal cooldown to prevent flicker.
         if self._macro_planner is not None:
@@ -553,23 +585,6 @@ class PlanningComponent(TimerComponent, ManagedComponent):
             if advice is not None and self._strategy_writer:
                 self._strategy_writer.Write(advice)
                 self._advice_count += 1
-
-        # ── Status ───────────────────────────────────────────────────
-        self._publish_status(Status.ok())
-
-        # Periodic log
-        if self._plan_count % 40 == 0:
-            macro_str = (
-                self._last_macro_decision.action.value
-                if self._last_macro_decision else "N/A"
-            )
-            logger.info(
-                "Planning tick=%d advice=%d macro=%s phase=%s",
-                self._plan_count, self._advice_count, macro_str,
-                snapshot.phase.name,
-            )
-
-        return True
 
     def on_shutdown(self) -> None:
         if self._node:

@@ -1,11 +1,21 @@
-# 设计规范：Apollo canbus_component.cc vs 我们的代码 — 真实 diff 报告 V2
+# 设计规范：Apollo 真实源码 vs 我们的代码 — 真实 diff 报告 V3
 
-## 勘误
+## 勘误（Claude22 V3 — 基于 git clone ApolloAuto/apollo 真实源码）
 
-前一版本（Claude22 V1）声称 Apollo Proc() 只有 3 行。
-这是错误的。实际的 Apollo canbus_component.cc 有约 300 行有效代码，
-Proc() 有 35 行。以下是基于 `cat apollo/modules/canbus/canbus_component.cc`
-实际源码的修正分析。
+V1 声称 Apollo Proc() 只有 3 行。V2 修正为 35 行。
+V3 最终修正：基于 `git clone https://github.com/ApolloAuto/apollo.git`
+拉取的真实源码逐行统计：
+
+| 组件 | Apollo 真实 Proc() 行数 | V2 声称 | 委托方法 |
+|------|----------------------|---------|---------|
+| canbus | **55 行** | 35 行 | 无（自包含） |
+| planning | **135 行** | 未提及 | planning_base_->RunOnce() |
+| prediction | **7 行** | 未提及 | →PredictionEndToEndProc() **130 行** |
+| lidar_tracking | **18 行** | 未提及 | →InternalProc() **50 行** |
+
+**关键发现：Apollo 的 Proc() 本身并不短。**
+Apollo 的真实模式是 **Proc() 作为薄壳 + 一层委托**（prediction, lidar_tracking），
+或 **Proc() 自包含但结构清晰**（canbus, planning）。
 
 ---
 
