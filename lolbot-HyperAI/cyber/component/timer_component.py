@@ -37,6 +37,13 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Deque, Dict, Optional
 
+# Claude29: Apollo profiler for per-frame performance tracking
+try:
+    from cyber.profiler import Profiler
+    _HAS_PROFILER = True
+except ImportError:
+    _HAS_PROFILER = False
+
 logger = logging.getLogger(__name__)
 
 # ─── Constants ───────────────────────────────────────────────────────────────
@@ -467,9 +474,16 @@ class TimerComponent(abc.ABC):
             self._seq += 1
             success = True
 
-            # ── Execute Proc() ───────────────────────────────────────
+            # ── Execute Proc() with profiling (Claude29) ───────────────
             try:
-                result = self.Proc()
+                # Claude29: Wrap Proc() in profiler frame for performance tracking
+                if _HAS_PROFILER:
+                    profiler = Profiler.instance()
+                    with profiler.frame(f"{self.name}_proc"):
+                        result = self.Proc()
+                else:
+                    result = self.Proc()
+
                 if not result:
                     success = False
                     self._consecutive_failures += 1

@@ -97,6 +97,9 @@ from modules.common.adapters.game_record import GameRecorder
 # Claude27: Apollo parity — Environment detection + GlobalData singleton
 from cyber.common.environment import Environment
 from cyber.common.global_data import GlobalData
+# Claude29: Apollo cyber core infrastructure for 10ms precision timing
+from cyber.profiler import Profiler
+from cyber.sysmo import SysMo, SystemHealth
 
 
 # ---------------------------------------------------------------------------

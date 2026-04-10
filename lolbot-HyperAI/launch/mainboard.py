@@ -37,6 +37,10 @@ from cyber.component.timer_component import ComponentState, TimerComponent
 # GlobalData for runtime config singleton
 from cyber.blocker.blocker_manager import BlockerManager
 from cyber.common.global_data import GlobalData
+# Claude29: Apollo cyber core infrastructure
+from cyber.timer import TimingWheel
+from cyber.profiler import Profiler
+from cyber.sysmo import SysMo, SystemHealth
 
 logger = get_logger("mainboard")
 
@@ -81,6 +85,14 @@ class Mainboard:
         # Apollo pattern: mainboard.cc owns the lifecycle of global singletons
         self._blocker_manager = BlockerManager.instance()
         self._global_data = GlobalData.instance()
+
+        # Claude29: Initialize Apollo cyber core infrastructure
+        # TimingWheel for O(1) task scheduling, Profiler for performance tracking,
+        # SysMo for system health monitoring
+        self._timing_wheel = TimingWheel.instance()
+        self._profiler = Profiler.instance()
+        self._sysmo = SysMo.instance()
+        self._sysmo.on_health_change(self._on_system_health_change)
 
     def register(self, component: TimerComponent) -> None:
         """Register a component for lifecycle management.
@@ -170,6 +182,12 @@ class Mainboard:
 
             self._started = True
             self._startup_duration_s = time.monotonic() - _t0
+
+            # Claude29: Start cyber core infrastructure after components
+            self._timing_wheel.start()
+            self._sysmo.start()
+            logger.info("Claude29: TimingWheel + SysMo started")
+
             logger.info("Mainboard: %d components started (all_ok=%s, %.2fs)",
                        len(self._components), all_ok,
                        self._startup_duration_s)
@@ -218,6 +236,16 @@ class Mainboard:
                     results[comp.name] = "ERROR"
 
             self._started = False
+            # Claude29: Stop cyber core infrastructure
+            self._timing_wheel.stop()
+            self._sysmo.stop()
+            # Export profiler data before shutdown
+            try:
+                trace_path = self._profiler.export_chrome_trace()
+                logger.info("Claude29: Profiler trace exported to %s", trace_path)
+            except Exception as exc:
+                logger.warning("Claude29: Profiler export failed: %s", exc)
+
             # Claude27: Shutdown BlockerManager (Apollo: mainboard cleans up global state)
             self._blocker_manager.shutdown()
             logger.info("Mainboard: all components stopped")
@@ -519,3 +547,44 @@ class Mainboard:
         if diag is None:
             return {}
         return diag.snapshot()
+
+    # ─── Claude29: System Health Monitoring ─────────────────────────────────
+
+    def _on_system_health_change(
+        self, old_health: SystemHealth, new_health: SystemHealth
+    ) -> None:
+        """Callback for system health changes from SysMo.
+
+        Apollo equivalent: sysmo callback in mainboard for resource alerts.
+        """
+        if new_health == SystemHealth.CRITICAL:
+            logger.error(
+                "Claude29: System health CRITICAL (was %s). "
+                "Consider pausing non-essential components.",
+                old_health.name,
+            )
+            # Could pause low-priority components here
+        elif new_health == SystemHealth.WARNING:
+            logger.warning(
+                "Claude29: System health WARNING (was %s). "
+                "CPU or memory usage elevated.",
+                old_health.name,
+            )
+        elif new_health == SystemHealth.HEALTHY and old_health != SystemHealth.HEALTHY:
+            logger.info("Claude29: System health returned to HEALTHY")
+
+    @property
+    def timing_wheel(self) -> TimingWheel:
+        """Access the TimingWheel instance for O(1) task scheduling."""
+        return self._timing_wheel
+
+    @property
+    def profiler(self) -> Profiler:
+        """Access the Profiler instance for performance tracking."""
+        return self._profiler
+
+    @property
+    def sysmo(self) -> SysMo:
+        """Access the SysMo instance for system monitoring."""
+        return self._sysmo
+
