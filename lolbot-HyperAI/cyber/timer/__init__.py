@@ -7,6 +7,8 @@ periodic and one-shot timer tasks.
 
 Apollo reference: cyber/timer/
 
+Claude30: Added ProcWatchdog for Proc() execution monitoring
+
 Usage::
 
     from cyber.timer import TimingWheel, TimerTask
@@ -22,6 +24,13 @@ Usage::
 from cyber.timer.timer_task import TimerTask, TaskState
 from cyber.timer.timer_bucket import TimerBucket
 from cyber.timer.timing_wheel import TimingWheel, TimingWheelConfig, WheelState
+# Claude30: Proc() watchdog
+from cyber.timer.watchdog import (
+    ProcWatchdog,
+    WatchdogConfig,
+    WatchdogManager,
+    WatchdogState,
+)
 
 __all__ = [
     "TimerTask",
@@ -30,4 +39,9 @@ __all__ = [
     "TimingWheel",
     "TimingWheelConfig",
     "WheelState",
+    # Claude30
+    "ProcWatchdog",
+    "WatchdogConfig",
+    "WatchdogManager",
+    "WatchdogState",
 ]

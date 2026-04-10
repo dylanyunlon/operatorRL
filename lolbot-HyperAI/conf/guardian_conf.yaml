@@ -1,0 +1,105 @@
+# Guardian Configuration
+# ========================
+# Apollo reference: modules/guardian/conf/guardian_conf.pb.txt
+#
+# This configuration controls the Guardian safety system that
+# monitors command timing and triggers emergency degradation.
+#
+# Claude30: Initial configuration
+
+# Enable/disable guardian functionality
+enabled: true
+
+# ─── Timeout Configuration ────────────────────────────────────────────────────
+timeout:
+  # Maximum allowed command delay before timeout (seconds)
+  # Apollo: FLAGS_max_control_miss_num * FLAGS_control_period
+  max_cmd_delay_s: 0.5
+  
+  # Maximum consecutive timeouts before escalation
+  max_consecutive_timeouts: 5
+  
+  # Cooldown before recovery attempt (seconds)
+  recovery_cooldown_s: 2.0
+
+# ─── Watchdog Configuration ───────────────────────────────────────────────────
+watchdog:
+  # Timeout threshold for Proc() execution (seconds)
+  # Default: 2x the component interval
+  timeout_s: 0.2
+  
+  # Check interval (seconds)
+  check_interval_s: 0.01
+  
+  # Maximum consecutive Proc() timeouts before escalation
+  max_consecutive_timeouts: 10
+  
+  # Auto-restart after timeout
+  auto_restart: true
+
+# ─── Monitor Configuration ────────────────────────────────────────────────────
+monitor:
+  # Minimum components that must timeout for global degradation
+  min_timeout_components: 2
+  
+  # Time window for counting timeouts (seconds)
+  timeout_window_s: 5.0
+  
+  # Time to wait before attempting recovery (seconds)
+  recovery_wait_s: 10.0
+  
+  # Monitoring interval (seconds)
+  monitor_interval_s: 1.0
+
+# ─── Estop Configuration ──────────────────────────────────────────────────────
+estop:
+  # Allow auto-recovery from soft estop
+  allow_auto_recovery: true
+  
+  # Minimum time in estop before recovery (seconds)
+  min_estop_duration_s: 2.0
+  
+  # Maximum soft estop duration before escalation (seconds)
+  max_soft_estop_s: 30.0
+  
+  # Triggers that cause hard estop (no auto-recovery)
+  # Options: MANUAL, SYSTEM, COMMUNICATION, GUARDIAN, EXTERNAL
+  hard_estop_triggers:
+    - MANUAL
+    - SYSTEM
+
+# ─── Protected Components ─────────────────────────────────────────────────────
+# List of components to protect with Guardian
+protected_components:
+  - canbus
+  - perception
+  - prediction
+  - planning
+  - control
+  - storytelling
+
+# ─── Component-Specific Overrides ─────────────────────────────────────────────
+# Override timeout settings for specific components
+component_overrides:
+  canbus:
+    # Canbus is most critical — shorter timeout
+    max_cmd_delay_s: 0.3
+    
+  prediction:
+    # Prediction can take longer
+    max_cmd_delay_s: 1.0
+    
+  storytelling:
+    # Storytelling is non-critical
+    max_cmd_delay_s: 5.0
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+logging:
+  # Log timeout events
+  log_timeouts: true
+  
+  # Log recovery events
+  log_recoveries: true
+  
+  # Log periodic stats (interval in seconds, 0 to disable)
+  stats_interval_s: 60
